@@ -42,6 +42,12 @@ export const DEFAULTS = {
   // orphan-surface 게이트가 "표면 파일"로 볼 경로 정규식. 기본 [] = 게이트 비활성.
   // 예(Next.js): ["src/app/.*/route\\.ts$", "src/app/.*/page\\.tsx$"]
   surfaceGlobs: [],
+  // spec 입도(cohesion) 게이트 임계 — check-ownership(dedup)의 거울상.
+  // 한 spec이 카테고리별 키를 maxKeysPerCategoryPerSpec개 초과 소유하거나
+  // FR을 maxFRsPerSpec개 초과 포함하면 under-fragmentation(여러 기능 욱여넣기)
+  // 신호 → 분할 권고(advisory). 카테고리명 무관(ownershipCategories 따름).
+  maxKeysPerCategoryPerSpec: 4,
+  maxFRsPerSpec: 8,
   // spec 파일·ID·@covers 태그에서 인정할 ID 접두어들(언어중립 추적 닻).
   // 기본 = ["SPEC"](하위호환). 프로젝트가 인프라/테스트 등을 1급 spec으로
   // 다룬다면 확장(예: ["SPEC","TEST","INFRA"]). 파일명·SPEC_ID·COVERS 정규식이
