@@ -48,7 +48,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 ## 2. 스펙 저장 규칙 (명시적)
 1. **1 스펙 = 1 파일** = `<specDir>/<PREFIX>-NNN.md` (기본 `sdd/specs/`).
 2. **PREFIX는 반드시 `sdd.config.json`의 `specIdPrefixes`에 등록.** 기본 `["SPEC"]`. `FEAT`/`TEST`/`INFRA`를 쓰려면 **먼저 등록** — 안 하면 4판 게이트가 그 스펙을 **조용히 누락**(FR 추적에서 빠져 거짓 green). ← 가장 흔한 함정.
-3. 본문 필수: `Module` 헤더 · **`**FR-NNN**`(EARS 5패턴)** · `## Ownership`(키 종류 = config의 `ownershipCategories`). 선택: SC·NFR·Infrastructure Prerequisites(인프라 의존 없으면 생략). 단 **FR이 있으면 SC·인수조건 권장** — `check-spec-completeness`가 *존재*를 advisory로 점검(SC 충족·측정가능성은 런타임/`/checklist` 담당). 인수조건·SC 리뷰 자체는 Spec Kit 네이티브가 맡는다.
+3. 본문 필수: `Module` 헤더 · **`**FR-NNN**`(EARS 5패턴)** · `## Ownership`(키 종류 = config의 `ownershipCategories`). 선택: SC·NFR·Infrastructure Prerequisites(인프라 의존 없으면 생략). 단 **FR이 있으면 SC·인수조건 권장** — `check-spec-completeness`가 *존재*를 advisory로 점검(SC 충족·측정가능성은 런타임/`/checklist` 담당). 인수조건·SC 리뷰 자체는 Spec Kit 네이티브가 맡는다. **왜 Ownership만 필수인가:** dedup 게이트의 "한 키=한 spec" 판정은 *모든 spec이 키를 선언해야* 성립한다 — Ownership을 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(**미선언 1개 = 보장에 뚫린 구멍**). SC·NFR 누락은 *그 기능 하나*의 로컬 약점이지만, Ownership 누락은 *시스템 전체* 중복 보장을 깬다 — 그래서 SC·NFR은 선택, Ownership은 필수.
 4. **추적 닻 = 언어중립 ID** `FR-NNN`. 테스트는 `@covers <PREFIX>-NNN/FR-NNN`(주석 스타일 자유 `//`·`#`·`--`)로 연결.
 5. **정본 언어 = 영어**, 현지어본은 생성만(병행 편집 금지).
 6. 폐기 = 통제 제거(spec+코드+테스트 같은 PR 원자 삭제, `MODULE_MAP`에 기록) — `STRUCTURE.md` 수명주기.
