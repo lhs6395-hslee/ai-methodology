@@ -23,6 +23,7 @@ spec/코드  ──①추출──▶  키 후보  ──②정규화──▶  
 - 사람이 손으로도 규칙을 따라 **재현 가능**하게 키 생성(LLM 비의존).
 - dedup의 거짓양성(참조를 소유로 오인)·거짓음성(표면 다른 같은 개념) 축소.
 - spec PREFIX **난립·조용한 누락** 제거.
+- **spec 분리 경계의 결정성** — "1 spec = 1 aggregate"로 "응집 묶음"의 모호함 제거.
 
 **비목표 (정직)**
 - 코드에서 키를 **자동 추출**(언어별 파서) — 언어중립을 깨므로 안 함. 추출은 사람/LLM.
@@ -37,6 +38,7 @@ spec/코드  ──①추출──▶  키 후보  ──②정규화──▶  
 | 결정성 근거 | 정규화 규칙 절대화 (언어중립) | vs 코드 자동추출(기각: 언어결합) |
 | Capability verb | 고정 verb 집합 (config 등록) | CRUD 기본 + 도메인 verb |
 | 소유/참조 표현 | 별도 섹션 `## Ownership` + `## Dependencies` | dedup 게이트 변경 최소 |
+| **spec 경계** | 1 spec = 1 aggregate(핵심 Entity) | dedup=경계 강제, cohesion=위반 신호 |
 | PREFIX | 표준 `SPEC`/`INFRA`/`TEST` 화이트리스트 + 사유 관문 | 임의 생성 금지 |
 | 과편화 | 키 입도 하한 규칙(FR 1:1) | 게이트 강제 안 함 |
 
@@ -58,6 +60,16 @@ spec/코드  ──①추출──▶  키 후보  ──②정규화──▶  
 - dedup(`check-ownership`)은 `## Ownership`만 읽는다 → 참조를 소유로 오인하던 **거짓양성이 코드 변경 거의 없이 해소**.
 - 하위호환: 기존 `## Ownership`은 그대로 "소유"로 해석. `## Dependencies` 없으면 참조 없음.
 - DDD 정합: bounded context의 "소유 vs 의존"과 1:1.
+
+### 3.1 spec 경계 — 1 spec = 1 aggregate (분리의 결정적 기준)
+
+"무엇이 하나의 spec인가"의 경계도 키 위에서 결정적으로 정한다. 현재 [STRUCTURE.md](../../../STRUCTURE.md)는 "1 spec = 1 응집 capability 묶음"이라 하는데 "응집"이 주관적이다. dedup이 이미 "1 Entity = 한 spec"을 강제하므로, **Entity(aggregate root)를 명시적 경계 닻으로 격상**한다.
+
+- **규칙**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조.
+- **라우팅(새 FR → 어느 spec?)**: 그 FR이 *변경하는* aggregate를 식별 → 그 aggregate 소유 spec을 개정. 기존 owner 없으면(새 aggregate) 새 spec.
+- **부속 엔티티**: aggregate root에 종속된 엔티티(예: `recommendation_log` ⊂ `recommendation`)는 별도 키로 적지 않고 root에 딸린다 → `Ownership.Entities` 개수 ≈ aggregate 개수.
+- **세 게이트가 한 닻(Entity)으로 묶인다**: dedup(1 Entity=1 spec)=경계 강제, cohesion(Entities 다수 = 여러 aggregate 삼킴)=위반 신호, Dependencies=경계 밖 참조.
+- **한계(정직)**: aggregate 경계 식별은 여전히 모델링 판단이다(`order`+`order_line`이 한 aggregate인가 등). 다만 "독립 생성·삭제되는 root"라는 조작적 정의가 "응집 묶음"보다 훨씬 결정적이고, dedup이 그 판정을 사후 강제한다.
 
 ## 4. 정규화 절대 규칙 (결정성의 심장)
 
@@ -158,6 +170,11 @@ Entity 키 — 예: 테이블 pjt_projects
 ### 6.3 PREFIX 사유 검증
 - `check-fr-coverage`(또는 공통 config 로더)에서 §5.2·§5.3 강제.
 
+### 6.4 `check-spec-cohesion` (갱신)
+- 기존 숫자 임계(키>4·FR>8)는 보조 신호로 유지.
+- **주 신호 추가**: `## Ownership`의 Entities(aggregate root)가 2개 이상이면 "여러 aggregate 삼킴 의심 — 분할 검토"(advisory). §3.1 경계 규칙의 게이트 표현.
+- 강제 안 함(advisory) — 긴밀한 한 쌍의 entity가 한 spec에 오는 정상 경우가 있어 거짓경고 가능.
+
 ## 7. 강제력 (본성대로)
 
 | 검증 | 강제 | 비고 |
@@ -188,7 +205,8 @@ Entity 키 — 예: 테이블 pjt_projects
 | `DEDUP.md` | 소유/참조 분리 · 정규화 절대규칙 · 거짓양성 해소 |
 | `METHODOLOGY.md` | 키 생성 결정 절차(EARS→키) · verb 집합 |
 | `STORAGE.md` | PREFIX 표준 3종 · 사유 관문 · 조용한 누락 제거 |
-| `방법론.html` (웹 배포용 진입점 아님 — `index.html` 아님) | **(a) 키 생성 결정 절차** 섹션 신설(정규화 규칙 + 단계별 알고리즘 + 예시) · **(b) spec PREFIX** 설명(표준 SPEC/INFRA/TEST + 사유 관문 + 조용한 누락) |
+| `STRUCTURE.md` | spec 경계 = 1 aggregate(§3.1)로 "응집 묶음" 정밀화 · 라우팅 갱신 |
+| `방법론.html` (웹 배포용 진입점 아님 — `index.html` 아님) | **(a) 키 생성 결정 절차** 섹션 신설(정규화 규칙 + 단계별 알고리즘 + 예시) · **(b) spec PREFIX** 설명(표준 SPEC/INFRA/TEST + 사유 관문 + 조용한 누락) · **(c) spec 경계 = 1 aggregate** 규칙 |
 | `tooling/sdd.config.presets.md` | 언어별 `capabilityVerbs` 예시 |
 
 ## 10. 하위호환 · 점진 도입
