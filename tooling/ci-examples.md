@@ -17,6 +17,7 @@
 | converge drift | `node check-converge-drift.mjs [base]` | (포팅 예정) |
 | orphan surface | `node check-orphan-surfaces.mjs` | (포팅 예정) |
 | spec 입도(cohesion) | `node check-spec-cohesion.mjs` | (포팅 예정) |
+| spec 완전성 | `node check-spec-completeness.mjs` | (포팅 예정) |
 
 아래 예시는 `<GATE>` = 위 중 택1로 읽으면 된다.
 

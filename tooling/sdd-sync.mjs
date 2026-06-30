@@ -18,7 +18,7 @@ const HERE = dirname(new URL(import.meta.url).pathname);
 const RULES = [
   { rule: "R1 spec→code", gates: ["check-fr-coverage.mjs"] },
   { rule: "R2 code→spec", gates: ["check-converge-drift.mjs", "check-orphan-surfaces.mjs"] },
-  { rule: "R3 dedup+입도", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs"] },
+  { rule: "R3 dedup+입도+완전성", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs", "check-spec-completeness.mjs"] },
 ];
 
 function runGate(file) {

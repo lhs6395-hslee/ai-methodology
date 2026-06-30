@@ -24,7 +24,7 @@ function run(dir, args = []) {
 
 test("clean 프로젝트(FR↔test 커버·중복/과대 없음) → 전부 sync, exit 0", () => {
   const dir = fixture({
-    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Capabilities**: a.create\n",
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** a\n**Given** x **When** y **Then** z\n## Ownership\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n",
     "src/a.test.js": "// @covers SPEC-001/FR-001\nimport {test} from 'node:test';\ntest('a',()=>{expect(1).toBe(1)});\n",
   });
   const r = run(dir);

@@ -43,7 +43,7 @@ case "$GATE" in
   sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh" ;;
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py" ;;
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
-                 check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs; do
+                 check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
