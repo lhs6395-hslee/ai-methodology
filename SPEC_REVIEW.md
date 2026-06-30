@@ -7,6 +7,7 @@
 | **중복(spec 간) — 구조적** | 두 spec이 같은 Entity/Surface/Capability 소유 | **`check-ownership.mjs` 게이트(소유권 유일성)** | ★자동(CI) |
 | **중복(spec 간) — 의미적** | 키는 다른데 의도 같음(reworded) | 같은 Entity 이웃 spec과 좁힌 LLM diff + (선택)임베딩 유사도 | 반자동 |
 | **과대 spec(입도)** | 한 spec에 여러 기능 욱여넣음(under-fragmentation) — 키/FR 과다 | **`check-spec-cohesion.mjs` 게이트(dedup의 거울상, advisory)** | ★자동(CI) |
+| **불완전 spec** | FR 있는데 SC·인수조건 없음 | **`check-spec-completeness.mjs`(존재만, advisory)** · 충족·측정가능성=`/checklist` | ★자동(CI) |
 | **모순/충돌** | FR끼리 상충 | `/analyze` | 자동 |
 | **커버리지 누락** | 수용기준인데 task/test 없음, FR인데 컴포넌트 없음 | `/analyze` | 자동 |
 | **모호어·검증불가** | should/적절히, 측정불가 SC, 2동작 | EARS 작성규칙 + `/checklist` | 반자동 |
