@@ -42,10 +42,21 @@ case "$GATE" in
   go)   say "  → Go 바이너리는 빌드/다운로드: cd $KIT/tooling/go-gate && CGO_ENABLED=0 go build -o \"$T/scripts/sdd-gate\" ." ;;
   sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh" ;;
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py" ;;
-  node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs; do
+  node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
+                 check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
+
+# ── 2b. 하네스 (선택) — 인터랙티브 spec↔code sync (Claude Code 1차) ──
+# 하네스 detector는 Node 게이트를 쓰므로 --gate=node 일 때만 설치.
+if [ "$GATE" = "node" ]; then
+  copy "$KIT/tooling/sdd-sync.mjs"               "$T/scripts/sdd-sync.mjs"
+  copy "$KIT/tooling/harness/sdd-sync.SKILL.md"  "$T/.claude/skills/sdd-sync/SKILL.md"
+  copy "$KIT/tooling/harness/pre-push"           "$T/scripts/sdd-pre-push.sh"
+  say "  → 하네스 훅 설치(선택): ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push"
+  say "  → 계약: $KIT/HARNESS.md  · 스킬: /sdd-sync"
+fi
 
 # ── 3. 방법론 설명서는 복사 안 함 — 키트 참조(드리프트 방지). 포인터만. ──
 PTR="$T/sdd/README.md"

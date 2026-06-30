@@ -74,6 +74,9 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 - 각 spec에 `## Ownership`(config의 `ownershipCategories`와 같은 헤더)을 선언 → `check:ownership`이 **구조적 중복(같은 키 2 spec 소유)** 을 CI에서 차단(`STRUCTURE.md` 소유권 유일성 규칙).
 - **CI가 green인지 확인** — config의 lint/typecheck/test가 기존 코드에서 통과하는지 먼저 점검(참조 프로젝트는 lint 4 errors로 red였음 → 적용 시 흔한 함정).
 
+## 3b. (선택) 하네스 — 인터랙티브 spec↔code sync
+`--gate=node`로 init하면 `scripts/sdd-sync.mjs`·`/sdd-sync` 스킬·`scripts/sdd-pre-push.sh`가 설치된다(계약: 키트 `HARNESS.md`). spec/코드 변경 후 또는 수시로 `/sdd-sync`로 R1~R4(spec→code·code→spec·dedup+입도·상시 sync)를 사람 확인 게이트로 정렬한다. push마다 점검하려면: `ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push`(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
+
 ## 4. 루프 가동
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 
