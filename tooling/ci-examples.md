@@ -10,7 +10,7 @@
 | Python | `python sdd_gates.py fr` | `python sdd_gates.py ownership` | `python sdd_gates.py run <stage>` |
 | Node | `node check-fr-coverage.mjs` | `node check-ownership.mjs` | `node sdd-run.mjs <stage>` |
 
-보강 게이트 3종(advisory — Node 우선, 나머지 런타임 포팅 예정):
+보강 게이트 5종(advisory — Node 우선, 나머지 런타임 포팅 예정):
 | 게이트 | Node | 기타 런타임 |
 |---|---|---|
 | 테스트 적정성 | `node check-test-adequacy.mjs` | (포팅 예정) |
