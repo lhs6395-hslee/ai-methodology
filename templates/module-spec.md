@@ -12,6 +12,7 @@
 
 ## ⚙ 작성 규칙 (에이전트는 반드시 준수)
 모든 FR은 **EARS 5패턴 중 하나**. 한 요구=한 동작=검증가능. 모르는 값 → `[NEEDS CLARIFICATION: …]`(창작 금지).
+⚠ **EARS는 FR 절에만 적용된다.** spec의 다른 절은 각자 형식을 쓴다 — User Story=서술, Acceptance=Given-When-Then, SC=측정형 숫자, NFR=측정 기준, Ownership=소유 키. **코드와 `@covers`로 묶이는 추적 단위는 FR뿐**(SC·NFR은 검증·측정의 기준이지 코드에 1:1로 매달리지 않는다).
 
 | 패턴 | 틀 |
 |---|---|
