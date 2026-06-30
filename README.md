@@ -1,6 +1,6 @@
 # SDD 포터블 키트 (범용)
 
-> 📐 **시각 설명서:** [`index.html`](index.html) — 방법론 전체를 다이어그램으로 설명. 브라우저로 직접 열거나 GitHub Pages로 서빙.
+> 📐 **시각 설명서:** [`방법론.html`](방법론.html) — 방법론 전체를 다이어그램으로 설명. 브라우저로 직접 열어 본다(웹 배포용 진입점 아님 — 그래서 `index.html`이 아니라 `방법론.html`).
 
 어떤 AI vibe-coding 프로젝트에든 **이 폴더만 참조하면** SDD(Spec-Driven Development)를 같은 방식으로 시작·유지할 수 있도록 정리한 재사용 키트다. 도메인 무관 — 모든 예시는 일반 placeholder(`THE SYSTEM SHALL …`, `<MODULE>`)다.
 

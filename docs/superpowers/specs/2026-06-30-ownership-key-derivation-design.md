@@ -188,7 +188,7 @@ Entity 키 — 예: 테이블 pjt_projects
 | `DEDUP.md` | 소유/참조 분리 · 정규화 절대규칙 · 거짓양성 해소 |
 | `METHODOLOGY.md` | 키 생성 결정 절차(EARS→키) · verb 집합 |
 | `STORAGE.md` | PREFIX 표준 3종 · 사유 관문 · 조용한 누락 제거 |
-| `index.html` | **(a) 키 생성 결정 절차** 섹션 신설(정규화 규칙 + 단계별 알고리즘 + 예시) · **(b) spec PREFIX** 설명(표준 SPEC/INFRA/TEST + 사유 관문 + 조용한 누락) |
+| `방법론.html` (웹 배포용 진입점 아님 — `index.html` 아님) | **(a) 키 생성 결정 절차** 섹션 신설(정규화 규칙 + 단계별 알고리즘 + 예시) · **(b) spec PREFIX** 설명(표준 SPEC/INFRA/TEST + 사유 관문 + 조용한 누락) |
 | `tooling/sdd.config.presets.md` | 언어별 `capabilityVerbs` 예시 |
 
 ## 10. 하위호환 · 점진 도입
