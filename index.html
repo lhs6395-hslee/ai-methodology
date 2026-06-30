@@ -130,33 +130,33 @@
 
 <header class="hero"><div class="wrap">
   <span class="eyebrow">Spec-Driven Development · 범용 키트</span>
-  <h1>“무엇·왜”와 “어떻게”를<br>항상 일치시키는 개발 방법</h1>
+  <h1>"무엇·왜"와 "어떻게"를<br>항상 일치시키는 개발 방법</h1>
   <p class="lede">스펙(무엇을·왜)과 코드(어떻게)를 다른 서랍에 나눠 두고, 둘이 어긋나지 않도록 <strong>기계(게이트)가 강제</strong>하고 <strong>사람이 승인</strong>한다. Spec Kit · EARS · Superpowers를 한 골격으로 묶고, 언어·모델·인프라에 무관하게 같게 돈다.</p>
   <div class="analogy">
-    <b>비유 — 건축 도면과 건물.</b> 도면(spec) 없이 건물(code)을 올리면 “왜 이렇게 지었지?”를 아무도 모른다. 도면만 그리고 건물과 안 맞으면 도면이 거짓말이 된다. 이 방법론은 <strong>도면과 건물을 묶어두고, 어긋나면 경보가 울리게</strong> 한다.
+    <b>비유 — 건축 도면과 건물.</b> 도면(spec) 없이 건물(code)을 올리면 "왜 이렇게 지었지?"를 아무도 모른다. 도면만 그리고 건물과 안 맞으면 도면이 거짓말이 된다. 이 방법론은 <strong>도면과 건물을 묶어두고, 어긋나면 경보가 울리게</strong> 한다.
   </div>
-  <p class="runex">이 글은 하나의 가상 기능 — <b>“프로젝트에 직원을 추천해주는 기능”</b> — 을 처음부터 끝까지 따라가며 설명한다. 추천 서비스가 한 모듈, 그 안의 <code>SPEC-001</code>이 그 기능의 명세다.</p>
+  <p class="runex">이 글은 하나의 가상 기능 — <b>"프로젝트에 직원을 추천해주는 기능"</b> — 을 처음부터 끝까지 따라가며 설명한다. 추천 서비스가 한 모듈, 그 안의 <code>SPEC-001</code>이 그 기능의 명세다.</p>
 </div></header>
 
 <section id="why"><div class="wrap">
   <span class="eyebrow">왜 필요한가</span>
   <h2>AI는 코드를 잘 짠다 — 무너지는 건 그 주변이다</h2>
-  <p>LLM은 구현엔 강하다. “직원 추천 함수 짜줘”라고 하면 잘 짠다. 문제는 그 코드를 <em>둘러싼 것들</em>이다. 한 달 뒤 “이 추천 로직 왜 이렇게 됐지?”, “이거 이미 다른 데서 만들지 않았나?”, “명세엔 A인데 코드는 B인데?” — 이 셋이 시간이 지나며 반드시 무너진다. 이 방법론은 그걸 <strong>구조 + 기계적 강제</strong>로 막는 것이 전부다.</p>
+  <p>LLM은 구현엔 강하다. "직원 추천 함수 짜줘"라고 하면 잘 짠다. 문제는 그 코드를 <em>둘러싼 것들</em>이다. 한 달 뒤 "이 추천 로직 왜 이렇게 됐지?", "이거 이미 다른 데서 만들지 않았나?", "명세엔 A인데 코드는 B인데?" — 이 셋이 시간이 지나며 반드시 무너진다. 이 방법론은 그걸 <strong>구조 + 기계적 강제</strong>로 막는 것이 전부다.</p>
   <div class="grid g3">
-    <div class="card"><h4>① 흩어짐</h4><p>요구사항이 채팅·머릿속·주석에 흩어져 <strong>단일 진실원(SSOT)</strong>이 없다. “무엇을 만들기로 했더라?”에 답할 곳이 없다.</p></div>
+    <div class="card"><h4>① 흩어짐</h4><p>요구사항이 채팅·머릿속·주석에 흩어져 <strong>단일 진실원(SSOT)</strong>이 없다. "무엇을 만들기로 했더라?"에 답할 곳이 없다.</p></div>
     <div class="card"><h4>② 표류(drift)</h4><p>핫픽스로 코드만 고치고 명세는 그대로 둔다 → 시간이 지나면 도면과 건물이 따로 논다. 명세가 거짓말이 된다.</p></div>
-    <div class="card"><h4>③ 중복</h4><p>이미 “추천” 기능이 있는 줄 모르고 비슷한 걸 또 만든다. 진실이 두 곳으로 갈라진다.</p></div>
+    <div class="card"><h4>③ 중복</h4><p>이미 "추천" 기능이 있는 줄 모르고 비슷한 걸 또 만든다. 진실이 두 곳으로 갈라진다.</p></div>
   </div>
 </div></section>
 
 <section id="pillars"><div class="wrap">
   <span class="eyebrow">무엇을 조합했나</span>
   <h2>4개의 기둥</h2>
-  <p>혼자 만든 게 아니라, 검증된 도구 셋을 한 골격으로 묶고 거기에 “어디서나 같게 돈다”는 보장을 더했다. 앞 3개가 <em>무엇을 하는가</em>, 4번째가 <em>어디서나 같게 돈다</em>는 약속이다.</p>
+  <p>혼자 만든 게 아니라, 검증된 도구 셋을 한 골격으로 묶고 거기에 "어디서나 같게 돈다"는 보장을 더했다. 앞 3개가 <em>무엇을 하는가</em>, 4번째가 <em>어디서나 같게 돈다</em>는 약속이다.</p>
   <div class="grid g4">
-    <div class="card"><span class="chip spec">골격</span><h4>GitHub Spec Kit</h4><p><code>specify→plan→tasks</code> 흐름 + 리뷰 명령. “스펙의 옳음”을 담당. 30개+ 에이전트 비종속.</p></div>
-    <div class="card"><span class="chip spec">요구 형식</span><h4>EARS</h4><p>요구를 모호하지 않은 5가지 문장틀로 강제. “한 요구 = 한 동작 = 검증가능”.</p></div>
-    <div class="card"><span class="chip code">구현·검증</span><h4>Superpowers</h4><p>TDD(테스트 먼저)·완료전검증·코드리뷰. “코드의 옳음”을 담당.</p></div>
+    <div class="card"><span class="chip spec">골격</span><h4>GitHub Spec Kit</h4><p><code>specify→plan→tasks</code> 흐름 + 리뷰 명령. "스펙의 옳음"을 담당. 30개+ 에이전트 비종속.</p></div>
+    <div class="card"><span class="chip spec">요구 형식</span><h4>EARS</h4><p>요구를 모호하지 않은 5가지 문장틀로 강제. "한 요구 = 한 동작 = 검증가능".</p></div>
+    <div class="card"><span class="chip code">구현·검증</span><h4>Superpowers</h4><p>TDD(테스트 먼저)·완료전검증·코드리뷰. "코드의 옳음"을 담당.</p></div>
     <div class="card"><span class="chip gate">보장</span><h4>범용성</h4><p>언어·모델·DB·클라우드·CI 무엇이든 같게. 차이는 설정 한 장으로만 흡수.</p></div>
   </div>
   <h3>왜 한 골격으로 묶나 — 셋은 서로의 구멍을 메운다</h3>
@@ -169,7 +169,7 @@
   <p class="note">EARS 없으면 FR이 모호해 테스트로 못 묶고, Spec Kit 없으면 명세가 흩어지고, Superpowers 없으면 코드가 미검증이라 명세가 희망사항이 된다 — 그래서 한 골격. (+ 4번째 기둥 범용성이 어디서나 같게 돌린다.)</p>
 
   <h3>EARS 5패턴 — 우리 예제로 보면</h3>
-  <p class="sub">“직원 추천”의 요구를 EARS로 쓰면 모호함이 사라진다. 예: <code>WHEN 직원 조회 요청이 오면, THE SYSTEM SHALL 적합도 순으로 추천 목록을 반환한다.</code></p>
+  <p class="sub">"직원 추천"의 요구를 EARS로 쓰면 모호함이 사라진다. 예: <code>WHEN 직원 조회 요청이 오면, THE SYSTEM SHALL 적합도 순으로 추천 목록을 반환한다.</code></p>
   <div class="tablewrap"><table>
     <tr><th>패턴</th><th>문장틀</th></tr>
     <tr><td>Ubiquitous</td><td><code>THE SYSTEM SHALL &lt;응답&gt;</code> (항상)</td></tr>
@@ -178,19 +178,19 @@
     <tr><td>Unwanted</td><td><code>IF &lt;비정상&gt;, THEN THE SYSTEM SHALL …</code></td></tr>
     <tr><td>Optional</td><td><code>WHERE &lt;옵션&gt;, THE SYSTEM SHALL …</code></td></tr>
   </table></div>
-  <p class=”sub”>금지: “적절히”, “가능하면”, should, 한 문장에 동작 2개, 측정 불가. — 모호하면 검증할 수 없고, 검증 못 하면 게이트가 못 잡는다.</p>
-  <p class=”note gate”>⚠ <strong>EARS는 spec 전체가 아니라 FR 절에만 적용된다.</strong> 한 spec은 여러 절로 구성되고 절마다 형식이 다르다 — 그리고 코드와 <code>@covers</code>로 묶이는 추적 단위는 <strong>FR뿐</strong>이다. SC·NFR은 검증·측정의 <em>기준</em>이지 코드에 1:1로 매달리지 않는다.</p>
-  <div class=”tablewrap”><table>
+  <p class="sub">금지: "적절히", "가능하면", should, 한 문장에 동작 2개, 측정 불가. — 모호하면 검증할 수 없고, 검증 못 하면 게이트가 못 잡는다.</p>
+  <p class="note gate">⚠ <strong>EARS는 spec 전체가 아니라 FR 절에만 적용된다.</strong> 한 spec은 여러 절로 구성되고 절마다 형식이 다르다 — 그리고 코드와 <code>@covers</code>로 묶이는 추적 단위는 <strong>FR뿐</strong>이다. SC·NFR은 검증·측정의 <em>기준</em>이지 코드에 1:1로 매달리지 않는다.</p>
+  <div class="tablewrap"><table>
     <tr><th>spec의 절</th><th>형식</th><th>출처</th><th>코드 연결</th></tr>
     <tr><td>User Story / 시나리오</td><td>서술 문단</td><td>Spec Kit 기본</td><td>—</td></tr>
     <tr><td>Acceptance</td><td>Given–When–Then</td><td>Spec Kit 기본</td><td>—</td></tr>
     <tr><td><strong>FR</strong> (Functional Req.)</td><td><strong>EARS 5패턴</strong></td><td>절=기본 · <strong>EARS=우리 preset</strong></td><td><code>@covers</code> → test↔code</td></tr>
-    <tr><td>SC (Success Criteria)</td><td>측정형 숫자 <span style=”color:var(--muted)”>(예: 추천 정확도 ≥ 80%)</span></td><td>Spec Kit 기본</td><td>—</td></tr>
-    <tr><td>NFR (Non-Functional)</td><td>품질 제약 <span style=”color:var(--muted)”>(성능·보안·가용성, 예: p95 &lt; 200ms)</span></td><td>우리 템플릿</td><td>—</td></tr>
-    <tr><td><strong>Ownership</strong></td><td>소유 키 <span style=”color:var(--muted)”>(Entities/Surfaces/Capabilities)</span></td><td><strong>우리 추가</strong></td><td>게이트 dedup·cohesion</td></tr>
+    <tr><td>SC (Success Criteria)</td><td>측정형 숫자 <span style="color:var(--muted)">(예: 추천 정확도 ≥ 80%)</span></td><td>Spec Kit 기본</td><td>—</td></tr>
+    <tr><td>NFR (Non-Functional)</td><td>품질 제약 <span style="color:var(--muted)">(성능·보안·가용성, 예: p95 &lt; 200ms)</span></td><td>우리 템플릿</td><td>—</td></tr>
+    <tr><td><strong>Ownership</strong></td><td>소유 키 <span style="color:var(--muted)">(Entities/Surfaces/Capabilities)</span></td><td><strong>우리 추가</strong></td><td>게이트 dedup·cohesion</td></tr>
   </table></div>
-  <p class=”note gate”>분담: <strong>FR</strong>은 이 키트의 게이트(<code>@covers</code>·dedup·cohesion·completeness)가 추적·강제하고, <strong>인수조건·SC</strong>는 Spec Kit 네이티브(<code>/analyze</code>·<code>/checklist</code>·<code>/tasks</code>)가 담당한다. <code>check-spec-completeness</code>는 SC·인수조건이 <em>존재</em>하는지만 advisory로 지킨다 — SC <strong>충족</strong>은 런타임 지표라 빌드 게이트가 강제할 수 없다.</p>
-  <p class=”note”>선택 절 <strong>Infrastructure Prerequisites</strong>의 “왜”: 인프라 의존도 <em>요구사항</em>이라 spec에 적되 <strong>역량으로</strong> 적는다 — “내구성 있는 이벤트 로그 필요”(O) / “Kafka”(X). spec에 두는 이유는 그 의존이 추적되고, <strong>배포 실제(IaC)와의 drift를 검증</strong>할 수 있어서다. 인프라 의존이 없는 순수 코드 spec이면 이 절은 통째로 생략 — FR이 필수인 것과 달리 SC·NFR·Infra는 *참조(선택)*, 팀이 원하면 <code>--strict</code>로 강제 승격.</p>
+  <p class="note gate">분담: <strong>FR</strong>은 이 키트의 게이트(<code>@covers</code>·dedup·cohesion·completeness)가 추적·강제하고, <strong>인수조건·SC</strong>는 Spec Kit 네이티브(<code>/analyze</code>·<code>/checklist</code>·<code>/tasks</code>)가 담당한다. <code>check-spec-completeness</code>는 SC·인수조건이 <em>존재</em>하는지만 advisory로 지킨다 — SC <strong>충족</strong>은 런타임 지표라 빌드 게이트가 강제할 수 없다.</p>
+  <p class="note">선택 절 <strong>Infrastructure Prerequisites</strong>의 "왜": 인프라 의존도 <em>요구사항</em>이라 spec에 적되 <strong>역량으로</strong> 적는다 — "내구성 있는 이벤트 로그 필요"(O) / "Kafka"(X). spec에 두는 이유는 그 의존이 추적되고, <strong>배포 실제(IaC)와의 drift를 검증</strong>할 수 있어서다. 인프라 의존이 없는 순수 코드 spec이면 이 절은 통째로 생략 — FR이 필수인 것과 달리 SC·NFR·Infra는 *참조(선택)*, 팀이 원하면 <code>--strict</code>로 강제 승격.</p>
 </div></section>
 
 <section id="core"><div class="wrap">
@@ -198,8 +198,8 @@
   <h2>핵심 구조</h2>
 
   <h3>① 1 레포 = 1 모듈</h3>
-  <p>레포 하나는 정확히 <strong>모듈 하나</strong>(안정적 능력 영역, bounded context)를 담는다. “추천 서비스”가 한 모듈이면 그게 레포 하나다. 모듈 안엔 <strong>여러 spec</strong>이 산다 — 추천 로직(<code>SPEC-001</code>), 직원 매칭(<code>SPEC-002</code>), 알림(<code>SPEC-003</code>)… 각각 한 spec.</p>
-  <p class="sub"><strong>왜 한 레포에 여러 모듈을 안 넣나?</strong> 모듈은 독립적으로 배포·교체되는 단위여야 하기 때문이다. 한 레포에 여러 모듈을 섞으면 서로 몰래 얽혀 결국 “같이만 배포되는” 덩어리가 된다. 그래서 모듈이 늘면 <em>레포를 나눈다.</em></p>
+  <p>레포 하나는 정확히 <strong>모듈 하나</strong>(안정적 능력 영역, bounded context)를 담는다. "추천 서비스"가 한 모듈이면 그게 레포 하나다. 모듈 안엔 <strong>여러 spec</strong>이 산다 — 추천 로직(<code>SPEC-001</code>), 직원 매칭(<code>SPEC-002</code>), 알림(<code>SPEC-003</code>)… 각각 한 spec.</p>
+  <p class="sub"><strong>왜 한 레포에 여러 모듈을 안 넣나?</strong> 모듈은 독립적으로 배포·교체되는 단위여야 하기 때문이다. 한 레포에 여러 모듈을 섞으면 서로 몰래 얽혀 결국 "같이만 배포되는" 덩어리가 된다. 그래서 모듈이 늘면 <em>레포를 나눈다.</em></p>
 
   <h3>② 한 레포 안의 두 서랍</h3>
   <p>스펙(무엇/왜)과 코드(어떻게)는 <strong>다른 디렉토리</strong>에 산다. 섞으면 안 된다.</p>
@@ -211,10 +211,10 @@
       <ul><li><code>src/recommend.ts</code> — production 코드</li>
       <li><code>tests/recommend.test.ts</code> — <code>@covers</code>로 FR에 연결</li></ul></div>
   </div>
-  <p class="sub"><strong>왜 코드를 <code>sdd/</code>에 안 넣나?</strong> (1) 언어 테스트러너(vitest·pytest·go test)가 평범한 소스 트리에서 테스트를 찾기 때문이고, (2) 문서(명세)와 실행(코드)이 뒤섞이면 “무엇이 진실원인가”의 경계가 무너지기 때문이다. <code>sdd/</code>는 <em>문서만</em>.</p>
+  <p class="sub"><strong>왜 코드를 <code>sdd/</code>에 안 넣나?</strong> (1) 언어 테스트러너(vitest·pytest·go test)가 평범한 소스 트리에서 테스트를 찾기 때문이고, (2) 문서(명세)와 실행(코드)이 뒤섞이면 "무엇이 진실원인가"의 경계가 무너지기 때문이다. <code>sdd/</code>는 <em>문서만</em>.</p>
 
   <h3>③ 둘을 잇는 사슬 — <code>@covers FR-ID</code> (방법론의 심장)</h3>
-  <p>여기가 핵심이다. 두 서랍은 <strong>딱 하나의 끈</strong>으로 묶인다 — 요구마다 붙는 번호 <code>FR-001</code>, 그리고 테스트에 다는 <code>@covers</code> 주석. 명세에 “<code>FR-001</code>: 추천 반환”을 쓰면, 그 요구를 검증하는 테스트에 <code>// @covers SPEC-001/FR-001</code>을 단다. 그러면 “이 테스트가 저 요구를 검증한다”가 <em>기계로 추적 가능</em>해진다.</p>
+  <p>여기가 핵심이다. 두 서랍은 <strong>딱 하나의 끈</strong>으로 묶인다 — 요구마다 붙는 번호 <code>FR-001</code>, 그리고 테스트에 다는 <code>@covers</code> 주석. 명세에 "<code>FR-001</code>: 추천 반환"을 쓰면, 그 요구를 검증하는 테스트에 <code>// @covers SPEC-001/FR-001</code>을 단다. 그러면 "이 테스트가 저 요구를 검증한다"가 <em>기계로 추적 가능</em>해진다.</p>
   <figure><div class="figscroll"><svg viewBox="0 0 820 250" role="img" aria-label="spec FR-001이 test의 @covers를 거쳐 code로 이어지는 사슬, 게이트가 강제">
     <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5a6489"/></marker></defs>
     <rect x="14" y="34" width="244" height="120" rx="9" fill="#eef1fd" stroke="#3a57d6" stroke-width="1.5"/>
@@ -240,10 +240,10 @@
     <rect x="300" y="206" width="220" height="30" rx="15" fill="#fcefe2" stroke="#e2620a"/>
     <text x="410" y="226" font-size="12.5" font-weight="700" fill="#e2620a" text-anchor="middle">게이트: FR ↔ test ↔ code 강제</text>
   </svg></div>
-  <figcaption>왜 번호(<code>FR-001</code>)로 잇나? — <strong>언어중립 추적 닻</strong>이라서다. 주석 스타일이 <code>//</code>든 <code>#</code>든, 언어가 뭐든 같은 방식으로 추적된다. 게이트(<code>check-fr-coverage</code>)는 이 사슬에 끊긴 데가 있는지 — “명세엔 있는데 검증하는 테스트가 없는 FR” — 를 CI에서 찾아낸다.</figcaption></figure>
+  <figcaption>왜 번호(<code>FR-001</code>)로 잇나? — <strong>언어중립 추적 닻</strong>이라서다. 주석 스타일이 <code>//</code>든 <code>#</code>든, 언어가 뭐든 같은 방식으로 추적된다. 게이트(<code>check-fr-coverage</code>)는 이 사슬에 끊긴 데가 있는지 — "명세엔 있는데 검증하는 테스트가 없는 FR" — 를 CI에서 찾아낸다.</figcaption></figure>
 
-  <h3>④ <code>sdd.config.json</code> — “이 프로젝트의 저장·연결 방식” 한 장</h3>
-  <p>그럼 게이트는 “스펙이 어디 있고, 테스트를 어디서 찾는지”를 어떻게 아는가? 이 설정 파일 하나로 안다. 그래서 <strong>언어가 Python이든 Go든 게이트 코드를 새로 짤 필요가 없다</strong> — 값만 바꾼다.</p>
+  <h3>④ <code>sdd.config.json</code> — "이 프로젝트의 저장·연결 방식" 한 장</h3>
+  <p>그럼 게이트는 "스펙이 어디 있고, 테스트를 어디서 찾는지"를 어떻게 아는가? 이 설정 파일 하나로 안다. 그래서 <strong>언어가 Python이든 Go든 게이트 코드를 새로 짤 필요가 없다</strong> — 값만 바꾼다.</p>
   <pre><span class="c">// 언어·접두어가 달라도 게이트 코드를 새로 짤 필요 없음 — 값만 바꾼다</span>
 {
   <span class="k">"specDir"</span>: <span class="s">"sdd/specs"</span>,                  <span class="c">// 스펙이 어디 사나</span>
@@ -284,13 +284,13 @@
     <text x="410" y="284" font-size="11.5" fill="#7a3b10" text-anchor="middle">어떤 모듈들 · 계약 버전 핀 · 상호작용 규약</text>
     <text x="410" y="302" font-size="11" fill="#a8693a" text-anchor="middle">※ 계약 원본·코드는 소유 안 함 (중앙 결합 = 분산 모놀리스 방지)</text>
   </svg></div>
-  <figcaption>핵심 함정 회피: <strong>계약 원본은 만든 모듈 레포가 소유</strong>하고, 통합 레포는 “어느 버전끼리 맞물리나”만 핀(참조)한다. 통합 레포가 계약·코드를 직접 들면 모두가 그곳에 의존하게 돼 <em>다시 모놀리스</em>가 된다. — 이 MSA 계층은 다중 모듈일 때만 켜는 선택 계층이라 단일 모듈은 비용 0.</figcaption></figure>
+  <figcaption>핵심 함정 회피: <strong>계약 원본은 만든 모듈 레포가 소유</strong>하고, 통합 레포는 "어느 버전끼리 맞물리나"만 핀(참조)한다. 통합 레포가 계약·코드를 직접 들면 모두가 그곳에 의존하게 돼 <em>다시 모놀리스</em>가 된다. — 이 MSA 계층은 다중 모듈일 때만 켜는 선택 계층이라 단일 모듈은 비용 0.</figcaption></figure>
 </div></section>
 
 <section id="gates"><div class="wrap">
   <span class="eyebrow">강제</span>
-  <h2>게이트 — “주장”을 “기계적 사실”로</h2>
-  <p>여기까지가 <em>구조</em>다. 그런데 구조를 문서로 “이렇게 합시다”라고만 적으면 사람도 LLM도 빠뜨린다. <strong>LLM은 누락을 낸다</strong> — 그래서 확률적 리뷰가 아니라 <strong>결정적 게이트가 1차</strong>다. 게이트는 CI(또는 git 훅)에서 돌고, 규칙을 어기면 빌드를 막는다(<code>exit 1</code>).</p>
+  <h2>게이트 — "주장"을 "기계적 사실"로</h2>
+  <p>여기까지가 <em>구조</em>다. 그런데 구조를 문서로 "이렇게 합시다"라고만 적으면 사람도 LLM도 빠뜨린다. <strong>LLM은 누락을 낸다</strong> — 그래서 확률적 리뷰가 아니라 <strong>결정적 게이트가 1차</strong>다. 게이트는 CI(또는 git 훅)에서 돌고, 규칙을 어기면 빌드를 막는다(<code>exit 1</code>).</p>
   <div class="tablewrap"><table>
     <tr><th>게이트</th><th>무엇을 잡나</th><th>강제</th><th>비유</th></tr>
     <tr><td><code>check-fr-coverage</code></td><td>테스트 없는 FR (사슬 끊김)</td><td class="blk">차단</td><td>도면엔 있는데 안 지은 방</td></tr>
@@ -301,7 +301,7 @@
   </table></div>
 
   <h3>dedup ↔ cohesion = 거울상 (핵심 통찰)</h3>
-  <p><strong>방법론의 최대 빈칸이 여기 있었다.</strong> “이 spec이 기존과 중복인가?”를 판정할 <em>규칙</em>이 없어 사람·LLM 판단에 맡겨 뒀고 — LLM은 누락을 낸다(→ 거짓 green). 그래서 각 spec이 자기가 <strong>소유하는 키</strong>를 선언하게 하고, <strong>”하나의 키는 정확히 한 spec만 소유”</strong>라는 <strong>집합 규칙</strong>으로 바꿨다. 판정이 “감”이 아니라 “집합 조회”가 된다. (출처: 논문이 아니라 소프트웨어공학 1차 원칙 — DDD <em>bounded context</em>·SSOT·집합 유일성. 1차 원칙이라 결정적이고, 그래서 CI에서 <code>exit 1</code>로 강제할 수 있다.)</p>
+  <p><strong>방법론의 최대 빈칸이 여기 있었다.</strong> "이 spec이 기존과 중복인가?"를 판정할 <em>규칙</em>이 없어 사람·LLM 판단에 맡겨 뒀고 — LLM은 누락을 낸다(→ 거짓 green). 그래서 각 spec이 자기가 <strong>소유하는 키</strong>를 선언하게 하고, <strong>"하나의 키는 정확히 한 spec만 소유"</strong>라는 <strong>집합 규칙</strong>으로 바꿨다. 판정이 "감"이 아니라 "집합 조회"가 된다. (출처: 논문이 아니라 소프트웨어공학 1차 원칙 — DDD <em>bounded context</em>·SSOT·집합 유일성. 1차 원칙이라 결정적이고, 그래서 CI에서 <code>exit 1</code>로 강제할 수 있다.)</p>
   <p class="note gate"><strong>그래서 Ownership만 필수다 (SC·NFR은 선택).</strong> 이 판정은 <em>모든 spec이 키를 선언해야</em> 성립한다 — 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(<strong>미선언 1개 = 보장에 뚫린 구멍</strong>). SC·NFR 누락은 <em>그 기능 하나</em>의 로컬 약점이지만, Ownership 누락은 <strong>시스템 전체</strong> 중복 보장을 깬다. 비유하면 Ownership은 그 spec이 점유한 땅의 <strong>등기</strong> — 등기가 없으면 두 spec이 같은 땅에 건물을 올려도(중복) 아무도 모른다. (게이트는 미선언을 warn으로 두고 <code>--strict</code>로 완전 강제 — 점진 도입.)</p>
   <pre><span class="c">## Ownership  ← SPEC-001이 "내가 소유한다"고 선언하는 키들</span>
 - **Entities**: pjt_projects, pjt_staff       <span class="c"># 도메인 객체/테이블</span>
@@ -327,27 +327,27 @@
     <text x="612" y="220" font-size="12.5" font-weight="700" fill="#e2620a" text-anchor="middle">1 spec → 키/FR 과다 ⚠ 분할 권고</text>
   </svg></div>
   <figcaption><strong>dedup</strong>: 두 spec이 <code>staff.recommend</code>를 동시에 소유 → 같은 기능 중복 → 차단. <strong>cohesion(거울상)</strong>: 한 spec이 키/FR을 과다 소유 → 여러 기능 욱여넣음 → 쪼개라 권고. <strong>왜 cohesion이 필요한가:</strong> 한 spec이 모든 걸 삼키면 FR↔test 사슬도 소유권 dedup도 무의미해진다(게이트가 잡을 경계가 사라짐) — 그게 메우려는 빈칸이다. (그 빈칸에 빠진 실제 사례가 finops였을 뿐 — 사례가 아니라 원리가 핵심.)</figcaption></figure>
-  <p class=”note gate”><strong>2계층(정직).</strong> 게이트는 “키가 같은” 구조적 중복만 막는다. “말만 다른 같은 요구”(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다.</p>
+  <p class="note gate"><strong>2계층(정직).</strong> 게이트는 "키가 같은" 구조적 중복만 막는다. "말만 다른 같은 요구"(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다.</p>
 
-  <h3>“SC·인수조건이 빠진 것 같다” — 왜 그렇게 보이고, 실제로는</h3>
+  <h3>"SC·인수조건이 빠진 것 같다" — 왜 그렇게 보이고, 실제로는</h3>
   <p>이 키트로 직접 만들다 보면 SC와 인수조건이 사라진 것처럼 느껴진다. 맞다 — 위 표에서 보듯 <strong>게이트·<code>@covers</code> 사슬·하네스가 전부 FR 중심</strong>이라 그렇게 보인다. 하지만 <em>빠진 게 아니라 담당이 나뉘어</em> 있다:</p>
-  <div class=”zones”>
-    <div class=”zone sdd”><div class=”lbl”>이 키트가 강제 — FR</div>
+  <div class="zones">
+    <div class="zone sdd"><div class="lbl">이 키트가 강제 — FR</div>
       <ul><li>FR ↔ test ↔ code 추적 (<code>@covers</code> · fr-coverage)</li>
       <li>중복 · 입도 · 완전성 (ownership · cohesion · completeness)</li></ul></div>
-    <div class=”zone tdd”><div class=”lbl”>Spec Kit 네이티브가 담당 — 인수조건 · SC</div>
+    <div class="zone tdd"><div class="lbl">Spec Kit 네이티브가 담당 — 인수조건 · SC</div>
       <ul><li>인수조건(GWT) → <code>/tasks</code>로 task·test화, <code>/analyze</code> 커버리지</li>
       <li>SC 측정가능성 → <code>/checklist</code></li></ul></div>
   </div>
-  <p class=”note gate”>그래서 키트는 <strong><code>check-spec-completeness</code>로 “FR 있는 spec엔 SC·인수조건이 <em>존재</em>하는가”를 advisory로 지켜</strong> 둘을 그늘에서 끌어낸다. 단 SC의 <strong>충족</strong>(예: p95 &lt; 200ms를 실제 달성했나)은 런타임 지표라 빌드 게이트가 강제하지 않는다 — 못 하는 걸 한다고 하지 않고 정직하게 둔다. <strong>요약: 빠진 게 아니라, FR은 키트가·인수조건/SC는 Spec Kit이 맡고, 존재는 게이트가 지킨다.</strong></p>
+  <p class="note gate">그래서 키트는 <strong><code>check-spec-completeness</code>로 "FR 있는 spec엔 SC·인수조건이 <em>존재</em>하는가"를 advisory로 지켜</strong> 둘을 그늘에서 끌어낸다. 단 SC의 <strong>충족</strong>(예: p95 &lt; 200ms를 실제 달성했나)은 런타임 지표라 빌드 게이트가 강제하지 않는다 — 못 하는 걸 한다고 하지 않고 정직하게 둔다. <strong>요약: 빠진 게 아니라, FR은 키트가·인수조건/SC는 Spec Kit이 맡고, 존재는 게이트가 지킨다.</strong></p>
 </div></section>
 
 <section id="loop"><div class="wrap">
   <span class="eyebrow">기능 하나가 흐르는 길</span>
   <h2>생애주기 — 0~8 루프</h2>
-  <p>“직원 추천”을 새로 만든다면, 이 순서로 흐른다. 한 칸 한 칸이 게이트를 통과해야 다음으로 간다.</p>
+  <p>"직원 추천"을 새로 만든다면, 이 순서로 흐른다. 한 칸 한 칸이 게이트를 통과해야 다음으로 간다.</p>
   <div class="pipe">
-    <div class="step"><span class="n">1</span><b>specify</b><span>“직원 추천” 한 마디 → spec (FR을 EARS로)</span></div>
+    <div class="step"><span class="n">1</span><b>specify</b><span>"직원 추천" 한 마디 → spec (FR을 EARS로)</span></div>
     <div class="step"><span class="n">2</span><b>clarify</b><span>빈칸([NEEDS CLARIFICATION]) 질문해서 메움</span></div>
     <div class="step"><span class="n">3</span><b>plan</b><span>FR ↔ 컴포넌트 매핑</span></div>
     <div class="step"><span class="n">4</span><b>tasks</b><span>2~5분 TDD 작업으로 분해</span></div>
@@ -356,13 +356,13 @@
     <div class="step"><span class="n">7</span><b>머지</b><span>사람 PR 리뷰·승인</span></div>
     <div class="step"><span class="n">8</span><b>converge</b><span>시간 지나 drift났나 검사 → 갭 표면화</span></div>
   </div>
-  <p class="note"><strong>양방향 동기화 — 작성은 LLM, 승인은 사람.</strong><br>· <strong>위→아래</strong>(spec→code): 사람이 spec 작성 → 미구현을 구현.<br>· <strong>아래→위</strong>(code→spec, 핫픽스 후): 코드가 먼저 바뀜 → <em>사람이 “무슨 기능·왜”(intent) 한 줄 입력</em> → LLM이 코드+intent로 spec 갱신 → 사람이 “정본화 vs 되돌리기” 승인. — 코드만 보고 spec을 자동으로 덮어쓰지 않는다(그러면 spec이 코드의 거울로 전락해 drift 탐지가 무의미해진다).</p>
+  <p class="note"><strong>양방향 동기화 — 작성은 LLM, 승인은 사람.</strong><br>· <strong>위→아래</strong>(spec→code): 사람이 spec 작성 → 미구현을 구현.<br>· <strong>아래→위</strong>(code→spec, 핫픽스 후): 코드가 먼저 바뀜 → <em>사람이 "무슨 기능·왜"(intent) 한 줄 입력</em> → LLM이 코드+intent로 spec 갱신 → 사람이 "정본화 vs 되돌리기" 승인. — 코드만 보고 spec을 자동으로 덮어쓰지 않는다(그러면 spec이 코드의 거울로 전락해 drift 탐지가 무의미해진다).</p>
 </div></section>
 
 <section id="harness"><div class="wrap">
   <span class="eyebrow">조종석</span>
-  <h2>하네스 — 이 모든 걸 “수시로” 돌린다</h2>
-  <p>지금까지는 <em>규칙·구조</em>였다. 하지만 규칙이 있다고 사람이 매번 “아 이제 게이트 돌리고, 중복 보고, 명세 맞춰야지”를 기억할까? 안 한다. <strong>하네스</strong>는 그 운영을 <strong>사람과 대화하며 자동으로</strong> 끌고 가는 층이다. 핵심은 — 새 판정 로직을 만드는 게 아니라, <strong>이미 있는 게이트를 트리거하고(detect), 사람에게 묻고(ask), 행동을 잇는다(act).</strong></p>
+  <h2>하네스 — 이 모든 걸 "수시로" 돌린다</h2>
+  <p>지금까지는 <em>규칙·구조</em>였다. 하지만 규칙이 있다고 사람이 매번 "아 이제 게이트 돌리고, 중복 보고, 명세 맞춰야지"를 기억할까? 안 한다. <strong>하네스</strong>는 그 운영을 <strong>사람과 대화하며 자동으로</strong> 끌고 가는 층이다. 핵심은 — 새 판정 로직을 만드는 게 아니라, <strong>이미 있는 게이트를 트리거하고(detect), 사람에게 묻고(ask), 행동을 잇는다(act).</strong></p>
   <figure><div class="figscroll"><svg viewBox="0 0 820 230" role="img" aria-label="하네스 루프: detect 게이트, ask 사람, act 방법론을 순환하며 R1부터 R4가 트리거">
     <defs><marker id="ar3" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#3a57d6"/></marker></defs>
     <rect x="40" y="70" width="180" height="70" rx="10" fill="#fcefe2" stroke="#e2620a"/><text x="130" y="100" font-size="14" font-weight="800" fill="#e2620a" text-anchor="middle">detect</text><text x="130" y="122" font-size="11.5" fill="#7a3b10" text-anchor="middle">게이트 일괄 실행</text>
@@ -377,9 +377,9 @@
   <figcaption>이 4칸짜리 규칙표가 <strong>포터블 계약</strong>(<code>HARNESS.md</code>)이다. Claude Code 실행기는 이 표를 해석할 뿐 — 다른 에이전트도 같은 표로 자기 실행기를 만들 수 있다.</figcaption></figure>
   <div class="tablewrap"><table>
     <tr><th>규칙</th><th>언제(trigger)</th><th>무엇을 묻나(ask) → 행동(act)</th></tr>
-    <tr><td><strong>R1</strong> spec→code</td><td>spec 바뀜</td><td>“이 FR들 코드 만들/고칠까요?” → TDD 구현</td></tr>
-    <tr><td><strong>R2</strong> code→spec</td><td>코드만 바뀜</td><td>“기존 고칠까 / 새로 만들까 / 무시?” → specify 갱신</td></tr>
-    <tr><td><strong>R3</strong> dedup+입도</td><td>spec 생긴 직후</td><td>“중복 합칠까 / 과대 spec 쪼갤까?” → 통합·분할</td></tr>
+    <tr><td><strong>R1</strong> spec→code</td><td>spec 바뀜</td><td>"이 FR들 코드 만들/고칠까요?" → TDD 구현</td></tr>
+    <tr><td><strong>R2</strong> code→spec</td><td>코드만 바뀜</td><td>"기존 고칠까 / 새로 만들까 / 무시?" → specify 갱신</td></tr>
+    <tr><td><strong>R3</strong> dedup+입도</td><td>spec 생긴 직후</td><td>"중복 합칠까 / 과대 spec 쪼갤까?" → 통합·분할</td></tr>
     <tr><td><strong>R4</strong> 상시 sync</td><td>push·수시</td><td>위를 일괄 점검 → drift면 해당 규칙으로 라우팅</td></tr>
   </table></div>
 </div></section>
@@ -387,14 +387,14 @@
 <section id="run"><div class="wrap">
   <span class="eyebrow">실전 — 하네스가 실제로 도는 모습</span>
   <h2>핫픽스 한 줄이 명세까지 도달하기까지</h2>
-  <p>추상적인 루프 말고, <strong>실제 시나리오</strong>로 보자. 가장 흔하고 위험한 경우 — <em>급해서 코드부터 고친</em> 핫픽스(아래→위, R2 + R4)다. “주말엔 추천을 끄자”를 개발자가 코드에 바로 박았다고 하자.</p>
+  <p>추상적인 루프 말고, <strong>실제 시나리오</strong>로 보자. 가장 흔하고 위험한 경우 — <em>급해서 코드부터 고친</em> 핫픽스(아래→위, R2 + R4)다. "주말엔 추천을 끄자"를 개발자가 코드에 바로 박았다고 하자.</p>
   <div class="scenario">
     <div class="sc"><div class="role dev">개발자<small>code</small></div><div class="body">
-      <b>1. 코드부터 고침</b><p><code>src/recommend.ts</code>에 “주말 제외” 로직을 추가하고 커밋. <strong>명세는 안 건드림.</strong> (전형적 핫픽스 — 여기서 drift가 태어난다.)</p></div></div>
+      <b>1. 코드부터 고침</b><p><code>src/recommend.ts</code>에 "주말 제외" 로직을 추가하고 커밋. <strong>명세는 안 건드림.</strong> (전형적 핫픽스 — 여기서 drift가 태어난다.)</p></div></div>
     <div class="sc"><div class="role hook">pre-push<small>훅</small></div><div class="body">
-      <b>2. 밀려는 순간 자동 점검</b><p><code>git push</code> → pre-push 훅이 <code>node scripts/sdd-sync.mjs</code>를 돌린다. (R4 “수시”의 값싼 1차 — 밀 때마다.)</p></div></div>
+      <b>2. 밀려는 순간 자동 점검</b><p><code>git push</code> → pre-push 훅이 <code>node scripts/sdd-sync.mjs</code>를 돌린다. (R4 "수시"의 값싼 1차 — 밀 때마다.)</p></div></div>
     <div class="sc"><div class="role harness">하네스<small>detect</small></div><div class="body">
-      <b>3. drift 감지 → 안내(비차단)</b><p><code>check-converge-drift</code>가 “코드는 바뀌었는데 spec은 그대로”를 잡는다. 리포트를 찍고 “<code>/sdd-sync</code> 돌려라”라고 안내한다 — push는 막지 않는다.</p>
+      <b>3. drift 감지 → 안내(비차단)</b><p><code>check-converge-drift</code>가 "코드는 바뀌었는데 spec은 그대로"를 잡는다. 리포트를 찍고 "<code>/sdd-sync</code> 돌려라"라고 안내한다 — push는 막지 않는다.</p>
       <p class="termlbl">$ git push → pre-push 훅 출력</p>
 <pre>SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 
@@ -406,17 +406,17 @@
 요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
 <span class="w">↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)</span></pre></div></div>
     <div class="sc"><div class="role harness">하네스<small>ask</small></div><div class="body">
-      <b>4. 개발자가 <code>/sdd-sync</code> 실행 → 하네스가 물음</b><p>“코드만 바뀐 부분이 있습니다(R2). <strong>① 기존 SPEC-001 개정 / ② 새 spec / ③ 의도적 무시(hotfix)</strong> — 어느 쪽인가요?”</p></div></div>
+      <b>4. 개발자가 <code>/sdd-sync</code> 실행 → 하네스가 물음</b><p>"코드만 바뀐 부분이 있습니다(R2). <strong>① 기존 SPEC-001 개정 / ② 새 spec / ③ 의도적 무시(hotfix)</strong> — 어느 쪽인가요?"</p></div></div>
     <div class="sc"><div class="role human">사람<small>결정</small></div><div class="body">
-      <b>5. 사람이 결정 + intent 입력</b><p>“① 기존 SPEC-001 개정”을 고르고 <em>intent 한 줄</em>: “주말엔 운영 부하를 피하려 추천을 끈다”.</p></div></div>
+      <b>5. 사람이 결정 + intent 입력</b><p>"① 기존 SPEC-001 개정"을 고르고 <em>intent 한 줄</em>: "주말엔 운영 부하를 피하려 추천을 끈다".</p></div></div>
     <div class="sc"><div class="role harness">하네스<small>act</small></div><div class="body">
       <b>6. LLM이 명세를 갱신(작성)</b><p><code>/speckit.converge</code>로 갭 표면화 → <code>/speckit.specify update</code>가 <em>코드 diff + intent</em>로 <code>FR-007: WHILE 주말, THE SYSTEM SHALL 추천을 비활성화한다</code>를 SPEC-001에 추가 → <code>/speckit.analyze</code>로 정합 검사.</p></div></div>
     <div class="sc"><div class="role harness">하네스<small>재검증</small></div><div class="body">
-      <b>7. 다시 점검 → 새 경보가 뜰 수도</b><p><code>/sdd-sync</code> 재실행: R2는 이제 <span class="pass">clean</span>. 단 SPEC-001이 FR이 많아졌다면 <code>check-spec-cohesion</code>이 “이 spec 과대 — 쪼갤까?”(R3)를 물을 수 있다. → 사람이 다시 결정.</p></div></div>
+      <b>7. 다시 점검 → 새 경보가 뜰 수도</b><p><code>/sdd-sync</code> 재실행: R2는 이제 <span class="pass">clean</span>. 단 SPEC-001이 FR이 많아졌다면 <code>check-spec-cohesion</code>이 "이 spec 과대 — 쪼갤까?"(R3)를 물을 수 있다. → 사람이 다시 결정.</p></div></div>
     <div class="sc"><div class="role human">사람<small>승인</small></div><div class="body">
       <b>8. bless(정본화)</b><p>사람이 명세 변경을 승인한다. 끝 — 도면과 건물이 다시 일치한다. <strong>작성은 LLM이 했지만, 무엇을 진실로 삼을지는 사람이 정했다.</strong></p></div></div>
   </div>
-  <p class="note">반대 방향(<strong>R1, spec→code</strong>)은 더 단순하다: 명세에 <code>FR-008</code>을 새로 쓰면 → <code>/sdd-sync</code>의 <code>check-fr-coverage</code>가 “이 FR엔 검증 테스트가 없다”를 잡고 → “구현할까요?”를 물어 → TDD(RED→GREEN)로 코드를 만든다. <strong>어느 방향이든: 기계가 어긋남을 찾고, 사람이 결정하고, LLM이 작성한다.</strong></p>
+  <p class="note">반대 방향(<strong>R1, spec→code</strong>)은 더 단순하다: 명세에 <code>FR-008</code>을 새로 쓰면 → <code>/sdd-sync</code>의 <code>check-fr-coverage</code>가 "이 FR엔 검증 테스트가 없다"를 잡고 → "구현할까요?"를 물어 → TDD(RED→GREEN)로 코드를 만든다. <strong>어느 방향이든: 기계가 어긋남을 찾고, 사람이 결정하고, LLM이 작성한다.</strong></p>
 </div></section>
 
 <section id="big"><div class="wrap">
