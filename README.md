@@ -1,5 +1,7 @@
 # SDD 포터블 키트 (범용)
 
+> 📐 **시각 설명서:** [`index.html`](index.html) — 방법론 전체를 다이어그램으로 설명. 브라우저로 직접 열거나 GitHub Pages로 서빙.
+
 어떤 AI vibe-coding 프로젝트에든 **이 폴더만 참조하면** SDD(Spec-Driven Development)를 같은 방식으로 시작·유지할 수 있도록 정리한 재사용 키트다. 도메인 무관 — 모든 예시는 일반 placeholder(`THE SYSTEM SHALL …`, `<MODULE>`)다.
 
 > ⚠️ **먼저 읽을 것: [`REALITY_CHECK.md`](REALITY_CHECK.md).** 이 키트의 어떤 부분이 "참조만 하면 바로 되는지" vs "프로젝트마다 설치/배선해야 되는지" vs "현재 깨져 있는지"를 **실제 실행으로 검증한 결과**가 들어 있다. (추측 아님)
