@@ -1,0 +1,18 @@
+{
+  "specDir": "sdd/specs",
+  "scanDirs": ["src", "tests"],
+  "ignoreDirs": [
+    "node_modules", ".next", "coverage", "dist", "build", "out",
+    "target", "vendor", "__pycache__", ".venv", "venv", ".git",
+    ".idea", ".gradle", "bin", "obj", "Pods", ".dart_tool"
+  ],
+  "testFileRegex": ["\\.(test|spec)\\.(ts|tsx|js|jsx|mjs|cjs)$"],
+  "ownershipCategories": ["Entities", "Surfaces", "Capabilities"],
+  "specIdPrefixes": ["SPEC"],
+  "commands": {
+    "setup": "npm ci",
+    "lint": "npm run lint",
+    "typecheck": "npx tsc --noEmit",
+    "test": "npm test"
+  }
+}

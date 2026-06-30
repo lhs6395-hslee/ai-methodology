@@ -1,0 +1,248 @@
+<title>소유권 유일성 게이트 — 팀 가이드</title>
+<style>
+  :root{
+    --ink:#1a1c23; --ink2:#3d4150; --ink3:#6b7080; --line:#e4e6ec;
+    --bg:#fbfbfd; --surface:#ffffff; --surface2:#f5f6fa;
+    --accent:#5b54d6; --accent-soft:#ecebfb; --accent-ink:#3f3aa8;
+    --good:#1f8a55; --good-soft:#e6f4ec; --warn:#b06a12; --warn-soft:#fbf0df;
+    --bad:#c0392b; --bad-soft:#fbe9e7;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;
+    -webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:880px;margin:0 auto;padding:56px 24px 96px}
+  header.top{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600}
+  h1{font-size:31px;line-height:1.25;margin:.4em 0 .2em;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--ink3);font-size:14px;margin:0}
+  h2{font-size:21px;margin:52px 0 4px;letter-spacing:-.01em;padding-top:18px;border-top:1px solid var(--line)}
+  h2 .n{font-family:var(--mono);color:var(--accent);font-size:14px;margin-right:10px}
+  h3{font-size:15.5px;margin:26px 0 6px;color:var(--ink)}
+  h4{margin:6px 0 4px;font-size:15px}
+  p{margin:10px 0;color:var(--ink2)}
+  ul{margin:10px 0;padding-left:20px;color:var(--ink2)}
+  li{margin:5px 0}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface2);padding:1.5px 6px;border-radius:5px;
+    color:var(--accent-ink);border:1px solid var(--line)}
+  strong{color:var(--ink);font-weight:650}
+  .lead{font-size:16.5px;color:var(--ink2)}
+  /* callout */
+  .box{border-radius:12px;padding:16px 20px;margin:18px 0;border:1px solid var(--line);background:var(--surface)}
+  .box.honest{background:var(--warn-soft);border-color:#eed6ad}
+  .box.honest .tag{color:var(--warn)}
+  .box.key{background:var(--accent-soft);border-color:#d9d6f6}
+  .box.key .tag{color:var(--accent-ink)}
+  .box.good{background:var(--good-soft);border-color:#bfe3cd}
+  .box.good .tag{color:var(--good)}
+  .box.bad{background:var(--bad-soft);border-color:#f3c9c2}
+  .box.bad .tag{color:var(--bad)}
+  .box .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    font-weight:700;display:block;margin-bottom:6px}
+  .box p:first-of-type{margin-top:0}.box p:last-child{margin-bottom:0}
+  /* paper card */
+  .paper{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin:18px 0;
+    box-shadow:0 1px 2px rgba(20,22,40,.04)}
+  .paper .ttl{font-size:16px;font-weight:650;line-height:1.4;margin:0 0 4px}
+  .paper .meta{font-size:13px;color:var(--ink3);margin:0 0 14px}
+  .paper dl{display:grid;grid-template-columns:108px 1fr;gap:8px 16px;margin:0;font-size:14px}
+  .paper dt{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);
+    padding-top:3px;font-weight:600}
+  .paper dd{margin:0;color:var(--ink2)}
+  /* concept card */
+  .concept{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .concept .k{font-family:var(--mono);font-size:11px;color:var(--accent-ink);font-weight:700;
+    text-transform:uppercase;letter-spacing:.08em}
+  .concept h4{margin:5px 0 6px;font-size:15.5px}
+  .concept p{margin:0 0 8px;font-size:13.5px}
+  .concept .eg{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink3);
+    background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-top:auto}
+  /* table */
+  .scroll{overflow-x:auto;margin:18px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600;
+    background:var(--surface2)}
+  td:first-child{font-weight:600;color:var(--ink);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .pill.s{background:var(--accent-soft);color:var(--accent-ink)}
+  .pill.m{background:var(--warn-soft);color:var(--warn)}
+  .pill.g{background:var(--good-soft);color:var(--good)}
+  /* code block */
+  pre{background:#1c1e2a;color:#e6e7ee;border-radius:11px;padding:18px 20px;overflow-x:auto;font-family:var(--mono);
+    font-size:12.5px;line-height:1.65;margin:16px 0}
+  pre .c{color:#8b90a8}
+  pre .r{color:#ff9b8a}
+  pre .g{color:#86e0a8}
+  /* steps */
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+  ol.steps li{position:relative;padding:4px 0 16px 42px;margin:0}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:2px;width:27px;height:27px;
+    background:var(--accent);color:#fff;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);
+    font-size:13px;font-weight:700}
+  ol.steps li::after{content:"";position:absolute;left:13px;top:30px;bottom:0;width:1.5px;background:var(--line)}
+  ol.steps li:last-child::after{display:none}
+  ol.steps li strong{display:block;margin-bottom:2px}
+  .foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink3)}
+  .foot a{color:var(--accent-ink)}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .threecol{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0;align-items:stretch}
+  .threecol .concept{display:flex;flex-direction:column}
+  @media(max-width:640px){.twocol,.threecol{grid-template-columns:1fr}.paper dl{grid-template-columns:1fr}}
+  .mini{font-size:13px;color:var(--ink3);margin-top:4px}
+  .tldr{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;margin:14px 0;font-size:14px}
+  .tldr dt{font-weight:650;color:var(--ink)}
+  .tldr dd{margin:0;color:var(--ink2)}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">SDD 포터블 키트 · 팀 가이드</span>
+  <h1>소유권 유일성 게이트<br>— 스펙이 늘어도 중복이 안 쌓이게</h1>
+  <p class="sub">스펙 간 중복을 “사람이 판단”에서 “CI가 강제”로 바꾸는 규칙 — 무엇을·왜·어떻게 쓰는지 · 2026-06-29</p>
+</header>
+
+<div class="box key">
+  <span class="tag">30초 요약</span>
+  <dl class="tldr">
+    <dt>문제</dt><dd>기능이 늘면 비슷한 스펙이 여러 개 생기고, 같은 내용을 두 곳이 “진실”이라고 주장한다(중복 → drift).</dd>
+    <dt>해법</dt><dd>각 스펙이 자기가 <strong>소유하는 키</strong>를 선언한다. <strong>한 키는 한 스펙만 소유</strong> — 두 스펙이 같은 키를 가지면 CI가 <code>exit 1</code>로 막는다.</dd>
+    <dt>당신이 할 일</dt><dd>스펙 쓸 때 <code>## Ownership</code> 블록 채우기 · 새 요구가 오면 “이 키 주인이 이미 있나?” 먼저 조회하기.</dd>
+  </dl>
+</div>
+
+<h2><span class="n">01</span>왜 필요한가 — 막지 않으면 생기는 일</h2>
+<p class="lead">스펙 기반 개발(SDD)에서 스펙은 “그 기능의 단일 진실원(SSOT)”이어야 한다. 그런데 기능이 쌓이면 자연스럽게 이런 일이 벌어진다:</p>
+<div class="box bad">
+  <span class="tag">중복이 쌓이는 전형적 시나리오</span>
+  <p>지난달 <code>SPEC-014 프로젝트 인력배정</code>을 썼다. 이번에 “외부 협력사 담당자도 배정” 요구가 온다. 새 스펙 <code>SPEC-022 협력사 배정</code>을 만든다. 둘 다 <strong>같은 테이블(<code>pjt_project_staff</code>)·같은 동작(<code>staff.assign</code>)</strong>을 건드린다. 이제 “배정 규칙의 진실”이 두 곳에 흩어진다. 한쪽만 고치면 둘이 어긋나고(drift), 코드는 어느 스펙을 따라야 할지 모른다.</p>
+</div>
+<p>기존 방법론은 “이게 중복인가?”를 <strong>사람·LLM 판단</strong>에 맡겼다. 그런데 리뷰어는 14번 스펙의 존재를 잊고, LLM은 누락을 낸다. <strong>판단에 맡기는 한 중복은 새어 들어온다.</strong> 그래서 이 키트는 중복 판정을 <strong>기계가 강제</strong>하도록 바꿨다.</p>
+
+<h2><span class="n">02</span>중복은 두 종류 — 잡는 방법이 다르다</h2>
+<p>“중복”을 한 덩어리로 보면 자동화가 안 된다. 두 종류로 나누면 각각 맞는 도구가 보인다.</p>
+<div class="twocol">
+  <div class="box good"><span class="tag">계층 1 · 구조적 중복 (게이트가 강제)</span>
+    <p>두 스펙이 <strong>같은 대상</strong>(같은 테이블/route/동작)을 소유. 집합 조회로 <strong>명확히 판정</strong>되므로 CI가 자동으로 막는다. <strong>이게 1차 방어선.</strong></p></div>
+  <div class="box"><span class="tag">계층 2 · 의미적 중복 (리뷰가 보조)</span>
+    <p>대상은 다른데 <strong>말만 바꾼 같은 요구</strong>(reworded). 게이트는 못 잡는다 → 같은 영역 이웃 스펙끼리 좁혀서 사람이 리뷰. 확률적이라 강제 못 함.</p></div>
+</div>
+<div class="scroll"><table>
+  <tr><th>구분</th><th>구조적 중복</th><th>의미적 중복</th></tr>
+  <tr><td>무엇</td><td>두 스펙이 <strong>같은 키</strong> 소유</td><td>키는 다른데 <strong>의도가 같음</strong></td></tr>
+  <tr><td>예</td><td>두 스펙 다 <code>staff.assign</code> 소유</td><td>“인력 배정” vs “리소스 할당” (사실 같은 것)</td></tr>
+  <tr><td>판정</td><td>집합 조회 — <strong>결정적</strong></td><td>유사도 추정 — <strong>확률적</strong></td></tr>
+  <tr><td>도구</td><td><code>check-ownership.mjs</code></td><td>이웃 리뷰 + (선택) 임베딩 유사도</td></tr>
+  <tr><td>강제력</td><td><span class="pill s">CI 게이트 (exit 1)</span></td><td><span class="pill m">좁힌 리뷰 보조</span></td></tr>
+</table></div>
+<p class="mini">핵심 원칙: LLM·사람 리뷰는 누락을 낸다 → <strong>결정적 게이트가 1차, 확률적 리뷰는 2차.</strong></p>
+
+<h2><span class="n">03</span>핵심 개념 — 스펙이 “소유하는 키” 3종</h2>
+<p>게이트의 전부는 이 한 문장이다: <strong>“하나의 키는 정확히 한 스펙만 소유한다.”</strong> 그럼 키가 뭔가? 스펙이 권위를 갖는 대상을 세 종류로 본다.</p>
+<div class="threecol">
+  <div class="concept">
+    <span class="k">Entity</span>
+    <h4>도메인 객체 · 테이블</h4>
+    <p>이 스펙이 정의·소유하는 데이터. 보통 DB 테이블이나 핵심 도메인 객체.</p>
+    <span class="eg">pjt_projects<br>pjt_project_staff</span>
+  </div>
+  <div class="concept">
+    <span class="k">Surface</span>
+    <h4>route · 화면 · job</h4>
+    <p>외부에 노출되는 표면. API 엔드포인트, 화면 경로, 배치/이벤트 핸들러.</p>
+    <span class="eg">POST /api/pjt/recommend<br>/tools/pjt-management/new</span>
+  </div>
+  <div class="concept">
+    <span class="k">Capability</span>
+    <h4>Entity × Action</h4>
+    <p>“무엇을 할 수 있는가”. 객체와 동작의 조합으로 한 능력을 가리킨다.</p>
+    <span class="eg">project.create<br>staff.assign</span>
+  </div>
+</div>
+<p>스펙마다 자기가 소유하는 키를 <code>## Ownership</code> 블록에 적는다. 이 블록이 게이트가 읽는 “소유권 등기부”다.</p>
+<pre><span class="c">## Ownership   &larr; 모든 스펙이 선언</span>
+- **Entities**: pjt_projects, pjt_project_staff
+- **Surfaces**: POST /api/pjt/recommend, /tools/pjt-management/new
+- **Capabilities**: project.create, staff.assign</pre>
+<p class="mini">미선언 스펙은 일단 경고만(점진 도입). 팀이 자리잡으면 <code>--strict</code>로 “모든 스펙이 Ownership 선언 필수”로 승격한다.</p>
+
+<h2><span class="n">04</span>실무 — 새 요구가 오면 (결정 트리)</h2>
+<p>새 기능 요구를 받으면 <strong>새 스펙을 만들기 전에</strong> 이 순서로 판단한다. 핵심은 “새로 만들까?”가 아니라 <strong>“이 키 주인이 이미 있나?”</strong>를 먼저 묻는 것.</p>
+<ol class="steps">
+  <li><strong>키를 뽑는다.</strong> 이 요구는 어떤 Entity를 건드리나 / 어떤 Surface인가 / 어떤 Capability인가?</li>
+  <li><strong>그 키의 주인을 조회한다.</strong> <code>MODULE_MAP</code> 등기부 또는 <code>check-ownership</code>으로 이미 소유한 스펙이 있는지 본다.</li>
+  <li><strong>있으면 → 그 스펙을 개정한다 (새 스펙 금지).</strong> 같은 범위면 owner 스펙에 FR을 추가. 완전히 새 범위일 때만 새 스펙을 만들고 키를 등록한다.</li>
+</ol>
+<div class="twocol">
+  <div class="box good"><span class="tag">올바른 흐름</span>
+    <p>“외부 협력사 담당자 배정” 요구 → 키 산출: <code>staff.assign</code>. 조회해보니 <strong>SPEC-014가 이미 소유</strong>. → SPEC-014에 FR을 추가해 개정. 진실이 한 곳에 유지된다.</p></div>
+  <div class="box bad"><span class="tag">게이트가 막는 실수</span>
+    <p>같은 요구로 새 <code>SPEC-022</code>를 만들고 거기에도 <code>staff.assign</code>을 선언. → 두 스펙이 같은 키 소유 → <strong>CI가 <code>exit 1</code>로 차단.</strong> 병합 전에 강제로 멈춘다.</p></div>
+</div>
+
+<h2><span class="n">05</span>CI에서 막히면 — 이렇게 읽고 고친다</h2>
+<p>게이트가 충돌을 잡으면 <strong>어느 키를 어느 스펙들이 다투는지</strong> 그대로 출력한다. 추측할 필요가 없다.</p>
+<pre><span class="c">$ sdd-gate ownership        # 또는: sh sdd_gates.sh ownership · python sdd_gates.py ownership · node scripts/check-ownership.mjs</span>
+Ownership 게이트: spec 3개 중 2개가 Ownership 선언.
+<span class="r">✗ 중복 소유(구조적 중복) 1건:
+  [Entities] "pjt_projects" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요</span>
+<span class="c"># exit 1 — 빌드 중단</span></pre>
+<p class="sub">게이트는 <strong>언어·런타임 무관 4판</strong>(Go 바이너리·셸·Python·Node, 동작 동일) — 가진 쪽으로 돌린다. 키 종류(<code>Entities</code> 등)는 <code>sdd.config.json</code>의 <code>ownershipCategories</code>로, 비-웹은 <code>Modules·Symbols·Artifacts</code> 등으로 바꾼다. CI/CD 도구도 무관(특정 도구 한정 아님).</p>
+<h3>고치는 법 (3단계)</h3>
+<ol class="steps">
+  <li><strong>진짜 주인을 정한다.</strong> <code>pjt_projects</code>의 권위를 가질 스펙 하나를 고른다(보통 먼저 만든·더 핵심인 쪽).</li>
+  <li><strong>다른 스펙에서 그 키를 뺀다.</strong> 그 스펙이 정말 그 데이터가 필요하면, 소유하지 말고 owner 스펙을 <strong>참조</strong>하거나 owner 쪽으로 FR을 옮긴다.</li>
+  <li><strong>다시 돌린다.</strong> <code>exit 0 — 모든 키가 유일</code>이 나오면 통과. <code>MODULE_MAP</code> 등기부도 정리한다.</li>
+</ol>
+<div class="box good"><span class="tag">해결 후</span>
+  <p><code>✓ 구조적 중복 없음 — 모든 Entity/Surface/Capability 키가 유일.</code> &nbsp;<span class="pill g">exit 0</span></p></div>
+
+<h2><span class="n">06</span>이 게이트는 어디서 왔나 — 논문과의 관계</h2>
+<div class="box honest">
+  <span class="tag">먼저 짚고 갈 것</span>
+  <p>이 게이트는 어떤 논문의 알고리즘을 옮긴 게 <strong>아니다.</strong> 소프트웨어공학 <strong>1차 원칙</strong>에서 직접 설계했다 — ① DDD <em>bounded context</em>(한 능력은 한 곳이 소유) ② Single Source of Truth(진실은 한 곳) ③ 집합 유일성(한 키 = 한 owner). <strong>이게 약점이 아니라 강점이다</strong>: 1차 원칙 기반이라 판정이 결정적이고, 그래서 CI에서 빌드를 깰 수 있다(확률적 모델이면 못 한다).</p>
+</div>
+<p>아래 논문은 <strong>다른 문제 — 의미적(NLP) 중복 탐지</strong>를 다룬다. 우리 게이트의 출처가 아니라, <strong>계층 2(의미적 리뷰)의 근거이자 참고 구현</strong>으로만 인용한다.</p>
+<div class="paper">
+  <p class="ttl">Transfer learning for conflict and duplicate detection in software requirement pairs</p>
+  <p class="meta">Garima Malik, Savas Yildirim, Mucahit Cevik, Ayse Bener, Devang Parikh · arXiv:2301.03709 (cs.SE) · 2023 제출, 2024 개정</p>
+  <dl>
+    <dt>문제</dt><dd>충돌·중복 요구사항을 자동 식별해 요구 표현의 일관성을 높인다.</dd>
+    <dt>방법</dt><dd>요구문 <strong>“쌍(pair)” 분류</strong>로 형식화 → <strong>SR-BERT</strong>(Sentence-BERT+Bi-encoder)를 다단계 파인튜닝(transfer learning).</dd>
+    <dt>결과</dt><dd>데이터셋 4종 교차평가에서 SR-BERT가 큰 데이터셋에서 최고 성능 — 문장쌍 NLP가 중복/충돌 탐지를 효과적으로 자동화.</dd>
+    <dt>왜 인용</dt><dd><strong>(a)</strong> “말이 다른 같은 요구”가 실재한다는 근거, <strong>(b)</strong> 계층 2를 만들 때의 참고 구현. 단 확률적이라 <strong>CI 강제용으론 부적합</strong> → 1차는 결정적 게이트여야 한다.</dd>
+  </dl>
+</div>
+
+<h2><span class="n">07</span>검증 결과 (실제 실행 — 2026-06-29)</h2>
+<p>픽스처 스펙으로 <code>check-ownership.mjs</code>를 직접 돌려 동작을 확인했다(추측 아님).</p>
+<div class="scroll"><table>
+  <tr><th>케이스</th><th>기대</th><th>결과</th></tr>
+  <tr><td>두 스펙이 <code>pjt_projects</code> 공유</td><td>exit 1 + 충돌 출력</td><td><span class="pill g">통과</span> 어느 키·어느 스펙인지 표시</td></tr>
+  <tr><td>중복 제거 후</td><td>exit 0</td><td><span class="pill g">통과</span></td></tr>
+  <tr><td>Ownership 미선언 스펙</td><td>warn (점진 도입)</td><td><span class="pill g">통과</span></td></tr>
+  <tr><td><code>--strict</code> + 미선언</td><td>exit 1</td><td><span class="pill g">통과</span></td></tr>
+  <tr><td><code>node --check</code> 문법</td><td>정상</td><td><span class="pill g">통과</span></td></tr>
+</table></div>
+
+<h2><span class="n">08</span>키트 어디에 반영됐나</h2>
+<div class="scroll"><table>
+  <tr><th>파일</th><th>역할</th></tr>
+  <tr><td>DEDUP.md</td><td><strong>정식 결정기록</strong> — 2계층 모델·근거·검증(이 HTML의 텍스트 정본)</td></tr>
+  <tr><td>tooling/check-ownership.mjs</td><td>게이트 본체 — <code>## Ownership</code> 파싱·충돌 검사</td></tr>
+  <tr><td>STRUCTURE.md</td><td>소유권 유일성 규칙 + 라우팅 결정트리</td></tr>
+  <tr><td>SPEC_REVIEW.md</td><td>cross-spec 중복: 구조적=CI게이트 / 의미적=좁힌 리뷰</td></tr>
+  <tr><td>templates/module-spec.md</td><td>모든 스펙 템플릿에 <code>## Ownership</code> 블록</td></tr>
+  <tr><td>sdd-gates.yml · APPLYING.md</td><td><code>check:ownership</code> CI·스크립트 배선</td></tr>
+</table></div>
+
+<div class="box key">
+  <span class="tag">한 줄 요약</span>
+  <p>중복을 <strong>구조적</strong>(같은 키)과 <strong>의미적</strong>(말 바꾼 같은 요구)으로 나눠, 구조적은 <strong>게이트로 강제(1차)</strong>, 의미적은 <strong>좁힌 리뷰로 보조(2차)</strong>. 덕분에 “중복인가?”가 사람의 기억력이 아니라 <strong>CI가 막는 기계적 사실</strong>이 된다.</p>
+</div>
+
+<p class="foot">정본 문서: <code>DEDUP.md</code> · 게이트 구현: <code>tooling/check-ownership.mjs</code> · 설계 근거: DDD bounded context · Single Source of Truth · 집합 유일성. · 계층 2 참고: Malik et al., “Transfer learning for conflict and duplicate detection in software requirement pairs”, <a href="https://arxiv.org/abs/2301.03709">arXiv:2301.03709</a>.</p>
+</div>

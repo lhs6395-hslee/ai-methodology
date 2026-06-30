@@ -1,0 +1,102 @@
+name: SDD Quality Gates
+# ⚠️ 이건 **워크플로우 YAML 형식을 쓰는 CI/CD 도구용 샘플 하나**다. 방법론은 특정
+#    CI/CD 도구도 git 호스트도 요구하지 않는다 — 게이트는 CLI라 로컬/git훅/make/어떤
+#    CI/CD 도구에서든 돈다. 도구 무관 공통 형태·다른 환경은 → tooling/ci-examples.md
+#    (Spec Kit = spec 작성 도구, CI/CD = 게이트 실행기. 서로 별개다.)
+#
+# SSOT를 "주장"에서 "실재"로 바꾸는 드리프트 게이트 (SSOT.md §4). 매 PR/푸시 실행.
+#
+# ★ 언어/스택 무관: 프로젝트별 lint/typecheck/test 명령은 sdd.config.json의
+#   commands.* 에 선언하고, 이 워크플로우는 그것을 러너로 실행한다.
+#   → 이 YAML은 어떤 언어 프로젝트에서도 그대로 동작한다.
+#
+# ★ 게이트 런타임은 셋 중 프로젝트가 가진 쪽(동작 동일·전부 검증):
+#   • 셸판(진짜 언어 무관): sh scripts/sdd_gates.sh fr|ownership|run <stage>   (필요: sh+grep+awk+jq)
+#   • Python판            : python scripts/sdd_gates.py fr|ownership|run <stage>
+#   • Node판              : node scripts/check-*.mjs · node scripts/sdd-run.mjs
+#   아래는 Node 기준. Go·C·Rust 등 "그 언어 외엔 인터프리터 없음" 프로젝트는
+#   맨 아래 **셸판 변형**을 쓰면 추가 언어 런타임 0으로 동작한다.
+# ⚠️ commands의 lint/test가 기존 코드에서 통과하는지 먼저 확인할 것
+#    (흔한 함정: 기존 lint 에러로 red).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 게이트 런타임(Node) — 프로젝트가 무슨 언어든 필요.
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      # 프로젝트 언어 런타임이 필요하면 아래에서 골라 주석 해제(예시):
+      # - uses: actions/setup-python@v5
+      #   with: { python-version: '3.12' }
+      # - uses: actions/setup-go@v5
+      #   with: { go-version: '1.22' }
+      # - uses: actions/setup-java@v4
+      #   with: { distribution: temurin, java-version: '21' }
+      # - uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup (deps install — commands.setup)
+        run: node scripts/sdd-run.mjs setup
+      - name: Lint (commands.lint)
+        run: node scripts/sdd-run.mjs lint
+      - name: Type check (commands.typecheck)
+        run: node scripts/sdd-run.mjs typecheck
+      - name: Tests — test ↔ code (commands.test)
+        run: node scripts/sdd-run.mjs test
+      - name: FR ↔ test traceability (incremental)
+        run: node scripts/check-fr-coverage.mjs
+      - name: Cross-spec ownership uniqueness (구조적 중복 차단)
+        run: node scripts/check-ownership.mjs
+      # 모든 spec에 테스트/Ownership이 갖춰지면 strict로 승격:
+      # - name: FR coverage (strict)
+      #   run: node scripts/check-fr-coverage.mjs --strict
+      # - name: Ownership (strict — 모든 spec이 Owns 선언)
+      #   run: node scripts/check-ownership.mjs --strict
+      # 보강 게이트(advisory — 빌드 안 깸; 익으면 --strict 승격):
+      # - run: node scripts/check-test-adequacy.mjs
+      # - run: node scripts/check-converge-drift.mjs ${{ github.event.pull_request.base.ref || 'origin/main' }}
+      # - run: node scripts/check-orphan-surfaces.mjs
+
+# ─────────────────────────────────────────────────────────────
+# Python-only 프로젝트용 (Node 불필요) — 위 jobs.gates를 이걸로 대체:
+#
+#   jobs:
+#     gates:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: actions/setup-python@v5
+#           with: { python-version: '3.12' }
+#         - run: python scripts/sdd_gates.py run setup
+#         - run: python scripts/sdd_gates.py run lint
+#         - run: python scripts/sdd_gates.py run typecheck
+#         - run: python scripts/sdd_gates.py run test
+#         - run: python scripts/sdd_gates.py fr
+#         - run: python scripts/sdd_gates.py ownership
+#
+# (sdd_gates.py는 표준 라이브러리만 쓰므로 추가 설치 불필요. Node판과 동작 동일.)
+#
+# ─────────────────────────────────────────────────────────────
+# 언어 무관(Go·C·Rust 등, 추가 언어 런타임 0) — 셸판. ubuntu 러너엔 sh/grep/awk/jq 기본 존재:
+#
+#   jobs:
+#     gates:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v4
+#         # (프로젝트 언어 런타임이 commands.test 등에 필요하면 그 setup만 추가)
+#         - run: sh scripts/sdd_gates.sh run setup
+#         - run: sh scripts/sdd_gates.sh run lint
+#         - run: sh scripts/sdd_gates.sh run typecheck
+#         - run: sh scripts/sdd_gates.sh run test
+#         - run: sh scripts/sdd_gates.sh fr
+#         - run: sh scripts/sdd_gates.sh ownership
+#
+# (jq가 없는 희귀 러너면: sudo apt-get install -y jq. 셸판은 빌드 불필요.)

@@ -1,0 +1,41 @@
+name: Build SDD gate binaries
+# 한 Go 소스(tooling/go-gate)를 전 플랫폼 정적 바이너리로 크로스컴파일해 릴리스에 올린다.
+# → 소비자는 Go조차 필요 없이 자기 OS/arch 바이너리만 내려받아 실행한다(인터프리터 0).
+# 어떤 언어(Go·C·Rust·…) 프로젝트든 이 바이너리 하나면 게이트가 돈다.
+#
+# ⚠️ 이 파일은 워크플로우 YAML 형식 샘플일 뿐 — 특정 CI/CD 도구에 묶이지 않는다.
+#    다른 CI/CD 도구는 동일한 go build 매트릭스(아래 run 블록)를 그 문법으로 옮기면 된다.
+on:
+  push:
+    tags: ["sdd-gate-v*"]      # 예: git tag sdd-gate-v1.0.0 && git push --tags
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - name: Cross-compile (CGO_ENABLED=0 → 정적)
+        working-directory: tooling/go-gate
+        run: |
+          mkdir -p dist
+          for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${t%/*}; arch=${t#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
+              -o "dist/sdd-gate-$os-$arch$ext" .
+          done
+          (cd dist && sha256sum * > SHA256SUMS)
+          ls -lh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdd-gate-binaries
+          path: tooling/go-gate/dist/*
+      - name: Attach to release (tag push 시)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: tooling/go-gate/dist/*

@@ -1,0 +1,17 @@
+{
+  "id": "ears-ops",
+  "version": "1.0.0",
+  "description": "조직 표준 SDD preset — FR=EARS 5패턴, module>spec, [NEEDS CLARIFICATION] 강제 (도메인 범용)",
+  "specDir": "sdd/specs",
+  "templateDir": "sdd/templates",
+  "rules": {
+    "fr_format": "EARS 5패턴(Ubiquitous/Event/State/Unwanted/Optional) 중 하나만 사용",
+    "one_fr_one_action": "한 FR = 한 동작 = 검증 가능",
+    "no_ambiguity": "금지어: should/가능하면/적절히, 한 문장 2동작(and), 측정 불가 표현",
+    "unknown_values": "모르는 값은 [NEEDS CLARIFICATION: ...] — 창작 금지",
+    "fr_id_tagging": "구현 테스트는 @covers <SPEC-ID>/FR-NNN 로 FR과 연결(주석 스타일 자유: //·#·--). 언어/스택 차이는 sdd.config.json 어댑터로 — 게이트는 언어·모델·인프라 무관",
+    "approval": "spec 작성=LLM, 정본화 승인=사람. 코드→spec 자동 덮어쓰기 금지",
+    "domain": "[프로젝트 도메인으로 치환] — 다른 도메인 예시 강요 금지"
+  },
+  "modules": {}
+}
