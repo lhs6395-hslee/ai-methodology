@@ -1,9 +1,10 @@
 # 구조 — module > spec (범용)
 
-## 큰 틀 = 모듈, 그 안에 spec
-- **모듈** = 안정적 bounded context(제품당 보통 10여 개). 그 능력 영역의 SSOT 홈.
-- **spec** = 모듈 안의 응집된 기능 단위. 각 spec = 그 기능의 **살아있는 기능명세서**.
-- **과편화 금지** — 모듈을 너무 잘게 쪼개면 중복 리뷰가 폭발. `MODULE_MAP.md`로 인덱싱.
+## 큰 틀 = 1 레포 = 1 모듈, 그 안에 spec
+- **1 레포 = 1 모듈** (무조건). 레포 하나 = 안정적 bounded context 하나 = 그 능력 영역의 SSOT 홈. 모듈이 늘면 **레포가 는다**(한 레포에 여러 모듈을 넣지 않는다).
+- **spec** = 그 모듈 안의 응집된 기능 단위. 각 spec = 그 기능의 **살아있는 기능명세서**. 한 모듈(레포)은 spec 다수를 가진다.
+- **큰 프로그램 = 여러 모듈-레포의 MSA 합성** — 모듈 간은 공개 계약(API/이벤트)으로만 결합한다. 그 계약을 1급 SSOT로 강제하는 **MSA 계약 프로파일은 다중 모듈일 때 켜는 선택 계층**(Phase 2).
+- **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 응집 capability 묶음** — 서로 다른 top-level Surface/Capability를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **capability별로 분할**한다. 강제는 `check-spec-cohesion`(advisory, dedup의 거울상). 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
 
 ## 핵심 구분: 모듈 명세서(누적) vs feature 델타(병합)
 | | 정체 | 성격 |
@@ -25,7 +26,7 @@
    - 없지만 같은 Entity·Surface 범위 안 → 그 owner spec 개정.
    - 완전히 새 범위 → **새 spec 생성 + Owns 등록.**
 
-**강제(게이트):** 소유권 게이트가 전 spec의 `## Ownership`을 파싱해 **키별 소유 spec이 1개인지** CI에서 검증(중복 = exit 1). FR↔test 게이트의 형제. Ownership 미선언 spec은 warn(점진 도입), `--strict`로 완전 강제. (게이트는 Go 바이너리·셸·Python·Node 4판 동작 동일 — `principles.md` §10; CI는 provider 무관 — `ci-examples.md`.)
+**강제(게이트):** 소유권 게이트가 전 spec의 `## Ownership`을 파싱해 **키별 소유 spec이 1개인지** CI에서 검증(중복 = exit 1). FR↔test 게이트의 형제. Ownership 미선언 spec은 warn(점진 도입), `--strict`로 완전 강제. (게이트는 Go 바이너리·셸·Python·Node 4판 동작 동일 — `principles.md` §10; CI는 provider 무관 — `ci-examples.md`.) **유일성 범위 = 이 레포(=한 모듈)의 전 spec.** 모듈 간(레포 간) 키는 MSA 계약 경계로 분리되므로 dedup 대상이 아니다(1 레포=1 모듈). **거울상:** 한 spec이 키/FR을 과다 소유하면(under-fragmentation) `check-spec-cohesion` advisory 게이트가 분할을 권고한다.
 
 **2계층(정직):**
 - **구조적 중복**(같은 키) = `check-ownership` 게이트로 **기계적 차단**.

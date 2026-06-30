@@ -32,7 +32,7 @@ cp <KIT>/templates/module-spec.md  sdd/templates/spec-template.md
 cp <KIT>/templates/MODULE_MAP.md   sdd/MODULE_MAP.md
 cp <KIT>/templates/constitution.md .specify/memory/constitution.md
 ```
-- `STRUCTURE.md`대로 모듈을 10여 개로 정의, `MODULE_MAP.md`에 등록. 도메인 placeholder를 실제 도메인으로 치환.
+- `STRUCTURE.md`대로 **이 레포의 단일 모듈**(bounded context 하나)을 정의하고 `MODULE_MAP.md`(단일 모듈 매니페스트)에 등록. 도메인 placeholder를 실제 도메인으로 치환. 모듈이 더 필요하면 **레포를 나눈다**(MSA — 다중 모듈이면 Phase 2 계약 프로파일).
 
 ## 3. 검증 게이트 배선 (SSOT를 "실재"로) — 언어·런타임 무관
 ```bash
