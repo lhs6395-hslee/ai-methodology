@@ -76,7 +76,7 @@ for (const file of files) {
 
   // Parse Dependencies section — do NOT add to owners (not a dedup target)
   // This prevents false-positives where a referenced entity looks like a duplicate.
-  // parseSection(text, "Dependencies", CATEGORIES) — parsed but intentionally unused for dedup.
+  const _deps = parseSection(text, "Dependencies", CATEGORIES); // parsed but intentionally excluded from dedup
 }
 
 // 충돌(같은 키를 2+ spec이 소유) 수집

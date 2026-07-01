@@ -23,6 +23,9 @@ function run(specs, args = []) {
 }
 
 test("Dependencies의 키는 dedup 대상이 아니다(거짓양성 해소)", () => {
+  // A naive impl that fed ## Dependencies into the dedup map would see SPEC-001
+  // "owning" staff (via its Dependencies) AND SPEC-002 owning it → false conflict (exit 1).
+  // Correct impl excludes Dependencies → only SPEC-002 owns staff → exit 0.
   const A = "# SPEC-001\n## Ownership\n- **Entities**: recommendation\n## Dependencies\n- **Entities**: staff\n";
   const B = "# SPEC-002\n## Ownership\n- **Entities**: staff\n"; // staff를 소유 → A는 참조라 충돌 아님
   const r = run({ "SPEC-001.md": A, "SPEC-002.md": B });
@@ -41,4 +44,11 @@ test("미등록 verb는 --strict에서 exit 1", () => {
   const A = "# SPEC-001\n## Ownership\n- **Capabilities**: staff.suggest\n";
   assert.equal(run({ "SPEC-001.md": A }).code, 0);            // 기본 warn
   assert.equal(run({ "SPEC-001.md": A }, ["--strict"]).code, 1); // strict 차단
+});
+
+test("Surface 정규화 후 충돌: 다른 param 문법·메서드 케이스가 같은 키로 수렴", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Surfaces**: POST /api/items/:id\n";
+  const B = "# SPEC-002\n## Ownership\n- **Surfaces**: post /api/items/{id}/\n"; // normalizes to same key
+  const r = run({ "SPEC-001.md": A, "SPEC-002.md": B });
+  assert.equal(r.code, 1, r.out);
 });
