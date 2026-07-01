@@ -54,6 +54,30 @@ function walk(dir, acc = []) {
   return acc;
 }
 
+// 0. PREFIX whitelist pre-check — must run before spec collection.
+//    Scans ALL ^[A-Z]+-NNN.md files; unregistered prefix → exit 1 (no silent skip).
+//    Non-standard prefix without rationale → exit 1.
+const STANDARD = new Set(["SPEC", "INFRA", "TEST"]);
+const allowed = new Set(cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : ["SPEC"]);
+const rationale = cfg.prefixRationale || {};
+const prefixErrors = [];
+
+for (const f of readdirSync(SPEC_DIR)) {
+  const m = f.match(/^([A-Z]+)-\d{3}/);
+  if (!f.endsWith(".md") || !m) continue;
+  const pfx = m[1];
+  if (!allowed.has(pfx)) {
+    prefixErrors.push(`미등록 접두어 "${pfx}" (${f}) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가`);
+  } else if (!STANDARD.has(pfx) && !(rationale[pfx] && String(rationale[pfx]).trim())) {
+    prefixErrors.push(`표준 밖 접두어 "${pfx}" — prefixRationale["${pfx}"]에 도입 사유 필요(빈 값 불가)`);
+  }
+}
+if (prefixErrors.length) {
+  console.error("✗ PREFIX 위반:");
+  for (const e of prefixErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+
 // 1. Collect declared FRs per spec.
 const specs = new Map(); // SPEC-ID -> Set(FR-ID)
 for (const f of readdirSync(SPEC_DIR)) {
