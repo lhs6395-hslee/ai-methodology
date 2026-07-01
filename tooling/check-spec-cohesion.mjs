@@ -15,6 +15,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { parseSection } from "./ownership-keys.mjs";
 
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -22,8 +23,6 @@ const STRICT = process.argv.includes("--strict");
 const CATEGORIES = cfg.ownershipCategories;
 const MAX_KEYS = cfg.maxKeysPerCategoryPerSpec;
 const MAX_FRS = cfg.maxFRsPerSpec;
-const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
-
 function specFiles() {
   let names;
   try { names = readdirSync(SPEC_DIR); } catch {
@@ -33,23 +32,8 @@ function specFiles() {
   return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
 }
 
-// `## Ownership` 섹션 → 카테고리별 키 목록 (check-ownership.mjs와 동일 파서).
-function parseOwnership(text) {
-  const start = text.search(/^##\s+Ownership/m);
-  if (start === -1) return null;
-  const after = text.slice(start);
-  const body = after.slice(after.indexOf("\n") + 1);
-  const nextSec = body.search(/^##\s/m);
-  const block = nextSec === -1 ? body : body.slice(0, nextSec);
-  const out = {};
-  for (const cat of CATEGORIES) {
-    const line = block.match(new RegExp(`-\\s*\\*\\*${cat}\\*\\*\\s*:\\s*([^\\n]+)`, "i"));
-    out[cat] = line
-      ? line[1].split(",").map(norm).filter((k) => k && k !== "—" && k !== "[…]" && !k.startsWith("["))
-      : [];
-  }
-  return out;
-}
+// aggregate root 카테고리: /entit/i 패턴에 맞는 첫 카테고리, 없으면 첫 번째.
+const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
 
 // 고유 FR-ID 수.
 function countFRs(text) {
@@ -66,8 +50,13 @@ for (const file of files) {
   const specId = (text.match(cfg.__specIdRe) || [file.split("/").pop()])[0];
   const frs = countFRs(text);
   if (frs > MAX_FRS) violations.push({ specId, kind: "FR", n: frs, max: MAX_FRS });
-  const own = parseOwnership(text);
-  if (own) {
+  const own = parseSection(text, "Ownership", CATEGORIES);
+  const hasOwnership = text.search(/^##\s+Ownership/m) !== -1;
+  if (hasOwnership) {
+    // 신규: Entities(aggregate root) 다수 = 여러 aggregate 삼킴 신호
+    if (own[ENT_CAT] && own[ENT_CAT].length > 1)
+      violations.push({ specId, kind: `${ENT_CAT}(aggregate)`, n: own[ENT_CAT].length, max: 1 });
+    // 기존: 카테고리별 키 > MAX_KEYS
     for (const cat of CATEGORIES) {
       if (own[cat].length > MAX_KEYS)
         violations.push({ specId, kind: cat, n: own[cat].length, max: MAX_KEYS });
@@ -81,7 +70,10 @@ if (violations.length) {
   const tag = STRICT ? "✗" : "⚠";
   console.log(`${tag} 과대 spec(분할 권고) ${violations.length}건:`);
   for (const v of violations) {
-    console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} → capability별 분할 검토`);
+    if (v.kind.includes("aggregate"))
+      console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} — 여러 aggregate 삼킴 의심 → capability별 분할 검토`);
+    else
+      console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} → capability별 분할 검토`);
   }
   if (STRICT) {
     console.error(`\n✗ --strict: 과대 spec은 분할 필요.`);
