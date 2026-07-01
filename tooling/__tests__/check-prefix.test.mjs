@@ -31,10 +31,17 @@ test("사유(prefixRationale) 있으면 FEAT 통과", () => {
     { "FEAT-001.md": "# FEAT-001\n**FR-001** THE SYSTEM SHALL x.\n" },
     { specIdPrefixes: ["SPEC","INFRA","TEST","FEAT"], prefixRationale: { FEAT: "레거시 마법사 기능군" } }
   );
-  assert.notEqual(r.code, 1); // PREFIX 사유는 통과(FR 커버리지 warn은 별개)
+  assert.equal(r.code, 0); // PREFIX 사유는 통과(FR 커버리지 warn은 별개)
 });
 
 test("표준 접두어(SPEC/INFRA/TEST)는 정상", () => {
   const r = run({ "INFRA-001.md": "# INFRA-001\n인프라 spec.\n" });
-  assert.notEqual(r.code, 1);
+  assert.equal(r.code, 0);
+});
+
+test("bare config(specIdPrefixes 없음)에서 INFRA-001은 하위호환(정상)", () => {
+  const r = run({ "INFRA-001.md": "# INFRA-001\n인프라 spec.\n" }, {});
+  // No specIdPrefixes key → loadConfig fills DEFAULTS.specIdPrefixes = ["SPEC","INFRA","TEST"]
+  // → INFRA-001 등록됨 → exit 0
+  assert.equal(r.code, 0, r.out);
 });

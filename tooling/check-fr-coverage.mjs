@@ -24,7 +24,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -36,7 +36,7 @@ const STRICT = process.argv.includes("--strict");
 const FR_DECL = /\*\*(FR-\d{3})\*\*/g;   // **FR-006** in spec prose
 const SPEC_ID = cfg.__specIdRe;          // e.g. /(?:SPEC|TEST|INFRA)-\d{3}/ (from specIdPrefixes)
 const COVERS = cfg.__coversRe;           // @covers <PREFIX>-NNN/FR-NNN (from specIdPrefixes)
-const PREFIXES = cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : ["SPEC"];
+const PREFIXES = cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes;
 
 function walk(dir, acc = []) {
   let entries;
@@ -58,7 +58,7 @@ function walk(dir, acc = []) {
 //    Scans ALL ^[A-Z]+-NNN.md files; unregistered prefix → exit 1 (no silent skip).
 //    Non-standard prefix without rationale → exit 1.
 const STANDARD = new Set(["SPEC", "INFRA", "TEST"]);
-const allowed = new Set(cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : ["SPEC"]);
+const allowed = new Set(cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes);
 const rationale = cfg.prefixRationale || {};
 const prefixErrors = [];
 
