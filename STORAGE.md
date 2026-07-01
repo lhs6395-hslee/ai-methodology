@@ -47,7 +47,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 
 ## 2. 스펙 저장 규칙 (명시적)
 1. **1 스펙 = 1 파일** = `<specDir>/<PREFIX>-NNN.md` (기본 `sdd/specs/`).
-2. **PREFIX 표준 3종**: `SPEC`(기능 명세, 기본) · `INFRA`(인프라 prerequisite spec) · `TEST`(테스트 전용 spec). `specIdPrefixes` 기본값 = `["SPEC","INFRA","TEST"]`.
+2. **PREFIX 표준 3종**: `SPEC`(기능 명세, 기본) · `INFRA`(인프라 prerequisite spec) · `TEST`(테스트 전용 spec). `specIdPrefixes` 기본값 = `["SPEC","INFRA","TEST"]`. (표준 밖은 `prefixRationale` 등록 필수 — `check-fr-coverage`가 강제)
    - **표준 밖 접두어**(예: `FEAT`)를 쓰려면 **먼저 등록 + 사유 필수**: `sdd.config.json`에 `specIdPrefixes`에 추가 AND `prefixRationale`에 사유 기재. 사유 없으면 PREFIX 사유 검증 게이트가 exit 1.
    - **조용한 누락 제거**: 게이트는 `specDir`의 **모든** `^[A-Z]+-\d{3}.*\.md` 파일을 스캔한다. 허용 집합 밖 접두어 파일이 있으면 **조용히 건너뛰지 않고 exit 1**. (과거: 미등록 접두어 파일은 조용히 `continue`되어 그 spec의 FR이 추적에서 통째로 빠져 거짓 green — PM솔루션 FEAT-001 실측 사례.) ← 가장 흔한 함정.
 3. 본문 필수: `Module` 헤더 · **`**FR-NNN**`(EARS 5패턴)** · `## Ownership`(키 종류 = config의 `ownershipCategories`). 선택: SC·NFR·Infrastructure Prerequisites(인프라 의존 없으면 생략). 단 **FR이 있으면 SC·인수조건 권장** — `check-spec-completeness`가 *존재*를 advisory로 점검(SC 충족·측정가능성은 런타임/`/checklist` 담당). 인수조건·SC 리뷰 자체는 Spec Kit 네이티브가 맡는다. **왜 Ownership만 필수인가:** dedup 게이트의 "한 키=한 spec" 판정은 *모든 spec이 키를 선언해야* 성립한다 — Ownership을 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(**미선언 1개 = 보장에 뚫린 구멍**). SC·NFR 누락은 *그 기능 하나*의 로컬 약점이지만, Ownership 누락은 *시스템 전체* 중복 보장을 깬다 — 그래서 SC·NFR은 선택, Ownership은 필수.

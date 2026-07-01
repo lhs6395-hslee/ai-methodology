@@ -27,7 +27,7 @@
 - **Surfaces**: POST /api/pjt/recommend, /tools/pjt/new # route·화면·job(METHOD 대문자·path 소문자·{param})
 - **Capabilities**: project.create, staff.assign        # entity.verb (verb ∈ 허용 집합)
 
-## Dependencies   ← 참조(읽기/호출만). dedup 제외. 같은 정규화·형식.
+## Dependencies   ← 참조(읽기/호출만). dedup 제외. 같은 정규화 표기 권장(게이트 형식검증 대상 아님).
 - **Entities**: staff, project   # 이 spec이 소유하지 않고 참조하는 다른 aggregate의 Entity
 - **Surfaces**: GET /api/staff/{id}
 ```

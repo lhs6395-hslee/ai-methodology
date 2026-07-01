@@ -57,7 +57,7 @@
 - **Capabilities**: [entity.verb 형태 — 예: `project.create`, `staff.assign`. verb ∈ CRUD 기본(create/read/update/delete/list) + config `capabilityVerbs` 등록 verb만 허용]
 
 ## Dependencies (참조 — dedup 제외)
-> 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화·형식. `check-ownership`은 이 섹션을 dedup 대상에서 제외한다.
+> 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화 표기를 권장하되, 게이트의 형식검증·dedup 대상은 아니다.
 - **Entities**: [다른 spec 소유 Entity 중 참조하는 것]
 - **Surfaces**: [호출하는 외부 route·이벤트]
 
