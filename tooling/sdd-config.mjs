@@ -49,10 +49,15 @@ export const DEFAULTS = {
   maxKeysPerCategoryPerSpec: 4,
   maxFRsPerSpec: 8,
   // spec 파일·ID·@covers 태그에서 인정할 ID 접두어들(언어중립 추적 닻).
-  // 기본 = ["SPEC"](하위호환). 프로젝트가 인프라/테스트 등을 1급 spec으로
-  // 다룬다면 확장(예: ["SPEC","TEST","INFRA"]). 파일명·SPEC_ID·COVERS 정규식이
+  // 기본 = ["SPEC","INFRA","TEST"](§5.1 표준 3종). 파일명·SPEC_ID·COVERS 정규식이
   // 모두 이 목록에서 파생되어, 접두어 추가가 코드 fork 없이 config로 표현된다.
-  specIdPrefixes: ["SPEC"],
+  specIdPrefixes: ["SPEC", "INFRA", "TEST"],
+  // 표준 밖 접두어 → 도입 사유(빈 값이면 게이트 exit 1)
+  prefixRationale: {},
+  // CRUD 기본에 더할 도메인 verb
+  capabilityVerbs: [],
+  // Surface path param 표준 표기
+  surfacePathParam: "{name}",
   // 언어별 셸 명령(sdd-run.mjs가 실행). 미설정 stage는 건너뜀.
   //   { "setup": "...", "lint": "...", "typecheck": "...", "test": "..." }
   commands: {},
@@ -97,6 +102,14 @@ export function loadConfig(start = process.cwd()) {
   cfg.__idAlt = alt;
   cfg.__specIdRe = new RegExp(`(?:${alt})-\\d{3}`);                 // 본문/파일명에서 ID 추출
   cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/(FR-\\d{3})`, "g");
+
+  // Verb 파생값
+  const CRUD = ["create", "read", "update", "delete", "list"];
+  cfg.__crudVerbs = CRUD;
+  cfg.__allVerbs = new Set(
+    [...CRUD, ...(cfg.capabilityVerbs || [])].map((v) => String(v).trim().toLowerCase())
+  );
+
   return cfg;
 }
 
