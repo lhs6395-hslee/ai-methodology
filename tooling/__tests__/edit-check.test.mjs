@@ -10,7 +10,15 @@ function run(input) {
 
 test("src 편집이면 체크리스트 출력", () => {
   const out = run({ tool_name: "Write", tool_input: { file_path: "src/recommend.ts" } });
-  assert.match(out, /MODULE_MAP|대응 FR|PREFIX|@covers/);
+  assert.match(out, /MODULE_MAP/);
+  assert.match(out, /FR/);
+  assert.match(out, /PREFIX/);
+  assert.match(out, /@covers/);
+});
+
+test("중첩 lib 경로도 체크리스트 출력", () => {
+  const out = run({ tool_name: "Write", tool_input: { file_path: "packages/lib/util.ts" } });
+  assert.match(out, /MODULE_MAP/);
 });
 
 test("문서 파일이면 침묵", () => {
