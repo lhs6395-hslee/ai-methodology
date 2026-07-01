@@ -96,7 +96,7 @@ export function loadConfig(start = process.cwd()) {
   cfg.__root = path ? dirname(path) : start; // 모든 상대경로의 기준
   cfg.__testRegex = cfg.testFileRegex.map((s) => new RegExp(s));
   // spec ID 접두어 파생값(게이트 공통). 예: ["SPEC","TEST","INFRA"] → "SPEC|TEST|INFRA"
-  const alt = (cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : ["SPEC"])
+  const alt = (cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes)
     .map((p) => String(p).replace(/[^A-Za-z0-9_]/g, "")) // 정규식 안전
     .join("|");
   cfg.__idAlt = alt;
