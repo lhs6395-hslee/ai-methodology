@@ -56,6 +56,42 @@ if [ "$GATE" = "node" ]; then
   copy "$KIT/tooling/harness/pre-push"           "$T/scripts/sdd-pre-push.sh"
   say "  → 하네스 훅 설치(선택): ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push"
   say "  → 계약: $KIT/HARNESS.md  · 스킬: /sdd-sync"
+
+  # ── hook 세트 배선: 채택 순간 = 상시 강제 궤도 ─────────────────
+  copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
+  copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
+  copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
+  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-pre-commit.sh"
+
+  # git pre-commit 훅 연결 (.git 있을 때만)
+  if [ -d "$T/.git" ]; then
+    printf '#!/bin/sh\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
+    chmod +x "$T/.git/hooks/pre-commit"
+    say "  → git pre-commit 훅 연결됨"
+  fi
+
+  # .claude/settings.json 병합 — 기존 hooks 보존; jq 있으면 merge, 없으면 신규 생성
+  mkdir -p "$T/.claude"
+  SETTINGS="$T/.claude/settings.json"
+  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]}]}}'
+  if [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
+    # jq -s '.[0] * .[1]': object 재귀 merge — 기존 키 보존, SDD 키 추가
+    # 단, 동일 키(hooks.SessionStart)가 있으면 .[1](SDD)이 우선 — 기존 hook 배열 보존을 위해
+    # 배열 병합: 기존 SessionStart 엔트리 + SDD 엔트리를 concat
+    tmp=$(mktemp)
+    jq -s '
+      .[0] as $old | .[1] as $new |
+      $old * $new |
+      .hooks.SessionStart = (($old.hooks.SessionStart // []) + ($new.hooks.SessionStart // [])) |
+      .hooks.PreToolUse   = (($old.hooks.PreToolUse   // []) + ($new.hooks.PreToolUse   // []))
+    ' "$SETTINGS" - <<_JQ > "$tmp" && mv "$tmp" "$SETTINGS"
+$NEW_HOOKS
+_JQ
+    say "  → .claude/settings.json hooks 병합 완료"
+  else
+    printf '%s\n' "$NEW_HOOKS" > "$SETTINGS"
+    say "  → .claude/settings.json 생성(hooks 배선)"
+  fi
 fi
 
 # ── 3. 방법론 설명서는 복사 안 함 — 키트 참조(드리프트 방지). 포인터만. ──
