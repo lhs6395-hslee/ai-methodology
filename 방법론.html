@@ -31,6 +31,19 @@
   nav .links{display:flex;gap:15px;flex-wrap:wrap}
   @media(max-width:860px){nav .links{display:none}}
 
+  /* orbit walkthrough steps */
+  .orbit{margin:22px 0}
+  .orb{display:grid;grid-template-columns:110px 1fr;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+  .orb:first-child{border-top:0}
+  .orb .tag{font-size:.72rem;font-weight:800;letter-spacing:.02em;text-align:right;padding-top:4px}
+  .tag.session{color:var(--spec)} .tag.edit{color:var(--gate)} .tag.commit{color:var(--bad)} .tag.push{color:var(--code)} .tag.new{color:#7a3b10}
+  .orb .body>b{font-weight:750} .orb .body p{margin:.25rem 0 0;font-size:.95rem;max-width:62ch}
+
+  /* key derivation table */
+  .keytbl td:first-child{font-family:var(--mono);font-size:.82em;white-space:nowrap}
+  .keytbl td:nth-child(2){color:var(--muted);font-size:.88rem}
+  .keytbl td:nth-child(3){font-family:var(--mono);font-size:.82em;color:var(--code)}
+
   header.hero{padding:64px 0 40px}
   .eyebrow{font-size:.74rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--spec)}
   h1{font-size:clamp(2.1rem,5vw,3rem);line-height:1.12;letter-spacing:-.02em;font-weight:800;margin:.5rem 0 .4rem;text-wrap:balance}
@@ -124,7 +137,8 @@
   <div class="links">
     <a href="#why">왜</a><a href="#pillars">4 기둥</a><a href="#core">핵심 구조</a>
     <a href="#msa">MSA</a><a href="#gates">게이트</a><a href="#loop">생애주기</a>
-    <a href="#harness">하네스</a><a href="#run">하네스 실전</a><a href="#big">빅 픽처</a>
+    <a href="#harness">하네스</a><a href="#run">하네스 실전</a>
+    <a href="#determinism">결정성</a><a href="#orbit">궤도 운영</a><a href="#big">빅 픽처</a>
   </div>
 </div></nav>
 
@@ -419,6 +433,190 @@
   <p class="note">반대 방향(<strong>R1, spec→code</strong>)은 더 단순하다: 명세에 <code>FR-008</code>을 새로 쓰면 → <code>/sdd-sync</code>의 <code>check-fr-coverage</code>가 "이 FR엔 검증 테스트가 없다"를 잡고 → "구현할까요?"를 물어 → TDD(RED→GREEN)로 코드를 만든다. <strong>어느 방향이든: 기계가 어긋남을 찾고, 사람이 결정하고, LLM이 작성한다.</strong></p>
 </div></section>
 
+<section id="determinism"><div class="wrap">
+  <span class="eyebrow">결정성 — 키·경계·PREFIX</span>
+  <h2>Ownership 키의 결정성 — 누가 만들어도 같은 문자열</h2>
+  <p>게이트는 "한 키 = 한 spec"을 <em>비교</em>한다. 그런데 그 키가 <em>어떻게 만들어지는가</em>는 규칙 없이 사람·LLM 판단에 맡겨져 있었다 — "같은 개념인데 표기가 달라" 거짓 green이 나오거나, "다른 개념인데 비슷해 보여" 차단이 누락됐다. 이 결정성 설계가 메우는 빈칸이다.</p>
+
+  <h3>정규화 절대 규칙 (카테고리별)</h3>
+  <div class="tablewrap"><table class="keytbl">
+    <tr><th>카테고리</th><th>정규화 규칙</th><th>예시 결과</th></tr>
+    <tr><td>Entity</td><td>스키마/모델 식별자 그대로 + trim·소문자. 단복수·대소문자 임의 변환 금지(스키마가 진실)</td><td><code>recommendation</code>, <code>pjt_projects</code></td></tr>
+    <tr><td>Surface</td><td><code>METHOD&nbsp;path</code> — 메서드 대문자, path 소문자, param <code>{name}</code> 표준형(<code>:id</code>·<code>&lt;id&gt;</code>→<code>{id}</code>), trailing slash 제거. 이벤트=<code>event:name</code>, job=<code>job:name</code></td><td><code>POST /api/recommend/{id}</code></td></tr>
+    <tr><td>Capability</td><td><code>entity.verb</code> — 점 정확히 1개, 소문자, verb ∈ 허용집합(CRUD 기본 + config <code>capabilityVerbs</code>). 미등록 verb = 형식 위반</td><td><code>recommendation.create</code>, <code>staff.recommend</code></td></tr>
+  </table></div>
+
+  <h3>키 생성 결정 절차 — 사람·LLM이 밟으면 같은 문자열</h3>
+  <figure><div class="figscroll"><svg viewBox="0 0 820 290" role="img" aria-label="키 생성 단계별 알고리즘: Capability, Surface, Entity 세 트랙">
+    <defs><marker id="ar4" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5a6489"/></marker></defs>
+    <!-- Capability track -->
+    <text x="14" y="22" font-size="12.5" font-weight="800" fill="#3a57d6">Capability 키</text>
+    <rect x="14" y="32" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="124" y="53" font-size="11.5" text-anchor="middle" fill="#3a57d6">①&nbsp;핵심 Entity 식별</text><text x="124" y="67" font-size="10.5" text-anchor="middle" fill="#33406e">스키마/타입명 그대로, 소문자</text>
+    <line x1="124" y1="70" x2="124" y2="86" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="14" y="88" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="124" y="109" font-size="11.5" text-anchor="middle" fill="#3a57d6">②&nbsp;핵심 동작 1개 추출</text><text x="124" y="123" font-size="10.5" text-anchor="middle" fill="#33406e">"추천" → 허용 verb 집합 매핑</text>
+    <line x1="124" y1="126" x2="124" y2="142" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="14" y="144" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="124" y="165" font-size="11.5" text-anchor="middle" fill="#3a57d6">③&nbsp;조립 → entity.verb</text><text x="124" y="179" font-size="10.5" text-anchor="middle" fill="#33406e">점 1개, 소문자</text>
+    <line x1="124" y1="182" x2="124" y2="198" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="14" y="200" width="220" height="36" rx="6" fill="#e4f5ef" stroke="#0a946c"/><text x="124" y="223" font-size="12" text-anchor="middle" font-weight="700" fill="#0a946c">staff.recommend</text>
+    <rect x="14" y="248" width="220" height="36" rx="6" fill="#fcefe2" stroke="#e2620a"/><text x="124" y="266" font-size="11" text-anchor="middle" fill="#e2620a">verb 집합에 없으면 STOP</text><text x="124" y="280" font-size="10.5" text-anchor="middle" fill="#7a3b10">capabilityVerbs 등록 후 진행</text>
+    <!-- Surface track -->
+    <text x="300" y="22" font-size="12.5" font-weight="800" fill="#3a57d6">Surface 키</text>
+    <rect x="300" y="32" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="410" y="53" font-size="11.5" text-anchor="middle" fill="#3a57d6">①&nbsp;메서드 대문자</text><text x="410" y="67" font-size="10.5" text-anchor="middle" fill="#33406e">POST /api/Recommend/:id</text>
+    <line x1="410" y1="70" x2="410" y2="86" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="300" y="88" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="410" y="109" font-size="11.5" text-anchor="middle" fill="#3a57d6">②&nbsp;path 소문자</text><text x="410" y="123" font-size="10.5" text-anchor="middle" fill="#33406e">POST /api/recommend/:id</text>
+    <line x1="410" y1="126" x2="410" y2="142" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="300" y="144" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="410" y="165" font-size="11.5" text-anchor="middle" fill="#3a57d6">③&nbsp;param 표준형</text><text x="410" y="179" font-size="10.5" text-anchor="middle" fill="#33406e">:id → {id}</text>
+    <line x1="410" y1="182" x2="410" y2="198" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="300" y="200" width="220" height="36" rx="6" fill="#e4f5ef" stroke="#0a946c"/><text x="410" y="223" font-size="12" text-anchor="middle" font-weight="700" fill="#0a946c">POST /api/recommend/{id}</text>
+    <!-- Entity track -->
+    <text x="586" y="22" font-size="12.5" font-weight="800" fill="#3a57d6">Entity 키</text>
+    <rect x="586" y="32" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="696" y="53" font-size="11.5" text-anchor="middle" fill="#3a57d6">①&nbsp;스키마 식별자 그대로</text><text x="696" y="67" font-size="10.5" text-anchor="middle" fill="#33406e">pjt_projects (테이블명)</text>
+    <line x1="696" y1="70" x2="696" y2="86" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="586" y="88" width="220" height="38" rx="6" fill="#eef1fd" stroke="#3a57d6"/><text x="696" y="109" font-size="11.5" text-anchor="middle" fill="#3a57d6">②&nbsp;trim + 소문자</text><text x="696" y="123" font-size="10.5" text-anchor="middle" fill="#33406e">단복수·표기 임의 변환 금지</text>
+    <line x1="696" y1="126" x2="696" y2="142" stroke="#5a6489" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="586" y="144" width="220" height="92" rx="6" fill="#e4f5ef" stroke="#0a946c"/><text x="696" y="175" font-size="12" text-anchor="middle" font-weight="700" fill="#0a946c">pjt_projects</text><text x="696" y="198" font-size="10.5" text-anchor="middle" fill="#0a5e45">스키마가 진실 —</text><text x="696" y="212" font-size="10.5" text-anchor="middle" fill="#0a5e45">임의 복수화("projects"→"project") 금지</text>
+  </svg></div>
+  <figcaption>세 트랙 모두 규칙이 고정이라 — 사람이 수작업으로 따라도, LLM이 생성해도 — 같은 문자열이 나온다. 허용 verb 집합 멤버십 위반은 <code>check-ownership</code>이 잡는다.</figcaption></figure>
+
+  <h3>1 spec = 1 aggregate (분리의 결정적 기준)</h3>
+  <p>"무엇이 하나의 spec인가"도 결정적 기준이 필요하다. <em>"응집 묶음"</em>은 주관적 — 대신 <strong>aggregate root(독립적으로 생성·삭제되는 핵심 Entity)를 경계 닻으로</strong> 쓴다.</p>
+  <div class="grid g3">
+    <div class="card"><h4>소유</h4><p>한 spec = 한 aggregate root를 <code>Ownership.Entities</code>에 소유. 그 aggregate를 변경하는 Capability·Surface도 함께.</p></div>
+    <div class="card"><h4>참조</h4><p>다른 aggregate는 <code>Dependencies</code>로 참조(dedup 제외). 예: <code>recommendation</code> spec이 <code>staff</code>를 읽을 때.</p></div>
+    <div class="card"><h4>라우팅</h4><p>새 FR → 그 FR이 <em>변경하는</em> aggregate 식별 → 그 owner spec 개정. owner 없으면 새 spec(새 aggregate).</p></div>
+  </div>
+  <p class="note gate">세 게이트가 한 닻으로 묶인다: <strong>dedup</strong>(1 Entity=1 spec = 경계 강제) · <strong>cohesion</strong>(Entities 2개 이상 = 여러 aggregate 삼킴 경고) · <strong>Dependencies</strong>(경계 밖 참조 명시). "독립 생성·삭제되는 root"라는 조작적 정의가 "응집 묶음"보다 훨씬 결정적이고, dedup이 사후에 강제한다.</p>
+
+  <h3>spec PREFIX 거버넌스</h3>
+  <p>접두어가 난립하면 게이트가 spec을 조용히 건너뛴다 — <code>FEAT-001.md</code>가 있어도 config에 <code>FEAT</code>가 없으면 FR이 통째로 누락된 채 거짓 green. 이를 막는 두 장치:</p>
+  <div class="tablewrap"><table>
+    <tr><th>접두어</th><th>의미</th><th>기본 포함</th></tr>
+    <tr><td><code>SPEC</code></td><td>기능 명세 (기본)</td><td class="pass">✓</td></tr>
+    <tr><td><code>INFRA</code></td><td>인프라 prerequisite spec</td><td class="pass">✓</td></tr>
+    <tr><td><code>TEST</code></td><td>테스트 전용 spec</td><td class="pass">✓</td></tr>
+    <tr><td>그 외 (예: <code>FEAT</code>)</td><td>표준 밖 — 사유 없이 추가 불가</td><td class="blk">✗</td></tr>
+  </table></div>
+  <p><strong>조용한 누락 제거:</strong> 게이트가 <code>specDir</code>의 모든 <code>^[A-Z]+-\d{3}.*\.md</code>를 스캔 — 접두어가 허용집합 밖이면 건너뛰지 않고 <strong>exit 1</strong>. 표준 밖 접두어는 <code>specIdPrefixes</code>에 등록 + <code>prefixRationale</code>에 사유(사유 없으면 exit 1). 기계는 사유의 <em>존재</em>만 강제하고 <em>질</em>은 리뷰가 본다.</p>
+  <p class="termlbl">$ node scripts/check-fr-coverage.mjs (FEAT-001.md 있고 FEAT 미등록 시 — 실측)</p>
+  <pre><span class="r">✗ PREFIX 위반:</span>
+  <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
+</div></section>
+
+<section id="orbit"><div class="wrap">
+  <span class="eyebrow">채택 후 일상 운영</span>
+  <h2>채택 후 궤도 한 바퀴 — hook·게이트가 언제·무엇을 하나</h2>
+  <p><code>sdd-init</code>로 채택하면 <strong>hook 세트가 자동 배선</strong>되고, 이후 모든 세션·커밋이 방법론 궤도를 강제받는다. 아래가 실제 개발 하루 — 가상 기능 "직원 추천"을 기준으로.</p>
+  <div class="note">두 레이어: <strong>Claude Code hook(상기)</strong> — 세션 시작·코드 편집 시 컨텍스트 주입(Claude Code에서만). <strong>git hook(hard 차단)</strong> — 커밋·푸시에서 언어·에이전트 무관 물리 차단(백스톱).</div>
+
+  <div class="orbit">
+    <div class="orb">
+      <div class="tag session">① 세션 시작<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">SessionStart</small></div>
+      <div class="body">
+        <b>방법론 요약 자동 주입 (세션당 1회)</b>
+        <p>Claude Code를 열면 <code>SessionStart</code> hook이 궤도·진입규칙·PREFIX·spec 위치를 컨텍스트에 올린다. 아래가 실측 출력(<code>sdd-session-context.sh</code>):</p>
+        <p class="termlbl">SessionStart hook 출력 — 실측</p>
+        <pre>[SDD 방법론 — 이 프로젝트는 채택된 강제 궤도 위에서 돈다]
+궤도: spec → code → test → sync (이탈은 hook·게이트가 되돌림)
+진입 규칙(새 기능/수정 시 반드시):
+  1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
+  2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
+  3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
+  4) FR은 EARS, 테스트는 @covers &lt;PREFIX&gt;-NNN/FR-NNN
+  5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
+게이트: check-fr-coverage·check-ownership·check-spec-cohesion·check-spec-consistency
+동기화: /sdd-sync (drift 점검), pre-push 훅</pre>
+      </div>
+    </div>
+
+    <div class="orb">
+      <div class="tag new">② 새 기능<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">MODULE_MAP</small></div>
+      <div class="body">
+        <b>MODULE_MAP 대조 → spec → TDD</b>
+        <p><code>sdd/MODULE_MAP.md</code>에서 기존 spec과 겹치는지 확인 → 겹치면 <em>그 spec 개정</em>, 아니면 <code>sdd/specs/SPEC-NNN.md</code> 신규. PREFIX는 <code>SPEC</code>/<code>INFRA</code>/<code>TEST</code> 중 하나. FR은 EARS로, Ownership은 결정 절차(위 §결정성)로 — 그다음 TDD.</p>
+        <p><strong>1 spec = 1 aggregate 경계:</strong> 새 FR이 변경하는 aggregate를 먼저 식별해 소속 spec을 결정한다.</p>
+      </div>
+    </div>
+
+    <div class="orb">
+      <div class="tag edit">③ 코드 편집<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">PreToolUse</small></div>
+      <div class="body">
+        <b>편집 체크리스트 주입 (새 파일·세션 첫 편집 시만)</b>
+        <p><code>src/</code>에 <code>Write</code>/<code>Edit</code>가 처음 쓰일 때 <code>PreToolUse</code> hook이 체크리스트를 주입한다. 실측 출력(<code>sdd-edit-check.sh</code>):</p>
+        <p class="termlbl">PreToolUse hook 출력 — 실측</p>
+        <pre>[SDD 편집 체크 — 코드 건드리기 전 확인]
+  □ MODULE_MAP 대조했나 (기존 spec 개정 vs 새 spec)
+  □ 이 변경에 대응하는 FR 있나 — 없으면 sdd/specs/에 spec부터
+  □ PREFIX 표준(SPEC/INFRA/TEST)인가
+  □ 테스트에 @covers &lt;PREFIX&gt;-NNN/FR-NNN 계획했나</pre>
+      </div>
+    </div>
+
+    <div class="orb">
+      <div class="tag commit">④ 커밋<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-commit</small></div>
+      <div class="body">
+        <b>ownership·PREFIX·FR coverage hard 차단</b>
+        <p>스테이징된 코드 변경에 대응 FR·ownership·PREFIX 위반이면 커밋이 막힌다. 아래 세 실측 예시:</p>
+        <p class="termlbl">① PREFIX 위반 (미등록 접두어 "FEAT") — exit 1</p>
+        <pre><span class="r">✗ PREFIX 위반:</span>
+  <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
+        <p class="termlbl">② Ownership 중복 (두 spec이 같은 키 소유) — exit 1</p>
+        <pre>Ownership 게이트: spec 3개 중 3개가 Ownership 선언.
+<span class="r">✗ 중복 소유(구조적 중복) 3건:
+  [Entities] "recommendation" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
+  [Surfaces] "POST /api/recommend/{id}" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
+  [Capabilities] "recommendation.create" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요</span></pre>
+        <p class="termlbl">③ FR coverage strict 위반 (missing @covers) — exit 1</p>
+        <pre>FR coverage gate — specs:1 FRs:2 covered:1 mode:strict config:sdd.config.json
+<span class="r">FR coverage violations:
+  ✗ R2(strict) SPEC-001: 1/2 FRs covered — missing FR-002</span></pre>
+        <p><strong>해소:</strong> 메시지가 가리키는 spec·키를 고치고 재커밋. <code>--no-verify</code> 우회는 로그에 남아 리뷰에 노출된다.</p>
+      </div>
+    </div>
+
+    <div class="orb">
+      <div class="tag push">⑤ 푸시<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-push</small></div>
+      <div class="body">
+        <b>sdd-sync drift 점검 (기본 비차단 — 안내)</b>
+        <p><code>git push</code> 시 pre-push 훅이 <code>sdd-sync</code>로 R1~R4 drift를 점검. drift가 있으면 push는 계속되고 안내가 출력된다:</p>
+        <pre>SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
+
+● R1 spec→code: <span class="g">✓ clean</span>
+● R2 code→spec: <span class="w">⚠ 확인 필요</span>
+    [check-converge-drift.mjs] · 코드 1건 변경인데 스펙 무변경
+● R3 dedup+입도: <span class="g">✓ clean</span>
+
+요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
+<span class="w">↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)</span></pre>
+        <p><strong>해소:</strong> <code>/sdd-sync</code> 실행 → 하네스가 "spec 개정·새 spec·의도적 무시" 중 선택을 안내.</p>
+      </div>
+    </div>
+
+    <div class="orb">
+      <div class="tag edit">⑥ 이탈 대응<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">게이트 해소</small></div>
+      <div class="body">
+        <b>게이트 실패 메시지대로 해소</b>
+        <div class="tablewrap"><table style="min-width:420px;font-size:.88rem">
+          <tr><th>메시지</th><th>해소</th></tr>
+          <tr><td><code>미등록 접두어 "FEAT"</code></td><td><code>specIdPrefixes</code>에 등록 + 표준 밖이면 <code>prefixRationale</code>에 사유</td></tr>
+          <tr><td><code>중복 소유 SPEC-001 + SPEC-002</code></td><td>한 spec으로 통합·ownership 이전</td></tr>
+          <tr><td><code>missing FR-002</code></td><td>테스트에 <code>// @covers SPEC-001/FR-002</code> 추가</td></tr>
+          <tr><td><code>code→spec drift</code></td><td><code>/sdd-sync</code> → spec 개정 또는 의도적 무시 선택</td></tr>
+          <tr><td><code>미등록 verb "recommend"</code></td><td><code>sdd.config.json</code> <code>capabilityVerbs</code>에 추가</td></tr>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <h3>궤도 원칙 (설계 §8)</h3>
+    <ol>
+      <li><b>채택 = 상시 강제 궤도.</b> <code>sdd-init</code> 한 번으로 모든 세션·팀원에 영구 적용(레포 커밋).</li>
+      <li><b>두 레이어.</b> Claude Code hook(상기) + git hook(hard 차단) — 상기로 새는 걸 줄이고, 차단으로 못 넘어가게.</li>
+      <li><b>방법론은 읽는 문서가 아니라 벗어날 수 없는 궤도다.</b> 이탈(문서 없는 코드·임의 PREFIX·미대조 스펙)은 hook·게이트가 감지해 궤도로 되돌린다.</li>
+    </ol>
+  </div>
+</div></section>
+
 <section id="big"><div class="wrap">
   <span class="eyebrow">한 장에 담으면</span>
   <h2>빅 픽처</h2>
@@ -447,8 +645,8 @@
 </div></section>
 
 <footer><div class="wrap">
-  <p><span class="done">✓ Gap 1 · 2 · 3 완료</span> &nbsp; 1 레포=1 모듈 · spec 입도(cohesion) · 하네스 MVP — 모두 <code>main</code> 반영.</p>
-  <p>저장소: <a href="https://github.com/lhs6395-hslee/ai-methodology">github.com/lhs6395-hslee/ai-methodology</a> · 근거 문서: <code>METHODOLOGY.md</code> · <code>STORAGE.md</code> · <code>STRUCTURE.md</code> · <code>DEDUP.md</code> · <code>HARNESS.md</code> · <code>ROADMAP.md</code></p>
+  <p><span class="done">✓ Gap 1 · 2 · 3 완료</span> &nbsp; 1 레포=1 모듈 · spec 입도(cohesion) · 하네스 MVP · 결정성 게이트 · 강제 hook 세트 — 모두 <code>main</code> 반영.</p>
+  <p>저장소: <a href="https://github.com/lhs6395-hslee/ai-methodology">github.com/lhs6395-hslee/ai-methodology</a> · 근거 문서: <code>METHODOLOGY.md</code> · <code>STORAGE.md</code> · <code>STRUCTURE.md</code> · <code>DEDUP.md</code> · <code>HARNESS.md</code> · <code>APPLYING.md</code> · <code>ROADMAP.md</code></p>
 </div></footer>
 </body>
 </html>

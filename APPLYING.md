@@ -82,3 +82,108 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 
 ## 5. 채택 순서 (점진)
 incremental FR 게이트로 시작 → spec별 테스트가 갖춰지면 strict로 승격. 모든 spec이 strict 통과하면 SSOT가 완전히 기계 보장됨.
+
+---
+
+## 채택 후 궤도 한 바퀴 (운영법)
+
+> 채택(`sdd-init`) 완료 후 일상 개발에서 hook·게이트가 실제로 어떻게 돌아가는지 — 단계별 + 실측 출력.
+
+### ① 세션 시작 — SessionStart hook
+
+프로젝트 디렉토리에서 Claude Code 세션을 열면 `SessionStart` hook이 방법론 요약·궤도·진입 규칙을 컨텍스트에 주입한다(세션당 1회). 아래가 실제 출력(툴링 `sdd-session-context.sh` 실측):
+
+```
+[SDD 방법론 — 이 프로젝트는 채택된 강제 궤도 위에서 돈다]
+궤도: spec → code → test → sync (이탈은 hook·게이트가 되돌림)
+진입 규칙(새 기능/수정 시 반드시):
+  1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
+  2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
+  3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
+  4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
+  5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
+게이트: check-fr-coverage·check-ownership·check-spec-cohesion·check-spec-consistency
+동기화: /sdd-sync (drift 점검), pre-push 훅
+```
+
+**왜:** superpowers 스킬이 기본 경로(`docs/superpowers/specs/`)로 이끌고, FEAT 같은 임의 PREFIX를 만드는 이탈이 실제로 반복됐다. hook이 컨텍스트에 명시해야 모델이 프로젝트 규약을 따른다.
+
+### ② 새 기능 — MODULE_MAP 대조 → spec → TDD
+
+1. `sdd/MODULE_MAP.md`를 열고 기존 spec과 겹치는지 확인 — 겹치면 **그 spec 개정**(새 spec 금지), 안 겹치면 신규.
+2. spec 위치: **`sdd/specs/PREFIX-NNN.md`** (PREFIX는 `SPEC`/`INFRA`/`TEST` 중 하나).
+3. FR은 EARS 패턴으로(`WHEN … THE SYSTEM SHALL …`), 키 형식 규칙:
+   - **Entity** → 스키마 식별자 그대로 + `trim().toLowerCase()` (`pjt_projects` — 단복수 임의변환 금지).
+   - **Surface** → `<METHOD uppercase> <path lowercase>`, path param `{name}` 표준형(`POST /api/recommend/{id}`).
+   - **Capability** → `entity.verb` (점 1개, 소문자, verb는 허용집합 — CRUD 기본 + config `capabilityVerbs`).
+4. `## Ownership` 절 선언 후 TDD(테스트 먼저 → RED → GREEN → `@covers`).
+
+**1 spec = 1 aggregate 경계 규칙:** 한 spec은 한 aggregate root(독립 생성·삭제되는 핵심 Entity)만 소유한다. 다른 aggregate는 `## Dependencies`로 참조. 새 FR이 *어느 aggregate를 변경하는가*로 소속 spec을 결정한다.
+
+### ③ 코드 편집 — PreToolUse 체크리스트
+
+`src/` 경로에 `Write`/`Edit` 도구가 처음 쓰이면 `PreToolUse` hook이 체크리스트를 주입한다(매 편집마다 아님 — 소음 억제). 실측 출력(`sdd-edit-check.sh` 실행):
+
+```
+[SDD 편집 체크 — 코드 건드리기 전 확인]
+  □ MODULE_MAP 대조했나 (기존 spec 개정 vs 새 spec)
+  □ 이 변경에 대응하는 FR 있나 — 없으면 sdd/specs/에 spec부터
+  □ PREFIX 표준(SPEC/INFRA/TEST)인가
+  □ 테스트에 @covers <PREFIX>-NNN/FR-NNN 계획했나
+```
+
+### ④ 커밋 — pre-commit 차단
+
+`git commit` 시 pre-commit 훅이 스테이징된 코드에 대응 FR·ownership·PREFIX를 검사한다.
+
+**PREFIX 위반(미등록 접두어) — exit 1 차단 실측:**
+```
+✗ PREFIX 위반:
+  ✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가
+```
+
+**ownership 중복 — exit 1 차단 실측:**
+```
+Ownership 게이트: spec 3개 중 3개가 Ownership 선언.
+✗ 중복 소유(구조적 중복) 3건:
+  [Entities] "recommendation" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
+  [Surfaces] "POST /api/recommend/{id}" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
+  [Capabilities] "recommendation.create" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
+```
+
+**FR coverage strict 위반 — exit 1 차단 실측:**
+```
+FR coverage gate — specs:1 FRs:2 covered:1 mode:strict config:sdd.config.json
+FR coverage violations:
+  ✗ R2(strict) SPEC-001: 1/2 FRs covered — missing FR-002
+```
+
+**해소법:** 메시지가 가리키는 spec/키를 고치고 재커밋. PREFIX 위반이면 `sdd.config.json`의 `specIdPrefixes`에 등록(표준 밖이면 `prefixRationale`에 사유 필수). ownership 중복이면 한 spec으로 통합. FR 누락이면 테스트에 `@covers` 추가.
+
+### ⑤ 푸시 — pre-push sdd-sync drift 점검
+
+`git push` 시 pre-push 훅이 `sdd-sync`로 drift를 일괄 점검한다. drift가 있으면 안내(기본 비차단):
+
+```
+SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
+
+● R1 spec→code: ✓ clean
+● R2 code→spec: ⚠ 확인 필요
+    [check-converge-drift.mjs] · 코드 1건 변경인데 스펙 무변경
+● R3 dedup+입도: ✓ clean
+
+요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
+↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)
+```
+
+**해소:** `/sdd-sync` 실행 → 하네스가 의사결정을 안내(spec 개정/무시/새 spec).
+
+### ⑥ 이탈 대응 — 게이트 실패 메시지대로
+
+| 게이트 메시지 | 해소 |
+|---|---|
+| `✗ PREFIX 위반 — 미등록 접두어 "FEAT"` | `specIdPrefixes`에 등록 + 표준 밖이면 `prefixRationale`에 사유 |
+| `✗ 중복 소유 — SPEC-001 + SPEC-002` | 두 spec 중 하나로 ownership 이전, 나머지에서 제거 |
+| `✗ missing FR-002` | 테스트에 `// @covers SPEC-001/FR-002` 추가 |
+| `⚠ code→spec drift` | `/sdd-sync` → spec 개정 또는 의도적 무시 선택 |
+| `⚠ 미등록 verb "recommend"` | `sdd.config.json` `capabilityVerbs`에 `"recommend"` 추가 |
