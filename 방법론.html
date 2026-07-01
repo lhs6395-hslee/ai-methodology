@@ -415,7 +415,7 @@
 ● R1 spec→code: <span class="g">✓ clean</span>
 ● R2 code→spec: <span class="w">⚠ 확인 필요</span>
     [check-converge-drift.mjs] · 코드 1건 변경인데 스펙 무변경
-● R3 dedup+입도: <span class="g">✓ clean</span>
+● R3 dedup+입도+완전성: <span class="g">✓ clean</span>
 
 요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
 <span class="w">↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)</span></pre></div></div>
@@ -505,7 +505,7 @@
 <section id="orbit"><div class="wrap">
   <span class="eyebrow">채택 후 일상 운영</span>
   <h2>채택 후 궤도 한 바퀴 — hook·게이트가 언제·무엇을 하나</h2>
-  <p><code>sdd-init</code>로 채택하면 <strong>hook 세트가 자동 배선</strong>되고, 이후 모든 세션·커밋이 방법론 궤도를 강제받는다. 아래가 실제 개발 하루 — 가상 기능 "직원 추천"을 기준으로.</p>
+  <p><code>sdd-init</code>로 채택하면 <strong>SessionStart·PreToolUse·pre-commit이 자동 배선</strong>되고, 이후 모든 세션·커밋이 방법론 궤도를 강제받는다. pre-push는 <code>ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push</code>로 선택 연결한다. 아래가 실제 개발 하루 — 가상 기능 "직원 추천"을 기준으로.</p>
   <div class="note">두 레이어: <strong>Claude Code hook(상기)</strong> — 세션 시작·코드 편집 시 컨텍스트 주입(Claude Code에서만). <strong>git hook(hard 차단)</strong> — 커밋·푸시에서 언어·에이전트 무관 물리 차단(백스톱).</div>
 
   <div class="orbit">
@@ -540,8 +540,8 @@
     <div class="orb">
       <div class="tag edit">③ 코드 편집<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">PreToolUse</small></div>
       <div class="body">
-        <b>편집 체크리스트 주입 (새 파일·세션 첫 편집 시만)</b>
-        <p><code>src/</code>에 <code>Write</code>/<code>Edit</code>가 처음 쓰일 때 <code>PreToolUse</code> hook이 체크리스트를 주입한다. 실측 출력(<code>sdd-edit-check.sh</code>):</p>
+        <b>편집 체크리스트 주입 (src/lib/app Write/Edit 마다)</b>
+        <p><code>src/lib/app</code> 경로에 <code>Write</code>/<code>Edit</code>가 쓰일 <strong>때마다</strong> <code>PreToolUse</code> hook이 체크리스트를 주입한다(비차단). 실측 출력(<code>sdd-edit-check.sh</code>):</p>
         <p class="termlbl">PreToolUse hook 출력 — 실측</p>
         <pre>[SDD 편집 체크 — 코드 건드리기 전 확인]
   □ MODULE_MAP 대조했나 (기존 spec 개정 vs 새 spec)
@@ -554,8 +554,8 @@
     <div class="orb">
       <div class="tag commit">④ 커밋<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-commit</small></div>
       <div class="body">
-        <b>ownership·PREFIX·FR coverage hard 차단</b>
-        <p>스테이징된 코드 변경에 대응 FR·ownership·PREFIX 위반이면 커밋이 막힌다. 아래 세 실측 예시:</p>
+        <b>PREFIX·ownership hard 차단; FR coverage는 incremental(경고)</b>
+        <p>스테이징된 코드 변경에 PREFIX 위반·ownership 중복이 있으면 커밋이 막힌다. FR coverage는 pre-commit에서 <code>--strict</code> 없이 실행 → partial coverage는 경고만(비차단). 아래 실측 예시:</p>
         <p class="termlbl">① PREFIX 위반 (미등록 접두어 "FEAT") — exit 1</p>
         <pre><span class="r">✗ PREFIX 위반:</span>
   <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
@@ -565,11 +565,10 @@
   [Entities] "recommendation" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
   [Surfaces] "POST /api/recommend/{id}" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요
   [Capabilities] "recommendation.create" ← SPEC-001 + SPEC-002  → 한 spec으로 통합/개정 필요</span></pre>
-        <p class="termlbl">③ FR coverage strict 위반 (missing @covers) — exit 1</p>
-        <pre>FR coverage gate — specs:1 FRs:2 covered:1 mode:strict config:sdd.config.json
-<span class="r">FR coverage violations:
-  ✗ R2(strict) SPEC-001: 1/2 FRs covered — missing FR-002</span></pre>
-        <p><strong>해소:</strong> 메시지가 가리키는 spec·키를 고치고 재커밋. <code>--no-verify</code> 우회는 로그에 남아 리뷰에 노출된다.</p>
+        <p class="termlbl">③ FR coverage 경고 — pre-commit incremental(비차단); strict는 CI/수동 실행 시</p>
+        <pre>FR coverage gate — specs:1 FRs:2 covered:1 mode:incremental config:sdd.config.json
+<span class="w">⚠ SPEC-001: 1/2 FRs covered — missing FR-002 (incremental: warn only)</span></pre>
+        <p><strong>해소:</strong> 메시지가 가리키는 spec·키를 고치고 재커밋. 단, <code>--no-verify</code>는 hook을 우회하므로 (팀 규율로) 피한다.</p>
       </div>
     </div>
 
@@ -583,7 +582,7 @@
 ● R1 spec→code: <span class="g">✓ clean</span>
 ● R2 code→spec: <span class="w">⚠ 확인 필요</span>
     [check-converge-drift.mjs] · 코드 1건 변경인데 스펙 무변경
-● R3 dedup+입도: <span class="g">✓ clean</span>
+● R3 dedup+입도+완전성: <span class="g">✓ clean</span>
 
 요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
 <span class="w">↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)</span></pre>
