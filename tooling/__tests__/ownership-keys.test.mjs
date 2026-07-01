@@ -25,6 +25,12 @@ test("parseSection: Ownership과 Dependencies를 구분해 읽는다", () => {
 
 test("normalizeKey: Surface = 메서드 대문자 + 경로 소문자 + param 표준형 + trailing slash 제거", () => {
   assert.equal(normalizeKey("Surfaces", "post /api/Recommend/:id/", cfg), "POST /api/recommend/{id}");
+  // {id} 중괄호 형식
+  assert.equal(normalizeKey("Surfaces", "post /api/items/{id}", cfg), "POST /api/items/{id}");
+  // <id> 꺽쇠 형식
+  assert.equal(normalizeKey("Surfaces", "post /api/items/<id>", cfg), "POST /api/items/{id}");
+  // 하이픈 포함 param
+  assert.equal(normalizeKey("Surfaces", "get /api/items/:item-id", cfg), "GET /api/items/{item-id}");
 });
 
 test("normalizeKey: Capability = 소문자, 점표기 유지", () => {

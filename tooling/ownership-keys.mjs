@@ -28,7 +28,8 @@ export function normalizeKey(category, raw, cfg) {
     const m = s.match(/^(\S+)\s+(.+)$/);
     if (!m) return s.toLowerCase();
     const method = m[1].toUpperCase();
-    let path = m[2].toLowerCase().replace(/[:{<]([a-z0-9_]+)[>}]?/g, cfg.surfacePathParam.replace("name", "$1"));
+    const paramRepl = cfg.surfacePathParam.includes("name") ? cfg.surfacePathParam.replace("name", "$1") : "{$1}";
+    let path = m[2].toLowerCase().replace(/[:{<]([a-z0-9_-]+)[>}]?/g, paramRepl);
     path = path.replace(/\/+$/, "") || "/";
     return `${method} ${path}`;
   }
