@@ -50,11 +50,22 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 **유일하게 소유**하는 키. 한 키는 전 spec에서 **정확히 한 spec**만 소유한다(`check-ownership.mjs`가 CI에서 강제 — DEDUP.md, STRUCTURE.md 중복 규칙). 새 요구가 오면 그 키의 owner를 조회해 **이미 있으면 그 spec 개정, 없으면 여기 등록**.
+> 이 spec이 **유일하게 소유(권위)**하는 키. 한 키는 전 spec에서 **정확히 한 spec**만 소유한다(`check-ownership.mjs`가 CI에서 강제 — DEDUP.md, STRUCTURE.md 중복 규칙). 새 요구가 오면 그 키의 owner를 조회해 **이미 있으면 그 spec 개정, 없으면 여기 등록**. 이 spec이 변경하는 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)가 소유의 경계 닻이다. 다른 aggregate의 키는 아래 Dependencies로.
 > ⚠ **키 종류는 `sdd.config.json`의 `ownershipCategories`와 일치해야 한다.** 아래는 웹/CRUD 기본. 비-웹은 바꿔 쓴다(라이브러리/CLI=`Modules·Symbols·Artifacts`, 데이터=`Datasets·Jobs·Sinks`, IaC=`Resources·…`). 헤더(`- **<Category>**:`)는 config의 카테고리명과 정확히 같아야 게이트가 파싱한다.
-- **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분]
-- **Surfaces**: [이 spec이 관할하는 route·화면·job/event — 예: `POST /api/...`, `/tools/...`]
-- **Capabilities**: [Entity×Action 형태 — 예: `project.create`, `staff.assign`]
+- **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분. 스키마 식별자 그대로(trim+소문자, 단복수 임의변환 금지)]
+- **Surfaces**: [이 spec이 관할하는 route·화면·job/event — 예: `POST /api/{id}`, `event:<name>`. METHOD 대문자·path 소문자·param `{name}` 표준형·trailing slash 없음]
+- **Capabilities**: [entity.verb 형태 — 예: `project.create`, `staff.assign`. verb ∈ CRUD 기본(create/read/update/delete/list) + config `capabilityVerbs` 등록 verb만 허용]
+
+## Dependencies (참조 — dedup 제외)
+> 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화·형식. `check-ownership`은 이 섹션을 dedup 대상에서 제외한다.
+- **Entities**: [다른 spec 소유 Entity 중 참조하는 것]
+- **Surfaces**: [호출하는 외부 route·이벤트]
+
+<!-- 키 생성 결정 절차(사람=LLM 동일 결과):
+  Capability: ①핵심 Entity 식별(스키마 식별자 그대로, 소문자) ②핵심 동작 1개 추출 ③허용 verb 집합에 매핑 ④entity.verb 조립(점 1개) ⑤미등록 verb면 STOP → config capabilityVerbs 등록(리뷰) 후 진행. 임의 동의어 우회 금지.
+  Surface:    ①메서드 대문자 ②path 소문자 ③param 표준형(:id·<id>→{id}) ④trailing slash 제거
+  Entity:     스키마 테이블/타입명 그대로 trim+소문자(단복수·표기 임의변경 금지)
+  경계: 1 spec = 1 aggregate root(독립 생성·삭제되는 핵심 Entity). 다른 aggregate는 위 Dependencies로. -->
 
 ---
 

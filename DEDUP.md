@@ -17,14 +17,25 @@
 
 ## 3. ② 구조적 중복 — 소유권 유일성 게이트 (만든 것)
 
-**규칙(판정):** 각 spec은 `## Ownership` 블록에 자신이 **유일하게 소유하는 키**를 선언한다 — **Entity**(도메인 객체/테이블)·**Surface**(route·화면·job)·**Capability**(Entity×Action). **하나의 키는 정확히 한 spec만 소유.** 2개 이상이 같은 키 선언 = **구조적 중복**. (애매한 판단이 아니라 집합 멤버십 조회.)
+**규칙(판정):** 각 spec은 `## Ownership` 블록에 자신이 **유일하게 소유(권위를 가진)** 키를 선언한다 — **Entity**(도메인 객체/테이블)·**Surface**(route·화면·job)·**Capability**(Entity×Action). **하나의 키는 정확히 한 spec만 소유.** 2개 이상이 같은 키 선언 = **구조적 중복**. (애매한 판단이 아니라 집합 멤버십 조회.)
+
+**소유 vs 참조 분리:** 이 spec이 읽기/호출만 하는 다른 aggregate의 키는 `## Dependencies` 섹션으로 분리한다. `check-ownership`은 `## Ownership`만 dedup 대상으로 읽고 `## Dependencies`는 제외한다 → 참조를 소유로 오인하던 **거짓양성이 코드 변경 거의 없이 해소**. 하위호환: 기존 `## Ownership`은 그대로 "소유"로 해석. `## Dependencies` 없으면 참조 없음.
 
 ```
-## Ownership   ← spec마다 선언
-- **Entities**: pjt_projects, pjt_project_staff       # 도메인 객체/테이블
-- **Surfaces**: POST /api/pjt/recommend, /tools/pjt/new # route·화면·job
-- **Capabilities**: project.create, staff.assign        # Entity×Action
+## Ownership   ← 소유(권위). dedup 대상. 정규화·형식 검증 적용.
+- **Entities**: pjt_projects, pjt_project_staff       # 도메인 객체/테이블(스키마 식별자 그대로)
+- **Surfaces**: POST /api/pjt/recommend, /tools/pjt/new # route·화면·job(METHOD 대문자·path 소문자·{param})
+- **Capabilities**: project.create, staff.assign        # entity.verb (verb ∈ 허용 집합)
+
+## Dependencies   ← 참조(읽기/호출만). dedup 제외. 같은 정규화·형식.
+- **Entities**: staff, project   # 이 spec이 소유하지 않고 참조하는 다른 aggregate의 Entity
+- **Surfaces**: GET /api/staff/{id}
 ```
+
+**정규화 절대규칙 (결정성의 심장):**
+- **Entity**: 스키마·모델·마이그레이션의 테이블/타입명 식별자 그대로 + `trim().toLowerCase()`. 단복수 임의변환 금지(스키마가 진실).
+- **Surface**: `<METHOD> <path>` — METHOD 대문자, path 소문자, path param `{name}` 표준형(`:id`·`<id>` → `{id}`), trailing slash 제거. 이벤트=`event:<name>`, job=`job:<name>`.
+- **Capability**: `<entity>.<verb>` — 점 정확히 1개, 소문자, verb ∈ CRUD 기본(`create·read·update·delete·list`) + config `capabilityVerbs` 등록 verb만. 미등록 verb = 형식 위반. 임의 동의어 금지.
 
 **라우팅 결정트리(새 요구 → 새 spec? 개정?):**
 1. 새 요구의 키 산출: 어떤 Entity / Surface / Capability인가.
