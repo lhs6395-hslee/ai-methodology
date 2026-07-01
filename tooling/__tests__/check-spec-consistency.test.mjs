@@ -37,3 +37,12 @@ test("--strict에서 근거 없는 키는 exit 1", () => {
   const body = "# SPEC-001\nSHALL 결과 반환.\n## Ownership\n- **Entities**: ghostentity\n";
   assert.equal(run(body, ["--strict"]).code, 1);
 });
+
+test("Ownership 선언 자체는 근거로 인정 안 됨 (exclusion 동작 pin)", () => {
+  // "onlyinownership" is ONLY in the Ownership block, never in the FR text.
+  // Passes with exclusion (stripped from haystack → flagged). FAILS if reverted to full-body grounding.
+  const body = "# SPEC-001\nWHEN 조회, THE SYSTEM SHALL 결과 반환.\n## Ownership\n- **Entities**: onlyinownership\n";
+  const r = run(body);
+  assert.equal(r.code, 0);                    // advisory (not --strict)
+  assert.match(r.out, /onlyinownership/);      // must appear in the ungrounded warning
+});

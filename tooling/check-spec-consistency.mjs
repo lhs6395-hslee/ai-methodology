@@ -24,6 +24,8 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
   const own = parseSection(text, "Ownership", CATEGORIES);
   // Extract body (FR text) — everything before the Ownership section
   const ownershipStart = text.search(/^##\s+Ownership\b/m);
+  // Only the FR body BEFORE ## Ownership grounds keys; the Ownership block (and any
+  // post-Ownership sections) are intentionally excluded so a key isn't grounded by its own declaration.
   const body = ownershipStart === -1 ? text : text.slice(0, ownershipStart);
   const hay = body.toLowerCase();
   specCount++;
