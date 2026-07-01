@@ -9,6 +9,9 @@
 //   - **Surfaces**: POST /api/pjt/recommend, /tools/pjt-management/new
 //   - **Capabilities**: project.create, staff.assign
 //
+// ## Dependencies 블록은 다른 spec이 소유한 키를 '참조'로 선언한다.
+// Dependencies 키는 dedup 대상이 아님(거짓양성 방지).
+//
 // 규칙(같은 카테고리 내에서 위반 시 exit 1):
 //   하나의 Entity / Surface / Capability 키는 **정확히 한 spec**만 소유한다.
 //   2개 이상 spec이 같은 키를 선언하면 = 구조적 중복 → 실패.
@@ -22,11 +25,12 @@
 // config 없으면 기존 Entities/Surfaces/Capabilities 기본값(하위호환).
 //
 // Usage: node scripts/check-ownership.mjs [--strict]
-//   --strict : Ownership 블록 없는 spec도 실패(완전 강제)
+//   --strict : Ownership 블록 없는 spec도 실패(완전 강제), 형식위반도 실패
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -34,8 +38,6 @@ const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
 
 const CATEGORIES = cfg.ownershipCategories;
-// 키 정규화: 앞뒤 공백 제거 + 소문자 + 내부 공백 1칸(Surface의 "POST  /x" 등 흡수).
-const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 function specFiles() {
   let names;
@@ -46,41 +48,35 @@ function specFiles() {
   return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
 }
 
-// `## Ownership` 섹션을 잘라내 카테고리별 키 목록을 파싱.
-function parseOwnership(text) {
-  const start = text.search(/^##\s+Ownership/m);
-  if (start === -1) return null; // 블록 없음
-  const after = text.slice(start);
-  const body = after.slice(after.indexOf("\n") + 1); // 헤더 줄 다음부터
-  const nextSec = body.search(/^##\s/m);             // 다음 ## 섹션 전까지
-  const block = nextSec === -1 ? body : body.slice(0, nextSec);
-  const out = {};
-  for (const cat of CATEGORIES) {
-    const line = block.match(new RegExp(`-\\s*\\*\\*${cat}\\*\\*\\s*:\\s*([^\\n]+)`, "i"));
-    out[cat] = line
-      ? line[1].split(",").map(norm).filter((k) => k && k !== "—" && k !== "[…]" && !k.startsWith("["))
-      : [];
-  }
-  return out;
-}
-
 const files = specFiles();
 const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
-const missing = [];
+const missing = [], formatIssues = [];
 let declaredCount = 0;
 
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   const specId = (text.match(cfg.__specIdRe) || [file.split("/").pop()])[0];
-  const own = parseOwnership(text);
-  if (!own) { missing.push(specId); continue; }
+
+  // Parse Ownership section (dedup target)
+  const own = parseSection(text, "Ownership", CATEGORIES);
+  const hasAny = CATEGORIES.some((c) => own[c].length);
+
+  if (!hasAny) { missing.push(specId); continue; }
   declaredCount++;
+
   for (const cat of CATEGORIES) {
-    for (const key of own[cat]) {
+    for (const raw of own[cat]) {
+      const key = normalizeKey(cat, raw, cfg);
+      const bad = validateKey(cat, key, cfg);
+      if (bad) formatIssues.push({ specId, cat, bad });
       if (!owners[cat].has(key)) owners[cat].set(key, []);
       owners[cat].get(key).push(specId);
     }
   }
+
+  // Parse Dependencies section — do NOT add to owners (not a dedup target)
+  // This prevents false-positives where a referenced entity looks like a duplicate.
+  // parseSection(text, "Dependencies", CATEGORIES) — parsed but intentionally unused for dedup.
 }
 
 // 충돌(같은 키를 2+ spec이 소유) 수집
@@ -97,6 +93,11 @@ if (missing.length) {
   console.log(`${tag} Ownership 블록 없음(${missing.length}): ${missing.join(", ")}`);
 }
 
+if (formatIssues.length) {
+  const tag = STRICT ? "✗" : "⚠";
+  for (const f of formatIssues) console.log(`${tag} [${f.specId}] ${f.bad}`);
+}
+
 if (conflicts.length) {
   console.error(`\n✗ 중복 소유(구조적 중복) ${conflicts.length}건:`);
   for (const c of conflicts) {
@@ -105,8 +106,9 @@ if (conflicts.length) {
   process.exit(1);
 }
 
-if (STRICT && missing.length) {
-  console.error(`\n✗ --strict: 모든 spec이 Ownership을 선언해야 함.`);
+if (STRICT && (missing.length || formatIssues.length)) {
+  if (missing.length) console.error(`\n✗ --strict: 모든 spec이 Ownership을 선언해야 함.`);
+  if (formatIssues.length) console.error(`\n✗ --strict: 형식 위반이 있음 — 수정 필요.`);
   process.exit(1);
 }
 
