@@ -42,3 +42,49 @@ test("sdd-init가 기존 settings.json hooks 보존(merge)", () => {
     assert.ok(hasSddOrCustom, "SessionStart에 SDD 또는 기존 hook 존재");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("jq 없으면 기존 settings.json 보존(clobber 금지)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-nojq-"));
+  try {
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    const sentinel = { _sentinel: "keep", hooks: { SessionStart: [] } };
+    writeFileSync(join(root, ".claude/settings.json"), JSON.stringify(sentinel));
+
+    // PATH를 jq 없는 최소 경로로 — 스크립트가 sh/cp/mkdir 등은 찾되 jq만 없게 함.
+    // /bin:/usr/bin는 macOS/Linux 공통 기본 유틸 위치이나 jq는 보통 /usr/local/bin 등에 있음.
+    // 더 안전하게: PATH를 스크립트 실행에 필요한 최소값으로 설정하고 jq를 제외.
+    const noJqPath = "/bin:/usr/bin";
+    execFileSync(
+      "sh",
+      [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"],
+      { cwd: root, stdio: "ignore", env: { ...process.env, PATH: noJqPath } }
+    );
+
+    // 파일이 살아있고, sentinel 키가 보존되어 있어야 함
+    assert.ok(existsSync(join(root, ".claude/settings.json")), "settings.json 파일 유지");
+    const s = JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8"));
+    assert.strictEqual(s._sentinel, "keep", "sentinel 키 보존(clobber 없음)");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("sdd-init 재실행 시 SessionStart hook 중복 없음(idempotency)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-idem-"));
+  try {
+    const runInit = () => execFileSync(
+      "sh", [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"],
+      { cwd: root, stdio: "ignore" }
+    );
+    // 첫 번째 실행
+    runInit();
+    // 두 번째 실행 (동일 디렉토리, 동일 args)
+    runInit();
+
+    const s = JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8"));
+    const sessionStart = s.hooks?.SessionStart ?? [];
+    // sdd-session-context 명령을 포함하는 엔트리가 정확히 하나여야 함
+    const sddEntries = sessionStart.filter(e =>
+      (e.hooks || []).some(h => (h.command || "").includes("sdd-session-context"))
+    );
+    assert.strictEqual(sddEntries.length, 1, "sdd-session-context 엔트리가 정확히 1개(중복 없음)");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

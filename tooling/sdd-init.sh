@@ -74,20 +74,30 @@ if [ "$GATE" = "node" ]; then
   mkdir -p "$T/.claude"
   SETTINGS="$T/.claude/settings.json"
   NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]}]}}'
-  if [ -f "$SETTINGS" ] && command -v jq >/dev/null 2>&1; then
-    # jq -s '.[0] * .[1]': object 재귀 merge — 기존 키 보존, SDD 키 추가
-    # 단, 동일 키(hooks.SessionStart)가 있으면 .[1](SDD)이 우선 — 기존 hook 배열 보존을 위해
-    # 배열 병합: 기존 SessionStart 엔트리 + SDD 엔트리를 concat
-    tmp=$(mktemp)
-    jq -s '
-      .[0] as $old | .[1] as $new |
-      $old * $new |
-      .hooks.SessionStart = (($old.hooks.SessionStart // []) + ($new.hooks.SessionStart // [])) |
-      .hooks.PreToolUse   = (($old.hooks.PreToolUse   // []) + ($new.hooks.PreToolUse   // []))
-    ' "$SETTINGS" - <<_JQ > "$tmp" && mv "$tmp" "$SETTINGS"
+  if [ -f "$SETTINGS" ]; then
+    if command -v jq >/dev/null 2>&1; then
+      # jq merge — 기존 SDD hook 항목 제거 후 신규 추가(idempotency 보장)
+      # select로 sdd-session-context / sdd-edit-check 포함 엔트리를 걷어낸 뒤 concat
+      tmp=$(mktemp)
+      jq -s '
+        .[0] as $old | .[1] as $new |
+        ($old * $new) |
+        .hooks.SessionStart = (
+          [ ($old.hooks.SessionStart // [])[] | select((.hooks[0].command // "") | test("sdd-session-context") | not) ]
+          + ($new.hooks.SessionStart // [])
+        ) |
+        .hooks.PreToolUse = (
+          [ ($old.hooks.PreToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-edit-check") | not) ]
+          + ($new.hooks.PreToolUse // [])
+        )
+      ' "$SETTINGS" - <<_JQ > "$tmp" && mv "$tmp" "$SETTINGS"
 $NEW_HOOKS
 _JQ
-    say "  → .claude/settings.json hooks 병합 완료"
+      say "  → .claude/settings.json hooks 병합 완료"
+    else
+      say "  ⚠ jq 미설치 — 기존 .claude/settings.json 보존(hook 배선 스킵). jq 설치 후 재실행 권장."
+      # 기존 파일 보존 — 절대 덮어쓰지 않음
+    fi
   else
     printf '%s\n' "$NEW_HOOKS" > "$SETTINGS"
     say "  → .claude/settings.json 생성(hooks 배선)"
