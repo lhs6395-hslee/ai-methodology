@@ -6,7 +6,7 @@
 // 각 spec은 `## Ownership` 블록에 자신이 **소유하는 키**를 선언한다:
 //   ## Ownership
 //   - **Entities**: pjt_projects, pjt_project_staff
-//   - **Surfaces**: POST /api/pjt/recommend, /tools/pjt-management/new
+//   - **Surfaces**: POST /api/pjt/recommend, GET /tools/pjt-management/new
 //   - **Capabilities**: project.create, staff.assign
 //
 // ## Dependencies 블록은 다른 spec이 소유한 키를 '참조'로 선언한다.

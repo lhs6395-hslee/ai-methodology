@@ -170,7 +170,7 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 ● R1 spec→code: ✓ clean
 ● R2 code→spec: ⚠ 확인 필요
     [check-converge-drift.mjs] · 코드 1건 변경인데 스펙 무변경
-● R3 dedup+입도+완전성: ✓ clean
+● R3 dedup+입도+완전성+일관성: ✓ clean
 
 요약: 확인 필요 — R2 code→spec → '/sdd-sync'로 의사결정
 ↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)
