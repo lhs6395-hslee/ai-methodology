@@ -2,11 +2,15 @@
 # git pre-commit — 방법론 게이트 hard 차단(스테이징에 spec/코드 변경 있을 때).
 # sdd-init가 scripts/sdd-pre-commit.sh로 설치 + .git/hooks/pre-commit이 이를 호출.
 set -e
-DIR=$(git rev-parse --show-toplevel)
+DIR=$(git rev-parse --show-toplevel) || { echo "sdd pre-commit: git 저장소 아님" >&2; exit 1; }
 cd "$DIR"
 STAGED=$(git diff --cached --name-only)
 # 스펙 또는 코드 변경이 있을 때만 게이트(문서-only 커밋은 통과)
 if printf '%s' "$STAGED" | grep -qE '(^|/)(sdd/specs/|src/|lib/|app/|tests/)'; then
+  if [ ! -f scripts/check-fr-coverage.mjs ] || [ ! -f scripts/check-ownership.mjs ]; then
+    echo "sdd pre-commit: 게이트가 scripts/에 없음 — sdd-init 재실행 필요" >&2
+    exit 1
+  fi
   node scripts/check-fr-coverage.mjs   # PREFIX 화이트리스트·사유·조용한누락(exit 1)
   node scripts/check-ownership.mjs     # dedup·정규화·형식(exit 1)
 fi
