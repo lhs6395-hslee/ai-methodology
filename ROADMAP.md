@@ -10,6 +10,14 @@
 
 설계·계획 근거: `docs/superpowers/specs/` · `docs/superpowers/plans/`.
 
+## 🎯 설계·계획 완료 (구현 대기)
+> "채택 = 상시 강제 궤도(spec→code→test→sync를 벗어날 수 없게)"를 닫는 두 조각. 설계·TDD 계획까지 완료, **구현은 미착수**(추측 아닌 실측 원칙 — 구현 시 hook 스키마·게이트 출력 확정).
+
+| 항목 | 설계 | 계획(TDD) |
+|---|---|---|
+| **Ownership 키 결정성** — 소유(`## Ownership`)/참조(`## Dependencies`) 분리 · 정규화 절대규칙 · Capability verb 고정집합 · PREFIX 표준(SPEC/INFRA/TEST)+사유 관문 · 1 spec=1 aggregate 경계 · `check-spec-consistency` 신규 | `specs/2026-06-30-ownership-key-derivation-design.md` | `plans/2026-07-01-ownership-key-determinism.md` (7 태스크) |
+| **방법론 강제 hook 세트** — 채택(`sdd-init`) 시 SessionStart(방법론 주입)·PreToolUse(편집 체크리스트)·git pre-commit(hard 차단) 자동배선 → 상시 강제 궤도 · 궤도 원칙 명시 · 사용법 | `specs/2026-07-01-methodology-enforcement-hooks-design.md` | `plans/2026-07-01-methodology-enforcement-hooks.md` (6 태스크) |
+
 ## 🔜 보류 (트리거가 오면 착수)
 | 항목 | 착수 트리거 |
 |---|---|
