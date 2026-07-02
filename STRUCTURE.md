@@ -50,6 +50,14 @@
 - **강제되는 것:** spec/FR 삭제 시 그 FR을 `@covers`하던 테스트는 **dangling → FR 게이트 R1이 막아** 테스트 삭제를 강제.
 - **강제 안 되는 틈:** "spec은 지웠는데 코드가 남은" 고아 코드는 FR↔test 게이트가 못 잡는다(spec↔test 매핑이라). → 제거 task 실행 + 리뷰 + (선택) dead-code/coverage 점검으로 닫는다.
 
+## Files 소유 glob — 완전성·과광역 경고·INFRA 관행
+
+**Files 완전성:** 각 spec의 `Files:` glob은 소유 코드를 **빠짐없이** 덮어야 한다 — API route(`src/app/api/<f>/**`)뿐 아니라 그 기능의 라이브러리(`src/lib/<f>/**`)까지. 라이브러리가 누락되면 그 파일은 check-spec-sync 레이더 밖에 놓여 코드 변경이 스펙 동반 없이 통과한다(pdf-parse 사례의 근본 원인). Files 완전성 자체는 자연어 판단이라 **규칙·리뷰**로 관리한다(게이트 강제 안 함).
+
+**과광역 glob 경고:** 여러 spec의 Files glob이 같은 파일을 덮으면(겹침) `check-spec-sync`가 **AND**로 동작 — 해당 파일 변경 시 *모든* 소유 스펙에 의미 있는 변경을 요구한다. 공유 유틸이 N개 스펙 편집을 강요하는 부담이 되므로 겹침은 최소화를 권장한다. 공유 코드는 별도 스펙(또는 미소유→converge-drift 소관)으로 두는 것이 좋다.
+
+**INFRA 스펙 config 파일 소유 관행(권장):** 프로젝트 루트 config 파일(`next.config.ts`·`tsconfig.json`·`vite.config.ts` 등)은 특정 기능 스펙의 소유가 아니어서 check-spec-sync가 침묵한다(converge-drift advisory만). 이 사각지대를 닫으려면 **INFRA 스펙**(`INFRA-001` 등)에 `Files: next.config.ts, tsconfig.json, …`으로 등록하는 관행을 권장한다. 채택하지 않으면 config 파일 변경은 advisory 그물만 적용된다(과장 금지).
+
 ## SSOT 3계층 (한 덩어리 아님)
 | 레이어 | SSOT 주체 |
 |---|---|

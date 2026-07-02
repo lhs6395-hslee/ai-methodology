@@ -32,6 +32,7 @@
 - **Independent Test**: [이 스토리만으로 단독 검증법]
 - **Acceptance (GWT)**: 1. **Given** […], **When** […], **Then** […].
 ### Edge Cases
+<!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 - [엣지] · 불명확 시 `[NEEDS CLARIFICATION: …]`
 
 ---
@@ -55,6 +56,7 @@
 - **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분. 스키마 식별자 그대로(trim+소문자, 단복수 임의변환 금지)]
 - **Surfaces**: [이 spec이 관할하는 route·화면·job/event — 예: `POST /api/{id}`, `event:<name>`. METHOD 대문자·path 소문자·param `{name}` 표준형·trailing slash 없음]
 - **Capabilities**: [entity.verb 형태 — 예: `project.create`, `staff.assign`. verb ∈ CRUD 기본(create/read/update/delete/list) + config `capabilityVerbs` 등록 verb만 허용]
+- **Files**: [이 spec이 소유하는 코드 파일 glob — 예: `src/lib/<feature>/**, src/app/api/<feature>/**`. **`**`·`*`만 지원**(중괄호·`?`·`[` 금지), 콤마 구분, 인라인 주석 금지. route뿐 아니라 그 기능의 라이브러리까지 빠짐없이(§Files 완전성). check-spec-sync가 이 glob으로 코드→스펙 동반을 강제]
 
 ## Dependencies (참조 — dedup 제외)
 > 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화 표기를 권장하되, 게이트의 형식검증·dedup 대상은 아니다.
@@ -82,6 +84,7 @@
 - [전제] / [인터뷰로 확정할 빈칸] → `CLARIFICATIONS.md`
 
 ## Change Log
+<!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | [YYYY-MM-DD] | 초안 | |

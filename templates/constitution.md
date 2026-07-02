@@ -10,6 +10,8 @@
 ### I. Spec = 요구 SSOT, 테스트 = 자물쇠 (NON-NEGOTIABLE)
 각 기능 모듈은 살아있는 spec("무엇을/왜")을 소유한다. spec은 **실행 가능한 테스트 스위트가 강제할 때만** 신뢰된다. 따라서 모든 FR은 **언어중립 ID(`FR-001`)** 를 갖고, 모든 FR은 `@covers <SPEC-ID>/FR-NNN` 로 태깅된 테스트 ≥1개를 가진다(주석 스타일은 언어 자유 — `//`·`#`·`--` 모두 인식). Spec Kit은 스캐폴더이지 강제자가 아니다 — **CI 드리프트 게이트가 강제자**다. (게이트는 `sdd.config.json` 어댑터로 언어·모델·인프라 무관하게 동작.)
 
+owned Files의 코드 변경은 동일 changeset(브랜치)에 스펙 변경(FR·Edge Case·Change Log)을 동반한다. 순수 기계적/버그픽스 변경도 Edge Case+Change Log 항목을 남긴다(`/speckit.fix`). `check-spec-sync` 게이트(commit-msg hard)가 강제하며, 예외는 `Spec-Impact: none <사유>` 트레일러로만(커밋에 영속).
+
 ### II. Test-First (NON-NEGOTIABLE)
 TDD 필수: 실패 테스트(RED) → 최소 구현(GREEN) → 완료 선언 전 검증. 테스트가 CI에서 통과하지 않으면 어떤 기능도 "완료"가 아니다.
 
