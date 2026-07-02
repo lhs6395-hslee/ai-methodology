@@ -19,7 +19,7 @@
 
 ### Edge Cases
 - `parseSection`으로 넘어온 값이 `—`, `[…]`, 또는 `[`로 시작하는 placeholder 토큰이면 키에서 제외한다(빈 카테고리 허용, 조용한 오탐 방지).
-- `normalizeKey`의 Surface 경로에 매칭되는 `<METHOD> <path>` 형태가 없으면(공백 분리 실패) 전체를 소문자화한 fallback을 반환한다.
+- `normalizeKey`의 Surface 경로에 매칭되는 `<METHOD> <path>` 형태가 없으면(공백 분리 실패) 전체를 소문자화한 fallback을 반환한다. `surfaceFormat: "path"|"any"`이면 애초에 METHOD 파싱을 생략하고 소문자 경로(trailing slash 제거)로 정규화한다(파일 라우팅·비-HTTP 자원용).
 - `loadConfig`가 `sdd.config.json` JSON 파싱에 실패하면 stderr로 경로·사유를 출력하고 `process.exit(1)`한다(조용한 무시 금지).
 - `validateKey`의 Capability는 점 1개(`entity.verb`)가 아니거나 verb가 `__allVerbs`(CRUD + 등록 verb)에 없으면 위반 사유 문자열을 돌려준다.
 - `__coversRe`의 FR ID 문법은 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-003a`)이며 경계까지 요구한다 — 2자 서픽스(`FR-003ab`)는 부분 캡처(`FR-003a`/`FR-003`) 없이 통째로 불인정(절단 오판 금지).
@@ -30,10 +30,10 @@
 > 정본은 영어. 각 FR은 구현된 동작을 서술한다(발명 금지).
 
 - **FR-001** (event): WHEN `parseSection` receives a heading and category list, THE SYSTEM SHALL slice the text from that `## <heading>` line to the next `## ` line and return one comma-split, trimmed key array per category, excluding empty, `—`, and bracket-prefixed placeholder tokens.
-- **FR-002** (event): WHEN a Surfaces key is normalized, THE SYSTEM SHALL uppercase the METHOD, lowercase the path, rewrite `:id`/`<id>`/`{id}` params to the configured `surfacePathParam` `{name}` form, and strip the trailing slash.
+- **FR-002** (event): WHERE `surfaceFormat` is `http` (default), WHEN a Surfaces key is normalized, THE SYSTEM SHALL uppercase the METHOD, lowercase the path, rewrite `:id`/`<id>`/`{id}` params to the configured `surfacePathParam` `{name}` form, and strip the trailing slash; WHERE `surfaceFormat` is `path` or `any`, THE SYSTEM SHALL instead lowercase the key and strip the trailing slash without METHOD/param parsing (file-path surfaces).
 - **FR-003** (event): WHEN a non-Surfaces key (Entity or Capability class) is normalized, THE SYSTEM SHALL lowercase it and collapse internal whitespace to single spaces.
 - **FR-004** (unwanted): IF a Capabilities key is not exactly `entity.verb` (one dot) or its verb is absent from the configured verb set, THEN THE SYSTEM SHALL return a violation reason string instead of null.
-- **FR-005** (unwanted): IF a Surfaces key does not match `<METHOD> <path>` or the `event:`/`job:` form, THEN THE SYSTEM SHALL return a violation reason string.
+- **FR-005** (unwanted): WHERE `surfaceFormat` is `http` (default), IF a Surfaces key does not match `<METHOD> <path>` or the `event:`/`job:` form, THEN THE SYSTEM SHALL return a violation reason string; WHERE `surfaceFormat` is `path`, IF the key contains whitespace or non-path characters THEN it is a violation; WHERE `surfaceFormat` is `any`, no surface format is enforced.
 - **FR-006** (ubiquitous): THE SYSTEM SHALL resolve the config by walking upward from the start directory for `sdd.config.json`, merge the parsed user object over `DEFAULTS`, and shallow-merge the `commands` map.
 - **FR-007** (event): WHEN config is loaded, THE SYSTEM SHALL derive the shared regexes `__specIdRe` and `__coversRe` from `specIdPrefixes`, set `__root` to the config directory (or the start directory when no config file exists), and build `__allVerbs` from CRUD plus `capabilityVerbs`.
 - **FR-008** (unwanted): IF `sdd.config.json` exists but fails to parse as JSON, THEN THE SYSTEM SHALL print the path and error to stderr and exit with a non-zero code.
@@ -71,3 +71,4 @@
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `__coversRe` 레터 서픽스(FR-003a) 지원 + 경계 강제 | 도그푸딩(PM솔루션 f36494a): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |
+| 2026-07-02 | `surfaceFormat`(http\|path\|any) config 추가 — FR-002/005 개정 + `normalizeKey`/`validateKey` 분기 + 테스트 | 도그푸딩(PM솔루션): Next.js 파일 라우팅·비-HTTP 자원(Dockerfile·IaC)을 Surface로 모델링 — HTTP 강제를 config로 완화 |

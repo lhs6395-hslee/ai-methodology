@@ -53,9 +53,10 @@ for (const file of files) {
   const own = parseSection(text, "Ownership", CATEGORIES);
   const hasOwnership = text.search(/^##\s+Ownership/m) !== -1;
   if (hasOwnership) {
-    // 신규: Entities(aggregate root) 다수 = 여러 aggregate 삼킴 신호
-    if (own[ENT_CAT] && own[ENT_CAT].length > 1)
-      violations.push({ specId, kind: `${ENT_CAT}(aggregate)`, n: own[ENT_CAT].length, max: 1 });
+    // 신규: Entities(aggregate root) 다수 = 여러 aggregate 삼킴 신호. 임계는 config(기본 1).
+    const MAX_AGG = cfg.maxAggregateRootsPerSpec ?? 1;
+    if (own[ENT_CAT] && own[ENT_CAT].length > MAX_AGG)
+      violations.push({ specId, kind: `${ENT_CAT}(aggregate)`, n: own[ENT_CAT].length, max: MAX_AGG });
     // 기존: 카테고리별 키 > MAX_KEYS
     for (const cat of CATEGORIES) {
       if (own[cat].length > MAX_KEYS)

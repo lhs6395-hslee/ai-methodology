@@ -48,6 +48,9 @@ export const DEFAULTS = {
   // 신호 → 분할 권고(advisory). 카테고리명 무관(ownershipCategories 따름).
   maxKeysPerCategoryPerSpec: 4,
   maxFRsPerSpec: 8,
+  // cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수. 기본 1(1 spec = 1 aggregate).
+  // aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 모델이면 상향(자식은 별도 root 아님).
+  maxAggregateRootsPerSpec: 1,
   // check-spec-sync 예외 glob(§5.5) — Files glob이 과포함한 생성물·락파일 등.
   // 통과하되 영속 흔적 없음(정직) — 목록 자체가 config 리뷰 대상.
   specSyncExemptGlobs: [],
@@ -61,6 +64,10 @@ export const DEFAULTS = {
   capabilityVerbs: [],
   // Surface path param 표준 표기
   surfacePathParam: "{name}",
+  // Surface 키 형식: "http"(기본 — "<METHOD> <path>" / "event:" / "job:") | "path"(파일경로 표면)
+  // | "any"(형식검증 안함). 파일 라우팅 프레임워크(Next.js 등)나 비-HTTP 자원(Dockerfile·IaC)을
+  // Surface로 모델링하는 프로젝트는 "path". normalizeKey/validateKey가 이 값으로 분기.
+  surfaceFormat: "http",
   // 언어별 셸 명령(sdd-run.mjs가 실행). 미설정 stage는 건너뜀.
   //   { "setup": "...", "lint": "...", "typecheck": "...", "test": "..." }
   commands: {},

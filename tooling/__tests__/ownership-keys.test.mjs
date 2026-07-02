@@ -53,3 +53,27 @@ test("validateKey: 미등록 verb는 위반", () => {
 test("validateKey: 점 2개 이상이면 위반", () => {
   assert.equal(validateKey("Capabilities", "a.b.c", cfg) !== null, true);
 });
+
+test("validateKey: surfaceFormat 'http'(기본) → 파일경로 Surface는 위반", () => {
+  assert.equal(validateKey("Surfaces", "src/app/api/chat/route.ts", cfg) !== null, true);
+  assert.equal(validateKey("Surfaces", "POST /api/chat", cfg), null);
+});
+
+test("validateKey: surfaceFormat 'path' → 파일경로 Surface 허용, 공백 포함은 위반", () => {
+  const pathCfg = { ...cfg, surfaceFormat: "path" };
+  assert.equal(validateKey("Surfaces", "src/app/api/chat/route.ts", pathCfg), null);
+  assert.equal(validateKey("Surfaces", "infra/terraform", pathCfg), null);
+  assert.equal(validateKey("Surfaces", "src/app/tools/pjt-management/[id]", pathCfg), null);
+  assert.equal(validateKey("Surfaces", "dockerfile", pathCfg), null);
+  assert.equal(validateKey("Surfaces", "POST /api/x with space", pathCfg) !== null, true);
+});
+
+test("validateKey: surfaceFormat 'any' → Surface 형식 검증 안함", () => {
+  const anyCfg = { ...cfg, surfaceFormat: "any" };
+  assert.equal(validateKey("Surfaces", "anything at all", anyCfg), null);
+});
+
+test("normalizeKey: surfaceFormat 'path' → 소문자 + trailing slash 제거(METHOD 파싱 안함)", () => {
+  const pathCfg = { ...cfg, surfaceFormat: "path" };
+  assert.equal(normalizeKey("Surfaces", "Src/App/API/route.ts/", pathCfg), "src/app/api/route.ts");
+});

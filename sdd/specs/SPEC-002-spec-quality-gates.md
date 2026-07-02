@@ -19,7 +19,7 @@
 
 ### Edge Cases
 - Ownership 블록이 없는 spec은 비-strict에서 **warn**(점진 도입) — dedup은 건너뛴다.
-- cohesion에서 aggregate-root 카테고리(config의 첫 카테고리, 여기서는 Modules)가 2개 이상이면 "여러 aggregate 삼킴" 신호로 warn(경계 규칙).
+- cohesion에서 aggregate-root 카테고리(config의 첫 카테고리, 여기서는 Modules) 키가 `maxAggregateRootsPerSpec`(기본 1) 초과면 "여러 aggregate 삼킴" 신호로 warn — aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 프로젝트는 이 값을 상향(자식은 별도 root 아님).
 - completeness는 FR이 0개인 spec(순수 인프라)은 SC·인수조건 검사에서 면제한다.
 - consistency는 `## Ownership` **이전** 본문만 근거로 삼는다 — 키가 자기 선언 줄로 근거되는 것을 방지하며, 근거 없는 키는 advisory warn(비차단)이다.
 - FR ID는 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-002b`) — coverage의 FR 선언 추출, cohesion의 FR 수 집계, completeness의 FR-존재 면제 판단이 모두 동일 문법을 쓴다(사이트 간 문법 불일치 = 절단 태그·조용한 FR 누락의 뿌리).
@@ -31,7 +31,7 @@
 
 - **FR-001** (event): WHEN a test file carries an `@covers <SPEC-ID>/FR-NNN` tag referencing a FR that does not exist in that spec, THE SYSTEM SHALL report an R1 dangling-reference error and exit non-zero; a spec with zero covering tests SHALL only warn (incremental adoption).
 - **FR-002** (unwanted): IF two or more specs own the same normalized key within one ownership category, THEN THE SYSTEM SHALL report a structural-duplicate conflict and exit non-zero, while Dependencies-section keys are excluded from the duplicate check.
-- **FR-003** (event): WHEN a spec owns more keys per category than `maxKeysPerCategoryPerSpec`, or declares more than one aggregate-root-category key, or exceeds `maxFRsPerSpec` FRs, THE SYSTEM SHALL emit an under-fragmentation (cohesion) split advisory.
+- **FR-003** (event): WHEN a spec owns more keys per category than `maxKeysPerCategoryPerSpec`, or declares more aggregate-root-category keys than `maxAggregateRootsPerSpec` (default 1), or exceeds `maxFRsPerSpec` FRs, THE SYSTEM SHALL emit an under-fragmentation (cohesion) split advisory.
 - **FR-004** (unwanted): IF a spec declares at least one FR but has no `SC-NNN` success criterion or no acceptance clause (Given/Acceptance/수용 기준), THEN THE SYSTEM SHALL warn that the spec is incomplete.
 - **FR-005** (unwanted): IF an owned key's core tokens never appear in the spec body preceding the `## Ownership` section, THEN THE SYSTEM SHALL emit a consistency advisory that the key lacks grounding.
 - **FR-006** (event): WHEN `check-fr-coverage.mjs` starts, THE SYSTEM SHALL validate every spec filename prefix against `specIdPrefixes` before collecting FRs, and SHALL exit non-zero for an unregistered prefix or a non-standard prefix lacking a `prefixRationale` entry.
@@ -74,3 +74,4 @@
 | 2026-07-02 | `maxKeysPerCategoryPerSpec`를 4→6으로 상향(sdd.config.json) | 이 spec의 Symbols=5개 게이트 파일명은 한 응집 aggregate라 분할이 부적절 — 브리프 허용 config 조정으로 cohesion warn 해소 |
 | 2026-07-02 | check-test-adequacy.mjs(+ 테스트) + FR-008 편입 — Symbols=6 유지(threshold 내) | spec-quality-gates aggregate의 6번째 게이트; @covers 빈 껍데기 검출은 FR coverage 게이트의 직접 보완 |
 | 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(PM솔루션): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |
+| 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(PM솔루션): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |

@@ -85,3 +85,14 @@ test("FR 카운트가 레터 서픽스 FR(FR-008a)을 집계 — 9개>8 과다 a
   assert.match(warn.out, /SPEC-001/); // 과다 신호에 spec이 지목돼야 함(조용한 미집계 금지)
   assert.equal(run(dir, ["--strict"]).code, 1);
 });
+
+test("maxAggregateRootsPerSpec 상향 → aggregate 다수 신호 억제(루트+자식표 소유 모델)", () => {
+  const dir = fixture({ specDir: "sdd/specs", maxAggregateRootsPerSpec: 10, maxKeysPerCategoryPerSpec: 10 }, {
+    "sdd/specs/SPEC-001.md":
+      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Entities**: root, child_a, child_b, child_c\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.doesNotMatch(r.out, /aggregate/i); // 임계 상향 시 aggregate 경고 없음
+  assert.match(r.out, /분할 권고 없음/);
+});

@@ -24,6 +24,11 @@ export function parseSection(text, heading, categories) {
 export function normalizeKey(category, raw, cfg) {
   const s = String(raw).trim();
   if (category === "Surfaces") {
+    const style = (cfg && cfg.surfaceFormat) || "http";
+    if (style !== "http") {
+      // 파일경로/자유형 Surface — 소문자 + trailing slash 제거(HTTP METHOD 파싱 안함).
+      return s.toLowerCase().replace(/\/+$/, "") || s.toLowerCase();
+    }
     // "<METHOD> <path>" 또는 "event:.."/"job:.." — 메서드 대문자, path 소문자, param 표준형, trailing slash 제거
     const m = s.match(/^(\S+)\s+(.+)$/);
     if (!m) return s.toLowerCase();
@@ -46,6 +51,14 @@ export function validateKey(category, key, cfg) {
     return null;
   }
   if (category === "Surfaces") {
+    const style = (cfg && cfg.surfaceFormat) || "http";
+    if (style === "any") return null;
+    if (style === "path") {
+      // 파일경로 Surface: 공백 없는 경로형 토큰(슬래시·점·하이픈·[param]·glob·@scope 허용).
+      return /^[\w.\-/\[\]@*]+$/.test(key)
+        ? null
+        : `Surface(path)는 공백 없는 파일경로 형식이어야 함: "${key}"`;
+    }
     if (!/^[A-Z]+ \S/.test(key) && !/^(event|job):/.test(key))
       return `Surface는 "<METHOD> <path>" 또는 "event:/job:" 형식이어야 함: "${key}"`;
     return null;
