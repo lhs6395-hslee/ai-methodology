@@ -229,3 +229,5 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 1. 각 스펙의 `## Ownership` 절에 `- **Files**: <소유 경로 glob>` 한 줄 추가 (예: `src/lib/pdf/**`).
 2. glob은 `**`와 `*` 만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
 3. `sdd-init` 이후 신규 스펙은 템플릿(`sdd/templates/spec-template.md`)에 Files 절이 포함되어 자동 안내된다.
+
+**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 4-spec(1 aggregate씩, `Files` glob으로 tooling 14파일 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 커버리지 갭(미커버 5 FR)도 게이트가 정직하게 드러낸다 — incremental 모드로 점진 보강.
