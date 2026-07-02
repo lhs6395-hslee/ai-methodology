@@ -6,7 +6,7 @@
 
 ## 0. 요약
 
-코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과, commit-msg 훅 hard + range 모드) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 커밋에 강제한다."
+코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과 — changeset=브랜치(§5.8), commit-msg 훅 hard + range 모드) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 커밋에 강제한다."
 
 ## 1. 문제 — 기존 게이트가 못 잡는 이음매
 
@@ -42,6 +42,8 @@
 | 다중 소유 | **AND** — 소유 스펙 전부 변경 요구 (§6.1) | vs OR(가장 쉬운 스펙 touch 루프홀) |
 | merge/amend | merge commit은 **감지 후 skip+기록** (§5.6) | vs merge-base diff(복잡·오탐) |
 | 두 운영 모드 | staged(hard, commit-msg) + range(advisory, sdd-sync/CI) 명시 분리 (§5.7) | vs 단일 모드(sdd-sync 배선 시 무의미 판정) |
+| **changeset 의미** | **브랜치 단위** — 스테이징 ∪ `base...HEAD`에서 스펙 변경 인정 (§5.8) | vs 커밋 단위(top-down 정상 흐름 — spec 커밋 후 구현 커밋들 — 을 전부 FAIL시킴) |
+| 소유권 스냅샷 | **HEAD ∪ index 합집합** (§5.1) | vs index만(스펙 삭제+코드 변경이 조용히 통과하는 구멍) |
 
 ## 4. 데이터 모델 — `Files:` 필드
 
@@ -71,9 +73,11 @@
 
 ```
 1. 변경 파일 수집 (모드별 — §5.7)
-2. 전 스펙의 Ownership을 parseSection(text, "Ownership", ["Files"])로 로드
+2. 스펙 Ownership 로드 — **HEAD와 index(staged) 양쪽에서 parseSection(text,
+   "Ownership", ["Files"])로 읽어 합집합**. (index만 보면 "스펙 삭제+코드 변경"
+   커밋에서 소유권이 사라져 조용히 통과하는 구멍 — HEAD판이 삭제를 가시화.)
 3. 변경된 각 파일 → Files glob 매치(§4.1) → 소유 스펙(들) 확정
-4. 매치된 소유 스펙 각각에 대해(AND — §6.1): 그 .md가 같은 diff에 있고
+4. 매치된 소유 스펙 각각에 대해(AND — §6.1): **changeset(§5.8) 안에서**
    의미 있는 섹션 변경(§5.4)이 있어야 통과. 하나라도 없으면 FAIL(exit 1, staged 모드).
 5. 탈출구(§5.5): Spec-Impact 트레일러 / exempt glob.
 6. Files 어느 glob에도 안 맞는 파일 → 침묵. check-converge-drift(전역 advisory)가 백업.
@@ -83,7 +87,7 @@
 
 소유 스펙 `.md`의 diff에서 "의미 있는 변경"을 다음으로 판정한다:
 
-1. **스펙 파일의 new-file 전체 내용**(post-image)을 읽어 `## ` 헤더 기준 **라인번호→섹션 맵**을 만든다. (hunk 컨텍스트만으로 섹션을 추정하지 않는다 — 컨텍스트 없는 소형 hunk·섹션 경계 편집의 오귀속 방지.)
+1. **스펙 파일의 new-file 전체 내용**(post-image)을 읽어 `## ` 헤더 기준 **라인번호→섹션 맵**을 만든다. **post-image 출처 명시**: staged 모드 = **index판**(`git show :<path>` — 작업트리가 아님, unstaged 편집이 섞이면 §6.2 판정이 깨짐) / range·브랜치 diff = 해당 범위 head판(`git show <head>:<path>`). (hunk 컨텍스트만으로 섹션을 추정하지 않는다 — 컨텍스트 없는 소형 hunk·섹션 경계 편집의 오귀속 방지.)
 2. diff의 각 추가 라인(`+`)을 hunk 헤더(`@@ -a,b +c,d @@`)의 new-file 라인번호로 환산해 섹션에 귀속.
 3. 다음 중 하나면 통과:
    - **FR 본문 변경**: `**FR-NNN**` 라인의 추가/삭제,
@@ -91,11 +95,11 @@
    - **`## Edge Cases`** 아래 새 항목: 동일 규칙.
 4. 파일 동반만·공백·주석만 변경 → 불통과(우회 차단).
 
-스펙 파일 **삭제**는 "의미 있는 변경"으로 인정(폐기는 STRUCTURE 수명주기 절차가 별도 규율). 소유 코드 파일의 **rename/delete**도 변경으로 취급(소유 스펙 갱신 요구 — Files glob 자체를 고치는 변경이 그 스펙 변경에 포함되므로 자연 해소).
+스펙 파일 **삭제**는 "의미 있는 변경"으로 인정하되 **눈에 띄게 기록**(폐기는 STRUCTURE 수명주기 — spec+코드+테스트 원자 삭제 — 가 별도 규율; §5.1의 HEAD∪index 로드 덕에 삭제 커밋에서도 소유권이 보여 조용한 우회가 아니라 시끄러운 통과가 된다). 스펙 파일 **순수 rename**(내용 무변경)은 의미 있는 변경이 **아니다** — 소유 코드도 같이 바뀌면 Change Log 항목 필요(엄격 유지). 소유 코드 파일의 **rename/delete**도 변경으로 취급(소유 스펙 갱신 요구 — Files glob 자체를 고치는 변경이 그 스펙 변경에 포함되므로 자연 해소).
 
 ### 5.5 탈출구 — 감사 흔적의 실체 (정직)
 
-- **`Spec-Impact: none <사유>` 트레일러** — 커밋 메시지에 남는 **영속 감사 흔적**(`git log --grep`으로 조회 가능, 리뷰 노출). 이것이 감사 경로의 실체다. ~~stderr 기록~~은 커밋 시점 터미널에만 보이고 영속되지 않으므로 감사 주장에서 제외(참고 출력일 뿐).
+- **`Spec-Impact: none <사유>` 트레일러** — 커밋 메시지에 남는 **영속 감사 흔적**(`git log --grep`으로 조회 가능, 리뷰 노출). 이것이 감사 경로의 실체다. **사유는 비어 있으면 안 된다** — `Spec-Impact: none`만 있고 사유가 없으면 FAIL("사유 필수", prefixRationale과 동일 패턴). ~~stderr 기록~~은 커밋 시점 터미널에만 보이고 영속되지 않으므로 감사 주장에서 제외(참고 출력일 뿐).
 - **exempt glob**(config `specSyncExemptGlobs`, 기본 `[]`) — 통과하되 **영속 흔적은 없다**(정직하게 인정). exempt 목록 자체가 config로 리뷰되는 것이 통제선. 예시: 생성물·락파일이 Files glob에 과포함될 때.
 
 ### 5.6 훅 배선·우회 경계 (정직)
@@ -114,6 +118,16 @@
 
 - **sdd-sync R2에는 range 모드가 배선**된다 — sdd-sync는 게이트를 인자 없이 실행하므로(§11) 기본값이 range 모드여야 무의미한 빈-staged 판정을 피한다. staged 모드는 commit-msg 훅 전용.
 
+### 5.8 changeset = 브랜치 (staged 모드의 통과 범위 — 핵심 결정)
+
+**"동일 changeset"의 단위는 커밋이 아니라 브랜치다.** staged 모드의 통과 조건:
+
+> 소유 스펙의 의미 있는 변경(§5.4)이 **스테이징 diff ∪ `base...HEAD`**(base 기본 `origin/main`, converge-drift와 동일 규약) 어딘가에 존재하면 통과.
+
+**왜 커밋 단위가 아닌가:** 커밋 단위로 강제하면 **정통 top-down 흐름이 깨진다** — spec-first 정상 작업은 spec 커밋(A) 후 구현 커밋(B·C·D…)인데, B·C·D는 소유 코드를 바꾸면서 스펙은 그 커밋엔 없으므로 전부 FAIL. 방법론의 1차 워크플로를 게이트가 막는 자기모순. 브랜치 단위면: top-down(spec이 브랜치 안에 이미 변경됨)은 자연 통과, **pdf-parse류(브랜치 전체에 스펙 무변경인 hotfix)는 여전히 정확히 잡힌다.**
+
+**정직한 경계:** ① 브랜치가 아주 길면 "옛날 스펙 변경 한 번"이 이후 코드 변경을 다 커버 — 브랜치=하나의 changeset이라는 정의상 수용(작은 브랜치 권장은 일반 위생). ② main 직커밋 워크플로에서 spec 커밋을 **push한 뒤** 코드 커밋을 만들면 base(origin/main)가 전진해 spec 변경이 범위 밖 → FAIL → 트레일러 또는 Change Log 항목으로 해소(문서화). ③ base 원격 미존재(초기 레포)·detached 등은 base 해석 불가 시 **staged diff만으로 판정 + 경고**.
+
 ## 6. 3분류 + 예외 + 경계 사례
 
 | 코드 변경 | 통과 조건 | 강제 |
@@ -128,7 +142,7 @@
 
 ### 6.2 partial staging = 의도된 FAIL
 
-코드는 staged, 스펙은 편집했지만 unstaged → `git diff --cached`엔 스펙 무변경 → **FAIL이 맞다**(같은 커밋에 스펙이 실려야 함). 흔한 함정이므로 FAIL 메시지에 힌트 포함: *"스펙을 수정했다면 `git add`로 스테이징했는지 확인"*.
+코드는 staged, 스펙은 편집했지만 unstaged(그리고 브랜치 히스토리에도 스펙 변경 없음, §5.8) → **FAIL이 맞다**(changeset에 스펙이 실려야 함). 흔한 함정이므로 FAIL 메시지에 힌트 포함: *"스펙을 수정했다면 `git add`로 스테이징했는지 확인"*.
 
 ### 6.3 트리거 케이스 완결 판정 (pdf-parse 사례에 정직)
 
@@ -199,8 +213,10 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 
 - **glob 단위**: `**`·`*` 변환·anchoring(`a/**`가 `a` 비매치)·POSIX/대소문자·미지원 문법(중괄호) 경고·인라인 `#` strip.
 - **섹션 귀속 단위**: 라인번호→섹션 맵 정확성 — 컨텍스트 없는 소형 hunk, 섹션 첫 줄 추가, 경계 편집.
-- **판정 통합(staged)**: Files 매치+스펙 무변경→FAIL / Change Log **표 행** 추가→PASS / Change Log **불릿** 추가→PASS / Edge Cases 항목→PASS / FR 라인 변경→PASS / 공백·주석만→FAIL / 다중 소유 한쪽만 변경→FAIL(AND) / partial staging(스펙 unstaged)→FAIL+힌트.
-- **탈출구**: `Spec-Impact: none` 트레일러→PASS / exempt glob→PASS / Files 미선언 코드→침묵.
+- **판정 통합(staged)**: Files 매치+스펙 무변경(브랜치 포함)→FAIL / Change Log **표 행** 추가→PASS / Change Log **불릿** 추가→PASS / Edge Cases 항목→PASS / FR 라인 변경→PASS / 공백·주석만→FAIL / 다중 소유 한쪽만 변경→FAIL(AND) / partial staging(스펙 unstaged·브랜치에도 없음)→FAIL+힌트.
+- **changeset=브랜치(§5.8)**: spec 커밋(N-1) 후 코드만 staged(N)→**PASS**(top-down 흐름 보존) / 브랜치 전체 스펙 무변경 hotfix→FAIL / base 해석 불가→staged만+경고.
+- **소유권 스냅샷(§5.1)**: 스펙 삭제+소유 코드 변경 한 커밋→HEAD판 소유권으로 감지, 삭제=의미 변경으로 **시끄럽게 통과**(조용한 우회 아님) / 순수 rename→의미 변경 아님.
+- **탈출구**: `Spec-Impact: none <사유>` 트레일러→PASS / **사유 없는 `Spec-Impact: none`→FAIL** / exempt glob→PASS / Files 미선언 코드→침묵.
 - **모드**: 인자 없음→range(origin/main 기본, advisory exit 0) / `--staged --message-file`→hard.
 - **훅 경계**: merge commit(MERGE_HEAD) skip / `--amend` 재실행 동작 문서화 검증.
 - **sdd-init**: init-then-execute — 배선 후 실제 `scripts/check-spec-sync.mjs` 실행 crash 없음(final-review Critical 교훈) + 비-Node 게이트 선택 시 경고 출력.
