@@ -9,7 +9,7 @@
 ## 채택 방법론 (한 줄)
 > **Spec Kit 골격 + 요구사항(FR)만 EARS + 구현·검증은 Superpowers.** module > spec 계층, spec = 살아있는 기능명세서(SSOT), 작성은 LLM·승인은 사람.
 >
-> ✅ **구현 완료:** "채택 = 상시 강제 궤도" — **결정성 게이트**(Ownership 키 도출 결정 절차·PREFIX 표준 SPEC/INFRA/TEST·1 spec=1 aggregate·조용한 누락 제거) + **강제 hook 세트**(SessionStart 방법론 주입·PreToolUse 편집 체크리스트·pre-commit hard 차단 — `sdd-init` 자동 배선; pre-push drift 점검은 `ln -sf`로 선택 연결). 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
+> ✅ **구현 완료:** "채택 = 상시 강제 궤도" — **결정성 게이트**(Ownership 키 도출 결정 절차·PREFIX 표준 SPEC/INFRA/TEST·1 spec=1 aggregate·조용한 누락 제거) + **강제 hook 세트**(SessionStart 방법론 주입·PreToolUse 편집 체크리스트·pre-commit hard 차단 — `sdd-init` 자동 배선; pre-push drift 점검은 `ln -sf`로 선택 연결) + **spec-first 강제**(`Files` glob 소유매핑·`check-spec-sync` commit-msg hard + range advisory·`/speckit.fix`·Edge Cases/Change Log 필수화). 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
 
 > **어떤 언어·어떤 모델·어떤 인프라든** 같은 규율로 동작한다. 언어/스택 차이는 `sdd.config.json` 어댑터 한 장으로만 표현(프리셋: `tooling/sdd.config.presets.md`), 방법론·게이트엔 특정 LLM·벤더 가정이 없다. **특정 CI/CD 도구도 불필요** — 게이트는 CLI라 로컬·git훅·어떤 CI/CD 도구에서든 돈다(`ci-examples.md`). *Spec Kit(spec 작성)과 CI/CD 도구(게이트 실행)는 별개*다. (→ `principles.md` §10)
 
@@ -27,7 +27,7 @@
 | [`APPLYING.md`](APPLYING.md) | **새 프로젝트에 적용하는 설치·배선 절차** + **채택 후 궤도 한 바퀴 운영법**(hook·게이트 실측 출력 포함) | 런북 |
 | [`PROMPTS.md`](PROMPTS.md) | 어느 IDE든 붙여넣는 시작/이어가기 프롬프트 | 프롬프트 |
 | [`principles.md`](principles.md) | 작업 원칙(전부정독·병렬=저비용티어·실패재시도·LLM작성/사람승인·언어/모델/인프라/CI 무관 §10) | 규칙 |
-| [`HARNESS.md`](HARNESS.md) | **인터랙티브 spec↔code sync 계약**(규칙표 R1~R4·실행기 `/sdd-sync`·pre-push 훅) + **강제 hook 세트**(SessionStart·PreToolUse·pre-commit·pre-push, `sdd-init` 배선) | ★ 하네스 |
+| [`HARNESS.md`](HARNESS.md) | **인터랙티브 spec↔code sync 계약**(규칙표 R1~R4·실행기 `/sdd-sync`·pre-push 훅) + **강제 hook 세트**(SessionStart·PreToolUse·pre-commit·pre-push, `sdd-init` 배선) + **spec-first**(`check-spec-sync`·commit-msg hard·`/speckit.fix` — Files glob 소유매핑, changeset=브랜치, Spec-Impact 트레일러) | ★ 하네스 |
 | [`ROADMAP.md`](ROADMAP.md) | **완료 / 보류 항목**(보류는 "필요 증명 시 착수" — YAGNI) | 로드맵 |
 | `templates/` | `module-spec.md`(EARS 범용), `MODULE_MAP.md`(단일 모듈 매니페스트), `constitution.md` | 템플릿 |
 | `tooling/` | **`sdd-init.sh`**(정식 레이아웃 결정적 스캐폴더 — 모든 프로젝트 동일 보장)·**`sdd.config.json`**(언어 어댑터)·**`sdd.config.presets.md`**(Python/Go/Rust/Java/… 프리셋). 게이트 **4판 동봉**(동작 동일·전부 검증): **`go-gate/`(Go→단일 정적 바이너리, 인터프리터 0 — 사실상 모든 언어 커버, 권장)** + `sdd-gate-release.yml`(전 플랫폼 빌드), `sdd_gates.sh`(POSIX 셸, 빌드 불필요), `sdd_gates.py`(Python), Node판 `*.mjs`. 모두 같은 config 구동. `vitest.config.ts`(JS만), **`ci-examples.md`**(게이트를 로컬·git훅·어떤 CI/CD 도구에서든 거는 예시 — 도구 무관), `sdd-gates.yml`(CI/CD 워크플로우 샘플 하나), `ears-preset/` | 이식 도구 |

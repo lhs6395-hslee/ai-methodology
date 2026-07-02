@@ -9,13 +9,13 @@
 - 강화 게이트 3종(test-adequacy / converge-drift / orphan-surfaces) + `sdd-init` 배선(node 게이트 전체 설치).
 - **Ownership 키 결정성** — 소유/참조(`## Dependencies`) 분리 · 정규화 절대규칙 · verb 고정집합 · PREFIX 표준(SPEC/INFRA/TEST)+사유 관문 · 1 spec=1 aggregate · `check-spec-consistency` 신규. (`cc3dc22..acf5b6f`, 설계 `specs/2026-06-30-…`, 계획 `plans/2026-07-01-ownership-…`)
 - **방법론 강제 hook 세트** — SessionStart(방법론 주입)·PreToolUse(편집 체크리스트)·git pre-commit(hard)·`sdd-init` 자동배선 · "채택=상시 강제 궤도" 원칙 · 사용법(`APPLYING`·`방법론.html`). (`cc3dc22..acf5b6f`, 설계 `specs/2026-07-01-…`, 계획 `plans/2026-07-01-methodology-…`)
+- **spec-first 강제** — `Files:` 소유매핑 · `check-spec-sync`(changeset=브랜치, commit-msg hard + range advisory) · `/speckit.fix` · Edge Cases/Change Log 필수화 · 사용법·데모 실측(`APPLYING`·`방법론.html`·`README`). (`74a747b..HEAD`, 설계 `specs/2026-07-02-spec-first-enforcement-design.md`, 계획 `plans/2026-07-02-spec-first-plan.md`)
 
 설계·계획 근거: `docs/superpowers/specs/` · `docs/superpowers/plans/`.
 
 ## 🎯 진행 중
 | 항목 | 상태 |
 |---|---|
-| **spec-first 강제** — `Files:` 소유매핑 · `check-spec-sync`(changeset=브랜치, commit-msg hard + range advisory) · `/speckit.fix` · Edge Cases/Change Log 필수화 | 설계 적대 리뷰 라운드 중(`specs/2026-07-02-spec-first-enforcement-design.md`) → clean 후 plan·구현. 트리거: 도그푸딩에서 pdf-parse 버그픽스가 스펙 미동반 커밋으로 통과한 실측 사례 |
 | **키트 자기 정렬(self-application)** — 키트 `tooling/`(게이트 스위트 = 실코드 51 tests)을 자기 방법론 궤도에 편입: 루트 `sdd.config.json`·`sdd/specs/`(1 spec=1 aggregate로 게이트군 스펙화, Files glob·Edge Cases·Change Log 포함)·`@covers` 태깅·hook 배선 | **확정(2026-07-02)** — spec-first 구현 직후 착수. 근거: tooling이 실코드가 된 순간 "메타 레포 면제" 소멸 + sdd-init 복사누락 Critical이 "스펙 없는 코드 drift"의 자체 발병 사례 + 새 게이트의 첫 소비자·상시 도그푸딩 |
 
 ## 🔜 보류 (트리거가 오면 착수)

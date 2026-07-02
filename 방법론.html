@@ -138,7 +138,7 @@
     <a href="#why">왜</a><a href="#pillars">4 기둥</a><a href="#core">핵심 구조</a>
     <a href="#msa">MSA</a><a href="#gates">게이트</a><a href="#loop">생애주기</a>
     <a href="#harness">하네스</a><a href="#run">하네스 실전</a>
-    <a href="#determinism">결정성</a><a href="#orbit">궤도 운영</a><a href="#big">빅 픽처</a>
+    <a href="#determinism">결정성</a><a href="#spec-first">spec-first</a><a href="#orbit">궤도 운영</a><a href="#big">빅 픽처</a>
   </div>
 </div></nav>
 
@@ -502,6 +502,79 @@
   <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
 </div></section>
 
+<section id="spec-first"><div class="wrap">
+  <span class="eyebrow">spec-first 강제</span>
+  <h2>코드 변경은 반드시 소유 스펙을 동반한다</h2>
+  <p>핫픽스 하나가 "급해서" 스펙 없이 커밋되면, 도면과 건물이 어긋난다. <strong>spec-first 게이트</strong>는 코드를 바꿀 때 <em>같은 changeset(브랜치) 안에서</em> 소유 스펙이 함께 갱신됐는지 commit-msg 훅에서 hard 차단한다. "소유"는 스펙의 <code>Files</code> glob으로 선언된다.</p>
+
+  <h3>Files 소유매핑 — 코드 경로 → glob → 스펙</h3>
+  <p>각 스펙의 <code>## Ownership</code> 절에 <code>- **Files**: &lt;glob&gt;</code> 한 줄을 추가한다. 이것이 "이 코드는 이 스펙이 소유한다"는 선언이다.</p>
+  <figure><div class="figscroll"><svg viewBox="0 0 820 200" role="img" aria-label="코드 파일이 Files glob을 통해 소유 스펙으로 귀속되는 흐름">
+    <defs><marker id="ar5" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5a6489"/></marker></defs>
+    <!-- code file box -->
+    <rect x="14" y="60" width="200" height="80" rx="8" fill="#e4f5ef" stroke="#0a946c" stroke-width="1.5"/>
+    <text x="24" y="84" font-size="12" font-weight="700" fill="#0a946c">코드 파일</text>
+    <text x="24" y="104" font-size="11.5" fill="#171f3a" font-family="monospace">src/lib/pdf/parse.ts</text>
+    <text x="24" y="122" font-size="11" fill="#5a6489">(변경 감지됨)</text>
+    <!-- arrow 1 -->
+    <line x1="214" y1="100" x2="282" y2="100" stroke="#5a6489" stroke-width="1.8" marker-end="url(#ar5)"/>
+    <text x="222" y="94" font-size="10.5" fill="#5a6489">glob 매칭</text>
+    <!-- glob box -->
+    <rect x="284" y="60" width="220" height="80" rx="8" fill="#eef1fd" stroke="#3a57d6" stroke-width="1.5"/>
+    <text x="294" y="84" font-size="12" font-weight="700" fill="#3a57d6">Files glob (소유 선언)</text>
+    <text x="294" y="106" font-size="11.5" fill="#171f3a" font-family="monospace">- **Files**: src/lib/pdf/**</text>
+    <text x="294" y="124" font-size="10.5" fill="#33406e">Ownership 절에 명시</text>
+    <!-- arrow 2 -->
+    <line x1="504" y1="100" x2="572" y2="100" stroke="#5a6489" stroke-width="1.8" marker-end="url(#ar5)"/>
+    <text x="512" y="94" font-size="10.5" fill="#5a6489">귀속</text>
+    <!-- spec box -->
+    <rect x="574" y="60" width="232" height="80" rx="8" fill="#eef1fd" stroke="#3a57d6" stroke-width="1.5"/>
+    <text x="584" y="84" font-size="12" font-weight="700" fill="#3a57d6">소유 스펙</text>
+    <text x="584" y="104" font-size="11.5" fill="#171f3a" font-family="monospace">sdd/specs/SPEC-001.md</text>
+    <text x="584" y="122" font-size="10.5" fill="#33406e">변경 동반 여부 검사</text>
+    <!-- gate bar -->
+    <rect x="14" y="162" width="792" height="24" rx="12" fill="#fcefe2" stroke="#e2620a"/>
+    <text x="410" y="178" font-size="11.5" font-weight="700" fill="#e2620a" text-anchor="middle">check-spec-sync: 소유 코드 변경 → 스펙 의미 변경(FR/Edge Cases/Change Log) 동반 여부 commit-msg hard 차단</text>
+  </svg></div>
+  <figcaption>glob은 <code>**</code>와 <code>*</code>만 지원. 여러 스펙이 같은 파일을 소유(다중 소유)하면 <strong>AND 조건</strong> — 모든 소유 스펙에 의미 변경이 있어야 통과한다.</figcaption></figure>
+
+  <h3>커밋 분류 — 3가지로 나뉜다</h3>
+  <div class="tablewrap"><table>
+    <tr><th>커밋 종류</th><th>Files glob 매치</th><th>스펙 동반 필요</th><th>결과</th></tr>
+    <tr><td><strong>기능 변경</strong> — spec 소유 코드 수정</td><td class="blk">✓ 매치</td><td class="blk">필수</td><td>FR/Edge Cases/Change Log 중 하나 추가</td></tr>
+    <tr><td><strong>hotfix</strong> — 버그 픽스(스펙 진짜 무관)</td><td class="blk">✓ 매치</td><td class="pass">트레일러 허용</td><td>커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code></td></tr>
+    <tr><td><strong>무관 파일</strong> — 설정·빌드 등 Files 미매치</td><td class="pass">✗ 미매치</td><td>불필요</td><td>침묵 통과</td></tr>
+  </table></div>
+  <p class="note gate"><strong>changeset = 브랜치</strong>(top-down 흐름 보존). staged(현 커밋) ∪ base...HEAD(이전 커밋들)를 합집합으로 본다 — 스펙을 먼저 커밋하고 코드를 나중에 커밋해도 같은 브랜치면 통과. "코드를 커밋할 때마다 스펙도 같이 고쳐야"가 <strong>아니라</strong> "브랜치 안에서 어느 커밋에든 스펙이 있으면 된다".</p>
+
+  <h3>commit-msg 훅 실측 출력</h3>
+  <p>소유 코드만 스테이징하고 스펙은 건드리지 않은 채 커밋하면:</p>
+  <p class="termlbl">$ git commit -m "fix: improve pdf parsing" — FAIL 실측</p>
+  <pre><span class="c">· spec-sync: base(origin/main) 해석 불가 — staged만 판정(경고)</span>
+spec-sync 게이트 — mode:staged(hard) changed:1 specs:1
+  <span class="r">✗ src/lib/pdf/parse.ts → 소유 스펙 SPEC-001에 의미 있는 변경 없음(FR/Edge Cases/Change Log)</span>
+
+<span class="r">✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.</span>
+  <span class="r">· 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).</span>
+  <span class="r">· 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none &lt;사유&gt;` 트레일러.</span></pre>
+
+  <p>소유 스펙의 Change Log에 새 행을 추가한 후 재실행하면:</p>
+  <p class="termlbl">$ git add sdd/specs/SPEC-001.md &amp;&amp; git commit -m "fix: ..." — PASS 실측</p>
+  <pre><span class="c">· spec-sync: base(origin/main) 해석 불가 — staged만 판정(경고)</span>
+spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
+<span class="g">spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).</span></pre>
+
+  <h3>/speckit.fix — 버그픽스 SDD 경로</h3>
+  <p>spec-first 차단이 뜨면 <code>/speckit.fix</code> 스킬이 해소를 안내한다:</p>
+  <div class="pipe">
+    <div class="step"><span class="n">1</span><b>소유 스펙 확인</b><span>변경 파일이 어느 spec의 Files glob에 속하는지</span></div>
+    <div class="step"><span class="n">2</span><b>버그 성격 판단</b><span>스펙 FR을 고치는 변경인가, 구현 버그인가</span></div>
+    <div class="step"><span class="n">3</span><b>스펙 갱신</b><span>FR 수정 또는 Edge Cases/Change Log 행 추가</span></div>
+    <div class="step"><span class="n">4</span><b>git add + 재커밋</b><span>스펙 파일도 스테이징해야 통과</span></div>
+  </div>
+  <p class="note">스펙과 진짜 무관한 변경(리팩터링·포맷팅·설정 파일)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러를 달면 즉시 통과. 사유 없이 <code>Spec-Impact: none</code>만 쓰면 차단(사유 필수).</p>
+</div></section>
+
 <section id="orbit"><div class="wrap">
   <span class="eyebrow">채택 후 일상 운영</span>
   <h2>채택 후 궤도 한 바퀴 — hook·게이트가 언제·무엇을 하나</h2>
@@ -552,10 +625,10 @@
     </div>
 
     <div class="orb">
-      <div class="tag commit">④ 커밋<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-commit</small></div>
+      <div class="tag commit">④ 커밋<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-commit + commit-msg</small></div>
       <div class="body">
-        <b>PREFIX·ownership hard 차단; FR coverage는 incremental(경고)</b>
-        <p>스테이징된 코드 변경에 PREFIX 위반·ownership 중복이 있으면 커밋이 막힌다. FR coverage는 pre-commit에서 <code>--strict</code> 없이 실행 → partial coverage는 경고만(비차단). 아래 실측 예시:</p>
+        <b>두 훅이 순서대로 — pre-commit(FR·ownership) → commit-msg(spec-sync hard)</b>
+        <p>pre-commit은 PREFIX 위반·ownership 중복을 잡고, commit-msg는 <strong>소유 코드가 바뀌었는데 스펙 미동반</strong>인지 hard 차단한다. merge commit에서 commit-msg spec-sync는 자동 skip(range 백스톱이 커버). <code>--no-verify</code>는 두 훅을 전면 우회하므로 팀 규율로 방지. 실측 예시:</p>
         <p class="termlbl">① PREFIX 위반 (미등록 접두어 "FEAT") — exit 1</p>
         <pre><span class="r">✗ PREFIX 위반:</span>
   <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
@@ -568,7 +641,19 @@
         <p class="termlbl">③ FR coverage 경고 — pre-commit incremental(비차단); strict는 CI/수동 실행 시</p>
         <pre>FR coverage gate — specs:1 FRs:2 covered:1 mode:incremental config:sdd.config.json
 <span class="w">⚠ SPEC-001: 1/2 FRs covered — missing FR-002 (incremental: warn only)</span></pre>
-        <p><strong>해소:</strong> 메시지가 가리키는 spec·키를 고치고 재커밋. 단, <code>--no-verify</code>는 hook을 우회하므로 (팀 규율로) 피한다.</p>
+        <p class="termlbl">④ spec-sync 차단 (commit-msg) — 소유 코드 변경에 스펙 미동반 — exit 1</p>
+        <pre><span class="c">· spec-sync: base(origin/main) 해석 불가 — staged만 판정(경고)</span>
+spec-sync 게이트 — mode:staged(hard) changed:1 specs:1
+  <span class="r">✗ src/lib/pdf/parse.ts → 소유 스펙 SPEC-001에 의미 있는 변경 없음(FR/Edge Cases/Change Log)</span>
+
+<span class="r">✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.</span>
+  <span class="r">· 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).</span>
+  <span class="r">· 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none &lt;사유&gt;` 트레일러.</span></pre>
+        <p class="termlbl">Change Log 행 추가 + git add 후 재실행 — PASS</p>
+        <pre><span class="c">· spec-sync: base(origin/main) 해석 불가 — staged만 판정(경고)</span>
+spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
+<span class="g">spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).</span></pre>
+        <p><strong>해소(spec-sync):</strong> <code>/speckit.fix</code> 실행, 또는 스펙 수정 후 <code>git add</code> 재스테이징, 또는 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러. <strong>해소(pre-commit):</strong> 메시지가 가리키는 spec·키를 고치고 재커밋.</p>
       </div>
     </div>
 
@@ -601,6 +686,7 @@
           <tr><td><code>missing FR-002</code></td><td>테스트에 <code>// @covers SPEC-001/FR-002</code> 추가</td></tr>
           <tr><td><code>code→spec drift</code></td><td><code>/sdd-sync</code> → spec 개정 또는 의도적 무시 선택</td></tr>
           <tr><td><code>미등록 verb "recommend"</code></td><td><code>sdd.config.json</code> <code>capabilityVerbs</code>에 추가</td></tr>
+          <tr><td><code>✗ spec-first 위반</code></td><td><code>/speckit.fix</code> 실행, 또는 <code>git add</code> 재스테이징, 또는 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러</td></tr>
         </table></div>
       </div>
     </div>
@@ -644,7 +730,7 @@
 </div></section>
 
 <footer><div class="wrap">
-  <p><span class="done">✓ Gap 1 · 2 · 3 완료</span> &nbsp; 1 레포=1 모듈 · spec 입도(cohesion) · 하네스 MVP · 결정성 게이트 · 강제 hook 세트 — 모두 <code>main</code> 반영.</p>
+  <p><span class="done">✓ Gap 1 · 2 · 3 + spec-first 완료</span> &nbsp; 1 레포=1 모듈 · spec 입도(cohesion) · 하네스 MVP · 결정성 게이트 · 강제 hook 세트 · <strong>spec-first</strong>(<code>check-spec-sync</code>·commit-msg hard·<code>/speckit.fix</code>) — 모두 <code>main</code> 반영.</p>
   <p>저장소: <a href="https://github.com/lhs6395-hslee/ai-methodology">github.com/lhs6395-hslee/ai-methodology</a> · 근거 문서: <code>METHODOLOGY.md</code> · <code>STORAGE.md</code> · <code>STRUCTURE.md</code> · <code>DEDUP.md</code> · <code>HARNESS.md</code> · <code>APPLYING.md</code> · <code>ROADMAP.md</code></p>
 </div></footer>
 </body>
