@@ -17,7 +17,15 @@ export function compileGlob(glob) {
 // §4.1: 원시 `- **Files**:` 라인에서 미지원 문법 스캔 — parseSection이 `[` 토큰을
 // placeholder로 조용히 버리기 전에 경고해야 하므로 반드시 원시 라인 기준.
 export function scanFilesLineIssues(rawLine) {
-  return ["{", "?", "["].filter((ch) => rawLine.includes(ch));
+  const value = rawLine.replace(/^.*?\*\*Files\*\*\s*:/, ""); // 값 부분만
+  const issues = ["{", "?", "["].filter((ch) => value.includes(ch));
+  for (const tok of value.split(",")) {
+    const t = tok.trim();
+    // 합법 형태: `**/` 또는 토큰 끝 `**`. 그 외 위치의 `**`는 오해석 경고.
+    const stripped = t.replace(/\*\*\//g, "").replace(/\*\*$/, "");
+    if (stripped.includes("**")) { issues.push("**"); break; }
+  }
+  return issues;
 }
 
 // §4.1: parseSection 반환값의 trailing " # …" strip (공유 파서는 불변).
@@ -60,6 +68,7 @@ const isTableRow = (t) => /^\s*\|/.test(t) && !/^\s*\|[\s:|-]+\|?\s*$/.test(t); 
 
 // §5.4 step 3: 의미 있는 변경 판정 (post-image + 그 이미지 기준 diff 한 슬라이스).
 export function hasMeaningfulSpecChange(postImage, diffText) {
+  // `+++`/`---` 헤더도 [+-]에 걸리지만 경로에 `**FR-\d{3}**` 리터럴이 올 수 없어 안전.
   if (/^[+-].*\*\*FR-\d{3}\*\*/m.test(diffText)) return true; // FR 라인 +/- (패턴 기반)
   const sections = buildSectionMap(postImage);
   for (const { line, text } of addedLines(diffText)) {

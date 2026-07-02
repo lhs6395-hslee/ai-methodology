@@ -18,9 +18,20 @@ test("compileGlob: * 는 세그먼트 내, 점 이스케이프", () => {
   assert.equal(compileGlob("next.config.ts").test("next2config.ts"), false); // . 리터럴
 });
 
+test("compileGlob: 중간 **/ 는 0개 세그먼트 허용", () => {
+  const re = compileGlob("a/**/b.ts");
+  assert.ok(re.test("a/b.ts"));
+  assert.ok(re.test("a/x/y/b.ts"));
+});
+
 test("scanFilesLineIssues: 미지원 문법 경고 목록", () => {
   assert.deepEqual(scanFilesLineIssues("- **Files**: src/{a,b}/**"), ["{"]);
   assert.deepEqual(scanFilesLineIssues("- **Files**: src/lib/**"), []);
+});
+
+test("scanFilesLineIssues: 불법 중간 ** 경고, 합법 **/·끝 ** 는 통과, 볼드마커 오탐 없음", () => {
+  assert.deepEqual(scanFilesLineIssues("- **Files**: src/a**b.ts"), ["**"]);
+  assert.deepEqual(scanFilesLineIssues("- **Files**: src/**/x.ts, src/lib/**"), []);
 });
 
 test("stripInlineComment: trailing #… 제거", () => {
