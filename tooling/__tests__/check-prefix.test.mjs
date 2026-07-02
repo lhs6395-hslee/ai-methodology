@@ -1,4 +1,6 @@
 // tooling/__tests__/check-prefix.test.mjs
+// @covers SPEC-002/FR-006
+// @covers SPEC-002/FR-001
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

@@ -1,3 +1,4 @@
+// @covers SPEC-004/FR-002
 // ─── init-then-execute integration test ──────────────────────
 // Finding 2: sdd-init이 설치한 파일만으로 gate가 실행 가능한지 검증.
 // 이 테스트는 Finding 1 수정 전에는 ERR_MODULE_NOT_FOUND로 실패해야 하고,

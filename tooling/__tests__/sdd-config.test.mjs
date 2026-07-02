@@ -1,3 +1,5 @@
+// @covers SPEC-001/FR-006
+// @covers SPEC-001/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadConfig } from "../sdd-config.mjs";

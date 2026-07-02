@@ -1,4 +1,6 @@
 // tooling/__tests__/commit-msg-hook.test.mjs
+// @covers SPEC-003/FR-003
+// @covers SPEC-003/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

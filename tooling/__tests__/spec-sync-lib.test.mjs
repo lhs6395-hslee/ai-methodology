@@ -1,4 +1,7 @@
 // tooling/__tests__/spec-sync-lib.test.mjs
+// @covers SPEC-003/FR-007
+// @covers SPEC-003/FR-005
+// @covers SPEC-003/FR-001
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "../spec-sync-lib.mjs";

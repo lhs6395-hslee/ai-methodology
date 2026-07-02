@@ -1,3 +1,4 @@
+// @covers SPEC-003/FR-009
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";

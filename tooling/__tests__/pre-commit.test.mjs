@@ -1,4 +1,6 @@
 // tooling/__tests__/pre-commit.test.mjs
+// @covers SPEC-004/FR-005
+// @covers SPEC-002/FR-006
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

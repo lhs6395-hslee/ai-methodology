@@ -1,4 +1,6 @@
 // tooling/__tests__/init-spec-sync.test.mjs
+// @covers SPEC-004/FR-002
+// @covers SPEC-004/FR-003
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

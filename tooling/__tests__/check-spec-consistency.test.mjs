@@ -1,4 +1,6 @@
 // tooling/__tests__/check-spec-consistency.test.mjs
+// @covers SPEC-002/FR-005
+// @covers SPEC-002/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

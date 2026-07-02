@@ -1,4 +1,6 @@
 // tooling/__tests__/check-ownership.test.mjs
+// @covers SPEC-002/FR-002
+// @covers SPEC-002/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

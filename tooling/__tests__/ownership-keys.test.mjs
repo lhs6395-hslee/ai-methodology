@@ -1,4 +1,8 @@
 // tooling/__tests__/ownership-keys.test.mjs
+// @covers SPEC-001/FR-001
+// @covers SPEC-001/FR-002
+// @covers SPEC-001/FR-003
+// @covers SPEC-001/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseSection, normalizeKey, validateKey } from "../ownership-keys.mjs";
