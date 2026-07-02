@@ -1,5 +1,20 @@
 # 붙여넣기 프롬프트 (어느 IDE/에이전트든)
 
+## A0. 레포 URL만으로 진입 (다른 머신 / 새 프로젝트 — 권장 시작점)
+> "이 방법론 기반으로 개발할거야"를 URL만 주고 시작할 때. 강제 궤도(hook·게이트)는 **sdd-init 이후부터 기계적으로** 걸리므로, 그 전 구간은 아래처럼 명령형으로 좁혀야 이탈(임의 PREFIX·스펙 위치 발명)이 안 생긴다.
+```
+이 프로젝트는 https://github.com/lhs6395-hslee/ai-methodology 의 SDD 방법론을 따른다. 아래를 순서대로, 추측 없이 실행해.
+1) 키트 준비(프로젝트 밖에 참조용으로만 — 이 레포 안으로 복사/fork 금지):
+   로컬에 키트가 이미 있으면 git pull로 최신화, 없으면 git clone https://github.com/lhs6395-hslee/ai-methodology ~/ai-methodology
+2) 키트의 REALITY_CHECK.md → STORAGE.md → APPLYING.md 정독. "된다"는 실제 실행 증거로만 — [검증]/[추론]/[미확인] 구분.
+3) 이 프로젝트 루트에서: sh <키트경로>/tooling/sdd-init.sh --gate=node
+   → sdd/ 레이아웃·게이트·git 훅(pre-commit·commit-msg)·SessionStart/PreToolUse·스킬(/sdd-sync·/speckit.fix)이 배선된다.
+4) 세션 재시작(SessionStart hook이 방법론을 주입) 후 게이트 green을 실행으로 확인.
+고정 규칙(발명 금지): spec 위치는 sdd/specs/ 만, PREFIX는 SPEC/INFRA/TEST 만(새 PREFIX는 사유와 함께 내 승인 필요),
+1 spec = 1 aggregate, 소유 코드 변경엔 같은 changeset에 spec 동반(순수 hotfix만 커밋 트레일러 Spec-Impact: none <사유>).
+지금은 설치·배선까지만 하고, 스펙 대량 생성은 내 승인 후에.
+```
+
 ## A. 이 키트로 새 프로젝트에 SDD 셋업
 ```
 /Users/toule/Documents/claude/sdd 키트를 기준으로 이 프로젝트에 SDD를 셋업해줘.
@@ -21,6 +36,7 @@ red면 원인을 실행으로 찾아 고친 뒤 진행해. (게이트는 sdd.con
 ```
 
 ## C. 코드 우선 변경(hotfix) 후 spec 동기화
+> 일상 버그픽스는 `/speckit.fix`(RED 재현 → spec 선착지 → GREEN → 게이트)가 정경로. 아래는 spec 없이 코드가 이미 벌어진 **드리프트 복구**용.
 ```
 hotfix로 코드가 spec보다 앞섰어. /speckit.converge로 갭을 task로 표면화하고,
 /speckit.specify(update)로 네가 spec(FR)을 갱신해 초안을 만들어. /speckit.analyze로

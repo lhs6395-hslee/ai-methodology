@@ -35,6 +35,7 @@
 | `tooling/` | **`sdd-init.sh`**(정식 레이아웃 결정적 스캐폴더 — 모든 프로젝트 동일 보장)·**`sdd.config.json`**(언어 어댑터)·**`sdd.config.presets.md`**(Python/Go/Rust/Java/… 프리셋). 게이트 **4판 동봉**(동작 동일·전부 검증): **`go-gate/`(Go→단일 정적 바이너리, 인터프리터 0 — 사실상 모든 언어 커버, 권장)** + `sdd-gate-release.yml`(전 플랫폼 빌드), `sdd_gates.sh`(POSIX 셸, 빌드 불필요), `sdd_gates.py`(Python), Node판 `*.mjs`. 모두 같은 config 구동. `vitest.config.ts`(JS만), **`ci-examples.md`**(게이트를 로컬·git훅·어떤 CI/CD 도구에서든 거는 예시 — 도구 무관), `sdd-gates.yml`(CI/CD 워크플로우 샘플 하나), `ears-preset/` | 이식 도구 |
 
 ## 쓰는 법 (요약)
+0. 키트가 로컬에 없으면(다른 머신/새 환경): `git clone https://github.com/lhs6395-hslee/ai-methodology` 를 **프로젝트 밖에** 두고 참조만(복사/fork 금지). AI 에이전트에게 URL만 주고 시작하는 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md) **A0**.
 1. `REALITY_CHECK.md`로 "되는 것/배선할 것"을 먼저 파악.
 2. **`sh tooling/sdd-init.sh --gate=sh`** 를 대상 프로젝트 루트에서 실행 → **공통 큰 틀**(`sdd/` 폴더 구조·스펙 위치)이 어느 프로젝트나 같게 생성된다(`STORAGE.md` §5). 그 안의 스펙·모듈·`sdd.config.json` 값은 프로젝트가 채운다. (수동 절차·세부는 `APPLYING.md`.)
 3. `STRUCTURE.md`대로 module>spec 구성, `templates/`로 spec 작성.
