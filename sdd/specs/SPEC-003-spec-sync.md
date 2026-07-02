@@ -22,6 +22,7 @@
 - spec 파일이 index에서 삭제되면(수명주기) 의미 변경으로 인정한다.
 - base(`origin/main`)를 해석할 수 없으면 range 모드는 판정을 건너뛰고(exit 0), staged 모드는 staged만으로 경고 판정한다.
 - range(advisory) 모드는 위반이 있어도 exit 0으로 안내만 하고, hard 차단은 staged(commit-msg) 모드에서만 일어난다.
+- FR 라인 판정은 레터 서픽스 FR 라인의 추가/삭제도 의미 있는 변경으로 인정한다 — SPEC-001/002와 동일한 FR ID 문법(3자리 + 선택적 소문자 서픽스 1자). (이 항목에 ID 예시를 안 쓰는 이유: 게이트가 예시 토큰을 이 spec의 FR 집계에 포함시키기 때문.)
 
 ---
 
@@ -72,3 +73,4 @@
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |
+| 2026-07-02 | FR 라인 패턴 레터 서픽스 지원 | SPEC-001/002와 FR ID 문법 통일(사이트 간 불일치 금지) — /speckit.fix |

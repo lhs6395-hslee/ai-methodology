@@ -22,6 +22,7 @@
 - cohesion에서 aggregate-root 카테고리(config의 첫 카테고리, 여기서는 Modules)가 2개 이상이면 "여러 aggregate 삼킴" 신호로 warn(경계 규칙).
 - completeness는 FR이 0개인 spec(순수 인프라)은 SC·인수조건 검사에서 면제한다.
 - consistency는 `## Ownership` **이전** 본문만 근거로 삼는다 — 키가 자기 선언 줄로 근거되는 것을 방지하며, 근거 없는 키는 advisory warn(비차단)이다.
+- FR ID는 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-002b`) — coverage의 FR 선언 추출, cohesion의 FR 수 집계, completeness의 FR-존재 면제 판단이 모두 동일 문법을 쓴다(사이트 간 문법 불일치 = 절단 태그·조용한 FR 누락의 뿌리).
 
 ---
 
@@ -48,7 +49,7 @@
 - **Modules**: spec-quality-gates
 - **Symbols**: check-fr-coverage.mjs, check-ownership.mjs, check-spec-cohesion.mjs, check-spec-completeness.mjs, check-spec-consistency.mjs, check-test-adequacy.mjs
 - **Artifacts**: —
-- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
+- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 이 게이트군은 키의 파싱·정규화·검증을 SPEC-001에 위임한다.
@@ -72,3 +73,4 @@
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `maxKeysPerCategoryPerSpec`를 4→6으로 상향(sdd.config.json) | 이 spec의 Symbols=5개 게이트 파일명은 한 응집 aggregate라 분할이 부적절 — 브리프 허용 config 조정으로 cohesion warn 해소 |
 | 2026-07-02 | check-test-adequacy.mjs(+ 테스트) + FR-008 편입 — Symbols=6 유지(threshold 내) | spec-quality-gates aggregate의 6번째 게이트; @covers 빈 껍데기 검출은 FR coverage 게이트의 직접 보완 |
+| 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(PM솔루션): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |

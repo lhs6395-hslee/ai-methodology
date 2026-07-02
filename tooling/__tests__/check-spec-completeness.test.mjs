@@ -57,3 +57,12 @@ test("FR 없는 spec(예: 순수 인프라) → 면제, 통과", () => {
   assert.equal(r.code, 0);
   assert.match(r.out, /구비|검사/);
 });
+
+test("서픽스 FR만 있는 spec(FR-001a)도 FR 있는 spec — SC 없으면 warn·strict 실패(면제 오판 금지)", () => {
+  const dir = fixture({ "sdd/specs/SPEC-001.md":
+    "**Spec**: `SPEC-001`\n**FR-001a** y\n**Given** x **When** y **Then** z\n" });
+  const warn = run(dir);
+  assert.equal(warn.code, 0);
+  assert.match(warn.out, /SPEC-001/); // 미비 spec으로 지목돼야 함(FR 0개 면제로 새면 안 됨)
+  assert.equal(run(dir, ["--strict"]).code, 1);
+});

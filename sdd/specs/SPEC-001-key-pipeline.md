@@ -22,6 +22,7 @@
 - `normalizeKey`의 Surface 경로에 매칭되는 `<METHOD> <path>` 형태가 없으면(공백 분리 실패) 전체를 소문자화한 fallback을 반환한다.
 - `loadConfig`가 `sdd.config.json` JSON 파싱에 실패하면 stderr로 경로·사유를 출력하고 `process.exit(1)`한다(조용한 무시 금지).
 - `validateKey`의 Capability는 점 1개(`entity.verb`)가 아니거나 verb가 `__allVerbs`(CRUD + 등록 verb)에 없으면 위반 사유 문자열을 돌려준다.
+- `__coversRe`의 FR ID 문법은 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-003a`)이며 경계까지 요구한다 — 2자 서픽스(`FR-003ab`)는 부분 캡처(`FR-003a`/`FR-003`) 없이 통째로 불인정(절단 오판 금지).
 
 ---
 
@@ -69,3 +70,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
+| 2026-07-02 | `__coversRe` 레터 서픽스(FR-003a) 지원 + 경계 강제 | 도그푸딩(PM솔루션 f36494a): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |

@@ -104,7 +104,7 @@ export function loadConfig(start = process.cwd()) {
     .join("|");
   cfg.__idAlt = alt;
   cfg.__specIdRe = new RegExp(`(?:${alt})-\\d{3}`);                 // 본문/파일명에서 ID 추출
-  cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/(FR-\\d{3})`, "g");
+  cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/(FR-\\d{3}[a-z]?)\\b`, "g"); // 서픽스는 소문자 1자(FR-003a) — \b로 2자(FR-003ab) 절단 캡처 금지
 
   // Verb 파생값
   const CRUD = ["create", "read", "update", "delete", "list"];

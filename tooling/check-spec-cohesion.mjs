@@ -38,7 +38,7 @@ const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
 // 고유 FR-ID 수.
 function countFRs(text) {
   const ids = new Set();
-  for (const m of text.matchAll(/\bFR-\d{3}\b/g)) ids.add(m[0]);
+  for (const m of text.matchAll(/\bFR-\d{3}[a-z]?\b/g)) ids.add(m[0]);
   return ids.size;
 }
 

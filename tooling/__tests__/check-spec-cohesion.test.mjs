@@ -76,3 +76,12 @@ test("Ownership Entities 2개+ = aggregate 다수 분할 신호(advisory)", () =
   // must have a violation line mentioning Entities and aggregate signal
   assert.match(out, /Entities.*aggregate|aggregate.*Entities/i);
 });
+
+test("FR 카운트가 레터 서픽스 FR(FR-008a)을 집계 — 9개>8 과다 advisory·strict 실패", () => {
+  const frs = Array.from({ length: 8 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const dir = fixture(CFG, { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n**FR-008a** y\n` });
+  const warn = run(dir);
+  assert.equal(warn.code, 0);
+  assert.match(warn.out, /SPEC-001/); // 과다 신호에 spec이 지목돼야 함(조용한 미집계 금지)
+  assert.equal(run(dir, ["--strict"]).code, 1);
+});
