@@ -1,0 +1,35 @@
+# MODULE MANIFEST — 이 레포의 단일 모듈 (SDD 키트 자기 정렬)
+
+> **1 레포 = 1 모듈.** 이 파일은 이 레포가 구현하는 *하나의* 모듈 `sdd-tooling`을 선언한다 — 정체성·공개 계약 포인터·spec 인덱스. 새 기능은 여기서 **기존 spec 중복**을 먼저 확인한다(`STRUCTURE.md`). 이 키트는 자기 자신도 자기 궤도(spec→@covers→게이트→hook) 위에 올린다(자기 정렬/도그푸딩).
+
+## 모듈 정체성
+- **모듈 ID:** `sdd-tooling`
+- **Bounded context(한 줄):** 언어/스택 무관 SDD 게이트 스위트 + spec-first 하네스 + 설치기(키트가 원본).
+- **구조 SSOT:** `sdd.config.json`(저장·카테고리·접두어 정의) + `tooling/`(게이트 소스)
+
+## 공개 계약 (MSA — 다중 모듈일 때만, 단일이면 —)
+> 단일 모듈이라 외부 공개 Surface 없음.
+| 공개 Surface | 계약 산출물 경로 | 소유 spec |
+|---|---|---|
+| — | — | — |
+
+## Spec 인덱스 (이 모듈의 spec)
+| Spec | 책임(한 줄) | 코드 경로 | 상태 |
+|---|---|---|---|
+| SPEC-001 | 소유권 키 파싱·정규화·검증 파이프라인 + config 어댑터 | `tooling/ownership-keys.mjs`, `tooling/sdd-config.mjs` | active |
+| SPEC-002 | spec 품질 게이트군(fr-coverage·ownership·cohesion·completeness·consistency) + PREFIX 거버넌스 | `tooling/check-*.mjs` | active |
+| SPEC-003 | spec-first 강제(spec-sync) — staged hard / range advisory + commit-msg 훅 | `tooling/check-spec-sync.mjs`, `tooling/spec-sync-lib.mjs` | active |
+| SPEC-004 | 하네스(detect 집계) + 설치기(훅·settings·스킬 배선) | `tooling/sdd-sync.mjs`, `tooling/sdd-init.sh`, `tooling/harness/**` | active |
+
+> "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 6으로 조정했다(사유는 SPEC-002 Change Log).
+
+## 추가 규칙
+- 한 모듈(레포) 안 spec 과편화 금지 + **under-fragmentation 금지**(1 spec=1 응집 capability). 새 FR이 같은 모듈 기존 FR과 의미 중복이면 **새 spec 금지, 기존 spec 개정.**
+- 상태 컬럼: `draft/active/deprecated/removed`. 제거는 코드·테스트 동시 삭제 후(`STRUCTURE.md` 수명주기).
+- PREFIX 표준 = `SPEC/INFRA/TEST`만. 새 접두어는 `sdd.config.json`의 `specIdPrefixes`+`prefixRationale`에 사유와 함께 등록.
+
+## 제거 로그 (Removed)
+| 날짜 | Spec | 사유 | 코드·테스트 삭제 PR |
+|---|---|---|---|
+| | | | |
+> 삭제된 spec은 VCS 히스토리에 보존됨 — 표에 사유·날짜만 남기고 파일은 트리에서 제거.

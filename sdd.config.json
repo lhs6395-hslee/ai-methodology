@@ -1,0 +1,17 @@
+{
+  "specDir": "sdd/specs",
+  "scanDirs": ["tooling"],
+  "testFileRegex": ["\\.test\\.mjs$"],
+  "ownershipCategories": ["Modules", "Symbols", "Artifacts"],
+  "ignoreDirs": [
+    "node_modules", ".git", "go-gate", "docs", "ears-preset",
+    ".next", "coverage", "dist", "build", "out", "target", "vendor",
+    "__pycache__", ".venv", "venv", ".idea", ".gradle", "bin", "obj",
+    "Pods", ".dart_tool"
+  ],
+  "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
+  "maxKeysPerCategoryPerSpec": 6,
+  "commands": {
+    "test": "node --test tooling/__tests__/*.mjs"
+  }
+}

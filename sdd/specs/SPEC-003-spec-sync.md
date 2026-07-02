@@ -1,0 +1,71 @@
+# Feature Specification: Spec-First Enforcement (spec-sync)
+
+**Module**: `sdd-tooling`  **Spec**: `SPEC-003`  **Created**: 2026-07-02  **Status**: Active
+**Input**: 소유(Files) 코드가 바뀌면 소유 스펙의 의미 있는 변경이 같은 changeset에 있어야 한다 — commit-msg 훅에서 hard, range에서 advisory.
+
+---
+
+## User Scenarios & Testing
+
+### User Story 1 — 코드 변경에 스펙 동반 강제 (P1)
+`check-spec-sync.mjs`는 변경된 코드 파일이 어떤 spec의 `Ownership.Files` glob에 매칭되면, 그 spec에 **의미 있는 변경**(FR 라인 +/-, 또는 Edge Cases/Change Log의 불릿·표 행 추가)이 같은 changeset에 있는지 확인한다. changeset = staged ∪ base...HEAD(브랜치). `spec-sync-lib.mjs`가 glob 컴파일과 diff 섹션 귀속을 순수 함수로 담당해 git 없이도 테스트된다.
+- **Independent Test**: `spec-sync-lib.test.mjs`가 `compileGlob`·`scanFilesLineIssues`·`hasMeaningfulSpecChange`를 git 없이 단독 검증.
+- **Acceptance (GWT)**: 1. **Given** a staged code file matched by a spec's Files glob and no meaningful change in that spec, **When** the commit-msg hook runs `check-spec-sync.mjs --staged`, **Then** it reports a violation and exits non-zero.
+
+### User Story 2 — 정직한 탈출구와 merge 예외 (P1)
+스펙과 정말 무관한 변경은 커밋 메시지 트레일러 `Spec-Impact: none <사유>`로 통과하되 사유가 비면 실패한다(커밋에 영속 = 정직). git `commit-msg` 훅은 `MERGE_HEAD`가 있으면 merge 커밋으로 보고 skip한다(브랜치 커밋에서 이미 강제했고 range advisory가 백스톱).
+- **Independent Test**: `commit-msg-hook.test.mjs`가 트레일러 사유 유무·merge skip·위반 차단을 임시 저장소로 검증.
+- **Acceptance (GWT)**: 1. **Given** a commit message with `Spec-Impact: none` and no reason, **When** the gate runs staged, **Then** it exits non-zero demanding a reason.
+
+### Edge Cases
+- `Ownership.Files` 라인에 미지원 glob 문법(`{`, `?`, `[`, 또는 위치가 잘못된 `**`)이 있으면 spec별 1회 경고한다 — 지원 부분집합은 `**`·`*`뿐이라 해당 토큰은 매치되지 않을 수 있다.
+- spec 파일이 index에서 삭제되면(수명주기) 의미 변경으로 인정한다.
+- base(`origin/main`)를 해석할 수 없으면 range 모드는 판정을 건너뛰고(exit 0), staged 모드는 staged만으로 경고 판정한다.
+- range(advisory) 모드는 위반이 있어도 exit 0으로 안내만 하고, hard 차단은 staged(commit-msg) 모드에서만 일어난다.
+
+---
+
+## Functional Requirements (EARS)
+> 정본은 영어.
+
+- **FR-001** (event): WHEN a changed code file matches a spec's `Ownership.Files` glob, THE SYSTEM SHALL require a meaningful change to that spec in the same changeset (staged ∪ base...HEAD), where meaningful = an added/removed FR line or an added bullet/table row under Edge Cases or Change Log.
+- **FR-002** (state): WHILE running with `--staged --message-file`, THE SYSTEM SHALL treat violations as hard errors and exit non-zero; WHILE running in range mode (a base ref only), THE SYSTEM SHALL treat violations as non-blocking advisories and exit zero.
+- **FR-003** (unwanted): IF the commit message contains `Spec-Impact: none` without a trailing reason, THEN THE SYSTEM SHALL exit non-zero; WHERE a non-empty reason is present, THE SYSTEM SHALL pass and record it as a persisted trailer.
+- **FR-004** (event): WHEN the git `commit-msg` hook detects `MERGE_HEAD`, THE SYSTEM SHALL skip the spec-sync check for the merge commit and rely on the range advisory as backstop.
+- **FR-005** (event): WHEN a raw `- **Files**:` line contains unsupported glob syntax, THE SYSTEM SHALL warn once per spec that only `**` and `*` are supported and the token may not match.
+- **FR-006** (unwanted): IF the base ref cannot be resolved, THEN in range mode THE SYSTEM SHALL skip judgment and exit zero, and in staged mode THE SYSTEM SHALL judge from the staged set only with a notice.
+- **FR-007** (ubiquitous): THE SYSTEM SHALL compile `Ownership.Files` globs as anchored, case-sensitive POSIX patterns where `**` spans zero-or-more path segments and `*` matches within one segment, stripping trailing inline comments before compiling.
+
+### Key Entities
+- **changeset** — the union of staged files and `base...HEAD` diff on the branch, against which ownership matching runs.
+- **meaningful spec change** — an FR line delta, or a new Edge Cases / Change Log bullet or table row, detected from the post-image and its diff slice.
+
+---
+
+## Ownership (중복 방지 — 강제됨)
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+- **Modules**: spec-sync
+- **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs
+- **Artifacts**: .git/hooks/commit-msg
+- **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs
+
+## Dependencies (참조 — dedup 제외)
+> glob 매칭 대상 키의 파싱은 SPEC-001 파이프라인에 위임.
+- **Modules**: key-pipeline
+
+---
+
+## Success Criteria (측정형)
+- **SC-001**: `check-spec-sync.test.mjs`·`spec-sync-lib.test.mjs`·`commit-msg-hook.test.mjs`의 모든 케이스가 통과한다(현재 green).
+- **SC-002**: 소유 코드만 바뀌고 스펙 동반이 없는 스테이징에서 commit-msg 훅이 exit 1로 100% 차단한다(거짓음성 0).
+
+## Non-Functional Requirements
+- **NFR-001**: `spec-sync-lib.mjs`는 git·파일시스템에 비의존한 순수 함수라 결정적으로 단위 테스트된다.
+
+## Assumptions / Clarifications Retained
+- range 모드 base 기본값은 `origin/main`(또는 `SDD_DIFF_BASE`) — 브랜치에 스펙만 추가되는 경우 위반은 0이다.
+
+## Change Log
+| 날짜 | 변경 | 근거 |
+|---|---|---|
+| 2026-07-02 | 초안(자기 정렬) | plan ④ |
