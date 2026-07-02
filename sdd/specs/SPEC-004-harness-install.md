@@ -13,7 +13,7 @@
 - **Acceptance (GWT)**: 1. **Given** a repo with the gate suite, **When** `sdd-sync.mjs` runs, **Then** it reports R1/R2/R3 each as flagged or clean and exits non-zero under `--strict` only when flagged.
 
 ### User Story 2 — 채택 = 상시 강제 궤도 설치 (P1)
-`sdd-init.sh`는 어느 프로젝트에서 돌리든 동일한 `sdd/` 레이아웃과 저장 위치를 만들고, `--gate=node`일 때 하네스와 훅 세트를 배선한다: `.git/hooks/pre-commit`·`pre-push` 연결, `.claude/settings.json`에 SessionStart/PreToolUse 훅 병합(`sdd-session-context.sh`·`sdd-edit-check.sh`), `.claude/skills/`에 스킬 설치. 게이트 임포트 클로저(예: `ownership-keys.mjs`)를 함께 복사해 설치만으로 게이트가 실행된다.
+`sdd-init.sh`는 어느 프로젝트에서 돌리든 동일한 `sdd/` 레이아웃과 저장 위치를 만들고, `--gate=node`일 때 하네스와 훅 세트를 배선한다: `.git/hooks/pre-commit`·`.git/hooks/commit-msg` 자동 연결, `scripts/sdd-pre-push.sh` 스캐폴딩(pre-push 훅은 선택 수동 연결 안내), `.claude/settings.json`에 SessionStart/PreToolUse 훅 병합(`sdd-session-context.sh`·`sdd-edit-check.sh`), `.claude/skills/`에 스킬 설치. 게이트 임포트 클로저(예: `ownership-keys.mjs`)를 함께 복사해 설치만으로 게이트가 실행된다.
 - **Independent Test**: `init-hooks.test.mjs`·`init-gates.test.mjs`·`init-spec-sync.test.mjs`가 배선·임포트 클로저·idempotency를 임시 프로젝트로 검증.
 - **Acceptance (GWT)**: 1. **Given** a fresh project with `.git`, **When** `sdd-init.sh --gate=node` runs, **Then** `.git/hooks/pre-commit` calls the installed script and the gate suite executes without a missing-module error.
 
@@ -30,12 +30,13 @@
 > 정본은 영어.
 
 - **FR-001** (ubiquitous): THE SYSTEM SHALL run, via `sdd-sync.mjs`, the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean, exiting non-zero under `--strict` only when a rule is flagged.
-- **FR-002** (event): WHEN `sdd-init.sh --gate=node` runs in a target project, THE SYSTEM SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, and wire `.git/hooks/pre-commit` and `.git/hooks/pre-push`.
+- **FR-002** (event): WHEN `sdd-init.sh --gate=node` runs in a target project, THE SYSTEM SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically.
 - **FR-003** (event): WHEN `sdd-init.sh` wires session hooks, THE SYSTEM SHALL merge SessionStart and PreToolUse entries into `.claude/settings.json` and install the `sdd-session-context.sh` and `sdd-edit-check.sh` scripts plus the `/sdd-sync` and `/speckit.fix` skills.
 - **FR-004** (unwanted): IF `.claude/settings.json` already exists and `jq` is unavailable, THEN THE SYSTEM SHALL preserve the existing file and skip hook merging rather than clobber it; WHERE `jq` is available, THE SYSTEM SHALL strip prior SDD entries before re-adding them so re-runs are idempotent.
 - **FR-005** (event): WHEN the `pre-commit` hook runs and the staged set touches a spec or code path, THE SYSTEM SHALL execute `check-fr-coverage` and `check-ownership` and block the commit on their failure.
 - **FR-006** (state): WHILE the `pre-push` hook runs, THE SYSTEM SHALL report drift advisorily and pass the push unless `SDD_SYNC_BLOCK=1` is set.
 - **FR-007** (unwanted): IF `sdd-init.sh` is executed from inside the kit directory itself, THEN THE SYSTEM SHALL refuse and exit non-zero.
+- **FR-008** (event): WHEN `sdd-run.mjs` is invoked with a stage name, THE SYSTEM SHALL execute the command declared in `commands.<stage>` from `sdd.config.json` and exit with that command's exit code; WHERE the stage is not declared in `commands`, THE SYSTEM SHALL skip and exit zero without error.
 
 ### Key Entities
 - **install layout** — the deterministic `sdd/` tree, `sdd.config.json`, and wired hooks/settings/skills produced by init.
@@ -46,9 +47,9 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts). Symbols = 소스 진입점, Artifacts = 설치 산출물.
 - **Modules**: harness-install
-- **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh
+- **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh, sdd-run.mjs
 - **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md
-- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
+- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
@@ -70,3 +71,5 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
+| 2026-07-02 | FR-002 정직 정정 — pre-push 자동배선 아님; commit-msg 자동배선 명시; sdd-pre-push.sh 스캐폴딩+안내 정확히 기술 | HONESTY 위반(자기 정렬 발견) |
+| 2026-07-02 | sdd-run.mjs(CI 스테이지 러너) + FR-008 편입 — Symbols 7개(maxKeysPerCategoryPerSpec 7로 상향, sdd.config.json) | 하네스+설치기 aggregate는 6+1 엔트리포인트가 한 응집 묶음; SPEC-002의 5→6 선례와 동일 논리 |

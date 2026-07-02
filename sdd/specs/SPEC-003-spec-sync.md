@@ -35,6 +35,8 @@
 - **FR-005** (event): WHEN a raw `- **Files**:` line contains unsupported glob syntax, THE SYSTEM SHALL warn once per spec that only `**` and `*` are supported and the token may not match.
 - **FR-006** (unwanted): IF the base ref cannot be resolved, THEN in range mode THE SYSTEM SHALL skip judgment and exit zero, and in staged mode THE SYSTEM SHALL judge from the staged set only with a notice.
 - **FR-007** (ubiquitous): THE SYSTEM SHALL compile `Ownership.Files` globs as anchored, case-sensitive POSIX patterns where `**` spans zero-or-more path segments and `*` matches within one segment, stripping trailing inline comments before compiling.
+- **FR-008** (event): WHEN `check-converge-drift.mjs` runs against a base ref, THE SYSTEM SHALL report code changes (files under `scanDirs`) not accompanied by any spec change as a drift advisory, exiting zero in advisory mode and non-zero under `--strict`; WHERE git diff is unavailable, THE SYSTEM SHALL skip judgment and exit zero.
+- **FR-009** (event): WHEN `check-orphan-surfaces.mjs` runs and `surfaceGlobs` is non-empty, THE SYSTEM SHALL report any surface file matched by `surfaceGlobs` that is not declared in any spec's `Ownership` block as an orphan advisory, exiting zero in advisory mode and non-zero under `--strict`; WHERE `surfaceGlobs` is empty, THE SYSTEM SHALL exit zero as a no-op.
 
 ### Key Entities
 - **changeset** — the union of staged files and `base...HEAD` diff on the branch, against which ownership matching runs.
@@ -45,9 +47,9 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
 - **Modules**: spec-sync
-- **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs
+- **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs, check-converge-drift.mjs, check-orphan-surfaces.mjs
 - **Artifacts**: .git/hooks/commit-msg
-- **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs
+- **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/check-converge-drift.mjs, tooling/check-orphan-surfaces.mjs, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs, tooling/__tests__/check-converge-drift.test.mjs, tooling/__tests__/check-orphan-surfaces.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > glob 매칭 대상 키의 파싱은 SPEC-001 파이프라인에 위임.
@@ -69,3 +71,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
+| 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |

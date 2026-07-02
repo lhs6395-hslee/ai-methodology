@@ -10,7 +10,8 @@
     "Pods", ".dart_tool"
   ],
   "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
-  "maxKeysPerCategoryPerSpec": 6,
+  "maxKeysPerCategoryPerSpec": 7,
+  "maxFRsPerSpec": 9,
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"
   }

@@ -35,6 +35,7 @@
 - **FR-005** (unwanted): IF an owned key's core tokens never appear in the spec body preceding the `## Ownership` section, THEN THE SYSTEM SHALL emit a consistency advisory that the key lacks grounding.
 - **FR-006** (event): WHEN `check-fr-coverage.mjs` starts, THE SYSTEM SHALL validate every spec filename prefix against `specIdPrefixes` before collecting FRs, and SHALL exit non-zero for an unregistered prefix or a non-standard prefix lacking a `prefixRationale` entry.
 - **FR-007** (state): WHILE running without `--strict`, THE SYSTEM SHALL treat quality signals (missing ownership, cohesion, completeness, consistency, partial coverage) as non-blocking warnings and exit zero, deferring hard enforcement to `--strict`.
+- **FR-008** (event): WHEN `check-test-adequacy.mjs` runs over `@covers`-tagged test files, THE SYSTEM SHALL report any tagged file containing no assertion tokens (per `assertionPatterns` in config) as an adequacy violation, exiting zero in advisory mode and non-zero under `--strict`.
 
 ### Key Entities
 - **quality finding** — a per-spec signal (conflict / split advisory / completeness gap / ungrounded key / dangling cover) produced by a gate.
@@ -45,9 +46,9 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
 - **Modules**: spec-quality-gates
-- **Symbols**: check-fr-coverage.mjs, check-ownership.mjs, check-spec-cohesion.mjs, check-spec-completeness.mjs, check-spec-consistency.mjs
+- **Symbols**: check-fr-coverage.mjs, check-ownership.mjs, check-spec-cohesion.mjs, check-spec-completeness.mjs, check-spec-consistency.mjs, check-test-adequacy.mjs
 - **Artifacts**: —
-- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs
+- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 이 게이트군은 키의 파싱·정규화·검증을 SPEC-001에 위임한다.
@@ -70,3 +71,4 @@
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `maxKeysPerCategoryPerSpec`를 4→6으로 상향(sdd.config.json) | 이 spec의 Symbols=5개 게이트 파일명은 한 응집 aggregate라 분할이 부적절 — 브리프 허용 config 조정으로 cohesion warn 해소 |
+| 2026-07-02 | check-test-adequacy.mjs(+ 테스트) + FR-008 편입 — Symbols=6 유지(threshold 내) | spec-quality-gates aggregate의 6번째 게이트; @covers 빈 껍데기 검출은 FR coverage 게이트의 직접 보완 |
