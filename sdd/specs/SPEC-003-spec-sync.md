@@ -18,7 +18,7 @@
 - **Acceptance (GWT)**: 1. **Given** a commit message with `Spec-Impact: none` and no reason, **When** the gate runs staged, **Then** it exits non-zero demanding a reason.
 
 ### Edge Cases
-- `Ownership.Files` 라인에 미지원 glob 문법(`{`, `?`, `[`, 또는 위치가 잘못된 `**`)이 있으면 spec별 1회 경고한다 — 지원 부분집합은 `**`·`*`뿐이라 해당 토큰은 매치되지 않을 수 있다.
+- `Ownership.Files` 라인에 미지원 glob 문법이 있으면 spec별 1회 경고한다(지원 부분집합 `**`·`*`) — `{`·`?` 또는 위치가 잘못된 `**`는 어디서든, `[`는 **토큰이 `[`로 시작**할 때만(parseSection이 placeholder로 버리는 경우). 파일 라우팅 동적 세그먼트(`.../[id]/**`)는 토큰 중간이라 `compileGlob`이 리터럴로 정확히 매치하므로 경고하지 않는다.
 - spec 파일이 index에서 삭제되면(수명주기) 의미 변경으로 인정한다.
 - base(`origin/main`)를 해석할 수 없으면 range 모드는 판정을 건너뛰고(exit 0), staged 모드는 staged만으로 경고 판정한다.
 - range(advisory) 모드는 위반이 있어도 exit 0으로 안내만 하고, hard 차단은 staged(commit-msg) 모드에서만 일어난다.
@@ -33,7 +33,7 @@
 - **FR-002** (state): WHILE running with `--staged --message-file`, THE SYSTEM SHALL treat violations as hard errors and exit non-zero; WHILE running in range mode (a base ref only), THE SYSTEM SHALL treat violations as non-blocking advisories and exit zero.
 - **FR-003** (unwanted): IF the commit message contains `Spec-Impact: none` without a trailing reason, THEN THE SYSTEM SHALL exit non-zero; WHERE a non-empty reason is present, THE SYSTEM SHALL pass and record it as a persisted trailer.
 - **FR-004** (event): WHEN the git `commit-msg` hook detects `MERGE_HEAD`, THE SYSTEM SHALL skip the spec-sync check for the merge commit and rely on the range advisory as backstop.
-- **FR-005** (event): WHEN a raw `- **Files**:` line contains unsupported glob syntax, THE SYSTEM SHALL warn once per spec that only `**` and `*` are supported and the token may not match.
+- **FR-005** (event): WHEN a raw `- **Files**:` line contains unsupported glob syntax — `{` or `?` anywhere, a misplaced `**`, or a token **beginning** with `[` (a placeholder `parseSection` would drop) — THE SYSTEM SHALL warn once per spec that only `**` and `*` are supported; a mid-token file-routing dynamic segment such as `.../[id]/**` is matched literally by `compileGlob` and SHALL NOT be flagged.
 - **FR-006** (unwanted): IF the base ref cannot be resolved, THEN in range mode THE SYSTEM SHALL skip judgment and exit zero, and in staged mode THE SYSTEM SHALL judge from the staged set only with a notice.
 - **FR-007** (ubiquitous): THE SYSTEM SHALL compile `Ownership.Files` globs as anchored, case-sensitive POSIX patterns where `**` spans zero-or-more path segments and `*` matches within one segment, stripping trailing inline comments before compiling.
 - **FR-008** (event): WHEN `check-converge-drift.mjs` runs against a base ref, THE SYSTEM SHALL report code changes (files under `scanDirs`) not accompanied by any spec change as a drift advisory, exiting zero in advisory mode and non-zero under `--strict`; WHERE git diff is unavailable, THE SYSTEM SHALL skip judgment and exit zero.
@@ -74,3 +74,4 @@
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |
 | 2026-07-02 | FR 라인 패턴 레터 서픽스 지원 | SPEC-001/002와 FR ID 문법 통일(사이트 간 불일치 금지) — /speckit.fix |
+| 2026-07-02 | `[` 경고를 토큰-시작 위치로 한정(FR-005 개정) — 파일 라우팅 `.../[id]/**`는 리터럴 매치라 미경고 + 테스트 | 도그푸딩(PM솔루션): Next.js 동적 세그먼트를 Files glob에 쓰면 정확 매치되는데도 false-positive 경고 — parseSection 드롭 조건(토큰 시작 `[`)에 정렬 |

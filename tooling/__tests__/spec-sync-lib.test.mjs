@@ -32,6 +32,14 @@ test("scanFilesLineIssues: 미지원 문법 경고 목록", () => {
   assert.deepEqual(scanFilesLineIssues("- **Files**: src/lib/**"), []);
 });
 
+test("scanFilesLineIssues: 파일 라우팅 동적 세그먼트([id])는 경고 없음, `[`로 시작하는 placeholder만 경고", () => {
+  // .../[id]/** — 토큰 중간의 [id]는 parseSection이 안 버리고 compileGlob이 리터럴 매치 → 경고 없음
+  assert.deepEqual(scanFilesLineIssues("- **Files**: src/app/[id]/**"), []);
+  assert.deepEqual(scanFilesLineIssues("- **Files**: src/app/api/pjt/[id]/excel/**, app/[slug]/page.tsx"), []);
+  // 토큰이 `[`로 시작 → parseSection이 placeholder로 버림 → 경고
+  assert.deepEqual(scanFilesLineIssues("- **Files**: [NEEDS CLARIFICATION]"), ["["]);
+});
+
 test("scanFilesLineIssues: 불법 중간 ** 경고, 합법 **/·끝 ** 는 통과, 볼드마커 오탐 없음", () => {
   assert.deepEqual(scanFilesLineIssues("- **Files**: src/a**b.ts"), ["**"]);
   assert.deepEqual(scanFilesLineIssues("- **Files**: src/**/x.ts, src/lib/**"), []);

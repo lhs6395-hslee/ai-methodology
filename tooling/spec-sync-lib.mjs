@@ -18,7 +18,11 @@ export function compileGlob(glob) {
 // placeholder로 조용히 버리기 전에 경고해야 하므로 반드시 원시 라인 기준.
 export function scanFilesLineIssues(rawLine) {
   const value = rawLine.replace(/^.*?\*\*Files\*\*\s*:/, ""); // 값 부분만
-  const issues = ["{", "?", "["].filter((ch) => value.includes(ch));
+  const issues = ["{", "?"].filter((ch) => value.includes(ch));
+  // `[`: parseSection은 `[`로 **시작하는** 토큰만 placeholder로 버린다 → 그때만 경고.
+  // 파일 라우팅 동적 세그먼트(.../[id]/**·.../[slug]/**)는 토큰 중간이라 안 버려지고
+  // compileGlob이 `[`를 리터럴로 이스케이프해 정확히 매치한다(경고 불필요).
+  if (value.split(",").some((tok) => tok.trim().startsWith("["))) issues.push("[");
   for (const tok of value.split(",")) {
     const t = tok.trim();
     // 합법 형태: `**/` 또는 토큰 끝 `**`. 그 외 위치의 `**`는 오해석 경고.
