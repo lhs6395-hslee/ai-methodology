@@ -1,12 +1,12 @@
 # 설계 — spec-first 강제 (Files 소유매핑 · check-spec-sync · /speckit.fix)
 
-> Status: **Draft (검토 대기)** · Date: 2026-07-02
+> Status: **Draft (검토 대기, R1 반영)** · Date: 2026-07-02
 > 관련: [HARNESS.md](../../../HARNESS.md) R2 · [DEDUP.md](../../../DEDUP.md) · [STRUCTURE.md](../../../STRUCTURE.md) · `tooling/check-converge-drift.mjs`·`check-orphan-surfaces.mjs`·`ownership-keys.mjs` · `templates/constitution.md`·`module-spec.md`
 > 트리거: 도그푸딩(소비 프로젝트)에서 pdf-parse ENOENT 버그를 고칠 때, 소유 스펙(SPEC-002)을 안 건드리고 `parse.ts`·`next.config.ts`만 수정해 커밋 — 기존 게이트(fr-coverage·ownership) 전부 통과.
 
 ## 0. 요약
 
-코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과, pre-commit hard) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 커밋에 강제한다."
+코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과, commit-msg 훅 hard + range 모드) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 커밋에 강제한다."
 
 ## 1. 문제 — 기존 게이트가 못 잡는 이음매
 
@@ -28,65 +28,112 @@
 - 스펙 변경의 **질** 강제 — "가짜 Change Log 항목"은 자연어라 게이트가 못 막는다(리뷰가 잡음). 게이트는 "의미 있는 섹션이 *변경됐는가*"까지만.
 - Files 미선언 기존 스펙 즉시 전면 강제 — 점진 도입(선언된 스펙만 hard, 나머지 converge-drift advisory).
 - 코드 자동→스펙 생성 — 사람 intent + `/speckit.fix`.
+- **비-Node 런타임 즉시 포팅** — `check-spec-sync`는 Node판 먼저(§10.1, 기존 강화 게이트들과 동일 선례 — ROADMAP "비-Node 프로젝트가 필요할 때 포팅").
 
-## 3. 결정 요약 (브레인스토밍 합의)
+## 3. 결정 요약 (브레인스토밍 + R1 리뷰 합의)
 
 | # | 결정 | 선택 |
 |---|---|---|
 | 파일↔스펙 매핑 | 새 `Files:` glob 필드 (Surfaces와 분리, 정규화 면제) | vs Surfaces 확장(기각: 의미 혼탁·형식검증 충돌) |
-| 강제 강도 | pre-commit **hard FAIL** + Files 선언 스펙만 + Spec-Impact/exempt 탈출구 + converge-drift 백업 | vs 전면 hard(도입 마찰) / advisory(사후 안 지켜짐) |
+| 강제 강도 | commit-msg 훅 **hard FAIL** + Files 선언 스펙만 + Spec-Impact/exempt 탈출구 + converge-drift 백업 | vs 전면 hard(도입 마찰) / advisory(사후 안 지켜짐) |
 | 판정 세밀도 | **엄격** — 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과 | vs 느슨(파일 동반만 — 공백 touch 우회) |
+| glob 문법 | **`**`·`*`만 지원**, 콤마·`#`·중괄호 금지 (§4.1) | vs minimatch 전체(자체 구현과 불일치 위험) |
+| Change Log 검출 | 불릿(`+- `)과 표 행(`+\| `) **둘 다 인정** (§5.4) | vs 한 형식 강제(기존 템플릿=표라 마이그레이션 강요) |
+| 다중 소유 | **AND** — 소유 스펙 전부 변경 요구 (§6.1) | vs OR(가장 쉬운 스펙 touch 루프홀) |
+| merge/amend | merge commit은 **감지 후 skip+기록** (§5.6) | vs merge-base diff(복잡·오탐) |
+| 두 운영 모드 | staged(hard, commit-msg) + range(advisory, sdd-sync/CI) 명시 분리 (§5.7) | vs 단일 모드(sdd-sync 배선 시 무의미 판정) |
 
 ## 4. 데이터 모델 — `Files:` 필드
 
 ```
 ## Ownership
 - **Entities**: recommendation
-- **Surfaces**: POST /api/recommend          # 런타임 진입점 (기존, 정규화·형식검증 대상)
+- **Surfaces**: POST /api/recommend
 - **Capabilities**: recommendation.create
-- **Files**: src/lib/pdf/**, src/app/api/recommend/**   # ← 신규: 소유 코드 파일 glob
+- **Files**: src/lib/pdf/**, src/app/api/recommend/**
 ```
 
-- `ownership-keys.mjs`의 `parseSection`이 `Files`도 파싱. **Files는 경로 glob이라 정규화/형식검증(METHOD·verb) 면제** — glob 문자열 그대로.
-- **Files는 dedup(키 유일성) 대상 아님** — check-ownership의 3카테고리(Entities/Surfaces/Capabilities)는 그대로. Files는 `check-spec-sync` 전용 매핑 입력.
-- glob 매칭: `minimatch` 스타일(`**`·`*`) — 의존 최소화 위해 간단한 자체 glob→정규식 변환(`**`→`.*`, `*`→`[^/]*`).
+- `ownership-keys.mjs`의 `parseSection`으로 파싱하되, **호출자가 categories 인자로 `["Files"]`를 명시**해 읽는다. **`Files`를 config `ownershipCategories`에 추가하지 않는다** — 추가하면 dedup(check-ownership)·cohesion 키 카운트에 잘못 유입되고 `validateKey`가 glob을 형식위반으로 오판한다. Files는 `check-spec-sync` 전용 매핑 입력이며 dedup(키 유일성) 대상이 아니다.
+- **정규화/형식검증(METHOD·verb) 면제** — 경로 glob 문자열 그대로.
+
+### 4.1 glob 문법 (지원 부분집합 명시)
+
+- **지원: `**`(0개 이상 경로 세그먼트), `*`(세그먼트 내 0+문자)만.** `{a,b}` 중괄호·`?`·`[...]`·`!(...)`은 **미지원** — 콤마 구분 파서(`parseSection`이 `,`로 split)와 충돌하고 자체 glob 구현 범위를 넘는다.
+- **Files 값에 `,`(구분자 외)·`#`(인라인 주석) 금지.** 파서는 방어적으로 각 항목의 trailing `#…`를 strip한다(주석 유입이 glob을 조용히 무효화하는 사고 방지).
+- 매칭 규칙: **anchored(`^…$`) 정규식 변환**(`**`→`(?:[^/]+/)*[^/]+` 스타일로 "그 디렉토리 자신"은 불포함, `a/**`는 `a/x`·`a/x/y` 매치·`a`는 비매치), **POSIX 슬래시·대소문자 구분**(`git diff --name-only`는 항상 forward slash를 출력).
+- 형식 위반(중괄호 등 미지원 문법 발견) 시 check-spec-sync가 **명시 경고**(조용한 비매치 금지).
 
 ## 5. `check-spec-sync.mjs` — diff 기반 엄격 게이트
 
 **Files:** `tooling/check-spec-sync.mjs` (신규)
 
+### 5.1 판정 파이프라인
+
 ```
-1. 변경 파일 수집:
-   - staged: git diff --cached --name-only
-   - 또는 인자 커밋범위/파일목록 (CI용)
-2. 전 스펙의 Ownership.Files glob 로드 (parseSection 재사용)
-3. 변경된 각 코드 파일 → Files glob 매치 → 소유 스펙(들) 확정
-4. 매치된 소유 스펙마다: 그 .md가 같은 diff에 있고,
-   diff에 **의미 있는 섹션 변경**이 있는가:
-     · FR-NNN 라인 +/− 변경, 또는
-     · "## Change Log" 섹션 아래 새 "+- " 항목, 또는
-     · "## Edge Cases" 섹션 아래 새 "+- " 항목
-   없으면 → FAIL (hard, exit 1)
-5. 탈출구(통과 + stderr 기록):
-   · 커밋 메시지 트레일러 `Spec-Impact: none <사유>`
-   · sdd.config.json exempt glob (테스트·생성물·락파일)
-6. Files 어느 glob에도 안 맞는 코드 파일 → check-spec-sync는 침묵,
-   check-converge-drift(전역 advisory)가 백업 그물
+1. 변경 파일 수집 (모드별 — §5.7)
+2. 전 스펙의 Ownership을 parseSection(text, "Ownership", ["Files"])로 로드
+3. 변경된 각 파일 → Files glob 매치(§4.1) → 소유 스펙(들) 확정
+4. 매치된 소유 스펙 각각에 대해(AND — §6.1): 그 .md가 같은 diff에 있고
+   의미 있는 섹션 변경(§5.4)이 있어야 통과. 하나라도 없으면 FAIL(exit 1, staged 모드).
+5. 탈출구(§5.5): Spec-Impact 트레일러 / exempt glob.
+6. Files 어느 glob에도 안 맞는 파일 → 침묵. check-converge-drift(전역 advisory)가 백업.
 ```
 
-**엄격 판정 구현(결정적):** 소유 스펙 `.md`의 `git diff`를 **섹션 단위로 파싱** — `## <Section>` 헤더로 hunk를 구획하고, 대상 섹션(FR 본문·Change Log·Edge Cases) 아래 추가 라인(`+`)이 실제 항목(`+- ` 또는 `+**FR-`)인지 검출. 파일 존재·공백·주석만 변경은 불통과.
+### 5.4 엄격 판정 — 섹션 귀속 알고리즘 (결정적, 명시)
 
-**실행 위치 = commit-msg 훅 (결정).** `check-spec-sync`는 `Spec-Impact:` 트레일러를 읽어야 하는데 **pre-commit은 커밋 메시지를 못 본다**(커밋 확정 전). 따라서 **commit-msg 훅**(인자 `$1` = 커밋 메시지 파일 경로)에서 실행한다 — 스테이징 diff는 `git diff --cached`로, 트레일러는 `$1`에서 읽는다. 기존 pre-commit(`check-fr-coverage`·`check-ownership`)은 그대로 두고, `check-spec-sync`만 commit-msg 훅에 배선한다. CI/수동 실행 시엔 커밋범위 인자 + `--message-file`로 같은 판정.
+소유 스펙 `.md`의 diff에서 "의미 있는 변경"을 다음으로 판정한다:
 
-## 6. 3분류 + 예외
+1. **스펙 파일의 new-file 전체 내용**(post-image)을 읽어 `## ` 헤더 기준 **라인번호→섹션 맵**을 만든다. (hunk 컨텍스트만으로 섹션을 추정하지 않는다 — 컨텍스트 없는 소형 hunk·섹션 경계 편집의 오귀속 방지.)
+2. diff의 각 추가 라인(`+`)을 hunk 헤더(`@@ -a,b +c,d @@`)의 new-file 라인번호로 환산해 섹션에 귀속.
+3. 다음 중 하나면 통과:
+   - **FR 본문 변경**: `**FR-NNN**` 라인의 추가/삭제,
+   - **`## Change Log`** 아래 새 항목: `+- `(불릿) **또는** `+|`(표 행, 단 구분선 `|---|` 제외) — 기존 템플릿(표)과 신규 권장(불릿) 모두 인정,
+   - **`## Edge Cases`** 아래 새 항목: 동일 규칙.
+4. 파일 동반만·공백·주석만 변경 → 불통과(우회 차단).
+
+스펙 파일 **삭제**는 "의미 있는 변경"으로 인정(폐기는 STRUCTURE 수명주기 절차가 별도 규율). 소유 코드 파일의 **rename/delete**도 변경으로 취급(소유 스펙 갱신 요구 — Files glob 자체를 고치는 변경이 그 스펙 변경에 포함되므로 자연 해소).
+
+### 5.5 탈출구 — 감사 흔적의 실체 (정직)
+
+- **`Spec-Impact: none <사유>` 트레일러** — 커밋 메시지에 남는 **영속 감사 흔적**(`git log --grep`으로 조회 가능, 리뷰 노출). 이것이 감사 경로의 실체다. ~~stderr 기록~~은 커밋 시점 터미널에만 보이고 영속되지 않으므로 감사 주장에서 제외(참고 출력일 뿐).
+- **exempt glob**(config `specSyncExemptGlobs`, 기본 `[]`) — 통과하되 **영속 흔적은 없다**(정직하게 인정). exempt 목록 자체가 config로 리뷰되는 것이 통제선. 예시: 생성물·락파일이 Files glob에 과포함될 때.
+
+### 5.6 훅 배선·우회 경계 (정직)
+
+- **실행 위치 = commit-msg 훅** (인자 `$1`=커밋 메시지 파일). pre-commit은 커밋 메시지를 못 본다. 스테이징 diff는 commit-msg 시점에도 `git diff --cached`로 정확히 조회됨(검증됨).
+- **merge commit**: commit-msg가 실행되지만 staged diff가 일반 커밋과 다르므로 — `git rev-parse -q --verify MERGE_HEAD`(또는 `$1`이 MERGE_MSG)로 감지 시 **skip + 기록**. 브랜치 위 개별 커밋 강제 + pre-push `sdd-sync`(range 모드)가 머지 경로의 백스톱.
+- **`--amend`**: 훅이 재실행된다(이미 커밋된 내용에 재검사 — 의도된 동작이나 놀랄 수 있어 문서화).
+- **`--no-verify`**: 두 훅 모두 skip — 기계로 못 막는 정직한 한계. 팀 규율 + range 모드(CI/pre-push)가 잔여 그물.
+
+### 5.7 두 운영 모드 (명시 분리)
+
+| 모드 | 호출 | diff 소스 | 트레일러 | 강제 |
+|---|---|---|---|---|
+| **staged** (1차 강제점) | commit-msg 훅: `check-spec-sync.mjs --staged --message-file $1` | `git diff --cached` | `$1`에서 읽음 | **hard exit 1** |
+| **range** (백스톱/집계) | 인자 없음(기본) 또는 `<base>`: `check-spec-sync.mjs [base]` | `git diff base...HEAD` (기본 `origin/main`, converge-drift와 동일 규약) | 없음(요구 안 함) | advisory(⚠ 출력, exit 0) |
+
+- **sdd-sync R2에는 range 모드가 배선**된다 — sdd-sync는 게이트를 인자 없이 실행하므로(§11) 기본값이 range 모드여야 무의미한 빈-staged 판정을 피한다. staged 모드는 commit-msg 훅 전용.
+
+## 6. 3분류 + 예외 + 경계 사례
 
 | 코드 변경 | 통과 조건 | 강제 |
 |---|---|---|
-| **기능/버그픽스** (Files 매치) | 소유 스펙의 FR/Edge Case/Change Log 실제 변경 동반 | pre-commit **hard** |
+| **기능/버그픽스** (Files 매치) | 소유 스펙의 FR/Edge Case/Change Log 실제 변경 동반 | commit-msg **hard** |
 | **hotfix** (급함) | 위와 동일 (`/speckit.fix`로 Edge Case+Change Log 기록) — 또는 `Spec-Impact: none <사유>` | hard + 탈출구 |
-| **스펙 무관** (테스트·락·생성물) | exempt glob | 통과 + 기록 |
+| **스펙 무관** (생성물·락파일 등 Files 과포함분) | exempt glob | 통과 (영속 흔적 없음 — §5.5) |
 
-`Spec-Impact: none <사유>`·exempt는 커밋에 남아 리뷰에 노출(정직한 탈출구, 은폐 아님).
+### 6.1 다중 소유 = AND
+
+한 파일이 여러 스펙의 Files glob에 매치되면 **모든 소유 스펙**이 의미 있는 변경을 동반해야 한다(OR는 "가장 쉬운 스펙 touch" 루프홀). 공유 유틸이 N개 스펙 편집을 강요하는 부담은 §9의 "과광역 glob 경고"로 예방 — 공유 코드는 별도 스펙(또는 미소유→converge-drift 소관)으로 두는 것을 권장.
+
+### 6.2 partial staging = 의도된 FAIL
+
+코드는 staged, 스펙은 편집했지만 unstaged → `git diff --cached`엔 스펙 무변경 → **FAIL이 맞다**(같은 커밋에 스펙이 실려야 함). 흔한 함정이므로 FAIL 메시지에 힌트 포함: *"스펙을 수정했다면 `git add`로 스테이징했는지 확인"*.
+
+### 6.3 트리거 케이스 완결 판정 (pdf-parse 사례에 정직)
+
+- `parse.ts` — SPEC-002가 `Files: src/lib/pdf/**`를 선언하면 **잡힌다**(마이그레이션 §14 의존).
+- `next.config.ts` — 프로젝트 루트 config는 기능 스펙 소유가 아님 → **check-spec-sync 침묵, converge-drift advisory만**. 이를 잡으려면 **INFRA 스펙이 config 파일을 소유**하는 관행을 권장(`INFRA-001`에 `Files: next.config.ts, …`) — §9에 규칙화. 채택 안 하면 이 절반은 advisory 그물뿐임을 명시(과장 금지).
 
 ## 7. `/speckit.fix` 스킬 (버그픽스 SDD 경로)
 
@@ -109,12 +156,13 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 
 - `templates/constitution.md` 원칙 I(Spec=SSOT)에 명문화:
   > **owned Files의 코드 변경은 동일 changeset에 스펙 변경(FR·Edge Case·Change Log)을 동반한다. 순수 기계적/버그픽스 변경도 Edge Case+Change Log 항목을 남긴다. `check-spec-sync` 게이트로 강제한다.**
-- `templates/module-spec.md`: `## Ownership`에 `Files:` 필드 + `## Edge Cases`·`## Change Log` 섹션 **필수화**(픽스 착지 자리 보장). Change Log 항목 형식: `- YYYY-MM-DD: <무엇을·왜> (커밋/PR)`.
+- `templates/module-spec.md`: `## Ownership`에 `Files:` 필드 + `## Edge Cases` 섹션 신설 + 기존 `## Change Log`(표 형식) 유지 **필수화**. 항목 형식: 표 행 `| YYYY-MM-DD | <무엇> | <왜/커밋> |` — 게이트는 표 행·불릿 모두 인정(§5.4)하므로 기존 소비 프로젝트 스펙과 호환.
 
 ## 9. Files 완전성 규칙 (STRUCTURE / DEDUP)
 
-- `STRUCTURE.md`·`DEDUP.md`에 명시: **Files glob은 소유 코드를 빠짐없이 덮어야 한다** — API route(`src/app/api/<f>/**`)뿐 아니라 그 기능의 라이브러리(`src/lib/<f>/**`)까지. 안 그러면 라이브러리 변경이 check-spec-sync 사각지대(pdf-parse의 근본 원인).
-- 완전성 자체는 결정적 강제 어려움(무엇이 "이 기능의 코드 전부"인지 자연어) → **규칙·리뷰**로. `check-converge-drift`(전역)가 Files 사각지대의 백업 신호.
+- **Files glob은 소유 코드를 빠짐없이 덮어야 한다** — API route(`src/app/api/<f>/**`)뿐 아니라 그 기능의 라이브러리(`src/lib/<f>/**`)까지(pdf-parse의 근본 원인).
+- **INFRA 스펙이 프로젝트 config 파일을 소유하는 관행 권장**(`next.config.ts`·`tsconfig` 등) — §6.3의 사각지대를 opt-in으로 닫는다.
+- **과광역 glob 경고**: 여러 스펙 Files가 겹치면 AND 강제(§6.1)로 편집 부담 폭증 — 겹침 최소화 권장. 완전성·겹침 자체는 자연어 판단이라 **규칙·리뷰**로(게이트 강제 안 함, 정직).
 
 ## 10. 키트 vs 소비 프로젝트 레이아웃 + sdd-init 배선
 
@@ -123,34 +171,45 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 | 키트 원본 | → sdd-init가 소비 프로젝트에 |
 |---|---|
 | `tooling/check-spec-sync.mjs` | `scripts/check-spec-sync.mjs` |
+| `tooling/harness/commit-msg`(신규) | `.git/hooks/commit-msg` — staged 모드 실행 |
 | `tooling/harness/speckit-fix.SKILL.md` | `.claude/skills/speckit-fix/SKILL.md` |
-| `tooling/harness/commit-msg`(신규) | `.git/hooks/commit-msg` — `check-spec-sync` 실행(트레일러+diff) |
 | `tooling/harness/pre-commit`(기존 유지) | `.git/hooks/pre-commit` — fr-coverage·ownership |
 | `templates/module-spec.md`·`constitution.md`(갱신) | `sdd/templates/…` |
 
 - `sdd-init`가 `package.json`에 `check:spec-sync`(+staged 변형) 추가(소비 프로젝트에 package.json 있으면).
-- **`check-spec-sync`는 commit-msg 훅이 실행**(트레일러 접근 필요). pre-commit은 fr-coverage·ownership 유지 — 강제점이 둘로 나뉜다(pre-commit + commit-msg).
+- **두 훅의 트리거 표면이 다름을 명시**: pre-commit은 고정 경로 프리픽스(`sdd/specs/|src/|lib/|app/|tests/`)로 발동하는 거친 트리거, commit-msg의 spec-sync는 **Files glob 매치 자체**가 트리거(경로 프리픽스 불요, 어디에 있든 Files가 선언하면 대상). 서로 다른 감지 방식이며 의도된 분리다.
 
-## 11. converge-drift 관계
+### 10.1 런타임 커버리지 (정직 공개)
 
-폐기 안 함. **`check-spec-sync`(파일→소유스펙 정밀·hard)가 1차, `check-converge-drift`(전역 advisory)가 Files 미선언 코드의 백업 그물.** sdd-sync R2 gates에 check-spec-sync 추가(check-converge-drift·check-orphan-surfaces 옆).
+- `check-spec-sync`는 **Node판 먼저** — 기존 강화 게이트(cohesion·consistency 등)와 동일 선례(ROADMAP "비-Node 프로젝트가 필요할 때 포팅").
+- commit-msg 훅 자체는 `node scripts/check-spec-sync.mjs …` 한 줄이라 **선택한 게이트 런타임과 무관하게 Node만 있으면 동작**. `sdd-init --gate=sh|py|go`에서는: Node가 감지되면 훅 배선 + 안내, 없으면 **명시 경고**("spec-sync는 Node 필요 — 미적용, ROADMAP 포팅 참조")를 출력한다. **조용한 부재 금지.**
+
+## 11. converge-drift 관계 · sdd-sync 배선
+
+- 폐기 안 함. **check-spec-sync(staged, 파일→소유스펙 정밀·hard)가 1차, check-converge-drift(전역 advisory)가 Files 미선언 코드의 백업 그물.**
+- sdd-sync R2 gates에 **check-spec-sync의 range 모드**(인자 없음 기본값, §5.7)를 추가 — sdd-sync는 게이트를 인자 없이 실행하므로 기본 모드가 range여야 정합(staged 모드를 배선하면 빈 diff에 무의미 판정).
 
 ## 12. 강제력 · 정직한 한계
 
-- **hard(exit 1):** check-spec-sync(Files 선언 스펙, pre-commit). dedup·PREFIX(기존).
-- **advisory:** converge-drift(전역 백업), Files 완전성(규칙).
-- **못 하는 것(정직):** 스펙 변경의 *질*(가짜 항목), Files 완전성 자동판정 — 리뷰가 담당. 게이트는 "의미 있는 섹션이 변경됐는가"까지만.
+- **hard(exit 1):** check-spec-sync staged 모드(Files 선언 스펙, commit-msg 훅). dedup·PREFIX(기존).
+- **advisory:** check-spec-sync range 모드(sdd-sync/CI), converge-drift(전역 백업), Files 완전성·겹침(규칙).
+- **못 막는 것(정직):** ① 스펙 변경의 *질*(가짜 항목) — 리뷰 담당. ② `--no-verify` — 훅 전면 우회. ③ **merge commit** — skip(§5.6), 브랜치 커밋 강제+range 백스톱으로 보완. ④ exempt glob 통과의 무흔적(§5.5). ⑤ 비-Node 환경(§10.1) — 명시 경고로만.
 
 ## 13. 검증 계획 (TDD)
 
-- `check-spec-sync`: Files 매치 코드 변경 + 소유 스펙 무변경 → FAIL / 스펙 Change Log 항목 동반 → PASS / 공백만 touch → FAIL(엄격) / Spec-Impact:none 트레일러 → PASS+기록 / exempt glob → PASS+기록 / Files 미선언 코드 → 침묵(converge-drift 소관).
-- glob 매칭 단위 테스트(`**`·`*`·중첩).
-- 섹션 파싱 단위 테스트(Change Log/Edge Cases/FR 변경 검출 vs 공백).
-- `sdd-init` init-then-execute: 배선 후 실제 `scripts/check-spec-sync.mjs` 실행 crash 없음(final-review Critical 교훈 — fixture drift 방지).
-- 회귀: 기존 게이트 스윕 전량 GREEN.
+- **glob 단위**: `**`·`*` 변환·anchoring(`a/**`가 `a` 비매치)·POSIX/대소문자·미지원 문법(중괄호) 경고·인라인 `#` strip.
+- **섹션 귀속 단위**: 라인번호→섹션 맵 정확성 — 컨텍스트 없는 소형 hunk, 섹션 첫 줄 추가, 경계 편집.
+- **판정 통합(staged)**: Files 매치+스펙 무변경→FAIL / Change Log **표 행** 추가→PASS / Change Log **불릿** 추가→PASS / Edge Cases 항목→PASS / FR 라인 변경→PASS / 공백·주석만→FAIL / 다중 소유 한쪽만 변경→FAIL(AND) / partial staging(스펙 unstaged)→FAIL+힌트.
+- **탈출구**: `Spec-Impact: none` 트레일러→PASS / exempt glob→PASS / Files 미선언 코드→침묵.
+- **모드**: 인자 없음→range(origin/main 기본, advisory exit 0) / `--staged --message-file`→hard.
+- **훅 경계**: merge commit(MERGE_HEAD) skip / `--amend` 재실행 동작 문서화 검증.
+- **sdd-init**: init-then-execute — 배선 후 실제 `scripts/check-spec-sync.mjs` 실행 crash 없음(final-review Critical 교훈) + 비-Node 게이트 선택 시 경고 출력.
+- 회귀: 기존 게이트 스윕 전량 GREEN + **Files 라인이 dedup·cohesion 키 카운트에 안 섞임**(ownershipCategories 미등록 확인 테스트).
 
 ## 14. 마이그레이션 (소비 프로젝트 재-scaffold)
 
 - 새 스크립트/스킬/훅 반영: `sdd-init` 재실행(settings.json·package.json·git훅 병합).
-- 기존 스펙 보강: 각 스펙에 `Files:` glob + `## Edge Cases`·`## Change Log` 섹션 추가. Files 없는 스펙은 check-spec-sync 대상 아님(converge-drift advisory만) — 점진.
+- 기존 스펙 보강: 각 스펙에 `Files:` glob + `## Edge Cases` 섹션 추가(`## Change Log`는 기존 표 유지 가능 — §5.4가 표·불릿 모두 인정). Files 없는 스펙은 check-spec-sync 대상 아님(converge-drift advisory만) — 점진.
+- (권장) INFRA 스펙에 프로젝트 config 파일 소유 등록(§6.3·§9).
+- config: `specSyncExemptGlobs`(기본 `[]`) 필요 시 설정.
 - CHANGELOG + 키트 버전 bump. 마이그레이션 노트 문서화.
