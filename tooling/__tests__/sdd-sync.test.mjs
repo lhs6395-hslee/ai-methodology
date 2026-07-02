@@ -40,3 +40,12 @@ test("과대 spec(cohesion 위반) → R3 확인 필요, --strict exit 1", () =>
   assert.match(warn.out, /R3 dedup.*확인 필요/s);
   assert.equal(run(dir, ["--strict"]).code, 1);
 });
+
+test("R2에 check-spec-sync(range)가 배선됨", () => {
+  const dir = fixture({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n",
+    "src/a.test.js": "// @covers SPEC-001/FR-001\nimport {test} from 'node:test';\ntest('a',()=>{expect(1).toBe(1)});\n",
+  });
+  const r = run(dir);
+  assert.match(r.out, /check-spec-sync\.mjs/);
+});

@@ -7,7 +7,7 @@
 | 규칙 | Trigger | Detect (게이트) | Ask (사람) | Act |
 |---|---|---|---|---|
 | **R1 spec→code** | spec 생성/변경 | `check-fr-coverage`(테스트 없는 FR ≈ 미구현) | "이 FR들 코드 생성/업데이트?" | TDD(RED→GREEN) → 재검증 |
-| **R2 code→spec** | 코드 변경·spec 무변경 | `check-converge-drift`·`check-orphan-surfaces` | "기존 spec 개정 / 새 spec / 의도적 무시?" | `/converge`→intent→`/specify`(update·new)→`/analyze`→bless |
+| **R2 code→spec** | 코드 변경·spec 무변경 | `check-converge-drift`·`check-orphan-surfaces`·`check-spec-sync`(range) | "기존 spec 개정 / 새 spec / 의도적 무시?" | `/converge`→intent→`/specify`(update·new)→`/analyze`→bless |
 | **R3 dedup+입도+완전성** | spec 생성/변경 직후 | `check-ownership`·`check-spec-cohesion`·`check-spec-completeness` | "중복 통합 / 과대 spec 분할 / SC·인수조건 보강?" | 통합·분할·보강 → 재검증 |
 | **R4 상시 sync** | push·주기·요청 | 위 일괄(`sdd-sync.mjs`) | drift → 해당 규칙 라우팅 | (R1/R2/R3의 act) |
 
