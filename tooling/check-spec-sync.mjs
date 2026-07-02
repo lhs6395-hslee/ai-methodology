@@ -1,0 +1,110 @@
+#!/usr/bin/env node
+// ─── spec-first 강제 게이트 (§5) ─────────────────────────────
+// 소유(Files) 코드가 바뀌면 소유 스펙의 의미 있는 변경(FR/Edge Cases/Change Log)이
+// 같은 changeset(브랜치=staged ∪ base...HEAD, §5.8)에 있어야 한다.
+// 모드: --staged --message-file <p> = hard(exit 1, commit-msg 훅) / [base] = range advisory(exit 0).
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { loadConfig } from "./sdd-config.mjs";
+import { parseSection } from "./ownership-keys.mjs";
+import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
+
+const cfg = loadConfig();
+const args = process.argv.slice(2);
+const STAGED = args.includes("--staged");
+const mi = args.indexOf("--message-file");
+const MSG = mi >= 0 ? args[mi + 1] : null;
+const positional = args.filter((a, i) => !a.startsWith("--") && i !== mi + 1);
+const BASE = positional[0] || process.env.SDD_DIFF_BASE || "origin/main";
+
+const sh = (c) => execSync(c, { cwd: cfg.__root, encoding: "utf8" });
+const shOk = (c) => { try { return sh(c); } catch { return null; } };
+const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
+
+// ① 트레일러(§5.5): staged 모드에서만.
+if (STAGED && MSG) {
+  const msg = readFileSync(MSG, "utf8");
+  const m = msg.match(/^Spec-Impact:\s*none\s*(.*)$/m);
+  if (m) {
+    if (!m[1].trim()) { console.error("✗ spec-sync: `Spec-Impact: none`은 사유 필수 (`Spec-Impact: none <사유>`)"); process.exit(1); }
+    console.log(`spec-sync: Spec-Impact: none — 통과 (사유: ${m[1].trim()}) [트레일러가 커밋에 영속]`);
+    process.exit(0);
+  }
+}
+
+// ② 변경 파일 수집(§5.7): staged = cached ∪ base...HEAD / range = base...HEAD.
+const branchDiffOk = shOk(`git rev-parse -q --verify ${BASE}`) !== null && shOk(`git diff --name-only ${BASE}...HEAD`) !== null;
+const changed = new Set();
+if (branchDiffOk) lines(shOk(`git diff --name-only ${BASE}...HEAD`)).forEach((f) => changed.add(f));
+else console.log(`· spec-sync: base(${BASE}) 해석 불가 — ${STAGED ? "staged만 판정(경고)" : "판정 불가, 건너뜀"}`);
+if (STAGED) lines(sh("git diff --cached --name-only")).forEach((f) => changed.add(f));
+if (!STAGED && !branchDiffOk) process.exit(0);
+
+// ③ 스펙 로드(§5.1): HEAD ∪ index 합집합(삭제 가시화).
+const specPaths = new Set([
+  ...lines(shOk(`git ls-files -- ${cfg.specDir}`) || ""),
+  ...lines(shOk(`git ls-tree -r --name-only HEAD -- ${cfg.specDir}`) || ""),
+].filter((p) => p.endsWith(".md")));
+const specs = []; // {id, path, globs[], deletedInIndex}
+for (const p of specPaths) {
+  const idx = shOk(`git show :${p}`);
+  const head = shOk(`git show HEAD:${p}`);
+  const text = idx ?? head ?? "";
+  const id = (text.match(cfg.__specIdRe) || [p])[0];
+  const globs = new Set();
+  for (const src of [idx, head]) {
+    if (!src) continue;
+    for (const raw of src.split("\n")) {
+      if (/^-\s*\*\*Files\*\*\s*:/.test(raw)) {
+        const issues = scanFilesLineIssues(raw);
+        if (issues.length) console.log(`⚠ [${id}] Files에 미지원 glob 문법 ${issues.join(" ")} — **·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음`);
+      }
+    }
+    parseSection(src, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).forEach((g) => globs.add(g));
+  }
+  specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null });
+}
+
+// ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
+const exempt = (cfg.specSyncExemptGlobs || []).map(compileGlob);
+const specSet = new Set(specs.map((s) => s.path));
+const violations = []; // {file, spec}
+const memo = new Map(); // spec.path -> boolean(meaningful)
+function meaningful(spec) {
+  if (memo.has(spec.path)) return memo.get(spec.path);
+  let ok = false;
+  if (spec.deletedInIndex) { console.log(`⚠ [${spec.id}] 스펙 파일 삭제 — 의미 변경으로 인정(수명주기 리뷰 대상)`); ok = true; }
+  if (!ok && STAGED) {
+    const d = shOk(`git diff --cached -- ${spec.path}`);
+    const post = shOk(`git show :${spec.path}`);
+    if (d && post && hasMeaningfulSpecChange(post, d)) ok = true;
+  }
+  if (!ok && branchDiffOk) {
+    const d = shOk(`git diff ${BASE}...HEAD -- ${spec.path}`);
+    const post = shOk(`git show HEAD:${spec.path}`);
+    if (d && post && hasMeaningfulSpecChange(post, d)) ok = true;
+  }
+  memo.set(spec.path, ok);
+  return ok;
+}
+for (const f of changed) {
+  if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;      // 스펙 자신은 코드 아님
+  if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
+  for (const s of specs) {
+    if (!s.globs.some(({ re }) => re.test(f))) continue;
+    if (!meaningful(s)) violations.push({ file: f, spec: s.id });
+  }
+}
+
+// ⑤ 리포트.
+const mode = STAGED ? "staged(hard)" : `range(advisory, base:${BASE})`;
+console.log(`spec-sync 게이트 — mode:${mode} changed:${changed.size} specs:${specs.length}`);
+if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
+for (const v of violations) console.log(`  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
+if (STAGED) {
+  console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.`);
+  console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
+  console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
+  process.exit(1);
+}
+console.log("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.");
