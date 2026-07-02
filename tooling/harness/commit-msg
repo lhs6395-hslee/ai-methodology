@@ -1,0 +1,12 @@
+#!/bin/sh
+# git commit-msg — spec-first 강제(check-spec-sync staged 모드). $1 = 커밋 메시지 파일.
+# sdd-init가 scripts/sdd-commit-msg.sh로 설치 + .git/hooks/commit-msg가 호출.
+DIR=$(git rev-parse --show-toplevel) || { echo "sdd commit-msg: git 저장소 아님" >&2; exit 1; }
+cd "$DIR"
+# merge commit → skip(§5.6): 브랜치 커밋 강제 + pre-push range가 백스톱.
+if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+  echo "sdd commit-msg: merge commit — spec-sync skip (range 백스톱이 커버)" >&2
+  exit 0
+fi
+[ -f scripts/check-spec-sync.mjs ] || { echo "sdd commit-msg: check-spec-sync 없음 — sdd-init 재실행 필요" >&2; exit 1; }
+node scripts/check-spec-sync.mjs --staged --message-file "$1"
