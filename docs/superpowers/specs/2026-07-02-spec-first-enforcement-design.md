@@ -6,7 +6,7 @@
 
 ## 0. 요약
 
-코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과 — changeset=브랜치(§5.8), commit-msg 훅 hard + range 모드) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 커밋에 강제한다."
+코드가 바뀔 때 **소유 스펙도 같은 changeset에 바뀌었는지**를 강제하는 diff 기반 게이트를 추가한다. 핵심은 세 가지: **① `Files:` glob 필드**(파일→소유스펙 결정적 매핑) **② `check-spec-sync`**(엄격 판정: 소유 스펙의 FR/Edge Case/Change Log 섹션이 실제 변경돼야 통과 — changeset=브랜치(§5.8), commit-msg 훅 hard + range 모드) **③ `/speckit.fix`**(버그픽스도 스펙에 착지시키는 SDD 경로). "code-first는 hotfix로 정당하나 spec이 따라와야 한다 — 사후는 안 지켜지니 같은 changeset(브랜치, §5.8)에 강제한다."
 
 ## 1. 문제 — 기존 게이트가 못 잡는 이음매
 
@@ -61,7 +61,7 @@
 ### 4.1 glob 문법 (지원 부분집합 명시)
 
 - **지원: `**`(0개 이상 경로 세그먼트), `*`(세그먼트 내 0+문자)만.** `{a,b}` 중괄호·`?`·`[...]`·`!(...)`은 **미지원** — 콤마 구분 파서(`parseSection`이 `,`로 split)와 충돌하고 자체 glob 구현 범위를 넘는다.
-- **Files 값에 `,`(구분자 외)·`#`(인라인 주석) 금지.** 파서는 방어적으로 각 항목의 trailing `#…`를 strip한다(주석 유입이 glob을 조용히 무효화하는 사고 방지).
+- **Files 값에 `,`(구분자 외)·`#`(인라인 주석) 금지.** 방어적 정규화는 **check-spec-sync 자신이** 수행한다(공유 `parseSection`은 변경하지 않음 — dedup·cohesion과 공유되므로): ① `- **Files**:` **원시 라인을 먼저 스캔**해 미지원 문법(`{`·`?`·`[`)을 **명시 경고**(주의: parseSection은 `[`로 시작하는 토큰을 placeholder로 간주해 조용히 버리므로, 경고는 반드시 원시 라인 기준) ② parseSection 반환값에 trailing `#…` strip 적용.
 - 매칭 규칙: **anchored(`^…$`) 정규식 변환**(`**`→`(?:[^/]+/)*[^/]+` 스타일로 "그 디렉토리 자신"은 불포함, `a/**`는 `a/x`·`a/x/y` 매치·`a`는 비매치), **POSIX 슬래시·대소문자 구분**(`git diff --name-only`는 항상 forward slash를 출력).
 - 형식 위반(중괄호 등 미지원 문법 발견) 시 check-spec-sync가 **명시 경고**(조용한 비매치 금지).
 
@@ -87,12 +87,12 @@
 
 소유 스펙 `.md`의 diff에서 "의미 있는 변경"을 다음으로 판정한다:
 
-1. **스펙 파일의 new-file 전체 내용**(post-image)을 읽어 `## ` 헤더 기준 **라인번호→섹션 맵**을 만든다. **post-image 출처 명시**: staged 모드 = **index판**(`git show :<path>` — 작업트리가 아님, unstaged 편집이 섞이면 §6.2 판정이 깨짐) / range·브랜치 diff = 해당 범위 head판(`git show <head>:<path>`). (hunk 컨텍스트만으로 섹션을 추정하지 않는다 — 컨텍스트 없는 소형 hunk·섹션 경계 편집의 오귀속 방지.)
+1. **스펙 파일의 new-file 전체 내용**(post-image)을 읽어 **레벨 무관(`^#{2,3}\s+`) 헤더의 섹션 이름 기준** **라인번호→섹션 맵**을 만든다 — 템플릿의 `### Edge Cases`(H3, `## User Scenarios & Testing` 하위)와 `## Change Log`(H2)를 모두 잡기 위해 **깊이가 아니라 이름**("Edge Cases"·"Change Log"·FR 본문)으로 귀속한다. check-spec-sync가 자체 헤더 스캔을 소유(공유 parseSection의 `## ` 경계 로직과 무관). **post-image 출처 명시**: staged 슬라이스 = **index판**(`git show :<path>` — 작업트리가 아님, unstaged 편집이 섞이면 §6.2 판정이 깨짐) / `base...HEAD` 슬라이스 = **HEAD판**(`git show HEAD:<path>`) / range 모드 = 해당 범위 head판. **staged 모드는 귀속을 두 번 돌린다** — staged diff는 index판 이미지로, `base...HEAD` diff는 HEAD판 이미지로 각각 귀속하고 판정을 합집합한다(hunk 라인번호는 이미지 상대적이라 이미지를 섞으면 오귀속). (hunk 컨텍스트만으로 섹션을 추정하지 않는다 — 컨텍스트 없는 소형 hunk·섹션 경계 편집의 오귀속 방지.)
 2. diff의 각 추가 라인(`+`)을 hunk 헤더(`@@ -a,b +c,d @@`)의 new-file 라인번호로 환산해 섹션에 귀속.
 3. 다음 중 하나면 통과:
    - **FR 본문 변경**: `**FR-NNN**` 라인의 추가/삭제,
-   - **`## Change Log`** 아래 새 항목: `+- `(불릿) **또는** `+|`(표 행, 단 구분선 `|---|` 제외) — 기존 템플릿(표)과 신규 권장(불릿) 모두 인정,
-   - **`## Edge Cases`** 아래 새 항목: 동일 규칙.
+   - **"Change Log" 섹션**(레벨 무관 — 템플릿은 `## Change Log`) 아래 새 항목: `+- `(불릿) **또는** `+|`(표 행, 단 구분선 `|---|` 제외) — 기존 템플릿(표)과 신규 권장(불릿) 모두 인정,
+   - **"Edge Cases" 섹션**(레벨 무관 — 템플릿은 `### Edge Cases`, H3) 아래 새 항목: 동일 규칙.
 4. 파일 동반만·공백·주석만 변경 → 불통과(우회 차단).
 
 스펙 파일 **삭제**는 "의미 있는 변경"으로 인정하되 **눈에 띄게 기록**(폐기는 STRUCTURE 수명주기 — spec+코드+테스트 원자 삭제 — 가 별도 규율; §5.1의 HEAD∪index 로드 덕에 삭제 커밋에서도 소유권이 보여 조용한 우회가 아니라 시끄러운 통과가 된다). 스펙 파일 **순수 rename**(내용 무변경)은 의미 있는 변경이 **아니다** — 소유 코드도 같이 바뀌면 Change Log 항목 필요(엄격 유지). 소유 코드 파일의 **rename/delete**도 변경으로 취급(소유 스펙 갱신 요구 — Files glob 자체를 고치는 변경이 그 스펙 변경에 포함되므로 자연 해소).
@@ -113,8 +113,10 @@
 
 | 모드 | 호출 | diff 소스 | 트레일러 | 강제 |
 |---|---|---|---|---|
-| **staged** (1차 강제점) | commit-msg 훅: `check-spec-sync.mjs --staged --message-file $1` | `git diff --cached` | `$1`에서 읽음 | **hard exit 1** |
+| **staged** (1차 강제점) | commit-msg 훅: `check-spec-sync.mjs --staged --message-file $1` | `git diff --cached` **∪ `base...HEAD`** (§5.8) | `$1`에서 읽음 | **hard exit 1** |
 | **range** (백스톱/집계) | 인자 없음(기본) 또는 `<base>`: `check-spec-sync.mjs [base]` | `git diff base...HEAD` (기본 `origin/main`, converge-drift와 동일 규약) | 없음(요구 안 함) | advisory(⚠ 출력, exit 0) |
+
+두 모드는 **하나의 귀속 코어를 공유**하고 (diff 소스 목록, post-image 리졸버, 강제 수준, 트레일러 소스) 네 파라미터만 다르다 — range = staged에서 {staged 슬라이스, 트레일러, hard-exit}를 뺀 것. 귀속 엔진을 두 벌 만들지 말 것.
 
 - **sdd-sync R2에는 range 모드가 배선**된다 — sdd-sync는 게이트를 인자 없이 실행하므로(§11) 기본값이 range 모드여야 무의미한 빈-staged 판정을 피한다. staged 모드는 commit-msg 훅 전용.
 
@@ -170,7 +172,7 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 
 - `templates/constitution.md` 원칙 I(Spec=SSOT)에 명문화:
   > **owned Files의 코드 변경은 동일 changeset에 스펙 변경(FR·Edge Case·Change Log)을 동반한다. 순수 기계적/버그픽스 변경도 Edge Case+Change Log 항목을 남긴다. `check-spec-sync` 게이트로 강제한다.**
-- `templates/module-spec.md`: `## Ownership`에 `Files:` 필드 + `## Edge Cases` 섹션 신설 + 기존 `## Change Log`(표 형식) 유지 **필수화**. 항목 형식: 표 행 `| YYYY-MM-DD | <무엇> | <왜/커밋> |` — 게이트는 표 행·불릿 모두 인정(§5.4)하므로 기존 소비 프로젝트 스펙과 호환.
+- `templates/module-spec.md`: `## Ownership`에 `Files:` 필드 추가. **`### Edge Cases`(H3)와 `## Change Log`(표)는 템플릿에 이미 존재** — 신설이 아니라 **필수화**(비우지 말 것)로 승격하고, §5.4의 레벨 무관 귀속이 현 깊이 그대로 잡는다(템플릿 헤더 변경 불요). Change Log 항목 형식: 표 행 `| YYYY-MM-DD | <무엇> | <왜/커밋> |` — 게이트는 표 행·불릿 모두 인정(§5.4)하므로 기존 소비 프로젝트 스펙과 호환.
 
 ## 9. Files 완전성 규칙 (STRUCTURE / DEDUP)
 
@@ -212,7 +214,7 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 ## 13. 검증 계획 (TDD)
 
 - **glob 단위**: `**`·`*` 변환·anchoring(`a/**`가 `a` 비매치)·POSIX/대소문자·미지원 문법(중괄호) 경고·인라인 `#` strip.
-- **섹션 귀속 단위**: 라인번호→섹션 맵 정확성 — 컨텍스트 없는 소형 hunk, 섹션 첫 줄 추가, 경계 편집.
+- **섹션 귀속 단위**: 라인번호→섹션 맵 정확성 — 컨텍스트 없는 소형 hunk, 섹션 첫 줄 추가, 경계 편집, **레벨 무관(`### Edge Cases` H3 항목 추가→PASS, `## Change Log` H2→PASS)**, **두-이미지 귀속**(staged 슬라이스=index판·branch 슬라이스=HEAD판 각각 정확).
 - **판정 통합(staged)**: Files 매치+스펙 무변경(브랜치 포함)→FAIL / Change Log **표 행** 추가→PASS / Change Log **불릿** 추가→PASS / Edge Cases 항목→PASS / FR 라인 변경→PASS / 공백·주석만→FAIL / 다중 소유 한쪽만 변경→FAIL(AND) / partial staging(스펙 unstaged·브랜치에도 없음)→FAIL+힌트.
 - **changeset=브랜치(§5.8)**: spec 커밋(N-1) 후 코드만 staged(N)→**PASS**(top-down 흐름 보존) / 브랜치 전체 스펙 무변경 hotfix→FAIL / base 해석 불가→staged만+경고.
 - **소유권 스냅샷(§5.1)**: 스펙 삭제+소유 코드 변경 한 커밋→HEAD판 소유권으로 감지, 삭제=의미 변경으로 **시끄럽게 통과**(조용한 우회 아님) / 순수 rename→의미 변경 아님.
@@ -225,7 +227,7 @@ METHODOLOGY 0~8 루프 설명에 "버그픽스는 `/speckit.fix`" 명시(기능 
 ## 14. 마이그레이션 (소비 프로젝트 재-scaffold)
 
 - 새 스크립트/스킬/훅 반영: `sdd-init` 재실행(settings.json·package.json·git훅 병합).
-- 기존 스펙 보강: 각 스펙에 `Files:` glob + `## Edge Cases` 섹션 추가(`## Change Log`는 기존 표 유지 가능 — §5.4가 표·불릿 모두 인정). Files 없는 스펙은 check-spec-sync 대상 아님(converge-drift advisory만) — 점진.
+- 기존 스펙 보강: 각 스펙에 `Files:` glob 추가. 템플릿 파생 스펙은 `### Edge Cases`·`## Change Log`가 이미 있고(§5.4 레벨 무관 귀속이 그대로 잡음), 없는 스펙만 두 섹션 보강. Files 없는 스펙은 check-spec-sync 대상 아님(converge-drift advisory만) — 점진.
 - (권장) INFRA 스펙에 프로젝트 config 파일 소유 등록(§6.3·§9).
 - config: `specSyncExemptGlobs`(기본 `[]`) 필요 시 설정.
 - CHANGELOG + 키트 버전 bump. 마이그레이션 노트 문서화.
