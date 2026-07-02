@@ -39,12 +39,15 @@ copy "$KIT/templates/module-spec.md" "$T/sdd/templates/spec-template.md"
 
 # ── 2. 게이트 런타임 (택1, 출력 동일) ────────────────────────
 case "$GATE" in
-  go)   say "  → Go 바이너리는 빌드/다운로드: cd $KIT/tooling/go-gate && CGO_ENABLED=0 go build -o \"$T/scripts/sdd-gate\" ." ;;
-  sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh" ;;
-  py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py" ;;
+  go)   say "  → Go 바이너리는 빌드/다운로드: cd $KIT/tooling/go-gate && CGO_ENABLED=0 go build -o \"$T/scripts/sdd-gate\" ."
+        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
+  sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh"
+        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
+  py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py"
+        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
                  check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs \
-                 ownership-keys.mjs check-spec-consistency.mjs; do
+                 ownership-keys.mjs check-spec-consistency.mjs check-spec-sync.mjs spec-sync-lib.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -69,6 +72,22 @@ if [ "$GATE" = "node" ]; then
     printf '#!/bin/sh\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
     chmod +x "$T/.git/hooks/pre-commit"
     say "  → git pre-commit 훅 연결됨"
+  fi
+
+  # commit-msg 훅 + speckit-fix 스킬
+  copy "$KIT/tooling/harness/commit-msg" "$T/scripts/sdd-commit-msg.sh"
+  mkdir -p "$T/.claude/skills/speckit-fix"
+  copy "$KIT/tooling/harness/speckit-fix.SKILL.md" "$T/.claude/skills/speckit-fix/SKILL.md"
+  if [ -d "$T/.git" ]; then
+    printf '#!/bin/sh\nsh scripts/sdd-commit-msg.sh "$1"\n' > "$T/.git/hooks/commit-msg"
+    chmod +x "$T/.git/hooks/commit-msg"
+    say "  → git commit-msg 훅 연결됨"
+  fi
+
+  # package.json 있으면 check:spec-sync 스크립트 병합(node로 — jq 불요, 기존 보존)
+  if [ -f "$T/package.json" ]; then
+    node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));p.scripts=p.scripts||{};p.scripts["check:spec-sync"]=p.scripts["check:spec-sync"]||"node scripts/check-spec-sync.mjs";fs.writeFileSync(process.argv[1],JSON.stringify(p,null,2)+"\n");' "$T/package.json"
+    say "  → package.json check:spec-sync 스크립트 추가"
   fi
 
   # .claude/settings.json 병합 — 기존 hooks 보존; jq 있으면 merge, 없으면 신규 생성
