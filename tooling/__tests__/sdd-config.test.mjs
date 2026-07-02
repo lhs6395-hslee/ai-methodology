@@ -13,6 +13,11 @@ test("config: 새 필드 기본값", () => {
   assert.equal(cfg.surfacePathParam, "{name}");
 });
 
+test("config: specSyncExemptGlobs 기본 []", () => {
+  const cfg = loadConfig("/nonexistent");
+  assert.deepEqual(cfg.specSyncExemptGlobs, []);
+});
+
 test("config: verb 파생값(crud + 도메인)", () => {
   const cfg = loadConfig("/nonexistent");
   assert.ok(cfg.__allVerbs.has("create"));

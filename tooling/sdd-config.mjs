@@ -48,6 +48,9 @@ export const DEFAULTS = {
   // 신호 → 분할 권고(advisory). 카테고리명 무관(ownershipCategories 따름).
   maxKeysPerCategoryPerSpec: 4,
   maxFRsPerSpec: 8,
+  // check-spec-sync 예외 glob(§5.5) — Files glob이 과포함한 생성물·락파일 등.
+  // 통과하되 영속 흔적 없음(정직) — 목록 자체가 config 리뷰 대상.
+  specSyncExemptGlobs: [],
   // spec 파일·ID·@covers 태그에서 인정할 ID 접두어들(언어중립 추적 닻).
   // 기본 = ["SPEC","INFRA","TEST"](§5.1 표준 3종). 파일명·SPEC_ID·COVERS 정규식이
   // 모두 이 목록에서 파생되어, 접두어 추가가 코드 fork 없이 config로 표현된다.
