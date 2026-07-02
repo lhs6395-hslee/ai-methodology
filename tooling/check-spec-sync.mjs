@@ -46,6 +46,7 @@ const specPaths = new Set([
   ...lines(shOk(`git ls-tree -r --name-only HEAD -- ${cfg.specDir}`) || ""),
 ].filter((p) => p.endsWith(".md")));
 const specs = []; // {id, path, globs[], deletedInIndex}
+const warnedGlobSpec = new Set(); // track warned spec ids to dedupe per-spec
 for (const p of specPaths) {
   const idx = shOk(`git show :${p}`);
   const head = shOk(`git show HEAD:${p}`);
@@ -57,7 +58,10 @@ for (const p of specPaths) {
     for (const raw of src.split("\n")) {
       if (/^-\s*\*\*Files\*\*\s*:/.test(raw)) {
         const issues = scanFilesLineIssues(raw);
-        if (issues.length) console.log(`⚠ [${id}] Files에 미지원 glob 문법 ${issues.join(" ")} — **·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음`);
+        if (issues.length && !warnedGlobSpec.has(id)) {
+          warnedGlobSpec.add(id);
+          console.log(`⚠ [${id}] Files에 미지원 glob 문법 ${issues.join(" ")} — **·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음`);
+        }
       }
     }
     parseSection(src, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).forEach((g) => globs.add(g));

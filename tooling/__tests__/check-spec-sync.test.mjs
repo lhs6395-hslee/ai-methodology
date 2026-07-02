@@ -157,3 +157,22 @@ test("range 모드(인자 없음): 위반 → ⚠ + exit 0 (advisory, sdd-sync �
     assert.match(r.out, /⚠/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("미지원 glob 경고는 spec당 1회만(중복 스캔 dedupe)", () => {
+  const { root, g } = repo();
+  try {
+    // placeholder Files line committed to both idx and head (identical)
+    const specWithPlaceholder = SPEC("[소유 경로]");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), specWithPlaceholder);
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // stage an unowned file to trigger gate
+    writeFileSync(join(root, "src/other.ts"), "unowned\n");
+    g("add", "src/other.ts");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    // count occurrences of "미지원 glob"
+    const matches = (r.out.match(/미지원 glob/g) || []);
+    assert.equal(matches.length, 1, `expected 1 warning, got ${matches.length}:\n${r.out}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
