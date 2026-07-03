@@ -34,7 +34,7 @@
 | `templates/` | `module-spec.md`(EARS 범용), `MODULE_MAP.md`(단일 모듈 매니페스트), `constitution.md` | 템플릿 |
 | `tooling/` | **`sdd-init.sh`**(정식 레이아웃 결정적 스캐폴더 — 모든 프로젝트 동일 보장)·**`sdd.config.json`**(언어 어댑터)·**`sdd.config.presets.md`**(Python/Go/Rust/Java/… 프리셋). 게이트 **4판 동봉**(동작 동일·전부 검증): **`go-gate/`(Go→단일 정적 바이너리, 인터프리터 0 — 사실상 모든 언어 커버, 권장)** + `sdd-gate-release.yml`(전 플랫폼 빌드), `sdd_gates.sh`(POSIX 셸, 빌드 불필요), `sdd_gates.py`(Python), Node판 `*.mjs`. 모두 같은 config 구동. `vitest.config.ts`(JS만), **`ci-examples.md`**(게이트를 로컬·git훅·어떤 CI/CD 도구에서든 거는 예시 — 도구 무관), `sdd-gates.yml`(CI/CD 워크플로우 샘플 하나), `ears-preset/` | 이식 도구 |
 
-## 이 방법론 쓰는 법 (시작 & 업데이트)
+## 이 방법론 쓰는 법 (시작 · 재채택 · 업데이트)
 
 정본은 **GitHub 레포**([github.com/lhs6395-hslee/ai-methodology](https://github.com/lhs6395-hslee/ai-methodology))다. 쓰는 데엔 두 계층이 있고, "다운로드 없이 되냐"의 답이 계층마다 다르다:
 
@@ -56,7 +56,21 @@
 소유 코드 변경엔 같은 changeset에 spec 동반(순수 hotfix만 커밋 트레일러 Spec-Impact: none <사유>). 스펙 대량 생성은 내 승인 후.
 ```
 
-### 업데이트 (내가 GitHub에 방법론을 고도화한 뒤) — 이 프롬프트 한 줄
+### 재채택 (이미 sdd/가 있는 프로젝트를 처음부터 다시) — PM/FinOps 등
+> 기존 SDD 산출물이 낡거나 어긋났을 때 코드는 남기고 `sdd/`만 새로. git 스냅샷으로 되돌릴 수 있게 한 뒤 진행.
+```
+이 프로젝트를 https://github.com/lhs6395-hslee/ai-methodology 방법론으로 처음부터 완전 재채택한다. 순서대로:
+1) 안전망: git add -A && git commit 후  git tag sdd-pre-readopt-<오늘날짜>  로 현재 상태 스냅샷(진짜 손실 0).
+2) 방법론 읽기: ~/Documents/claude/sdd (없으면 clone 1회)의 REALITY_CHECK→STORAGE→APPLYING 정독.
+3) 강제 배선: 프로젝트 루트에서  sh ~/Documents/claude/sdd/tooling/sdd-init.sh --gate=node --force
+4) 구 산출물 정리: 기존 sdd/specs/* 를 걷어낸다(코드는 그대로. 스냅샷 태그에 남아 있음).
+5) 스펙 재도출: 현재 코드 실태를 읽어 EARS FR 스펙을 새로 도출해라(reverse-engineer). spec은 sdd/specs/ 에만,
+   PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate, 작성=너/승인=나. 초안을 만들되 대량 생성·확정은 내 승인 후.
+6) 결선: @covers 태깅 → 게이트 green → 커밋(자기 훅 통과).
+고정 규칙은 시작(위)과 동일. 승인 없이 스펙을 확정하거나 코드를 방법론에 맞춘다며 덮어쓰지 마.
+```
+
+### 업데이트 (내가 GitHub에 방법론을 고도화한 뒤)
 ```
 https://github.com/lhs6395-hslee/ai-methodology 방법론을 최신으로 업데이트해줘.
 1) 로컬 키트 ~/Documents/claude/sdd 를 git pull 로 origin/main 최신화.
