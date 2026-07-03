@@ -1,0 +1,246 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ownership 키 생성 — 스펙 문장에서 키가 어떻게 만들어지나</title>
+<style>
+  :root{
+    --ink:#1a1c23; --ink2:#3d4150; --ink3:#6b7080; --line:#e4e6ec;
+    --bg:#fbfbfd; --surface:#ffffff; --surface2:#f5f6fa;
+    --accent:#5b54d6; --accent-soft:#ecebfb; --accent-ink:#3f3aa8;
+    --good:#1f8a55; --good-soft:#e6f4ec; --warn:#b06a12; --warn-soft:#fbf0df;
+    --bad:#c0392b; --bad-soft:#fbe9e7;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;
+    -webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:880px;margin:0 auto;padding:56px 24px 96px}
+  header.top{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600}
+  h1{font-size:31px;line-height:1.25;margin:.4em 0 .2em;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--ink3);font-size:14px;margin:0}
+  h2{font-size:21px;margin:52px 0 4px;letter-spacing:-.01em;padding-top:18px;border-top:1px solid var(--line)}
+  h2 .n{font-family:var(--mono);color:var(--accent);font-size:14px;margin-right:10px}
+  h3{font-size:15.5px;margin:26px 0 6px;color:var(--ink)}
+  h4{margin:6px 0 4px;font-size:15px}
+  p{margin:10px 0;color:var(--ink2)}
+  ul{margin:10px 0;padding-left:20px;color:var(--ink2)}
+  li{margin:5px 0}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface2);padding:1.5px 6px;border-radius:5px;
+    color:var(--accent-ink);border:1px solid var(--line)}
+  strong{color:var(--ink);font-weight:650}
+  .lead{font-size:16.5px;color:var(--ink2)}
+  .box{border-radius:12px;padding:16px 20px;margin:18px 0;border:1px solid var(--line);background:var(--surface)}
+  .box.honest{background:var(--warn-soft);border-color:#eed6ad}
+  .box.honest .tag{color:var(--warn)}
+  .box.key{background:var(--accent-soft);border-color:#d9d6f6}
+  .box.key .tag{color:var(--accent-ink)}
+  .box.good{background:var(--good-soft);border-color:#bfe3cd}
+  .box.good .tag{color:var(--good)}
+  .box.bad{background:var(--bad-soft);border-color:#f3c9c2}
+  .box.bad .tag{color:var(--bad)}
+  .box .tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    font-weight:700;display:block;margin-bottom:6px}
+  .box p:first-of-type{margin-top:0}.box p:last-child{margin-bottom:0}
+  .concept{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .concept .k{font-family:var(--mono);font-size:11px;color:var(--accent-ink);font-weight:700;
+    text-transform:uppercase;letter-spacing:.08em}
+  .concept h4{margin:5px 0 6px;font-size:15.5px}
+  .concept p{margin:0 0 8px;font-size:13.5px}
+  .concept .eg{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink3);
+    background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-top:auto}
+  .scroll{overflow-x:auto;margin:18px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600;
+    background:var(--surface2)}
+  td:first-child{font-weight:600;color:var(--ink);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .pill.s{background:var(--accent-soft);color:var(--accent-ink)}
+  .pill.m{background:var(--warn-soft);color:var(--warn)}
+  .pill.g{background:var(--good-soft);color:var(--good)}
+  pre{background:#1c1e2a;color:#e6e7ee;border-radius:11px;padding:18px 20px;overflow-x:auto;font-family:var(--mono);
+    font-size:12.5px;line-height:1.65;margin:16px 0}
+  pre .c{color:#8b90a8}
+  pre .r{color:#ff9b8a}
+  pre .g{color:#86e0a8}
+  pre .b{color:#8fb8ff}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+  ol.steps li{position:relative;padding:4px 0 16px 42px;margin:0}
+  ol.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:2px;width:27px;height:27px;
+    background:var(--accent);color:#fff;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);
+    font-size:13px;font-weight:700}
+  ol.steps li::after{content:"";position:absolute;left:13px;top:30px;bottom:0;width:1.5px;background:var(--line)}
+  ol.steps li:last-child::after{display:none}
+  ol.steps li strong{display:block;margin-bottom:2px}
+  .foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink3)}
+  .foot a{color:var(--accent-ink)}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+  .threecol{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0;align-items:stretch}
+  .threecol .concept{display:flex;flex-direction:column}
+  @media(max-width:640px){.twocol,.threecol{grid-template-columns:1fr}}
+  .mini{font-size:13px;color:var(--ink3);margin-top:4px}
+  .tldr{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;margin:14px 0;font-size:14px}
+  .tldr dt{font-weight:650;color:var(--ink)}
+  .tldr dd{margin:0;color:var(--ink2)}
+  /* 스펙 문장 추출 하이라이트 */
+  .sentence{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:10px;padding:16px 18px;margin:16px 0;font-size:15.5px;line-height:1.9}
+  .hl{border-radius:4px;padding:0 4px;font-weight:600}
+  .hl.e{background:var(--good-soft);color:var(--good)}
+  .hl.v{background:var(--warn-soft);color:var(--warn)}
+  .hl.d{background:var(--surface2);color:var(--ink3);border:1px dashed var(--line)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink3);margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">SDD 포터블 키트 · 팀 가이드</span>
+  <h1>Ownership 키 생성<br>— 스펙 문장 하나에서 키가 어떻게 만들어지나</h1>
+  <p class="sub">사람이 뽑든 LLM이 뽑든 <b>같은 문자열</b> — 추출·정규화·검증의 결정 절차 · 2026-07-03</p>
+</header>
+
+<div class="box key">
+  <span class="tag">30초 요약</span>
+  <dl class="tldr">
+    <dt>문제</dt><dd>dedup 게이트는 “한 키 = 한 스펙”을 <strong>비교</strong>하지만, 그 키를 <strong>스펙 문장에서 어떻게 뽑아 만드는지</strong>는 사람·LLM 판단에 맡겨져 있었다 — 결정성이 반쪽.</dd>
+    <dt>해법</dt><dd>스펙 문장 → <strong>①추출</strong>(어느 단어가 키가 되나) → <strong>②정규화</strong>(고정 규칙) → 같은 문자열. 규칙이 게이트 코드에 박혀 있어 <strong>사람 = LLM 동일 결과</strong>.</dd>
+    <dt>당신이 할 일</dt><dd>FR 문장에서 <strong>소유하는 명사</strong>=Entity · <strong>동사</strong>=Capability verb · <strong>route</strong>=Surface를 이 절차대로 뽑아 <code>## Ownership</code>에 적는다.</dd>
+  </dl>
+</div>
+
+<h2><span class="n">01</span>왜 필요한가 — 키의 결정성이 반쪽이었다</h2>
+<p class="lead">키의 생애는 세 관문을 지난다. 마지막 <strong>비교</strong>는 이미 결정적인데, 앞의 <strong>추출·정규화</strong>가 판단에 맡겨져 있으면 같은 개념이 서로 다른 키로 새어 든다.</p>
+<pre><span class="c">스펙 문장 / 코드  ──①추출──▶  키 후보  ──②정규화──▶  표준 키  ──③비교──▶  충돌?</span>
+                 <span class="r">(규칙 없음)</span>           <span class="r">(공백·소문자만)</span>       <span class="g">(결정적 ✅ 기존 게이트)</span>
+                    <span class="r">↑ 여기가 비어 있었다</span>      <span class="r">↑ 여기를 규칙으로 강화</span></pre>
+<div class="box bad">
+  <span class="tag">막지 않으면 생기는 일</span>
+  <p>같은 “추천” 개념을 사람 A는 <code>Recommendation</code>, 사람 B는 <code>recommendation</code>, LLM은 <code>post /api/Recommend/</code>로 적는다. dedup은 <strong>같은 것을 다른 키로 봐서 중복을 놓친다</strong>(거짓음성). 반대로 참조일 뿐인 걸 소유로 적으면 거짓충돌(거짓양성). → 그래서 추출·정규화를 <strong>절대 규칙</strong>으로 박는다.</p>
+</div>
+
+<h2><span class="n">02</span>키 3종 — 무엇을 스펙이 “소유”하나</h2>
+<p>게이트가 다루는 소유 키는 세 종류다. 각각 스펙 문장의 <strong>어느 자리</strong>에서 나오는지가 정해져 있다.</p>
+<div class="threecol">
+  <div class="concept">
+    <span class="k">Entity</span>
+    <h4>도메인 객체 · 테이블</h4>
+    <p>시스템이 <strong>생성·소유</strong>하는 데이터. 스키마 테이블/타입명이 진실(SSOT).</p>
+    <span class="eg">recommendation<br>pjt_projects</span>
+  </div>
+  <div class="concept">
+    <span class="k">Surface</span>
+    <h4>route · 화면 · job</h4>
+    <p>외부에 노출되는 표면. API 엔드포인트·화면 경로·이벤트/배치.</p>
+    <span class="eg">POST /api/recommend<br>event:project.created</span>
+  </div>
+  <div class="concept">
+    <span class="k">Capability</span>
+    <h4>entity . verb</h4>
+    <p>“무엇을 할 수 있나”. 대상 Entity와 동작의 조합.</p>
+    <span class="eg">recommendation.create<br>staff.assign</span>
+  </div>
+</div>
+
+<h2><span class="n">03</span>스펙 문장 하나 → 키 (전 과정)</h2>
+<p>모르는 사람이 봐도 따라오도록, <strong>실제 FR 문장 하나</strong>에서 키를 뽑아 만드는 전 과정을 보인다.</p>
+
+<h3>출발점 — 스펙 문장 (FR · EARS · 정본 영어)</h3>
+<div class="sentence">
+  <b>FR-002</b> (event): WHEN a manager requests <span class="hl d">staff</span> recommendations for a <span class="hl d">project</span>, THE&nbsp;SYSTEM&nbsp;SHALL <span class="hl v">create</span> a <span class="hl e">recommendation</span>.
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--good-soft);border:1px solid #bfe3cd"></span> 소유 명사 → Entity</span>
+    <span><span class="swatch" style="background:var(--warn-soft);border:1px solid #eed6ad"></span> 동사 → verb</span>
+    <span><span class="swatch" style="background:var(--surface2);border:1px dashed var(--line)"></span> 읽기만 → Dependency</span>
+  </div>
+</div>
+
+<h3>①추출 — 문장의 어느 자리를 키로 가져오나</h3>
+<div class="scroll"><table>
+  <tr><th>키 종류</th><th>문장에서 뽑는 자리 (규칙)</th><th>이 문장에서</th></tr>
+  <tr><td>Entity</td><td><code>SHALL</code>이 <strong>생성·소유</strong>하는 명사 = aggregate root. 스키마 테이블/타입명이 SSOT</td><td><code>recommendation</code></td></tr>
+  <tr><td>Capability</td><td>그 Entity + <strong>핵심 동사 1개</strong> → <code>entity.verb</code> (동사를 허용 verb 집합에 매핑)</td><td><code>recommendation</code> + <code>create</code></td></tr>
+  <tr><td>Surface</td><td>그 FR을 노출하는 <strong>route 정의</strong>(코드가 SSOT — 문장이 아니라 엔드포인트에서)</td><td><code>POST /api/recommend</code></td></tr>
+  <tr><td>Dependency<br><span class="mini">(참조)</span></td><td><code>SHALL</code>이 <strong>읽기만</strong> 하는 명사(소유 아님) → dedup 제외</td><td><code>staff</code>, <code>project</code></td></tr>
+</table></div>
+<p class="mini">핵심 구분: 시스템이 <strong>만들어내는</strong> 명사만 소유(Entity), <strong>읽어 쓰는</strong> 명사는 참조(Dependency). 이 한 줄이 dedup 거짓양성을 없앤다.</p>
+
+<h3>②정규화 — 뽑은 후보가 최종 문자열이 되는 과정 (저자가 달라도 동일)</h3>
+<p>저자 A와 저자 B(또는 LLM)가 같은 문장에서 조금씩 다르게 뽑아도, 게이트 <code>normalizeKey</code>를 통과하면 <strong>같은 문자열</strong>로 수렴한다. 아래는 실제 함수를 돌린 출력이다.</p>
+<pre><span class="c">저자 A                        저자 B                        → 게이트 normalizeKey 출력      [검증]</span>
+[Entities]     <span class="b">"recommendation"</span>       <span class="b">"Recommendation"</span>       → <span class="g">"recommendation"</span>          ✓ 동일
+[Capabilities] <span class="b">"recommendation.create"</span> <span class="b">"Recommendation.Create"</span> → <span class="g">"recommendation.create"</span>   ✓ 동일
+[Surfaces]     <span class="b">"POST /api/recommend"</span>   <span class="b">"post /api/Recommend/"</span>  → <span class="g">"POST /api/recommend"</span>     ✓ 동일
+<span class="c">──────────────────────────────────────────────────────────────────────────</span>
+<span class="g">✅ 서로 다른 입력 → 고유 출력 1개. 사람 = LLM 최종 키 문자열이 완전히 같다.</span></pre>
+
+<h3>결과 — 이 문장 하나가 만들어내는 블록</h3>
+<pre><span class="c">## Ownership</span>
+- **Entities**: recommendation
+- **Surfaces**: POST /api/recommend
+- **Capabilities**: recommendation.create
+
+<span class="c">## Dependencies          # SHALL이 읽기만 하는 명사 → dedup 제외</span>
+- **Entities**: staff, project</pre>
+<p class="mini">이제 <code>check-ownership</code> 게이트가 이 키들을 전 스펙과 대조해 “한 키 = 한 스펙”을 CI에서 강제한다.</p>
+
+<h2><span class="n">04</span>정규화 절대 규칙 (결정성의 심장)</h2>
+<p>일반 규칙은 <strong>게이트 코드에 고정</strong>(모든 프로젝트 동일), 도메인 가변부(verb 집합·path param 표기)만 <code>sdd.config.json</code>.</p>
+<div class="scroll"><table>
+  <tr><th>카테고리</th><th>출처 (SSOT)</th><th>정규화 규칙 (결정적)</th><th>예</th></tr>
+  <tr><td>Entity</td><td>스키마·모델·마이그레이션의 테이블/타입명</td><td>식별자 <strong>그대로</strong> + <code>trim().toLowerCase()</code>. 단복수 임의변환 ✗(스키마가 진실)</td><td><code>recommendation</code></td></tr>
+  <tr><td>Surface</td><td>route·이벤트·job 정의</td><td><code>&lt;METHOD&gt; &lt;path&gt;</code> — METHOD 대문자, path 소문자, param <code>{name}</code> 표준형(<code>:id</code>·<code>&lt;id&gt;</code>→<code>{id}</code>), trailing slash 제거. 이벤트=<code>event:&lt;name&gt;</code>, job=<code>job:&lt;name&gt;</code></td><td><code>POST /api/recommend/{id}</code></td></tr>
+  <tr><td>Capability</td><td>공개 함수·핸들러 + Entity</td><td><code>&lt;entity&gt;.&lt;verb&gt;</code> — 점 정확히 1개, 소문자, <strong>verb ∈ 허용집합</strong></td><td><code>recommendation.create</code></td></tr>
+</table></div>
+<p>Surface 규칙은 특히 강력하다 — 대소문자·파라미터 문법(<code>:id</code>/<code>&lt;id&gt;</code>/<code>{id}</code>)·trailing slash가 제각각이어도 하나로 수렴한다(실측):</p>
+<pre>[Surfaces] <span class="b">"get /api/Staff/:id"</span>    → <span class="g">"GET /api/staff/{id}"</span>
+[Surfaces] <span class="b">"GET /api/staff/{id}/"</span>  → <span class="g">"GET /api/staff/{id}"</span>
+[Surfaces] <span class="b">"Get /API/staff/&lt;id&gt;"</span>   → <span class="g">"GET /api/staff/{id}"</span></pre>
+
+<h2><span class="n">05</span>멈춤(STOP) 가드 — 수렴 못 할 애매함은 통과 못 한다</h2>
+<p>수렴시킬 수 있는 것(대소문자·표기)은 자동으로 수렴시키고, <strong>수렴 못 할 애매함</strong>(유사어·형식 위반)은 <code>validateKey</code>가 통과 자체를 막는다. 그래서 사람·LLM이 임의로 갈라진 키를 만들 길이 없다(실측).</p>
+<pre>[Capabilities] <span class="b">"staff.suggest"</span>   → <span class="r">✗ STOP</span>  미등록 verb "suggest" (recommend의 유사어)
+[Capabilities] <span class="b">"staff.recommend"</span> → <span class="r">✗ STOP</span>  미등록 verb "recommend" — capabilityVerbs 등록[리뷰] 후 진행
+[Surfaces]     <span class="b">"recommend/{id}"</span>  → <span class="r">✗ STOP</span>  메서드 없음 — "&lt;METHOD&gt; &lt;path&gt;" 형식 위반</pre>
+<div class="box honest">
+  <span class="tag">임의 동의어 우회 금지</span>
+  <p><code>recommend</code>·<code>suggest</code> 같은 변종이 키를 분산시키지 않도록, 도메인 verb는 <code>capabilityVerbs</code>에 <strong>등록해야만</strong> 통과한다(CRUD 기본 <code>create/read/update/delete/list</code>은 항상 허용). 등록은 <code>specIdPrefixes</code>와 같은 <strong>config 리뷰 관문</strong> — 새 verb를 몰래 늘리는 대신 리뷰에 노출한다.</p>
+</div>
+
+<h2><span class="n">06</span>왜 “사람 = LLM 동일”이 보장되나</h2>
+<div class="box good">
+  <span class="tag">결정성의 근거</span>
+  <p><strong>추출</strong>이라는 창의적 행위는 사람·LLM이 하지만, <strong>규칙과 검증은 게이트 코드에 고정</strong>돼 있고 언어중립이다. 그래서 누가·언제·어떤 도구로 뽑든 정규화를 통과한 최종 문자열은 동일하다. 이건 확률적 모델의 “아마 같음”이 아니라 <strong>함수의 결정성</strong> — 그래서 CI에서 <code>exit 1</code>로 강제할 수 있다.</p>
+</div>
+
+<h2><span class="n">07</span>검증 (실제 실행 — 2026-07-03)</h2>
+<p>게이트 라이브러리 <code>tooling/ownership-keys.mjs</code>를 직접 import해 돌린 결과다(손계산 아님).</p>
+<div class="scroll"><table>
+  <tr><th>케이스</th><th>기대</th><th>결과</th></tr>
+  <tr><td>저자 A/B 다른 표기 3쌍</td><td>최종 키 동일</td><td><span class="pill g">통과</span> 3/3 수렴</td></tr>
+  <tr><td>Surface param <code>:id</code>/<code>{id}</code>/<code>&lt;id&gt;</code></td><td>모두 <code>{id}</code></td><td><span class="pill g">통과</span></td></tr>
+  <tr><td>미등록 verb <code>suggest</code></td><td>STOP</td><td><span class="pill g">통과</span> 형식 위반 표시</td></tr>
+  <tr><td>메서드 없는 Surface</td><td>STOP</td><td><span class="pill g">통과</span></td></tr>
+</table></div>
+
+<h2><span class="n">08</span>키트 어디에 있나</h2>
+<div class="scroll"><table>
+  <tr><th>파일</th><th>역할</th></tr>
+  <tr><td>docs/…/2026-06-30-ownership-key-derivation-design.md §4.2</td><td><strong>정식 결정기록</strong> — 키 생성 결정 절차(이 HTML의 텍스트 정본)</td></tr>
+  <tr><td>tooling/ownership-keys.mjs</td><td><code>normalizeKey</code>·<code>validateKey</code> — 절차의 “정답 코드”</td></tr>
+  <tr><td>templates/module-spec.md</td><td><code>## Ownership</code>·<code>## Dependencies</code> 블록 + 절차 주석</td></tr>
+  <tr><td>DEDUP.md</td><td>소유/참조 분리 · 정규화 절대규칙 · 거짓양성 해소</td></tr>
+  <tr><td>sdd.config.json</td><td><code>capabilityVerbs</code>·<code>surfacePathParam</code>·<code>ownershipCategories</code>(도메인 가변부)</td></tr>
+</table></div>
+
+<div class="box key">
+  <span class="tag">한 줄 요약</span>
+  <p>스펙 문장에서 <strong>소유 명사·동사·route</strong>를 정해진 자리에서 뽑아(①추출) 고정 규칙으로 다듬으면(②정규화), 누가 뽑든 <strong>같은 키 문자열</strong>이 나온다. 그래서 dedup의 “한 키 = 한 스펙”이 사람의 표기 습관이 아니라 <strong>기계적 사실</strong> 위에 선다.</p>
+</div>
+
+<p class="foot">텍스트 정본: <code>docs/superpowers/specs/2026-06-30-ownership-key-derivation-design.md</code> §4.2 · 구현: <code>tooling/ownership-keys.mjs</code> · 관련 시각 문서: <code>dedup-gate-design.html</code>(소유권 유일성 게이트) · <code>방법론.html</code>.</p>
+</div>
