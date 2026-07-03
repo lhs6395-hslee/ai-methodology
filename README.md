@@ -34,9 +34,37 @@
 | `templates/` | `module-spec.md`(EARS 범용), `MODULE_MAP.md`(단일 모듈 매니페스트), `constitution.md` | 템플릿 |
 | `tooling/` | **`sdd-init.sh`**(정식 레이아웃 결정적 스캐폴더 — 모든 프로젝트 동일 보장)·**`sdd.config.json`**(언어 어댑터)·**`sdd.config.presets.md`**(Python/Go/Rust/Java/… 프리셋). 게이트 **4판 동봉**(동작 동일·전부 검증): **`go-gate/`(Go→단일 정적 바이너리, 인터프리터 0 — 사실상 모든 언어 커버, 권장)** + `sdd-gate-release.yml`(전 플랫폼 빌드), `sdd_gates.sh`(POSIX 셸, 빌드 불필요), `sdd_gates.py`(Python), Node판 `*.mjs`. 모두 같은 config 구동. `vitest.config.ts`(JS만), **`ci-examples.md`**(게이트를 로컬·git훅·어떤 CI/CD 도구에서든 거는 예시 — 도구 무관), `sdd-gates.yml`(CI/CD 워크플로우 샘플 하나), `ears-preset/` | 이식 도구 |
 
-## 쓰는 법 (요약)
-0. 키트가 로컬에 없으면(다른 머신/새 환경): `git clone https://github.com/lhs6395-hslee/ai-methodology` 를 **프로젝트 밖에** 두고 참조만(복사/fork 금지). AI 에이전트에게 URL만 주고 시작하는 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md) **A0**.
-1. `REALITY_CHECK.md`로 "되는 것/배선할 것"을 먼저 파악.
-2. **`sh tooling/sdd-init.sh --gate=sh`** 를 대상 프로젝트 루트에서 실행 → **공통 큰 틀**(`sdd/` 폴더 구조·스펙 위치)이 어느 프로젝트나 같게 생성된다(`STORAGE.md` §5). 그 안의 스펙·모듈·`sdd.config.json` 값은 프로젝트가 채운다. (수동 절차·세부는 `APPLYING.md`.)
-3. `STRUCTURE.md`대로 module>spec 구성, `templates/`로 spec 작성.
-4. `SPEC_REVIEW.md`·`SSOT.md`·`DEDUP.md`의 게이트(`/analyze`, FR↔test, **스펙 간 중복(소유권)**, CI)로 SSOT를 "주장"이 아니라 "실재"로 유지.
+## 이 방법론 쓰는 법 (시작 & 업데이트)
+
+정본은 **GitHub 레포**([github.com/lhs6395-hslee/ai-methodology](https://github.com/lhs6395-hslee/ai-methodology))다. 쓰는 데엔 두 계층이 있고, "다운로드 없이 되냐"의 답이 계층마다 다르다:
+
+- **① 작성·검토 계층 — 다운로드 불필요.** 에이전트에게 "이 방법론(위 URL)을 따라"라고 하면, 에이전트가 GitHub에서 `METHODOLOGY`·`STRUCTURE`·`STORAGE`·`APPLYING`·템플릿을 **직접 읽어** 그 규율대로 스펙을 작성/검토한다. 문서만으로 시작 가능(레포 public, raw 읽기 됨).
+- **② 강제 계층 — 파일 배선 필요(`sdd-init` 1회).** "스펙 없는 커밋 차단" 같은 *기계적 강제*는 git 훅·게이트가 **로컬에 실제 파일로** 있어야 돈다(git은 원격 파일을 훅으로 실행 못 함). 이때 필요한 건 레포 전체(526KB)가 아니라 런타임 폐포 **약 25파일**뿐 — `sdd-init`가 프로젝트의 `scripts/`·`sdd/`·`.claude/`·`.git/hooks/`에 심는다.
+
+> 키트는 이 머신에 `~/Documents/claude/sdd`로 이미 있고 그 자체가 이 레포의 로컬 클론이다. 새 머신이면 **1회만** `git clone`(526KB)하면 되고, **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~25파일뿐.
+
+### 시작 (최초 채택) — 이 프롬프트를 붙여넣는다
+```
+이 프로젝트는 https://github.com/lhs6395-hslee/ai-methodology 의 SDD 방법론을 따른다. 추측 없이 순서대로 실행해:
+1) 방법론 읽기(다운로드 불필요): 키트의 REALITY_CHECK.md → STORAGE.md → APPLYING.md 를 정독.
+   (이 머신엔 ~/Documents/claude/sdd 로 이미 있음. 없으면 git clone https://github.com/lhs6395-hslee/ai-methodology ~/Documents/claude/sdd 1회.)
+   "된다"는 실제 실행 증거로만 — [검증]/[추론]/[미확인] 구분.
+2) 강제 배선(1회): 이 프로젝트 루트에서  sh ~/Documents/claude/sdd/tooling/sdd-init.sh --gate=node
+   → sdd/ 레이아웃·게이트(~25파일)·git 훅(pre-commit·commit-msg)·SessionStart/PreToolUse·스킬 설치. (언어 무관 — 게이트는 node 런타임만 쓰고 언어차는 sdd.config.json으로 흡수.)
+3) 세션 재시작(SessionStart가 방법론 주입) 후 게이트 green 확인.
+고정 규칙(발명 금지): spec은 sdd/specs/ 에만 · PREFIX는 SPEC/INFRA/TEST(새 건 사유+내 승인) · 1 spec=1 aggregate ·
+소유 코드 변경엔 같은 changeset에 spec 동반(순수 hotfix만 커밋 트레일러 Spec-Impact: none <사유>). 스펙 대량 생성은 내 승인 후.
+```
+
+### 업데이트 (내가 GitHub에 방법론을 고도화한 뒤) — 이 프롬프트 한 줄
+```
+https://github.com/lhs6395-hslee/ai-methodology 방법론을 최신으로 업데이트해줘.
+1) 로컬 키트 ~/Documents/claude/sdd 를 git pull 로 origin/main 최신화.
+2) 이 프로젝트에 설치된 것(scripts/의 *.mjs 게이트 · .git/hooks · .claude/skills · sdd/templates)을 키트와 diff.
+3) 바뀐 파일만 보여주고 내 승인을 받은 뒤 반영 — 자동 덮어쓰기 금지.
+   (sdd-init 를 --force 없이 재실행하면 신규만 추가되고 기존은 보존. 게이트 코드 갱신은 diff 확인 후 명시적으로.)
+4) 반영 후 게이트 green 확인.
+내 스펙·FR·작업물(sdd/specs/*)은 건드리지 마 — 방법론 도구(게이트·훅·템플릿)만 최신화 대상이다.
+```
+
+설치·배선·채택 후 궤도 운영 상세는 [`APPLYING.md`](APPLYING.md), 다른 상황(진행 중 이어가기·hotfix converge)의 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md).
