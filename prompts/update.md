@@ -2,9 +2,9 @@
 
 > **한 줄 사용법 (clean machine · clone 불필요):** 대화창에 아래 한 줄(또는 그냥 "이 방법론 업데이트해줘").
 > ```
-> https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/update.md 읽고 그대로 수행해줘
+> https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘
 > ```
-> `feat/lifecycle-commands`는 현재 검증 브랜치 — **main 머지 후 `main`으로 승격**. 키트가 로컬에 있으면 `<KIT>/prompts/update.md 를 수행해줘`도 동일.
+> 위 URL의 정본 ref는 `main`(자기참조 — 특정 브랜치에서 받으면 그 ref를 이어 쓴다). 키트가 로컬에 있으면 `<KIT>/prompts/update.md 를 수행해줘`도 동일.
 > **대상:** 이미 채택된 프로젝트. **방법론 도구(게이트·훅·템플릿)만 최신으로. 스펙·작업물은 불변.**
 
 **정본:** https://github.com/lhs6395-hslee/ai-methodology
@@ -14,7 +14,7 @@
 1. **키트 최신화(전체 clone 없이).** 로컬 키트가 있으면 `git -C "$KIT" pull` 로 최신화하고, 없으면 partial+sparse로 확보한다(뒤처졌으면 알린다):
    ```sh
    KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"           # 로컬 키트 캐시 위치(관례)
-   REF="feat/lifecycle-commands"                          # update.md를 받은 ref (main 머지 후 main)
+   REF="main"                          # update.md를 받은 ref (정본 main; 자기참조 — 브랜치에서 받으면 그 ref)
    if [ -d "$KIT/.git" ]; then
      git -C "$KIT" fetch origin "$REF" && git -C "$KIT" pull --ff-only origin "$REF"
    else                                                    # partial+sparse — 전체 clone 아님

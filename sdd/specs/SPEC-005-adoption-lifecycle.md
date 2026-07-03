@@ -24,7 +24,7 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 
 ### Edge Cases
 - `/sdd-start`가 이미 `sdd/`가 있는 프로젝트에서 불리면 중단하고 `/sdd-readopt`로 안내한다(오채택 방지).
-- **clean machine(키트 로컬에 없음)**: `prompts/` 정본 절차 파일을 `<methodology-url>` **raw URL**로 직접 읽어 실행한다 — 전체 clone 불필요. 진입 raw URL은 `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/<ref>/prompts/<파일>` 형식이며(현재 `<ref>`=검증 브랜치, main 머지 후 `main`), 각 절차는 자신을 받은 `<ref>`를 이어 써서 브랜치/main 어느 raw든 동일 동작한다.
+- **clean machine(키트 로컬에 없음)**: `prompts/` 정본 절차 파일을 `<methodology-url>` **raw URL**로 직접 읽어 실행한다 — 전체 clone 불필요. 진입 raw URL은 `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/<ref>/prompts/<파일>` 형식이며(정본 `<ref>`=`main`), 각 절차는 자신을 받은 `<ref>`를 이어 써서 main/브랜치 어느 raw든 동일 동작한다(자기참조).
 - **강제 tooling 확보**: 게이트·훅용 tooling은 로컬 절대경로를 가정하지 않고 repo URL 기반 **partial + sparse checkout**(`--filter=blob:none --sparse`, `sparse-checkout set tooling templates prompts`)으로 확보한다 — 전체 526KB clone 아님. 로컬 키트가 있으면 그것을 재사용한다.
 - 세 스킬 모두 인자 없이 불리면 현재 디렉토리를 대상 루트로, 정본 저장소를 방법론 URL로 삼는다.
 
@@ -75,3 +75,4 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 |---|---|---|
 | 2026-07-03 | 초안 — 채택 수명주기 3 명령(start/readopt/update)을 별도 aggregate로 신설(SPEC-004 install 메커니즘과 분리; cohesion 캡 준수) | feat/lifecycle-commands |
 | 2026-07-04 | 진입점 교정 — 로컬 절대경로(`~/Documents/claude/sdd/prompts/*`) 하드코딩 제거, 정본 진입을 GitHub **raw URL**로; tooling 확보를 repo URL 기반 **partial+sparse**로 명시(전체 clone 불필요, clean-machine 진입 보장). Edge Cases·Assumptions 갱신 | feat/lifecycle-commands |
+| 2026-07-04 | main 머지 후 ref 승격 — 진입 raw URL·`REF` 기본값·문서 주석의 `<ref>`를 `feat/lifecycle-commands`→`main`으로 교체(정본 ref=main, 자기참조 유지). Change Log 근거 열은 이력이라 보존 | main |

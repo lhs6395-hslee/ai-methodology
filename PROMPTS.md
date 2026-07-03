@@ -5,18 +5,18 @@
 
 | 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
 |---|---|
-| **시작** (새/SDD 없던 프로젝트) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/adopt.md 읽고 그대로 수행해줘` → [adopt.md](prompts/adopt.md) |
-| **재채택** (이미 sdd/ 있음 — PM/FinOps) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/readopt.md 읽고 그대로 수행해줘` → [readopt.md](prompts/readopt.md) |
-| **업데이트** (방법론 고도화 후) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/update.md 읽고 그대로 수행해줘` → [update.md](prompts/update.md) |
+| **시작** (새/SDD 없던 프로젝트) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/adopt.md 읽고 그대로 수행해줘` → [adopt.md](prompts/adopt.md) |
+| **재채택** (이미 sdd/ 있음 — PM/FinOps) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` → [readopt.md](prompts/readopt.md) |
+| **업데이트** (방법론 고도화 후) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘` → [update.md](prompts/update.md) |
 
-> **ref:** `feat/lifecycle-commands`는 현재 검증 브랜치 — **main 머지 후 `main`으로 승격**(`.../ai-methodology/main/prompts/<파일>`). 각 파일은 자신을 받은 ref를 이어 써서 브랜치/main 어느 raw든 동일 동작. 두 계층: **작성·검토**는 GitHub 문서 직접 읽기로 다운로드 없이, **강제**(훅·게이트)만 partial+sparse로 tooling 확보 후 `sdd-init` 1회(~25파일, 전체 clone 아님). 키트가 로컬에 있으면 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
+> **ref:** 위 URL의 정본 ref는 `main`. 각 파일은 자신을 받은 ref를 이어 써서 main/브랜치 어느 raw든 동일 동작(자기참조). 두 계층: **작성·검토**는 GitHub 문서 직접 읽기로 다운로드 없이, **강제**(훅·게이트)만 partial+sparse로 tooling 확보 후 `sdd-init` 1회(~25파일, 전체 clone 아님). 키트가 로컬에 있으면 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
 
 > **설치형 슬래시 명령:** `sdd-init` 배선 후에는 같은 3종이 `/sdd-start`·`/sdd-readopt`·`/sdd-update`로 설치되어(`.claude/skills/`) 프로젝트 안에서 바로 부를 수 있다(인자 `[<project-path>] [<methodology-url>]`, 없으면 현재 디렉토리·정본). 절차 원본은 위 `prompts/`이고 스킬이 이를 실행한다 — 계약: `SPEC-005`.
 
 아래 A/B/C는 위 3종에 안 들어가는 **다른 시나리오**의 붙여넣기 프롬프트다.
 
 ## A. 이 키트로 새 프로젝트에 SDD 셋업
-> 보통은 위 표의 `prompts/adopt.md` raw URL 한 줄이면 된다. 아래는 방법론 문서를 스스로 훑게 하고 싶을 때의 확장 프롬프트다. 키트가 로컬에 없으면 raw base(`https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/`)에서 읽는다(clone 불필요).
+> 보통은 위 표의 `prompts/adopt.md` raw URL 한 줄이면 된다. 아래는 방법론 문서를 스스로 훑게 하고 싶을 때의 확장 프롬프트다. 키트가 로컬에 없으면 raw base(`https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/`)에서 읽는다(clone 불필요).
 ```
 방법론 https://github.com/lhs6395-hslee/ai-methodology 를 기준으로 이 프로젝트에 SDD를 셋업해줘.
 (키트가 로컬에 있으면 그걸, 없으면 위 레포의 raw로 읽어라 — 다운로드 불필요.)

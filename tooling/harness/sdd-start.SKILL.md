@@ -4,7 +4,7 @@ description: SDD 최초 채택 — 깨끗한 프로젝트에 sdd-init로 강제 
 ---
 # /sdd-start — SDD 최초 채택 (작성=LLM · 확정=사람)
 
-**정본 절차(SSOT):** `prompts/adopt.md` 를 **그대로 실행**한다 — 절차 원본은 그 파일 한 곳(중복 저장 안 함). **clean machine(clone 불필요)엔 `<methodology-url>` raw로 읽어 실행**: `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/<ref>/prompts/adopt.md`(현재 `<ref>`=`feat/lifecycle-commands`, main 머지 후 `main`). 로컬 키트가 있으면 `<KIT>/prompts/adopt.md`(캐시 위치 관례 `~/Documents/claude/sdd`)도 동일. 게이트·훅용 tooling은 그 절차가 partial+sparse로 확보한다(전체 clone 아님). 아래는 그 요약 + 고정 규칙(가드레일) — **원본과 충돌 시 원본 우선**.
+**정본 절차(SSOT):** `prompts/adopt.md` 를 **그대로 실행**한다 — 절차 원본은 그 파일 한 곳(중복 저장 안 함). **clean machine(clone 불필요)엔 `<methodology-url>` raw로 읽어 실행**: `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/<ref>/prompts/adopt.md`(정본 `<ref>`=`main`; 특정 브랜치 검증 시 그 브랜치 ref). 로컬 키트가 있으면 `<KIT>/prompts/adopt.md`(캐시 위치 관례 `~/Documents/claude/sdd`)도 동일. 게이트·훅용 tooling은 그 절차가 partial+sparse로 확보한다(전체 clone 아님). 아래는 그 요약 + 고정 규칙(가드레일) — **원본과 충돌 시 원본 우선**.
 
 ## 인자
 - `<project-path>` (선택): 대상 프로젝트 루트. 없으면 현재 디렉토리.

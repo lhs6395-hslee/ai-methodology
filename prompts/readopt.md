@@ -2,9 +2,9 @@
 
 > **한 줄 사용법 (clean machine · clone 불필요):** 대화창에 아래 한 줄. 에이전트는 이 파일을 raw로 읽고 순서대로, 추측 없이 실행한다.
 > ```
-> https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/readopt.md 읽고 그대로 수행해줘
+> https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘
 > ```
-> `feat/lifecycle-commands`는 현재 검증 브랜치 — **main 머지 후 `main`으로 승격**. 키트가 로컬에 있으면 `<KIT>/prompts/readopt.md 를 그대로 수행해줘`도 동일.
+> 위 URL의 정본 ref는 `main`(자기참조 — 특정 브랜치에서 받으면 그 ref를 이어 쓴다). 키트가 로컬에 있으면 `<KIT>/prompts/readopt.md 를 그대로 수행해줘`도 동일.
 > **대상:** 이미 `sdd/` 산출물이 있는데(스펙·게이트가 낡거나 어긋남) 현 방법론으로 **처음부터 다시** 세울 때. **코드는 남기고 `sdd/` 산출물만 새로.** (PM/FinOps 등.)
 
 **정본 방법론:** https://github.com/lhs6395-hslee/ai-methodology
@@ -16,7 +16,7 @@
 3. **강제 재배선 — tooling 확보 후 `sdd-init --force`.** 전체 clone 없이 tooling만 확보(partial + sparse) 후 최신 도구로 덮어쓴다:
    ```sh
    KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"           # 로컬 키트 캐시 위치(관례)
-   REF="feat/lifecycle-commands"                          # readopt.md를 받은 ref (main 머지 후 main)
+   REF="main"                          # readopt.md를 받은 ref (정본 main; 자기참조 — 브랜치에서 받으면 그 ref)
    if [ ! -f "$KIT/tooling/sdd-init.sh" ]; then           # 없을 때만: partial+sparse — 전체 clone 아님 (sh로 실행하므로 -f 검사)
      git clone --filter=blob:none --sparse --branch "$REF" \
        https://github.com/lhs6395-hslee/ai-methodology "$KIT"

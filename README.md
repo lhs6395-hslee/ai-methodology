@@ -48,11 +48,11 @@
 
 | 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
 |---|---|
-| **시작** — SDD 처음인 새 프로젝트 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/adopt.md 읽고 그대로 수행해줘` |
-| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/readopt.md 읽고 그대로 수행해줘` |
-| **업데이트** — 내가 방법론을 고도화한 뒤 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/update.md 읽고 그대로 수행해줘` |
+| **시작** — SDD 처음인 새 프로젝트 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/adopt.md 읽고 그대로 수행해줘` |
+| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` |
+| **업데이트** — 내가 방법론을 고도화한 뒤 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘` |
 
-> **ref 주의:** 위 `feat/lifecycle-commands`는 현재 검증 브랜치다 — **main 머지 후 `main`으로 승격**한다(`.../ai-methodology/main/prompts/...`). 각 파일은 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함하며, 자신을 받은 ref를 이어 사용하므로 브랜치/main 어느 쪽 raw로 fetch해도 동일하게 동작한다.
+> **ref:** 위 URL의 정본 ref는 `main`이다. 각 파일은 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함하며, 자신을 받은 ref를 이어 사용하므로 특정 브랜치의 raw로 fetch하면 그 브랜치 기준으로 동일하게 동작한다(자기참조).
 >
 > 키트가 이미 로컬에 있으면 raw URL 대신 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
 
@@ -70,7 +70,7 @@
 ### 경량 부트스트랩 (전체 clone 없이 URL로 시작)
 위 raw URL 한 줄이면 에이전트가 이 부트스트랩을 알아서 수행한다. 수동으로 실행 폐포만 받으려면(526KB 전체 clone 불필요) partial + sparse clone 1회:
 ```sh
-KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"; REF="feat/lifecycle-commands"   # 검증 브랜치; main 머지 후 main
+KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"; REF="main"   # 정본 ref (자기참조: 브랜치에서 받으면 그 ref)
 git clone --filter=blob:none --sparse --branch "$REF" https://github.com/lhs6395-hslee/ai-methodology "$KIT"
 git -C "$KIT" sparse-checkout set tooling templates prompts
 ```
