@@ -16,7 +16,7 @@
    ```sh
    KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"           # 로컬 키트 캐시 위치(관례) — 없으면 아래로 생성
    REF="feat/lifecycle-commands"                          # adopt.md를 받은 ref (main 머지 후 main)
-   if [ ! -x "$KIT/tooling/sdd-init.sh" ]; then           # 없을 때만: partial+sparse — 전체 clone(526KB) 아님
+   if [ ! -f "$KIT/tooling/sdd-init.sh" ]; then           # 없을 때만: partial+sparse — 전체 clone(526KB) 아님 (sh로 실행하므로 -f 검사)
      git clone --filter=blob:none --sparse --branch "$REF" \
        https://github.com/lhs6395-hslee/ai-methodology "$KIT"
      git -C "$KIT" sparse-checkout set tooling templates prompts
