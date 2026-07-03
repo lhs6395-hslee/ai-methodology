@@ -31,7 +31,7 @@
 
 - **FR-001** (ubiquitous): THE SYSTEM SHALL run, via `sdd-sync.mjs`, the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean, exiting non-zero under `--strict` only when a rule is flagged.
 - **FR-002** (event): WHEN `sdd-init.sh --gate=node` runs in a target project, THE SYSTEM SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically.
-- **FR-003** (event): WHEN `sdd-init.sh` wires session hooks, THE SYSTEM SHALL merge SessionStart and PreToolUse entries into `.claude/settings.json` and install the `sdd-session-context.sh` and `sdd-edit-check.sh` scripts plus the `/sdd-sync` and `/speckit.fix` skills.
+- **FR-003** (event): WHEN `sdd-init.sh` wires session hooks, THE SYSTEM SHALL merge SessionStart and PreToolUse entries into `.claude/settings.json` and install the `sdd-session-context.sh` and `sdd-edit-check.sh` scripts plus the `/sdd-sync`, `/speckit.fix`, `/sdd-start`, `/sdd-readopt`, and `/sdd-update` skills into `.claude/skills/`.
 - **FR-004** (unwanted): IF `.claude/settings.json` already exists and `jq` is unavailable, THEN THE SYSTEM SHALL preserve the existing file and skip hook merging rather than clobber it; WHERE `jq` is available, THE SYSTEM SHALL strip prior SDD entries before re-adding them so re-runs are idempotent.
 - **FR-005** (event): WHEN the `pre-commit` hook runs and the staged set touches a spec or code path, THE SYSTEM SHALL execute `check-fr-coverage` and `check-ownership` and block the commit on their failure.
 - **FR-006** (state): WHILE the `pre-push` hook runs, THE SYSTEM SHALL report drift advisorily and pass the push unless `SDD_SYNC_BLOCK=1` is set.
@@ -74,3 +74,4 @@
 | 2026-07-02 | FR-002 정직 정정 — pre-push 자동배선 아님; commit-msg 자동배선 명시; sdd-pre-push.sh 스캐폴딩+안내 정확히 기술 | HONESTY 위반(자기 정렬 발견) |
 | 2026-07-02 | `self-hooks-install.sh`(키트 자기 훅 배선 — tooling 직접 호출) Files 편입 | plan ④ T3: 키트 자신을 자기 궤도에 |
 | 2026-07-02 | sdd-run.mjs(CI 스테이지 러너) + FR-008 편입 — Symbols 7개(maxKeysPerCategoryPerSpec 7로 상향, sdd.config.json) | 하네스+설치기 aggregate는 6+1 엔트리포인트가 한 응집 묶음; SPEC-002의 5→6 선례와 동일 논리 |
+| 2026-07-03 | FR-003 확장 — sdd-init가 수명주기 스킬(`/sdd-start`·`/sdd-readopt`·`/sdd-update`)도 `.claude/skills/`에 설치. 스킬 정의·계약은 SPEC-005(adoption-lifecycle) 소유(설치 메커니즘과 분리) | feat/lifecycle-commands |

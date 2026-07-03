@@ -19,6 +19,10 @@ test("sdd-init가 hook·settings·pre-commit 배선", () => {
     assert.ok(existsSync(join(root, "scripts/sdd-session-context.sh")), "sdd-session-context.sh 설치");
     assert.ok(existsSync(join(root, "scripts/sdd-edit-check.sh")), "sdd-edit-check.sh 설치");
     assert.ok(existsSync(join(root, "scripts/sdd-pre-commit.sh")), "sdd-pre-commit.sh 설치");
+    // 수명주기 스킬 설치(SPEC-004 FR-003 확장 — SPEC-005 스킬 배선)
+    assert.ok(existsSync(join(root, ".claude/skills/sdd-start/SKILL.md")), "sdd-start 스킬 설치");
+    assert.ok(existsSync(join(root, ".claude/skills/sdd-readopt/SKILL.md")), "sdd-readopt 스킬 설치");
+    assert.ok(existsSync(join(root, ".claude/skills/sdd-update/SKILL.md")), "sdd-update 스킬 설치");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

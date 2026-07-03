@@ -20,6 +20,7 @@
 | SPEC-002 | spec 품질 게이트군(fr-coverage·ownership·cohesion·completeness·consistency) + PREFIX 거버넌스 | `tooling/check-*.mjs` | active |
 | SPEC-003 | spec-first 강제(spec-sync) — staged hard / range advisory + commit-msg 훅 | `tooling/check-spec-sync.mjs`, `tooling/spec-sync-lib.mjs` | active |
 | SPEC-004 | 하네스(detect 집계) + 설치기(훅·settings·스킬 배선) | `tooling/sdd-sync.mjs`, `tooling/sdd-init.sh`, `tooling/harness/**` | active |
+| SPEC-005 | 채택 수명주기 명령(start/readopt/update) — prompts/ 정본 절차 실행 + 승인 게이트·안전망 불변식 | `tooling/harness/sdd-{start,readopt,update}.SKILL.md` | active |
 
 > "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 6으로 조정했다(사유는 SPEC-002 Change Log).
 

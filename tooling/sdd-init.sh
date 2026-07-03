@@ -84,6 +84,14 @@ if [ "$GATE" = "node" ]; then
     say "  → git commit-msg 훅 연결됨"
   fi
 
+  # 채택 수명주기 스킬 (start·readopt·update) — 최초 채택/재채택/평상시 동기화 진입점.
+  # prompts/의 정본 절차를 일관되게 실행하는 설치형 슬래시 명령(SPEC-005). SSOT는 prompts/.
+  for sk in sdd-start sdd-readopt sdd-update; do
+    mkdir -p "$T/.claude/skills/$sk"
+    copy "$KIT/tooling/harness/$sk.SKILL.md" "$T/.claude/skills/$sk/SKILL.md"
+  done
+  say "  → 수명주기 스킬 설치: /sdd-start · /sdd-readopt · /sdd-update"
+
   # package.json 있으면 check:spec-sync 스크립트 병합(node로 — jq 불요, 기존 보존)
   if [ -f "$T/package.json" ]; then
     node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));p.scripts=p.scripts||{};p.scripts["check:spec-sync"]=p.scripts["check:spec-sync"]||"node scripts/check-spec-sync.mjs";fs.writeFileSync(process.argv[1],JSON.stringify(p,null,2)+"\n");' "$T/package.json"
