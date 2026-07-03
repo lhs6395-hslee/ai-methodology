@@ -11,6 +11,8 @@
 
 > 두 계층: **작성·검토**는 GitHub 문서 직접 읽기로 다운로드 없이, **강제**(훅·게이트)만 `sdd-init` 1회로 ~25파일. 다른 머신(키트 로컬에 없음)이면 경로 대신 `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/<파일>` 지정.
 
+> **설치형 슬래시 명령:** `sdd-init` 배선 후에는 같은 3종이 `/sdd-start`·`/sdd-readopt`·`/sdd-update`로 설치되어(`.claude/skills/`) 프로젝트 안에서 바로 부를 수 있다(인자 `[<project-path>] [<methodology-url>]`, 없으면 현재 디렉토리·정본). 절차 원본은 위 `prompts/`이고 스킬이 이를 실행한다 — 계약: `SPEC-005`.
+
 아래 A/B/C는 위 3종에 안 들어가는 **다른 시나리오**의 붙여넣기 프롬프트다.
 
 ## A. 이 키트로 새 프로젝트에 SDD 셋업

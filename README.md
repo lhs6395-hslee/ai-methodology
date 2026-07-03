@@ -54,4 +54,23 @@
 
 각 파일이 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함한다. 다른 머신(키트 로컬에 없음)이면 경로 대신 GitHub raw URL을 지정: `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘`.
 
+### 설치형 슬래시 명령 (`sdd-init` 후 프로젝트 안에서)
+`sdd-init` 배선을 마친 프로젝트에는 위 3종이 **슬래시 명령**으로도 설치된다(`.claude/skills/`). 위 한 줄과 **동일한 `prompts/` 절차(SSOT)를 실행**하고, 인자로 대상/URL을 받는다:
+
+| 명령 | 상황 | 정본 절차 |
+|---|---|---|
+| `/sdd-start [<project-path>] [<methodology-url>]` | 최초 채택 | [`prompts/adopt.md`](prompts/adopt.md) |
+| `/sdd-readopt [<project-path>] [<methodology-url>]` | 완전 재채택 | [`prompts/readopt.md`](prompts/readopt.md) |
+| `/sdd-update [<project-path>] [<methodology-url>]` | 평상시 sync | [`prompts/update.md`](prompts/update.md) |
+
+인자 없으면 현재 디렉토리·정본 저장소를 기본값으로 쓴다. 절차 원본은 `prompts/`(SSOT)에 한 곳, 스킬은 이를 참조·실행한다(중복 저장 안 함). 스킬 계약은 [`sdd/specs/SPEC-005-adoption-lifecycle.md`](sdd/specs/SPEC-005-adoption-lifecycle.md).
+
+### 경량 부트스트랩 (전체 clone 없이 URL로 시작)
+새 머신에서 실행 폐포만 받으려면(526KB 전체 clone 불필요) partial + sparse clone 1회:
+```sh
+git clone --filter=blob:none --sparse https://github.com/lhs6395-hslee/ai-methodology ~/Documents/claude/sdd
+cd ~/Documents/claude/sdd && git sparse-checkout set tooling templates prompts
+```
+cone 모드라 **루트 파일 전부**(`STORAGE.md`·`APPLYING.md`·`REALITY_CHECK.md`… 방법론 설명서)와 `tooling/`·`templates/`·`prompts/`를 받고, 큰 하위폴더(`.superpowers/` 리뷰 diff ~864K·`docs/`·`sdd/`)는 워킹트리에서 제외한다. `--filter=blob:none`는 나머지 이력 블롭을 지연 로드(필요 시에만 fetch). 이후 대상 프로젝트 루트에서 `sh ~/Documents/claude/sdd/tooling/sdd-init.sh --gate=node` 또는 `/sdd-start`.
+
 설치·배선·채택 후 궤도 운영 상세는 [`APPLYING.md`](APPLYING.md), 다른 시나리오(진행 중 이어가기·hotfix converge)의 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md).
