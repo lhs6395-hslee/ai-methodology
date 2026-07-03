@@ -41,17 +41,39 @@
 - **① 작성·검토 계층 — 다운로드 불필요.** 에이전트에게 "이 방법론(위 URL)을 따라"라고 하면, 에이전트가 GitHub에서 `METHODOLOGY`·`STRUCTURE`·`STORAGE`·`APPLYING`·템플릿을 **직접 읽어** 그 규율대로 스펙을 작성/검토한다. 문서만으로 시작 가능(레포 public, raw 읽기 됨).
 - **② 강제 계층 — 파일 배선 필요(`sdd-init` 1회).** "스펙 없는 커밋 차단" 같은 *기계적 강제*는 git 훅·게이트가 **로컬에 실제 파일로** 있어야 돈다(git은 원격 파일을 훅으로 실행 못 함). 이때 필요한 건 레포 전체(526KB)가 아니라 런타임 폐포 **약 25파일**뿐 — `sdd-init`가 프로젝트의 `scripts/`·`sdd/`·`.claude/`·`.git/hooks/`에 심는다.
 
-> 키트는 이 머신에 `~/Documents/claude/sdd`로 이미 있고 그 자체가 이 레포의 로컬 클론이다. 새 머신이면 **1회만** `git clone`(526KB)하면 되고, **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~25파일뿐.
+> **clean machine(키트 로컬에 없음)에서도 clone 없이 시작된다:** 진입은 **GitHub raw URL**(아래 표) — 에이전트가 `prompts/adopt.md`를 raw로 읽어 실행하고, ②의 강제 tooling은 그 절차가 **partial+sparse**로만 확보한다(전체 526KB clone 아님). 키트가 이미 로컬(`~/Documents/claude/sdd`)에 있으면 그 경로로도 동일하게 되지만 **필수는 아니다**. 어느 경우든 **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~25파일뿐.
 
-### 한 줄로 쓰기 — 상황별 프롬프트 파일 실행
-각 상황의 **전체 절차는 [`prompts/`](prompts/)에 파일로** 있다(SSOT — 절차 원본은 여기 한 곳). 대화창에서 그 파일을 지정해 **한 줄**로 실행한다. 에이전트가 파일을 읽고 순서대로 수행한다:
+### 한 줄로 쓰기 — GitHub raw URL 하나로 실행 (clone 불필요)
+각 상황의 **전체 절차는 [`prompts/`](prompts/)에 파일로** 있다(SSOT — 절차 원본은 여기 한 곳). **진입 = 그 파일의 raw URL 한 줄** — 키트가 로컬에 없어도(clean machine) 에이전트가 raw로 읽고 순서대로 수행한다(강제 tooling은 그 절차가 partial+sparse로 확보, 전체 clone 아님):
 
-| 상황 | 대화창에 붙여넣는 한 줄 |
+| 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
 |---|---|
-| **시작** — SDD 처음인 새 프로젝트 | `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘` |
-| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `~/Documents/claude/sdd/prompts/readopt.md 를 그대로 수행해줘` |
-| **업데이트** — 내가 방법론을 고도화한 뒤 | `~/Documents/claude/sdd/prompts/update.md 를 수행해줘` |
+| **시작** — SDD 처음인 새 프로젝트 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/adopt.md 읽고 그대로 수행해줘` |
+| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/readopt.md 읽고 그대로 수행해줘` |
+| **업데이트** — 내가 방법론을 고도화한 뒤 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/feat/lifecycle-commands/prompts/update.md 읽고 그대로 수행해줘` |
 
-각 파일이 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함한다. 다른 머신(키트 로컬에 없음)이면 경로 대신 GitHub raw URL을 지정: `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘`.
+> **ref 주의:** 위 `feat/lifecycle-commands`는 현재 검증 브랜치다 — **main 머지 후 `main`으로 승격**한다(`.../ai-methodology/main/prompts/...`). 각 파일은 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함하며, 자신을 받은 ref를 이어 사용하므로 브랜치/main 어느 쪽 raw로 fetch해도 동일하게 동작한다.
+>
+> 키트가 이미 로컬에 있으면 raw URL 대신 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
+
+### 설치형 슬래시 명령 (`sdd-init` 후 프로젝트 안에서)
+`sdd-init` 배선을 마친 프로젝트에는 위 3종이 **슬래시 명령**으로도 설치된다(`.claude/skills/`). 위 한 줄과 **동일한 `prompts/` 절차(SSOT)를 실행**하고, 인자로 대상/URL을 받는다:
+
+| 명령 | 상황 | 정본 절차 |
+|---|---|---|
+| `/sdd-start [<project-path>] [<methodology-url>]` | 최초 채택 | [`prompts/adopt.md`](prompts/adopt.md) |
+| `/sdd-readopt [<project-path>] [<methodology-url>]` | 완전 재채택 | [`prompts/readopt.md`](prompts/readopt.md) |
+| `/sdd-update [<project-path>] [<methodology-url>]` | 평상시 sync | [`prompts/update.md`](prompts/update.md) |
+
+인자 없으면 현재 디렉토리·정본 저장소를 기본값으로 쓴다. 절차 원본은 `prompts/`(SSOT)에 한 곳, 스킬은 이를 참조·실행한다(중복 저장 안 함). 스킬 계약은 [`sdd/specs/SPEC-005-adoption-lifecycle.md`](sdd/specs/SPEC-005-adoption-lifecycle.md).
+
+### 경량 부트스트랩 (전체 clone 없이 URL로 시작)
+위 raw URL 한 줄이면 에이전트가 이 부트스트랩을 알아서 수행한다. 수동으로 실행 폐포만 받으려면(526KB 전체 clone 불필요) partial + sparse clone 1회:
+```sh
+KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"; REF="feat/lifecycle-commands"   # 검증 브랜치; main 머지 후 main
+git clone --filter=blob:none --sparse --branch "$REF" https://github.com/lhs6395-hslee/ai-methodology "$KIT"
+git -C "$KIT" sparse-checkout set tooling templates prompts
+```
+cone 모드라 **루트 파일 전부**(`STORAGE.md`·`APPLYING.md`·`REALITY_CHECK.md`… 방법론 설명서)와 `tooling/`·`templates/`·`prompts/`를 받고, 큰 하위폴더(`.superpowers/` 리뷰 diff ~864K·`docs/`·`sdd/`)는 워킹트리에서 제외한다. `--filter=blob:none`는 나머지 이력 블롭을 지연 로드(필요 시에만 fetch). 이후 대상 프로젝트 루트에서 `sh "$KIT/tooling/sdd-init.sh" --gate=node` 또는 `/sdd-start`.
 
 설치·배선·채택 후 궤도 운영 상세는 [`APPLYING.md`](APPLYING.md), 다른 시나리오(진행 중 이어가기·hotfix converge)의 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md).

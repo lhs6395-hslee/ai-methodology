@@ -10,6 +10,8 @@ sh <KIT>/tooling/sdd-init.sh --gate=sh        # gate: go|sh|py|node
 ```
 → `sdd/specs/`·`sdd/MODULE_MAP.md`·`sdd/templates/`·`sdd.config.json`·`scripts/<게이트>`가 **모든 프로젝트에서 동일하게** 생성된다(`STORAGE.md` §5). 그다음 **§3의 "언어 맞춤"** 으로 `sdd.config.json` 값만 조정하고, **§1**로 Spec Kit init(+constitution)만 추가하면 끝. 아래 0~5는 그 빠른 경로가 하는 일의 상세·수동 폴백이다.
 
+> **URL로 시작(경량 부트스트랩).** 키트가 이 머신에 없으면 전체 clone 대신 실행 폐포만 받는다: `git clone --filter=blob:none --sparse https://github.com/lhs6395-hslee/ai-methodology <KIT> && cd <KIT> && git sparse-checkout set tooling templates prompts` (cone 모드 — 루트 파일 + 이 3폴더; 큰 하위폴더 `.superpowers/`·`docs/`·`sdd/`는 제외). 이후 위 `sdd-init` 또는 채택 스킬 `/sdd-start`. 상세: `README.md` §"경량 부트스트랩".
+
 ## 0. 전제 도구
 - `uv`/`uvx`(Spec Kit 실행) · 대상 IDE에 **Superpowers 스킬**(또는 동급 TDD/검증 규율, `[조건부]`).
 - **게이트 런타임은 3단계에서 택1** — 추가 요구가 다름: Go 바이너리=**아무것도 불필요**(권장) / 셸판=`sh`+`grep`+`awk`+`jq`(유닉스 기본) / Python판=`python3` / Node판=`Node 20+`. 게이트는 텍스트 파서라 대상 프로젝트 언어와 무관.
@@ -76,6 +78,8 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 
 ## 3b. (선택) 하네스 — 인터랙티브 spec↔code sync
 `--gate=node`로 init하면 `scripts/sdd-sync.mjs`·`/sdd-sync` 스킬·`scripts/sdd-pre-push.sh`가 설치된다(계약: 키트 `HARNESS.md`). spec/코드 변경 후 또는 수시로 `/sdd-sync`로 R1~R4(spec→code·code→spec·dedup+입도·상시 sync)를 사람 확인 게이트로 정렬한다. push마다 점검하려면: `ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push`(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
+
+> **수명주기 스킬도 함께 설치된다**(`--gate=node`): `/sdd-start`(최초 채택)·`/sdd-readopt`(완전 재채택)·`/sdd-update`(평상시 sync). 각각 `prompts/{adopt,readopt,update}.md` 정본 절차를 실행하며 승인 게이트·재채택 안전망 태그를 불변식으로 강제한다(계약: `sdd/specs/SPEC-005-adoption-lifecycle.md`).
 
 ## 4. 루프 가동
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
