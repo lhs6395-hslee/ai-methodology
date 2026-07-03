@@ -43,42 +43,15 @@
 
 > 키트는 이 머신에 `~/Documents/claude/sdd`로 이미 있고 그 자체가 이 레포의 로컬 클론이다. 새 머신이면 **1회만** `git clone`(526KB)하면 되고, **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~25파일뿐.
 
-### 시작 (최초 채택) — 이 프롬프트를 붙여넣는다
-```
-이 프로젝트는 https://github.com/lhs6395-hslee/ai-methodology 의 SDD 방법론을 따른다. 추측 없이 순서대로 실행해:
-1) 방법론 읽기(다운로드 불필요): 키트의 REALITY_CHECK.md → STORAGE.md → APPLYING.md 를 정독.
-   (이 머신엔 ~/Documents/claude/sdd 로 이미 있음. 없으면 git clone https://github.com/lhs6395-hslee/ai-methodology ~/Documents/claude/sdd 1회.)
-   "된다"는 실제 실행 증거로만 — [검증]/[추론]/[미확인] 구분.
-2) 강제 배선(1회): 이 프로젝트 루트에서  sh ~/Documents/claude/sdd/tooling/sdd-init.sh --gate=node
-   → sdd/ 레이아웃·게이트(~25파일)·git 훅(pre-commit·commit-msg)·SessionStart/PreToolUse·스킬 설치. (언어 무관 — 게이트는 node 런타임만 쓰고 언어차는 sdd.config.json으로 흡수.)
-3) 세션 재시작(SessionStart가 방법론 주입) 후 게이트 green 확인.
-고정 규칙(발명 금지): spec은 sdd/specs/ 에만 · PREFIX는 SPEC/INFRA/TEST(새 건 사유+내 승인) · 1 spec=1 aggregate ·
-소유 코드 변경엔 같은 changeset에 spec 동반(순수 hotfix만 커밋 트레일러 Spec-Impact: none <사유>). 스펙 대량 생성은 내 승인 후.
-```
+### 한 줄로 쓰기 — 상황별 프롬프트 파일 실행
+각 상황의 **전체 절차는 [`prompts/`](prompts/)에 파일로** 있다(SSOT — 절차 원본은 여기 한 곳). 대화창에서 그 파일을 지정해 **한 줄**로 실행한다. 에이전트가 파일을 읽고 순서대로 수행한다:
 
-### 재채택 (이미 sdd/가 있는 프로젝트를 처음부터 다시) — PM/FinOps 등
-> 기존 SDD 산출물이 낡거나 어긋났을 때 코드는 남기고 `sdd/`만 새로. git 스냅샷으로 되돌릴 수 있게 한 뒤 진행.
-```
-이 프로젝트를 https://github.com/lhs6395-hslee/ai-methodology 방법론으로 처음부터 완전 재채택한다. 순서대로:
-1) 안전망: git add -A && git commit 후  git tag sdd-pre-readopt-<오늘날짜>  로 현재 상태 스냅샷(진짜 손실 0).
-2) 방법론 읽기: ~/Documents/claude/sdd (없으면 clone 1회)의 REALITY_CHECK→STORAGE→APPLYING 정독.
-3) 강제 배선: 프로젝트 루트에서  sh ~/Documents/claude/sdd/tooling/sdd-init.sh --gate=node --force
-4) 구 산출물 정리: 기존 sdd/specs/* 를 걷어낸다(코드는 그대로. 스냅샷 태그에 남아 있음).
-5) 스펙 재도출: 현재 코드 실태를 읽어 EARS FR 스펙을 새로 도출해라(reverse-engineer). spec은 sdd/specs/ 에만,
-   PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate, 작성=너/승인=나. 초안을 만들되 대량 생성·확정은 내 승인 후.
-6) 결선: @covers 태깅 → 게이트 green → 커밋(자기 훅 통과).
-고정 규칙은 시작(위)과 동일. 승인 없이 스펙을 확정하거나 코드를 방법론에 맞춘다며 덮어쓰지 마.
-```
+| 상황 | 대화창에 붙여넣는 한 줄 |
+|---|---|
+| **시작** — SDD 처음인 새 프로젝트 | `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘` |
+| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `~/Documents/claude/sdd/prompts/readopt.md 를 그대로 수행해줘` |
+| **업데이트** — 내가 방법론을 고도화한 뒤 | `~/Documents/claude/sdd/prompts/update.md 를 수행해줘` |
 
-### 업데이트 (내가 GitHub에 방법론을 고도화한 뒤)
-```
-https://github.com/lhs6395-hslee/ai-methodology 방법론을 최신으로 업데이트해줘.
-1) 로컬 키트 ~/Documents/claude/sdd 를 git pull 로 origin/main 최신화.
-2) 이 프로젝트에 설치된 것(scripts/의 *.mjs 게이트 · .git/hooks · .claude/skills · sdd/templates)을 키트와 diff.
-3) 바뀐 파일만 보여주고 내 승인을 받은 뒤 반영 — 자동 덮어쓰기 금지.
-   (sdd-init 를 --force 없이 재실행하면 신규만 추가되고 기존은 보존. 게이트 코드 갱신은 diff 확인 후 명시적으로.)
-4) 반영 후 게이트 green 확인.
-내 스펙·FR·작업물(sdd/specs/*)은 건드리지 마 — 방법론 도구(게이트·훅·템플릿)만 최신화 대상이다.
-```
+각 파일이 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함한다. 다른 머신(키트 로컬에 없음)이면 경로 대신 GitHub raw URL을 지정: `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘`.
 
-설치·배선·채택 후 궤도 운영 상세는 [`APPLYING.md`](APPLYING.md), 다른 상황(진행 중 이어가기·hotfix converge)의 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md).
+설치·배선·채택 후 궤도 운영 상세는 [`APPLYING.md`](APPLYING.md), 다른 시나리오(진행 중 이어가기·hotfix converge)의 붙여넣기 프롬프트는 [`PROMPTS.md`](PROMPTS.md).
