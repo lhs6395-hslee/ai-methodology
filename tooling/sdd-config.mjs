@@ -60,6 +60,10 @@ export const DEFAULTS = {
   specIdPrefixes: ["SPEC", "INFRA", "TEST"],
   // 표준 밖 접두어 → 도입 사유(빈 값이면 게이트 exit 1)
   prefixRationale: {},
+  // 요구 ID 접두어들(FR 라인·@covers·FR 집계가 인정할 접두어). 기본 ["FR"].
+  // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
+  // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).
+  requirementIdPrefixes: ["FR"],
   // CRUD 기본에 더할 도메인 verb
   capabilityVerbs: [],
   // Surface path param 표준 표기
@@ -111,7 +115,15 @@ export function loadConfig(start = process.cwd()) {
     .join("|");
   cfg.__idAlt = alt;
   cfg.__specIdRe = new RegExp(`(?:${alt})-\\d{3}`);                 // 본문/파일명에서 ID 추출
-  cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/(FR-\\d{3}[a-z]?)\\b`, "g"); // 서픽스는 소문자 1자(FR-003a) — \b로 2자(FR-003ab) 절단 캡처 금지
+  // 요구 ID 접두어 파생값 — 전 파싱 사이트(coverage 선언·cohesion/completeness 집계·
+  // spec-sync FR 라인·@covers)가 이 한 곳에서 파생된 문법을 공유한다(사이트 간 불일치 금지).
+  const reqAlt = (cfg.requirementIdPrefixes && cfg.requirementIdPrefixes.length ? cfg.requirementIdPrefixes : DEFAULTS.requirementIdPrefixes)
+    .map((p) => String(p).replace(/[^A-Za-z0-9_]/g, ""))
+    .join("|");
+  cfg.__reqAlt = reqAlt;
+  cfg.__frDeclRe = new RegExp(`\\*\\*((?:${reqAlt})-\\d{3}[a-z]?)\\*\\*`, "g"); // spec 본문의 **FR-NNN[a]** 선언
+  cfg.__frTokenRe = new RegExp(`\\b(?:${reqAlt})-\\d{3}[a-z]?\\b`, "g");        // 집계/면제용 토큰
+  cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/((?:${reqAlt})-\\d{3}[a-z]?)\\b`, "g"); // 서픽스는 소문자 1자(FR-003a) — \b로 2자(FR-003ab) 절단 캡처 금지
 
   // Verb 파생값
   const CRUD = ["create", "read", "update", "delete", "list"];

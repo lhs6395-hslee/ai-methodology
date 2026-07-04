@@ -14,7 +14,7 @@ const args = process.argv.slice(2);
 const STAGED = args.includes("--staged");
 const mi = args.indexOf("--message-file");
 const MSG = mi >= 0 ? args[mi + 1] : null;
-const positional = args.filter((a, i) => !a.startsWith("--") && i !== mi + 1);
+const positional = args.filter((a, i) => !a.startsWith("--") && (mi < 0 || i !== mi + 1)); // mi=-1일 때 args[0](base)이 mi+1=0으로 오배제되던 버그 수정
 const BASE = positional[0] || process.env.SDD_DIFF_BASE || "origin/main";
 
 const sh = (c) => execSync(c, { cwd: cfg.__root, encoding: "utf8" });
@@ -81,12 +81,12 @@ function meaningful(spec) {
   if (!ok && STAGED) {
     const d = shOk(`git diff --cached -- ${spec.path}`);
     const post = shOk(`git show :${spec.path}`);
-    if (d && post && hasMeaningfulSpecChange(post, d)) ok = true;
+    if (d && post && hasMeaningfulSpecChange(post, d, cfg.__reqAlt)) ok = true;
   }
   if (!ok && branchDiffOk) {
     const d = shOk(`git diff ${BASE}...HEAD -- ${spec.path}`);
     const post = shOk(`git show HEAD:${spec.path}`);
-    if (d && post && hasMeaningfulSpecChange(post, d)) ok = true;
+    if (d && post && hasMeaningfulSpecChange(post, d, cfg.__reqAlt)) ok = true;
   }
   memo.set(spec.path, ok);
   return ok;

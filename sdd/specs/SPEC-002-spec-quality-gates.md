@@ -22,7 +22,7 @@
 - cohesion에서 aggregate-root 카테고리(config의 첫 카테고리, 여기서는 Modules) 키가 `maxAggregateRootsPerSpec`(기본 1) 초과면 "여러 aggregate 삼킴" 신호로 warn — aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 프로젝트는 이 값을 상향(자식은 별도 root 아님).
 - completeness는 FR이 0개인 spec(순수 인프라)은 SC·인수조건 검사에서 면제한다.
 - consistency는 `## Ownership` **이전** 본문만 근거로 삼는다 — 키가 자기 선언 줄로 근거되는 것을 방지하며, 근거 없는 키는 advisory warn(비차단)이다.
-- FR ID는 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-002b`) — coverage의 FR 선언 추출, cohesion의 FR 수 집계, completeness의 FR-존재 면제 판단이 모두 동일 문법을 쓴다(사이트 간 문법 불일치 = 절단 태그·조용한 FR 누락의 뿌리).
+- 요구 ID는 접두어(`requirementIdPrefixes` 파생, 기본 `FR`) + 3자리 + 선택적 소문자 서픽스 1자(`FR-002b`) — coverage의 FR 선언 추출, cohesion의 FR 수 집계, completeness의 FR-존재 면제 판단이 모두 config 파생값(`__frDeclRe`/`__frTokenRe`) 하나를 쓴다(사이트별 자체 정규식 = 절단 태그·조용한 FR 누락의 뿌리 — 하드코딩 사이트 금지).
 
 ---
 
@@ -49,7 +49,7 @@
 - **Modules**: spec-quality-gates
 - **Symbols**: check-fr-coverage.mjs, check-ownership.mjs, check-spec-cohesion.mjs, check-spec-completeness.mjs, check-spec-consistency.mjs, check-test-adequacy.mjs
 - **Artifacts**: —
-- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
+- **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-req-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 이 게이트군은 키의 파싱·정규화·검증을 SPEC-001에 위임한다.
@@ -75,3 +75,4 @@
 | 2026-07-02 | check-test-adequacy.mjs(+ 테스트) + FR-008 편입 — Symbols=6 유지(threshold 내) | spec-quality-gates aggregate의 6번째 게이트; @covers 빈 껍데기 검출은 FR coverage 게이트의 직접 보완 |
 | 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(PM솔루션): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |
 | 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(PM솔루션): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |
+| 2026-07-05 | coverage·cohesion·completeness의 요구 ID 정규식을 `requirementIdPrefixes` 파생값으로 전환 + `check-req-prefix.test.mjs` Files 편입 | 진단 B-2: 사이트별 하드코딩이 접두어 확장 시 조용한 누락을 만듦 — SPEC-001 config 파생값 하나로 통일 |

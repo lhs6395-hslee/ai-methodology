@@ -23,6 +23,7 @@
 - `pre-commit` 훅은 스테이징에 spec 또는 코드 경로가 있을 때만 게이트를 돌린다(문서-only 커밋은 통과).
 - `pre-push`는 기본 비차단(안내만)이며 `SDD_SYNC_BLOCK=1`일 때만 push를 막는다.
 - PreToolUse `sdd-edit-check.sh`는 코드 경로(`src`/`lib`/`app`) 편집에만 체크리스트를 상기하고 그 외에는 침묵한다.
+- `--gate=py`는 Python 게이트가 spec-first(specsync)까지 패리티이므로(SPEC-006) `.git` 존재 시 pre-commit(fr·ownership)과 commit-msg(specsync, merge commit은 MERGE_HEAD로 skip) 훅을 함께 배선한다 — "spec-sync는 Node 필요" 안내는 셸/Go 게이트에만 남는다.
 
 ---
 
@@ -75,3 +76,4 @@
 | 2026-07-02 | `self-hooks-install.sh`(키트 자기 훅 배선 — tooling 직접 호출) Files 편입 | plan ④ T3: 키트 자신을 자기 궤도에 |
 | 2026-07-02 | sdd-run.mjs(CI 스테이지 러너) + FR-008 편입 — Symbols 7개(maxKeysPerCategoryPerSpec 7로 상향, sdd.config.json) | 하네스+설치기 aggregate는 6+1 엔트리포인트가 한 응집 묶음; SPEC-002의 5→6 선례와 동일 논리 |
 | 2026-07-03 | FR-003 확장 — sdd-init가 수명주기 스킬(`/sdd-start`·`/sdd-readopt`·`/sdd-update`)도 `.claude/skills/`에 설치. 스킬 정의·계약은 SPEC-005(adoption-lifecycle) 소유(설치 메커니즘과 분리) | feat/lifecycle-commands |
+| 2026-07-05 | `--gate=py`에 pre-commit·commit-msg(specsync) 훅 배선 — 낡은 "spec-sync는 Node 필요" 안내 제거(+ 테스트) | SPEC-006: Python판이 spec-first까지 전 게이트 패리티가 되어 Python-only 프로젝트도 hard 강제 가능 |

@@ -95,3 +95,18 @@ test("sdd-init 재실행 시 SessionStart hook 중복 없음(idempotency)", () =
     assert.strictEqual(sddEntries.length, 1, "sdd-session-context 엔트리가 정확히 1개(중복 없음)");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("sdd-init --gate=py: Python 게이트 + spec-first 훅(pre-commit·commit-msg) 배선", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-py-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" });
+    execFileSync("sh", [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=py"], { cwd: root, stdio: "ignore" });
+    assert.ok(existsSync(join(root, "scripts/sdd_gates.py")), "sdd_gates.py 설치");
+    const pre = readFileSync(join(root, ".git/hooks/pre-commit"), "utf8");
+    assert.match(pre, /sdd_gates\.py fr/);
+    assert.match(pre, /sdd_gates\.py ownership/);
+    const cm = readFileSync(join(root, ".git/hooks/commit-msg"), "utf8");
+    assert.match(cm, /specsync --staged --message-file/);
+    assert.match(cm, /MERGE_HEAD/); // merge commit skip(§5.6) 의미론 유지
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

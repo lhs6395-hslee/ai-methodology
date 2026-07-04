@@ -33,7 +33,7 @@ const SCAN_DIRS = cfg.scanDirs.map((d) => resolveFromRoot(cfg, d));
 const IGNORE = new Set(cfg.ignoreDirs);
 const STRICT = process.argv.includes("--strict");
 
-const FR_DECL = /\*\*(FR-\d{3}[a-z]?)\*\*/g;   // **FR-006**, **FR-003a** in spec prose (서픽스는 소문자 1자)
+const FR_DECL = cfg.__frDeclRe;          // **FR-006**, **FR-003a** in spec prose — 문법은 requirementIdPrefixes에서 파생(사이트 간 통일)
 const SPEC_ID = cfg.__specIdRe;          // e.g. /(?:SPEC|TEST|INFRA)-\d{3}/ (from specIdPrefixes)
 const COVERS = cfg.__coversRe;           // @covers <PREFIX>-NNN/FR-NNN (from specIdPrefixes)
 const PREFIXES = cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes;

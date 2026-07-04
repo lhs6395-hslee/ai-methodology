@@ -181,3 +181,19 @@ test("미지원 glob 경고는 spec당 1회만(중복 스캔 dedupe)", () => {
     assert.equal(matches.length, 1, `expected 1 warning, got ${matches.length}:\n${r.out}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("range: 첫 positional 인자(base)가 --message-file 부재 시에도 인식됨(mi=-1 오배제 회귀)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A"); g("commit", "-qm", "code only");
+    const r = runGate(root, ["main"]); // env 없이 positional만 — 이전엔 origin/main으로 조용히 대체됐다
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /base:main/);
+    assert.match(r.out, /⚠/); // main 기준 코드-only 변경이 실제로 판정됨
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

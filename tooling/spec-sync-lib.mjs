@@ -71,9 +71,12 @@ const isBullet = (t) => /^\s*-\s+\S/.test(t);
 const isTableRow = (t) => /^\s*\|/.test(t) && !/^\s*\|[\s:|-]+\|?\s*$/.test(t); // 구분선 제외
 
 // §5.4 step 3: 의미 있는 변경 판정 (post-image + 그 이미지 기준 diff 한 슬라이스).
-export function hasMeaningfulSpecChange(postImage, diffText) {
-  // `+++`/`---` 헤더도 [+-]에 걸리지만 경로에 `**FR-\d{3}[a-z]?**` 리터럴이 올 수 없어 안전.
-  if (/^[+-].*\*\*FR-\d{3}[a-z]?\*\*/m.test(diffText)) return true; // FR 라인 +/- (서픽스 FR-010a 포함)
+// reqAlt = 요구 ID 접두어 alternation("FR" 기본) — 순수 코어라 config를 직접 안 읽고
+// 호출부(check-spec-sync)가 cfg.__reqAlt를 주입한다(전 사이트 동일 문법, requirementIdPrefixes 파생).
+export function hasMeaningfulSpecChange(postImage, diffText, reqAlt = "FR") {
+  // `+++`/`---` 헤더도 [+-]에 걸리지만 경로에 `**<REQ>-NNN[a]**` 볼드 리터럴이 올 수 없어 안전.
+  const frLine = new RegExp(`^[+-].*\\*\\*(?:${reqAlt})-\\d{3}[a-z]?\\*\\*`, "m");
+  if (frLine.test(diffText)) return true; // FR 라인 +/- (서픽스 FR-010a 포함)
   const sections = buildSectionMap(postImage);
   for (const { line, text } of addedLines(diffText)) {
     const sec = sectionAt(sections, line);
