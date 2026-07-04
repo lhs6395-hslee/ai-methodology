@@ -2,7 +2,7 @@
 
 > **게이트는 그냥 CLI 명령이다.** 특정 CI/CD 도구도, git 호스트도 필요 없다. 로컬·git 훅·`make`·사내든 클라우드든 **어떤 CI/CD 도구**에서나 돌릴 수 있다. 어느 도구든 핵심은 같다 — *변경마다 두 게이트 명령을 한 스텝에서 실행하고, 0이 아니면 막는다.* 아래는 환경별로 거는 예시일 뿐.
 
-## 게이트 명령 (런타임 4판 중 가진 쪽 — 동작 동일)
+## 게이트 명령 (런타임 4판 중 가진 쪽 — 핵심 3커맨드 동작·문법 동일)
 | 런타임 | FR↔test | 소유권 중복 | 러너 |
 |---|---|---|---|
 | **Go 바이너리** | `sdd-gate fr` | `sdd-gate ownership` | `sdd-gate run <stage>` |
@@ -10,14 +10,20 @@
 | Python | `python sdd_gates.py fr` | `python sdd_gates.py ownership` | `python sdd_gates.py run <stage>` |
 | Node | `node check-fr-coverage.mjs` | `node check-ownership.mjs` | `node sdd-run.mjs <stage>` |
 
-보강 게이트 5종(advisory — Node 우선, 나머지 런타임 포팅 예정):
-| 게이트 | Node | 기타 런타임 |
+4판 모두 같은 `sdd.config.json`을 읽고, `fr`은 PREFIX 거버넌스(미등록 접두어 exit 1)를 포함하며, spec/요구 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생, 레터 서픽스 포함)이 전 런타임 동일하다(런타임 간 문법 드리프트는 `runtime-contract.test.mjs`가 회귀로 차단). 단 **ownership 키 정규화·형식검증(normalizeKey/validateKey)은 Node·Python만** — 셸/Go판 ownership은 소문자 정규화 dedup까지다(정직한 델타, SPEC-006).
+
+보강 게이트(advisory)와 spec-first 게이트는 **Node·Python 두 판 완전 동봉**(같은 픽스처에 같은 판정 — 패리티 테스트로 강제):
+| 게이트 | Node | Python |
 |---|---|---|
-| 테스트 적정성 | `node check-test-adequacy.mjs` | (포팅 예정) |
-| converge drift | `node check-converge-drift.mjs [base]` | (포팅 예정) |
-| orphan surface | `node check-orphan-surfaces.mjs` | (포팅 예정) |
-| spec 입도(cohesion) | `node check-spec-cohesion.mjs` | (포팅 예정) |
-| spec 완전성 | `node check-spec-completeness.mjs` | (포팅 예정) |
+| 테스트 적정성 | `node check-test-adequacy.mjs` | `python sdd_gates.py adequacy` |
+| converge drift | `node check-converge-drift.mjs [base]` | `python sdd_gates.py converge [base]` |
+| orphan surface | `node check-orphan-surfaces.mjs` | `python sdd_gates.py orphan` |
+| spec 입도(cohesion) | `node check-spec-cohesion.mjs` | `python sdd_gates.py cohesion` |
+| spec 완전성 | `node check-spec-completeness.mjs` | `python sdd_gates.py completeness` |
+| spec 일관성 | `node check-spec-consistency.mjs` | `python sdd_gates.py consistency` |
+| **spec-first(§5, hard)** | `node check-spec-sync.mjs --staged --message-file <p>` / `[base]` | `python sdd_gates.py specsync --staged --message-file <p>` / `[base]` |
+
+셸/Go판은 핵심 3커맨드만 제공한다 — 보강 게이트가 필요한 비-Node 프로젝트는 Python판을 쓴다(둘 다 없는 환경이 실제 생기면 그때 승격 판단).
 
 아래 예시는 `<GATE>` = 위 중 택1로 읽으면 된다.
 

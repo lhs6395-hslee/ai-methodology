@@ -55,13 +55,15 @@ cp <받은>/sdd-gate-<os>-<arch>  scripts/sdd-gate && chmod +x scripts/sdd-gate
 cp <KIT>/tooling/sdd_gates.sh scripts/
 #      → sh scripts/sdd_gates.sh fr | ownership | run <stage>
 #  (c) Python 스택 편의(Node 0): cp <KIT>/tooling/sdd_gates.py scripts/
+#      → 핵심 3커맨드 + 보강게이트·spec-first(specsync)까지 Node판 전 게이트 패리티(유일)
 #  (d) JS/TS 스택 편의(Python 0): Node판 네 파일
 cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
    <KIT>/tooling/check-ownership.mjs <KIT>/tooling/sdd-run.mjs scripts/
 ```
-> **어떤 언어 런타임도 강요하지 않는다.** Go·C·Rust 등은 (a) 바이너리면 인터프리터 0으로 돈다(크로스컴파일·정적 검증됨). 배포 파이프라인 없이 즉시 돌릴 땐 (b) 셸판(실증: `go` 미설치로 Go 프로젝트 게이트 통과). 이미 Python/Node가 있으면 (c)/(d).
+> **어떤 언어 런타임도 강요하지 않는다.** Go·C·Rust 등은 (a) 바이너리면 인터프리터 0으로 돈다(크로스컴파일·정적 검증됨). 배포 파이프라인 없이 즉시 돌릴 땐 (b) 셸판(실증: `go` 미설치로 Go 프로젝트 게이트 통과). 이미 Python/Node가 있으면 (c)/(d). **커버 범위 차이:** (a)/(b)는 핵심 3커맨드(fr·ownership·run), (c) Python은 보강게이트·spec-first까지 Node 전 게이트 패리티(`ci-examples.md` 표) — 비-Node 스택에서 전 게이트가 필요하면 (c).
 **언어 맞춤(핵심):** 루트의 `sdd.config.json`을 프로젝트 언어로 바꾼다 — `tooling/sdd.config.presets.md`에서 해당 언어 블록 복사(`testFileRegex`·`scanDirs`·`ignoreDirs`·`ownershipCategories`·`specIdPrefixes`·`commands`). JS/TS면 기본값 그대로.
-- ⚠ **`specIdPrefixes`(기본 `["SPEC"]`):** `FEAT`/`TEST`/`INFRA` 등 새 spec 접두어를 쓰면 **반드시 여기 등록**(예: `["SPEC","TEST","INFRA","FEAT"]`). 안 하면 그 접두어 spec들이 FR 게이트에서 **조용히 누락**된다(실제 사례 있음 — 등록만이 유일한 차단책).
+- ⚠ **`specIdPrefixes`(기본 `["SPEC","INFRA","TEST"]` — 전 런타임 동일):** 표준 밖 접두어(`FEAT` 등)를 쓰면 **반드시 여기 등록 + `prefixRationale`에 사유**(예: `["SPEC","INFRA","TEST","FEAT"]`). 미등록 접두어는 FR 게이트가 **exit 1로 차단**한다(조용한 누락 금지 — 4판 공통).
+- **`requirementIdPrefixes`(기본 `["FR"]`):** 요구 ID 접두어를 확장할 때 등록(예: `["FR","NFR"]`). FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 이 한 값에서 파생된다 — 코드 fork 없이 config로 확장.
 - `commands`에 그 언어의 `setup/lint/typecheck/test`를 넣는다(예: Python `pytest -q`, Go `go test ./...`). CI/CD는 `<게이트> run <stage>`로 그 명령을 실행하므로 **워크플로우 본체는 손대지 않는다**(도구별 예시: `ci-examples.md`). 미설정 stage는 건너뜀.
 - JS/TS 프로젝트만 해당: `npm i -D vitest vite-tsconfig-paths @vitest/coverage-v8` + `cp <KIT>/tooling/vitest.config.ts ./`.
 

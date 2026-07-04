@@ -23,7 +23,7 @@
 - **FR 게이트**가 spec의 FR 선언과 태그를 대조 →
   - R1: 존재하지 않는 FR 참조 시 fail.
   - R2: 커버 테스트가 있는 spec은 **모든 FR 커버 필수**(strict). 0개인 spec은 incremental에선 warn(점진 도입).
-- 게이트는 **언어·런타임 무관 4판 동봉**(동작 동일): Go 바이너리 `sdd-gate fr`·셸 `sdd_gates.sh fr`·Python `sdd_gates.py fr`·Node `check-fr-coverage.mjs`. 아래 본문은 Node 파일명으로 표기하나 나머지 판도 동일(`principles.md` §10).
+- 게이트는 **언어·런타임 무관 4판 동봉**: Go 바이너리 `sdd-gate fr`·셸 `sdd_gates.sh fr`·Python `sdd_gates.py fr`·Node `check-fr-coverage.mjs` — 핵심 3커맨드(fr·ownership·run)와 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생)은 4판 동일, **보강게이트·spec-first(§5)까지의 전 게이트는 Node·Python 두 판**(패리티 테스트로 강제 — 커버 매트릭스: `tooling/ci-examples.md`). 아래 본문은 Node 파일명으로 표기.
 - CI/CD는 매 변경에 `lint→typecheck→test→FR게이트→소유권게이트`를 **언어별 `commands`로** 실행(특정 CI/CD 도구 한정 아님 — 로컬·git훅·어떤 도구든, `tooling/ci-examples.md`).
 - **검증(2026-06-26):** incremental exit 0(통과), strict exit 1(미구현 spec 막음), test 8/8 통과, tsc 0. → 이 체인이 "SSOT=주장"을 "SSOT=기계적 사실"로 만든다.
 - **단, CI가 실제로 green이어야 효력.** 참조 프로젝트는 현재 lint 4 errors로 red → 적용 시 먼저 해소해야 함. (`REALITY_CHECK.md` §3)

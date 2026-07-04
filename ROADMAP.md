@@ -23,7 +23,8 @@
 | 하네스: 연속/스케줄 트리거 | on-demand `/sdd-sync` + pre-push 훅으로 **부족하다고 드러날 때** |
 | 하네스: 타 에이전트 실행기 | Claude Code 외 에이전트를 **실제로 쓸 때** (계약 `HARNESS.md`는 이미 런타임 중립) |
 | 하네스: R3 임베딩 의미리뷰 | reworded(의미적) 중복이 **실제 고통이 될 때** (현재는 같은 Entity 이웃 LLM 리뷰로 충분) |
-| 강화·cohesion·하네스 게이트의 Go·셸·Python 포팅 | **비-Node 프로젝트**가 그 게이트를 강제해야 할 때 (현재 Node판만, `ci-examples.md` "포팅 예정") |
+| 강화·cohesion·하네스 게이트의 **Go·셸** 포팅 + 셸/Go ownership 키 정규화·형식검증 | Python도 Node도 없는 프로젝트가 그 게이트를 강제해야 할 때 (**Python 포팅은 2026-07-05 완료** — 전 게이트 패리티, SPEC-006 · `ci-examples.md` 매트릭스) |
+| Go판 실행 패리티 재검증(2026-07-05 문법 정렬분) | Go 툴체인이 있는 CI에서 — 현재는 소스 계약 테스트만(`runtime-contract.test.mjs`, REALITY_CHECK 미확인 라벨) |
 
 ## 🔬 권장 다음 단계 (아직 미착수)
 - **도그푸딩**: 방법론을 실제 모듈(예: finops)에 끝까지 돌려 전 사슬(spec→test→code→게이트→하네스)을 검증 → 위 보류 항목 중 *실제로* 필요한 것을 추측이 아니라 사례로 식별.
