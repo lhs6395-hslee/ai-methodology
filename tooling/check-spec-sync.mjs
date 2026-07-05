@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { loadConfig } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
+import { parseStatus } from "./lifecycle-lib.mjs";
 
 const cfg = loadConfig();
 const args = process.argv.slice(2);
@@ -17,7 +18,8 @@ const MSG = mi >= 0 ? args[mi + 1] : null;
 const positional = args.filter((a, i) => !a.startsWith("--") && (mi < 0 || i !== mi + 1)); // mi=-1일 때 args[0](base)이 mi+1=0으로 오배제되던 버그 수정
 const BASE = positional[0] || process.env.SDD_DIFF_BASE || "origin/main";
 
-const sh = (c) => execSync(c, { cwd: cfg.__root, encoding: "utf8" });
+// core.quotepath=off: 비ASCII 경로가 8진수 인용 문자열("\353…")로 나오면 glob 매칭이 조용히 깨진다(도그푸딩 발견).
+const sh = (c) => execSync(c.replace(/^git /, "git -c core.quotepath=off "), { cwd: cfg.__root, encoding: "utf8" });
 const shOk = (c) => { try { return sh(c); } catch { return null; } };
 const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -66,13 +68,20 @@ for (const p of specPaths) {
     }
     parseSection(src, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).forEach((g) => globs.add(g));
   }
-  specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null });
+  specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null, status: parseStatus(text) });
 }
 
 // ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
+// 미소유 파일은 specSyncUnownedPolicy가 선언한 대로 — silent(현행)/warn/error(closed-world).
+const POLICY = cfg.specSyncUnownedPolicy || "silent";
+if (!["silent", "warn", "error"].includes(POLICY)) {
+  console.error(`✗ specSyncUnownedPolicy 값 위반 "${POLICY}" — silent|warn|error 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
 const exempt = (cfg.specSyncExemptGlobs || []).map(compileGlob);
 const specSet = new Set(specs.map((s) => s.path));
 const violations = []; // {file, spec}
+const unowned = [];    // 어떤 스펙 Files에도 매치 안 된 변경 파일(exempt 제외)
 const memo = new Map(); // spec.path -> boolean(meaningful)
 function meaningful(spec) {
   if (memo.has(spec.path)) return memo.get(spec.path);
@@ -94,20 +103,38 @@ function meaningful(spec) {
 for (const f of changed) {
   if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;      // 스펙 자신은 코드 아님
   if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
+  let owned = false;
   for (const s of specs) {
     if (!s.globs.some(({ re }) => re.test(f))) continue;
+    owned = true;
+    // Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
+    // 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
+    if (s.status === "Draft" && !s.deletedInIndex) { violations.push({ file: f, spec: s.id, draft: true }); continue; }
     if (!meaningful(s)) violations.push({ file: f, spec: s.id });
   }
+  if (!owned && POLICY !== "silent") unowned.push(f);
 }
 
-// ⑤ 리포트.
+// ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
+const unownedHard = POLICY === "error" && STAGED && unowned.length > 0;
 const mode = STAGED ? "staged(hard)" : `range(advisory, base:${BASE})`;
 console.log(`spec-sync 게이트 — mode:${mode} changed:${changed.size} specs:${specs.length}`);
+for (const f of unowned) {
+  console.log(`  ${unownedHard ? "✗" : "⚠"} unowned: ${f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy=${POLICY})`);
+}
+if (unownedHard && !violations.length) {
+  console.error(`\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.`);
+  process.exit(1);
+}
 if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
-for (const v of violations) console.log(`  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
+for (const v of violations) console.log(v.draft
+  ? `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
+  : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
 if (STAGED) {
   console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.`);
   console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
+  if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
+  if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
   process.exit(1);
 }

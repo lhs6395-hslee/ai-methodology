@@ -21,5 +21,6 @@ test("정식 템플릿은 게이트 파싱 앵커를 모두 가진다(앵커 자
   for (const anchor of [
     "- **Entities**:", "- **Surfaces**:", "- **Capabilities**:", "- **Files**:",
     "## Dependencies", "### Edge Cases", "## Change Log", "## Ownership",
+    "## Review Log", "## Dedup-Review", "**Status**: Draft | Reviewed | Approved | Active | Deprecated | Removed",
   ]) assert.ok(t.includes(anchor), `앵커 누락: ${anchor}`);
 });

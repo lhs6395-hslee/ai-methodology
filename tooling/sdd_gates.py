@@ -53,6 +53,11 @@ DEFAULTS = {
     "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
     "prefixRationale": {},
     "requirementIdPrefixes": ["FR"],
+    "strictSpecs": [],
+    "requireAccounting": False,
+    "smokeManifest": None,
+    "specSyncUnownedPolicy": "silent",
+    "entityRegistry": {},
     "capabilityVerbs": [],
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
@@ -221,6 +226,71 @@ def validate_key(category, key, cfg):
     return None  # Entity는 형식 제약 없음(스키마 식별자 그대로)
 
 
+# ── 검증 회계 (verification-accounting.mjs 패리티, SPEC-007) ──
+
+def load_manifest(cfg, specs):
+    """smokeManifest 로드+검증. 미설정 → (None, []). 반환: (entries, errors)."""
+    if not cfg.get("smokeManifest"):
+        return None, []
+    rel = str(cfg["smokeManifest"])
+    path = resolve(cfg, rel)
+    try:
+        raw = read_text(path)
+    except OSError:
+        return None, [f"M0 smokeManifest 파일 없음: {rel}"]
+    try:
+        data = json.loads(raw)
+    except ValueError as e:
+        return None, [f"M0 smokeManifest JSON 파싱 실패: {rel} — {e}"]
+    if not isinstance(data, dict):
+        return None, [f"M0 smokeManifest 최상위는 객체여야 함: {rel}"]
+
+    alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
+    key_re = re.compile(rf"^((?:{alt})-\d{{3}})/((?:{cfg['__reqAlt']})-\d{{3}}[a-z]?)$")
+    errors = []
+    entries = {}
+    for key in data.keys():
+        m = key_re.match(key)
+        if not m:
+            errors.append(f'M1 manifest 키 형식 위반 "{key}" — "SPEC-NNN/FR-NNN" 형식이어야 함')
+            continue
+        spec, fr = m.group(1), m.group(2)
+        if spec not in specs or fr not in specs[spec]:
+            errors.append(f'M1 dangling manifest 키 "{key}" — no such FR')
+            continue
+        v = data[key]
+        method = str((v or {}).get("method") or "").strip() if isinstance(v, dict) else ""
+        if not method:
+            errors.append(f'M2 "{key}": method 없음(빈 값 불가)')
+            continue
+        if method == "deferred":
+            if not str(v.get("reason") or "").strip():
+                errors.append(f'M2 "{key}": method=deferred는 reason 필수(빈 값 불가)')
+                continue
+        elif not str(v.get("evidence") or "").strip():
+            errors.append(f'M2 "{key}": evidence 필수(빈 값 불가 — 존재만 강제, 질은 리뷰 몫)')
+            continue
+        entries[key] = {"method": method}
+    return entries, errors
+
+
+def classify_accounting(specs, covered, entries):
+    """FR별 분류(unit > smoke > deferred > unaccounted) + 카운트."""
+    classes = {}
+    counts = {"unit": 0, "smoke": 0, "deferred": 0, "unaccounted": 0}
+    for spec, frs in specs.items():
+        for fr in frs:
+            key = f"{spec}/{fr}"
+            cls = "unaccounted"
+            if fr in covered.get(spec, set()):
+                cls = "unit"  # unit이 manifest보다 우선
+            elif entries is not None and key in entries:
+                cls = "deferred" if entries[key]["method"] == "deferred" else "smoke"
+            classes[key] = cls
+            counts[cls] += 1
+    return classes, counts
+
+
 # ── fr — FR↔test 추적 + PREFIX 거버넌스 (check-fr-coverage.mjs) ──
 
 def cmd_fr(cfg, strict):
@@ -278,26 +348,50 @@ def cmd_fr(cfg, strict):
     for file, spec, fr in bad_refs:
         errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
 
+    # 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
+    #     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
+    manifest, manifest_errors = load_manifest(cfg, specs)
+    errors.extend(manifest_errors)
+    strict_specs = set(cfg.get("strictSpecs") or [])
+    for sid in sorted(strict_specs):
+        if sid not in specs:
+            errors.append(f'strictSpecs에 존재하지 않는 spec "{sid}" — 오타/삭제 확인(조용한 스킵 금지)')
+    accounting_active = manifest is not None or bool(cfg.get("requireAccounting"))
+    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest)
+                                 if accounting_active else (None, None))
+
     for spec, frs in specs.items():
         cov = covered.get(spec, set())
+        hard = strict or spec in strict_specs
+        label = "R2(strict)" if strict else "R2(strictSpecs)"
         if not cov:
             msg = f"{spec}: 0/{len(frs)} FRs covered (not yet implemented)"
-            if strict and frs:
-                errors.append(f"R2(strict) {msg}")
+            if hard and frs:
+                errors.append(f"{label} {msg}")
             else:
                 warnings.append(msg)
             continue
         missing = sorted(fr for fr in frs if fr not in cov)
         if missing:
             msg = f"{spec}: {len(cov)}/{len(frs)} FRs covered — missing {', '.join(missing)}"
-            (errors if strict else warnings).append(f"R2(strict) {msg}" if strict else msg)
+            (errors if hard else warnings).append(f"{label} {msg}" if hard else msg)
         else:
             warnings.append(f"{spec}: {len(cov)}/{len(frs)} FRs covered ✓")
+
+    # R3(requireAccounting): 모든 FR이 unit ∨ smoke ∨ deferred — "조용히 미검증" 제거.
+    if cfg.get("requireAccounting"):
+        for spec, frs in specs.items():
+            for fr in sorted(frs):
+                if acct_classes.get(f"{spec}/{fr}") == "unaccounted":
+                    errors.append(f"R3 unaccounted {spec}/{fr} — unit·smoke·deferred 어느 것도 아님(requireAccounting)")
 
     total_fr = sum(len(s) for s in specs.values())
     total_cov = sum(len(s) for s in covered.values())
     mode = "strict" if strict else "incremental"
-    print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov} mode:{mode} config:{cfg_tag(cfg)}")
+    acct_tag = (f" accounted(unit:{acct_counts['unit']} smoke:{acct_counts['smoke']}"
+                f" deferred:{acct_counts['deferred']} unaccounted:{acct_counts['unaccounted']})"
+                if accounting_active else "")
+    print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov}{acct_tag} mode:{mode} config:{cfg_tag(cfg)}")
     for w in warnings:
         print(f"  · {w}")
     if errors:
@@ -341,6 +435,24 @@ def cmd_ownership(cfg, strict):
             if len(specs) > 1:
                 conflicts.append((cat, key, sorted(set(specs))))
 
+    # entity 레지스트리(SPEC-002 FR-009, P3): PREFIX 거버넌스와 동일 패턴 — 등록 = config 변경 = 리뷰 관문.
+    # 비어 있으면 비활성(현행). 채워지면 aggregate-root 카테고리의 소유 키는 등록된 것만, 사유는 빈 값 불가.
+    registry = cfg.get("entityRegistry") or {}
+    entity_errors, registry_warns = [], []
+    if registry:
+        ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
+        reg = {normalize_key(ent_cat, k, cfg): str(registry[k] or "").strip() for k in registry}
+        for key, rationale in reg.items():
+            if not rationale:
+                entity_errors.append(f'entityRegistry["{key}"] — 도입 사유 필요(빈 값 불가)')
+        for key, spec_ids in owners[ent_cat].items():
+            if key not in reg:
+                uniq = sorted(set(spec_ids), key=spec_ids.index)
+                entity_errors.append(f'미등록 entity "{key}" ({" + ".join(uniq)}) — entityRegistry에 사유와 함께 등록 필요(임의 신설 금지)')
+        for key in reg:
+            if key not in owners[ent_cat]:
+                registry_warns.append(f'entityRegistry의 "{key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상')
+
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
     if missing:
         tag = "✗" if strict else "⚠"
@@ -349,6 +461,13 @@ def cmd_ownership(cfg, strict):
         tag = "✗" if strict else "⚠"
         for spec_id, bad in format_issues:
             print(f"{tag} [{spec_id}] {bad}")
+    for w in registry_warns:
+        print(f"⚠ {w}")
+    if entity_errors:
+        print(f"\n✗ ENTITY 레지스트리 위반 {len(entity_errors)}건:", file=sys.stderr)
+        for e in entity_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
     if conflicts:
         print(f"\n✗ 중복 소유(구조적 중복) {len(conflicts)}건:", file=sys.stderr)
         for cat, key, specs in conflicts:
@@ -405,33 +524,82 @@ def cmd_cohesion(cfg, strict):
     print("✓ 모든 spec이 입도 기준 내 — 분할 권고 없음.")
 
 
-# ── completeness — SC·인수조건 존재 (check-spec-completeness.mjs) ──
+# ── 수명주기 (lifecycle-lib.mjs 패리티, SPEC-008) ──
+
+STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"]
+_REVIEWED_PLUS = {"Reviewed", "Approved", "Active"}
+
+
+def parse_status(text):
+    m = re.search(r"\*\*Status\*\*\s*:\s*([A-Za-z]+)", text)
+    return m.group(1) if m else None
+
+
+def is_reviewed_plus(status):
+    return status in _REVIEWED_PLUS
+
+
+def section_block(text, heading):
+    m = re.search(rf"^##\s+{heading}\b", text, re.MULTILINE)
+    if not m:
+        return None
+    after = text[m.start():]
+    body = after[after.index("\n") + 1:]
+    nxt = re.search(r"^##\s", body, re.MULTILINE)
+    return body[: nxt.start()] if nxt else body
+
+
+def has_review_log_entry(text):
+    block = section_block(text, "Review Log")
+    return block is not None and re.search(r"\d{4}-\d{2}-\d{2}", block) is not None
+
+
+def has_dedup_review(text, spec_id_re):
+    block = section_block(text, "Dedup-Review")
+    if block is None:
+        return False
+    return spec_id_re.search(block) is not None or "이웃 없음" in block
+
+
+# ── completeness — SC·인수조건·수명주기 기록 존재 (check-spec-completeness.mjs) ──
 
 def cmd_completeness(cfg, strict):
     files = spec_md_files(cfg)
     findings = []
+    enum = "|".join(STATUS_ENUM)
     for file in files:
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
+        # 수명주기(SPEC-008) — FR 유무와 무관하게 전 spec 대상. Status 없는 레거시는 warn(점진 도입).
+        status = parse_status(text)
+        if status is None:
+            findings.append((spec_id, f"Status 헤더(수명주기 상태) 없음 — {enum} 중 선언"))
+        elif status not in STATUS_ENUM:
+            findings.append((spec_id, f'미정의 Status "{status}" — {enum} 외 값 금지'))
+        elif is_reviewed_plus(status):
+            if not has_review_log_entry(text):
+                findings.append((spec_id, f"Status {status}인데 Review Log 기록(일시·수행자·판정) 없음 — Reviewed 전이는 /analyze·/checklist 결과 기록 필수"))
+            if not has_dedup_review(text, cfg["__specId"]):
+                findings.append((spec_id, f'Status {status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음'))
         if not set(cfg["__frToken"].findall(text)):
             continue  # FR 없는 spec은 면제(순수 인프라 등)
         if not set(re.findall(r"\bSC-\d{3}\b", text)):
-            findings.append((spec_id, "SC(측정형 성공 기준)"))
+            findings.append((spec_id, "SC(측정형 성공 기준) 없음"))
         if not (re.search(r"\b(Given|Acceptance)\b", text, re.IGNORECASE) or re.search(r"수용\s*기준", text)):
-            findings.append((spec_id, "인수조건(Given-When-Then)"))
+            findings.append((spec_id, "인수조건(Given-When-Then) 없음"))
 
-    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건 필요).")
+    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요).")
     if findings:
         tag = "✗" if strict else "⚠"
         print(f"{tag} 완전성 미흡 {len(findings)}건:")
         for spec_id, miss in findings:
-            print(f"  {tag} {spec_id}: {miss} 없음")
+            print(f"  {tag} {spec_id}: {miss}")
         if strict:
-            print("\n✗ --strict: FR 있는 spec은 SC·인수조건 필요.", file=sys.stderr)
+            print("\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요.", file=sys.stderr)
             sys.exit(1)
         return
-    print("✓ FR 있는 spec 모두 SC·인수조건 구비.")
+    print("✓ 완전성 구비 — SC·인수조건·수명주기 기록 모두 충족.")
 
 
 # ── consistency — 선언 키의 본문 근거 (check-spec-consistency.mjs) ──
@@ -539,8 +707,9 @@ def cmd_orphan(cfg, strict):
 # ── converge — 코드만 변경·스펙 무변경 드리프트 (check-converge-drift.mjs) ──
 
 def _git(cfg, args):
+    # core.quotepath=off: 비ASCII 경로가 8진수 인용 문자열로 나오면 glob 매칭이 조용히 깨진다(도그푸딩 발견).
     try:
-        r = subprocess.run(["git"] + args, cwd=cfg["__root"], capture_output=True,
+        r = subprocess.run(["git", "-c", "core.quotepath=off"] + args, cwd=cfg["__root"], capture_output=True,
                            text=True, encoding="utf-8")
     except FileNotFoundError:
         return None
@@ -724,12 +893,19 @@ def cmd_specsync(cfg, staged, msg_file, base):
                 if g:
                     globs.add(g)
         specs.append((spec_id, p, [(g, compile_glob(g)) for g in sorted(globs)],
-                      idx is None and head is not None))
+                      idx is None and head is not None, parse_status(text)))
 
     # ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
+    # 미소유 파일은 specSyncUnownedPolicy가 선언한 대로 — silent(현행)/warn/error(closed-world).
+    policy = cfg.get("specSyncUnownedPolicy") or "silent"
+    if policy not in ("silent", "warn", "error"):
+        print(f'✗ specSyncUnownedPolicy 값 위반 "{policy}" — silent|warn|error 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     exempt = [compile_glob(g) for g in (cfg.get("specSyncExemptGlobs") or [])]
-    spec_set = set(p for _, p, _, _ in specs)
+    spec_set = set(p for _, p, _, _, _ in specs)
     violations = []
+    unowned = []  # 어떤 스펙 Files에도 매치 안 된 변경 파일(exempt 제외)
     memo = {}
 
     def meaningful(spec_id, path, deleted):
@@ -758,23 +934,47 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if any(rx.match(f) for rx in exempt):
             print(f"· exempt: {f} (specSyncExemptGlobs — 영속 흔적 없음)")
             continue
-        for spec_id, path, globs, deleted in specs:
+        owned = False
+        for spec_id, path, globs, deleted, status in specs:
             if not any(rx.match(f) for _, rx in globs):
                 continue
+            owned = True
+            # Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
+            # 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
+            if status == "Draft" and not deleted:
+                violations.append((f, spec_id, True))
+                continue
             if not meaningful(spec_id, path, deleted):
-                violations.append((f, spec_id))
+                violations.append((f, spec_id, False))
+        if not owned and policy != "silent":
+            unowned.append(f)
 
-    # ⑤ 리포트.
+    # ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
+    unowned_hard = policy == "error" and staged and len(unowned) > 0
     mode = "staged(hard)" if staged else f"range(advisory, base:{base})"
     print(f"spec-sync 게이트 — mode:{mode} changed:{len(changed)} specs:{len(specs)}")
+    for f in unowned:
+        print(f"  {'✗' if unowned_hard else '⚠'} unowned: {f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy={policy})")
+    if unowned_hard and not violations:
+        print("\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.",
+              file=sys.stderr)
+        sys.exit(1)
     if not violations:
         print("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
-    for f, spec_id in violations:
-        print(f"  {'✗' if staged else '⚠'} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
+    for f, spec_id, draft in violations:
+        tag = "✗" if staged else "⚠"
+        if draft:
+            print(f"  {tag} {f} → 소유 스펙 {spec_id}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지")
+        else:
+            print(f"  {tag} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
     if staged:
         print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.", file=sys.stderr)
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
+        if any(d for _, _, d in violations):
+            print("  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
+        if unowned_hard:
+            print("  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
         sys.exit(1)
     print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")

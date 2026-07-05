@@ -11,6 +11,7 @@
 {
   "scanDirs": ["src", "tests"],
   "testFileRegex": ["\\.(test|spec)\\.(ts|tsx|js|jsx|mjs|cjs)$"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "npm ci", "lint": "npm run lint", "typecheck": "npx tsc --noEmit", "test": "npm test" }
 }
 ```
@@ -22,6 +23,7 @@
   "scanDirs": ["src", "tests"],
   "testFileRegex": ["(^|/)test_.*\\.py$", "_test\\.py$", "_spec\\.py$"],
   "ignoreDirs": ["__pycache__", ".venv", "venv", ".git", "build", "dist", ".mypy_cache", ".pytest_cache"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "pip install -r requirements.txt", "lint": "ruff check .", "typecheck": "mypy .", "test": "pytest -q" }
 }
 ```
@@ -32,6 +34,7 @@
   "scanDirs": ["."],
   "testFileRegex": ["_test\\.go$"],
   "ignoreDirs": ["vendor", ".git", "bin"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "go mod download", "lint": "go vet ./...", "typecheck": "go build ./...", "test": "go test ./..." }
 }
 ```
@@ -43,6 +46,7 @@
   "scanDirs": ["src", "tests"],
   "testFileRegex": ["\\.rs$"],
   "ignoreDirs": ["target", ".git"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "cargo fetch", "lint": "cargo clippy -- -D warnings", "typecheck": "cargo check", "test": "cargo test" }
 }
 ```
@@ -53,6 +57,7 @@
   "scanDirs": ["src/test", "src/main"],
   "testFileRegex": ["Test\\.(java|kt)$", "Tests\\.(java|kt)$", "IT\\.(java|kt)$", "Spec\\.kt$"],
   "ignoreDirs": [".gradle", "build", "target", ".git", "bin", "obj"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "./gradlew dependencies", "lint": "./gradlew checkstyleMain", "typecheck": "./gradlew compileJava", "test": "./gradlew test" }
 }
 ```
@@ -63,6 +68,7 @@
   "scanDirs": ["app", "lib", "spec", "test"],
   "testFileRegex": ["_spec\\.rb$", "_test\\.rb$"],
   "ignoreDirs": ["vendor", ".git", "tmp", "coverage"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "bundle install", "lint": "bundle exec rubocop", "test": "bundle exec rspec" }
 }
 ```
@@ -73,6 +79,7 @@
   "scanDirs": ["src", "tests"],
   "testFileRegex": ["Tests?\\.cs$", "Spec\\.cs$"],
   "ignoreDirs": ["bin", "obj", ".git", "packages"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "setup": "dotnet restore", "typecheck": "dotnet build --no-restore", "test": "dotnet test" }
 }
 ```
@@ -85,6 +92,7 @@
   "testFileRegex": ["_test\\.go$", "\\.rego$", "\\.tftest\\.hcl$"],
   "ignoreDirs": [".terraform", ".git"],
   "ownershipCategories": ["Resources", "Surfaces", "Capabilities"],
+  "specSyncUnownedPolicy": "warn",
   "commands": { "lint": "terraform fmt -check && tflint", "typecheck": "terraform validate", "test": "conftest test . && terraform plan -detailed-exitcode" }
 }
 ```
@@ -109,6 +117,11 @@
 | `ownershipCategories` | 구조적 중복 키 종류 | `Entities/Surfaces/Capabilities` |
 | `specIdPrefixes` | spec 파일·ID·`@covers`에서 인정할 ID 접두어. 표준 밖 접두어는 `prefixRationale` 사유 필수(미등록은 fr 게이트가 exit 1) | `["SPEC","INFRA","TEST"]` |
 | `requirementIdPrefixes` | 요구 ID 접두어 — FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 여기서 파생(레터 서픽스 1자 포함). 확장 예: `["FR","NFR"]` | `["FR"]` |
+| `strictSpecs` | 전역 `--strict`의 점진 브리지 — 등재 spec만 R2 하드(모든 FR unit 커버 필수, smoke 대체 불가). 미존재 ID는 에러 | `[]` |
+| `requireAccounting` | R3: 모든 FR이 unit ∨ smoke ∨ deferred로 회계돼야 함("조용히 미검증" 제거) | `false` |
+| `smokeManifest` | 회계 매니페스트 JSON 경로 — `"SPEC-NNN/FR-NNN": {method,evidence}` 또는 `{method:"deferred",reason}`. dangling·빈 값은 fr 게이트가 exit 1(사유 존재만 강제) | `null` |
+| `specSyncUnownedPolicy` | 어느 스펙 `Files`에도 미매치인 변경 파일 정책 — `silent`(현행)·`warn`·`error`(staged 차단=closed-world). 예외는 `specSyncExemptGlobs`로 선언. **소비 프로젝트 권장 시작값: `warn`**(안정 후 `error`) | `"silent"` |
+| `entityRegistry` | entity(aggregate-root 카테고리) 등록제 — `{"<entity>":"<도입 사유>"}`. 채우면 미등록 entity 소유·빈 사유는 ownership 게이트가 exit 1(PREFIX 거버넌스 동형). 비면 비활성 | `{}` |
 | `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀 | npm |
 
 > **모델 무관:** 이 config에는 어떤 LLM/에이전트 가정도 없다. 게이트는 모델과 독립적으로 CI에서 강제된다.

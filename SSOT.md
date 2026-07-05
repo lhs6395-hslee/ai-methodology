@@ -23,12 +23,16 @@
 - **FR 게이트**가 spec의 FR 선언과 태그를 대조 →
   - R1: 존재하지 않는 FR 참조 시 fail.
   - R2: 커버 테스트가 있는 spec은 **모든 FR 커버 필수**(strict). 0개인 spec은 incremental에선 warn(점진 도입).
+  - R3(선택, `requireAccounting`): 모든 FR이 **unit-covered ∨ smoke-verified ∨ deferred**로 회계(accounting)되어야 함 — "조용히 미검증"이 경고 속에 쌓이는 것을 제거. smoke/deferred는 `smokeManifest`(JSON: FR→`{method,evidence}` 또는 `{method:"deferred",reason}`)로 선언하고, 게이트는 dangling 키·빈 evidence/reason을 에러 처리한다. **evidence의 질은 기계가 못 본다 — 존재만 강제**(질은 리뷰 몫, 과장 금지). 리포트는 `accounted(unit/smoke/deferred/unaccounted)`.
+  - `strictSpecs`(spec ID 배열): 전역 `--strict`의 **점진 도입 브리지** — 등재 spec만 R2를 하드로(모든 FR unit 커버 필수, smoke/deferred 대체 불가). 완전 커버에 도달한 spec부터 하나씩 잠근다. (SPEC-007)
 - 게이트는 **언어·런타임 무관 4판 동봉**: Go 바이너리 `sdd-gate fr`·셸 `sdd_gates.sh fr`·Python `sdd_gates.py fr`·Node `check-fr-coverage.mjs` — 핵심 3커맨드(fr·ownership·run)와 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생)은 4판 동일, **보강게이트·spec-first(§5)까지의 전 게이트는 Node·Python 두 판**(패리티 테스트로 강제 — 커버 매트릭스: `tooling/ci-examples.md`). 아래 본문은 Node 파일명으로 표기.
 - CI/CD는 매 변경에 `lint→typecheck→test→FR게이트→소유권게이트`를 **언어별 `commands`로** 실행(특정 CI/CD 도구 한정 아님 — 로컬·git훅·어떤 도구든, `tooling/ci-examples.md`).
 - **검증(2026-06-26):** incremental exit 0(통과), strict exit 1(미구현 spec 막음), test 8/8 통과, tsc 0. → 이 체인이 "SSOT=주장"을 "SSOT=기계적 사실"로 만든다.
 - **단, CI가 실제로 green이어야 효력.** 참조 프로젝트는 현재 lint 4 errors로 red → 적용 시 먼저 해소해야 함. (`REALITY_CHECK.md` §3)
 
 > **보강 게이트(advisory):** test-adequacy(빈 껍데기 @covers)·converge-drift(코드↔스펙)·orphan-surface(스펙 없는 코드)는 §방법론 한계를 *부분* 기계화한다. 기본 warn(빌드 안 깸), 익으면 `--strict`. 의미적 중복·스펙 정확성은 여전히 사람 몫.
+>
+> **스펙 수명주기(SPEC-008):** 스펙 헤더 `Status:`는 enum(`Draft→Reviewed→Approved→Active→Deprecated→Removed`)이다. **Draft 스펙이 소유한 코드 변경은 spec-sync가 차단**(스펙 동반 여부 무관 — 리뷰 없는 스펙이 코드를 이끌 수 없다), Reviewed 이상은 `## Review Log`(일시·수행자·판정)·`## Dedup-Review`(이웃 검토 기록)의 **존재**를 completeness가 검사한다. 강제하는 것은 시간 순서가 아니라 **상태 순서**이며, Status 없는 레거시 스펙은 warn만(advisory → strict 승격 경로).
 
 ## 5. 양방향 동기화의 진실
 converge는 양방향 자동 sync가 아님. **작성=LLM, 승인=사람**(`METHODOLOGY.md` 동기화 절). 사람 승인 없는 코드→spec 자동 덮어쓰기는 금지(spec이 코드 거울로 전락).

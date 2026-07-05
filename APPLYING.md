@@ -87,7 +87,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 
 ## 5. 채택 순서 (점진)
-incremental FR 게이트로 시작 → spec별 테스트가 갖춰지면 strict로 승격. 모든 spec이 strict 통과하면 SSOT가 완전히 기계 보장됨.
+incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격.
 
 ---
 
@@ -225,6 +225,10 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 | `⚠ code→spec drift` | `/sdd-sync` → spec 개정 또는 의도적 무시 선택 |
 | `⚠ 미등록 verb "recommend"` | `sdd.config.json` `capabilityVerbs`에 `"recommend"` 추가 |
 | `✗ spec-first 위반` | `/speckit.fix` 실행 또는 `git add` 재스테이징 또는 `Spec-Impact: none <사유>` 트레일러 |
+| `✗ 소유 스펙 SPEC-NNN이 Draft 상태` | 리뷰(`/analyze`+`/checklist`) 결과를 스펙 `## Review Log`·`## Dedup-Review`에 기록 후 `Status: Reviewed`(이상)로 승격 |
+| `⚠/✗ unowned: <파일>` | 소유 스펙의 `Files` glob에 편입, 또는 의도적 예외면 `specSyncExemptGlobs`에 선언 |
+| `✗ R3 unaccounted SPEC-NNN/FR-NNN` | 테스트에 `@covers` 태그, 또는 `smokeManifest`에 `{method,evidence}`/`{method:"deferred",reason}` 선언 |
+| `✗ 미등록 entity "<키>"` | `sdd.config.json` `entityRegistry`에 entity와 도입 사유 등록(신설 = config 리뷰 관문) |
 
 ---
 

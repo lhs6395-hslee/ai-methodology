@@ -4,6 +4,7 @@
 // @covers SPEC-003/FR-003
 // @covers SPEC-003/FR-005
 // @covers SPEC-003/FR-006
+// @covers SPEC-003/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -19,7 +20,7 @@ function repo() {
   mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
@@ -195,5 +196,77 @@ test("range: 첫 positional 인자(base)가 --message-file 부재 시에도 인�
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /base:main/);
     assert.match(r.out, /⚠/); // main 기준 코드-only 변경이 실제로 판정됨
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── P2: specSyncUnownedPolicy (silent|warn|error) — @covers는 파일 헤더에 ──
+
+const setPolicy = (root, policy, exempt = []) =>
+  writeFileSync(join(root, "sdd.config.json"),
+    JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: policy, specSyncExemptGlobs: exempt }));
+
+test("unowned 정책: warn → ⚠ 라인 + 통과 / error(staged) → ✗ exit 1 / exempt로 탈출", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/stray.ts"), "unowned\n");
+    g("add", "src/stray.ts");
+    writeFileSync(join(root, "msg"), "chore\n");
+
+    setPolicy(root, "warn");
+    const warn = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(warn.code, 0, warn.out);
+    assert.match(warn.out, /⚠ unowned: src\/stray\.ts .*specSyncUnownedPolicy=warn/);
+
+    setPolicy(root, "error");
+    const err = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(err.code, 1, err.out);
+    assert.match(err.out, /✗ unowned: src\/stray\.ts/);
+    assert.match(err.out, /closed-world/);
+
+    setPolicy(root, "error", ["src/stray.ts"]);
+    const ex = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(ex.code, 0, ex.out);
+    assert.match(ex.out, /exempt: src\/stray\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("unowned 정책: error도 range 모드에선 advisory(⚠ + exit 0) / 미정의 정책 값 → exit 1", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/stray.ts"), "unowned\n");
+    g("add", "-A"); g("commit", "-qm", "stray");
+
+    setPolicy(root, "error");
+    const range = runGate(root, ["main"]);
+    assert.equal(range.code, 0, range.out);
+    assert.match(range.out, /⚠ unowned: src\/stray\.ts/);
+
+    setPolicy(root, "block-everything");
+    const bad = runGate(root, ["main"]);
+    assert.equal(bad.code, 1, bad.out);
+    assert.match(bad.out, /specSyncUnownedPolicy 값 위반/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("비ASCII 경로(quotepath): 한글 파일명 소유 코드도 인용 없이 매치·판정된다", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
+    writeFileSync(join(root, "src/lib/pdf/한글모듈.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/lib/pdf/한글모듈.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "fix: hotfix\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out); // 소유 매치가 됐다는 증거(인용된 "\354…" 문자열이면 침묵 통과해버림)
+    assert.match(r.out, /한글모듈\.ts/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

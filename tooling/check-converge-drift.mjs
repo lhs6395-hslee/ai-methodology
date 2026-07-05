@@ -13,7 +13,8 @@ const base = args.find((a) => !a.startsWith("--")) || process.env.SDD_DIFF_BASE 
 
 let changed;
 try {
-  changed = execSync(`git diff --name-only ${base}...HEAD`, { cwd: cfg.__root, encoding: "utf8" })
+  // core.quotepath=off: 비ASCII 경로 인용이 디렉토리 귀속 판정을 깨는 것 방지(spec-sync와 동일).
+  changed = execSync(`git -c core.quotepath=off diff --name-only ${base}...HEAD`, { cwd: cfg.__root, encoding: "utf8" })
     .split("\n").map((s) => s.trim()).filter(Boolean);
 } catch {
   console.log(`· converge-drift: git diff(${base}) 불가 — 건너뜀`);

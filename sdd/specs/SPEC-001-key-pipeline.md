@@ -68,6 +68,15 @@
 ## Assumptions / Clarifications Retained
 - `ownershipCategories` 헤더 문자열은 config 값과 정확히 일치해야 게이트가 파싱한다(정규화 표기 규칙은 설계 §4 표를 따른다).
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-002(spec-quality-gates): 비중복 — 이 spec은 파싱·정규화·config 코어, SPEC-002는 그 소비 게이트.
+- 2026-07-05 이웃 SPEC-007(verification-accounting): 비중복 — 회계 키 문법은 이 spec의 파생값을 소비만.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
@@ -75,3 +84,4 @@
 | 2026-07-02 | `__coversRe` 레터 서픽스(소문자 1자) 지원 + 경계 강제 | 도그푸딩(PM솔루션 f36494a): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |
 | 2026-07-02 | `surfaceFormat`(http\|path\|any) config 추가 — FR-002/005 개정 + `normalizeKey`/`validateKey` 분기 + 테스트 | 도그푸딩(PM솔루션): Next.js 파일 라우팅·비-HTTP 자원(Dockerfile·IaC)을 Surface로 모델링 — HTTP 강제를 config로 완화 |
 | 2026-07-05 | `requirementIdPrefixes` config + 요구 ID 정규식 3종 파생(FR-009) | 진단 B-2: 요구 접두어가 전 사이트에 하드코딩 — specIdPrefixes와 같은 config 파생으로 일반화(문법화, SPEC-006 연동) |
+| 2026-07-05 | DEFAULTS에 회계·정책 키 5종 추가(`strictSpecs`·`requireAccounting`·`smokeManifest`·`specSyncUnownedPolicy`·`entityRegistry`) — 전부 비활성 기본값(하위호환) | 고도화 2차(B-3·P1~P3): 소비 게이트들의 새 문법은 config 어댑터 한 곳에서 선언(SPEC-007 등 연동, 런타임 DEFAULTS 패리티는 계약 테스트가 강제) |

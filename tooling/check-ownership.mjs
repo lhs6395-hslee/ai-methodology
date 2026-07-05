@@ -87,6 +87,25 @@ for (const cat of CATEGORIES) {
   }
 }
 
+// entity 레지스트리(SPEC-002 FR-009, P3): PREFIX 거버넌스와 동일 패턴 — 등록 = config 변경 = 리뷰 관문.
+// 비어 있으면 비활성(현행). 채워지면 aggregate-root 카테고리의 소유 키는 등록된 것만, 사유는 빈 값 불가.
+const REGISTRY = cfg.entityRegistry || {};
+const entityErrors = [];
+const registryWarns = [];
+if (Object.keys(REGISTRY).length) {
+  const entCat = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
+  const reg = new Map(Object.keys(REGISTRY).map((k) => [normalizeKey(entCat, k, cfg), String(REGISTRY[k] ?? "").trim()]));
+  for (const [key, rationale] of reg) {
+    if (!rationale) entityErrors.push(`entityRegistry["${key}"] — 도입 사유 필요(빈 값 불가)`);
+  }
+  for (const [key, specIds] of owners[entCat]) {
+    if (!reg.has(key)) entityErrors.push(`미등록 entity "${key}" (${[...new Set(specIds)].join(" + ")}) — entityRegistry에 사유와 함께 등록 필요(임의 신설 금지)`);
+  }
+  for (const key of reg.keys()) {
+    if (!owners[entCat].has(key)) registryWarns.push(`entityRegistry의 "${key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상`);
+  }
+}
+
 console.log(`Ownership 게이트: spec ${files.length}개 중 ${declaredCount}개가 Ownership 선언.`);
 if (missing.length) {
   const tag = STRICT ? "✗" : "⚠";
@@ -96,6 +115,13 @@ if (missing.length) {
 if (formatIssues.length) {
   const tag = STRICT ? "✗" : "⚠";
   for (const f of formatIssues) console.log(`${tag} [${f.specId}] ${f.bad}`);
+}
+
+for (const w of registryWarns) console.log(`⚠ ${w}`);
+if (entityErrors.length) {
+  console.error(`\n✗ ENTITY 레지스트리 위반 ${entityErrors.length}건:`);
+  for (const e of entityErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
 }
 
 if (conflicts.length) {
