@@ -137,3 +137,28 @@ test("fr: derivationClassGlobs 클래스 단위 교체가 분류에 반영(SPEC-
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /접두어↔클래스 부정합 "SPEC-001"/);
 });
+
+// ── 분류 기본값 보정: 인프라/CI 동반·보조 파일도 인프라 클래스(회귀 고정) ──
+
+test("classifyInfraFile: 동반·보조 파일 분류 — .dockerignore/kustomization/*.hcl=iac, actions/cloudbuild/travis=ci", () => {
+  for (const f of [".dockerignore", "app/.dockerignore", "deploy/kustomization.yaml",
+    ".terraform.lock.hcl", "packer/build.hcl", "deploy/docker-compose.prod.yml", "deploy/compose.yaml"])
+    assert.equal(classifyInfraFile(f, GLOBS), "iac", f);
+  for (const f of [".github/actions/setup/action.yml", ".gitlab/ci/build.yml",
+    "cloudbuild.yaml", "svc/cloudbuild.yml", ".travis.yml", ".drone.yml"])
+    assert.equal(classifyInfraFile(f, GLOBS), "ci", f);
+  for (const f of [".gitignore", "src/app.hcl.md", "Makefile"])
+    assert.equal(classifyInfraFile(f, GLOBS), null, f);
+});
+
+test("fr: Jenkinsfile+.github+Dockerfile+.dockerignore만 소유한 SPEC- → 전적으로 인프라 = exit 1 (B안 예측 고정)", () => {
+  const r = run({
+    "sdd/specs/SPEC-013.md": IAC_SPEC("SPEC-013", "Jenkinsfile, .github/**, Dockerfile, .dockerignore"),
+    "Jenkinsfile": "pipeline {}\n",
+    ".github/workflows/ci.yml": "on: push\n",
+    "Dockerfile": "FROM node\n",
+    ".dockerignore": "node_modules\n",
+  });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /접두어↔클래스 부정합 "SPEC-013" — 소유 실파일 4건 전부 iac\/ci 클래스/);
+});

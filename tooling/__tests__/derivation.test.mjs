@@ -193,3 +193,24 @@ test("completeness: 실기록 Change Log 행의 근거 빈 값 → warn·--stric
     assert.doesNotMatch(ok.out, /근거 칸이 빈 값/);
   } finally { rmSync(missing, { recursive: true, force: true }); rmSync(filled, { recursive: true, force: true }); }
 });
+
+// ── 분류 기본값 보정: 인프라/CI 동반·보조 파일이 "other"로 새지 않는다 ──
+
+test("derivation D3: .dockerignore만 있어도 iac 실재 — none 선언 = exit 1 (동반 파일 분류 회귀)", () => {
+  const root = fixture({ ".dockerignore": "node_modules\n", "sdd/derivation.json": BASE }, CFG);
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /D3 iac: none 선언인데 검출 1건/);
+    assert.match(r.out, /\.dockerignore/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("derivation D3: composite action(.github/actions)만 있어도 ci 실재 — none 선언 = exit 1", () => {
+  const root = fixture({ ".github/actions/setup/action.yml": "runs: {}\n", "sdd/derivation.json": BASE }, CFG);
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /D3 ci: none 선언인데 검출 1건/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

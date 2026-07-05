@@ -86,11 +86,15 @@ export const DEFAULTS = {
   derivationManifest: null,
   // 검출 가능 소스 클래스의 탐지 글롭(클래스 단위 교체 — 병합 아님). **·* 만 지원(§4.1).
   // code(scanDirs)·prior-traceability(@covers)는 글롭이 아니라 스캔으로 검출.
+  // 분류 원칙: iac = 인프라 도구의 정의 파일 + 그 동반 파일(.dockerignore·*.hcl 락 등),
+  // ci = 파이프라인 정의 + 그 구성요소(.github/actions 등). `**/X`는 루트 X도 매치(§4.1).
   derivationClassGlobs: {
-    iac: ["**/*.tf", "**/*.tfvars", "k8s/**", "helm/**", "manifests/**",
-      "Dockerfile*", "**/Dockerfile*", "docker-compose*", "compose.yml", "compose.yaml"],
-    ci: [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile*", "**/Jenkinsfile*",
-      ".circleci/**", "azure-pipelines*", "bitbucket-pipelines.yml", ".buildkite/**"],
+    iac: ["**/*.tf", "**/*.tfvars", "**/*.hcl",
+      "k8s/**", "helm/**", "manifests/**", "**/kustomization.yaml", "**/kustomization.yml",
+      "**/Dockerfile*", "**/.dockerignore", "**/docker-compose*", "**/compose.yml", "**/compose.yaml"],
+    ci: [".github/workflows/**", ".github/actions/**", ".gitlab-ci.yml", ".gitlab/ci/**",
+      "**/Jenkinsfile*", ".circleci/**", "azure-pipelines*", "bitbucket-pipelines.yml",
+      ".buildkite/**", "**/cloudbuild.yaml", "**/cloudbuild.yml", ".travis.yml", ".drone.yml"],
     "ops-docs": ["runbook*", "RUNBOOK*", "docs/runbook*", "docs/runbooks/**",
       "docs/ops/**", "docs/operations/**", "ops/**"],
   },
