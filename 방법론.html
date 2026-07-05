@@ -311,8 +311,10 @@
     <tr><td><code>check-fr-coverage</code></td><td>테스트 없는 FR (사슬 끊김) + <strong>검증 회계</strong>(<code>requireAccounting</code>: 전 FR이 unit ∨ smoke ∨ deferred, <code>strictSpecs</code>: spec 단위 strict 잠금, <code>smokeManifest</code>: dangling·빈 사유)</td><td class="blk">차단</td><td>도면엔 있는데 안 지은 방 / 검사 안 받고 "됐다"는 방</td></tr>
     <tr><td><code>check-ownership</code> <span style="color:var(--muted)">(dedup)</span></td><td><strong>2개 spec이 같은 키 소유</strong> = 중복 + <strong>entity 등록제</strong>(<code>entityRegistry</code> — 미등록 entity·빈 사유)</td><td class="blk">차단</td><td>같은 방을 두 도면이 그림 / 무허가 지번</td></tr>
     <tr><td><code>check-spec-cohesion</code> <span style="color:var(--muted)">(거울상)</span></td><td><strong>1개 spec이 키/FR 과다</strong> = 욱여넣기</td><td class="pass">권고</td><td>한 도면에 집 전체를 우겨넣음</td></tr>
-    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장이 안 적힘</td></tr>
+    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음) + <strong>Change Log 근거 빈 값</strong>(선제 캡처 — 변경의 "왜"는 저술 시점에만 남는다)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장·변경 사유가 안 적힘</td></tr>
     <tr><td><code>check-spec-sync</code> <span style="color:var(--muted)">(spec-first)</span></td><td>소유 코드 변경에 스펙 미동반 + <strong>Draft 스펙 소유 코드</strong>(리뷰 전 코드 금지) + <strong>미소유 파일</strong>(<code>specSyncUnownedPolicy</code>)</td><td class="blk">차단(commit-msg)</td><td>도면 갱신 없이 공사 / 검토 안 된 도면으로 착공</td></tr>
+    <tr><td><code>check-derivation</code> <span style="color:var(--muted)">(재도출 회계)</span></td><td>재생성이 <strong>소스 클래스를 조용히 안 읽음</strong> — 9클래스(code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent) 전부 mapped ∨ none ∨ deferred 회계 + <strong>실재↔선언 교차검사</strong>(IaC 있는데 none = 차단)</td><td class="blk">차단</td><td>현장 실사 없이 도면만 보고 "다 봤다"는 감리</td></tr>
+    <tr><td><code>sdd-smoke-scan</code> <span style="color:var(--muted)">(증거 자동 수집)</span></td><td>smoke 증거의 <strong>수동 연결·드리프트</strong> — 검증 태그(<code>@verifies</code>)를 CI 정의·스크립트·runbook에서 수집해 매니페스트를 재생성(<code>--write</code>), check 모드가 태그↔매니페스트 불일치 차단</td><td class="blk">차단(check)</td><td>검사 성적서를 손으로 옮겨 적다 틀리는 것</td></tr>
     <tr><td>보강 4종</td><td>빈 테스트 / 코드만 바뀜 / 명세 없는 코드 / 근거 없는 키</td><td class="pass">권고</td><td>advisory 경고</td></tr>
   </table></div>
   <p class="note">런타임: 게이트는 <strong>4판 동봉</strong>(Go 정적 바이너리·셸·Python·Node) — 핵심 3커맨드(FR·소유권·러너)와 ID 문법(<code>specIdPrefixes</code>·<code>requirementIdPrefixes</code> 파생, 레터 서픽스 포함)은 4판 동일하고, 위 표의 <strong>전 게이트는 Node·Python 두 판</strong>이 같은 판정을 낸다(같은 픽스처 → 같은 exit code·같은 출력, 패리티 테스트로 강제). 런타임 간 문법이 갈라지면 "조용히 빠지는" 스펙·태그가 생기므로, 문법 드리프트 자체를 테스트가 회귀로 차단한다.</p>
@@ -585,6 +587,16 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
     <div class="step"><span class="n">3</span><b>Approved → Active</b><span>승인 후 구현 — 이때부터 소유 코드가 자유롭게 흐른다(동반 변경 규칙은 그대로)</span></div>
   </div>
   <p class="note gate"><strong>미소유 파일 정책(<code>specSyncUnownedPolicy</code>):</strong> 어느 스펙의 <code>Files</code>에도 안 잡히는 변경 파일은 원래 침묵 통과였다 — 이제 <code>silent</code>(현행)/<code>warn</code>/<code>error</code>(closed-world) 중 하나를 <em>선언</em>한다. 의도적 예외는 <code>specSyncExemptGlobs</code>로. <strong>검증 회계(<code>requireAccounting</code>):</strong> 커버 안 된 FR이 경고 속에 쌓이는 것도 막는다 — 모든 FR은 unit(@covers) ∨ smoke(매니페스트 evidence) ∨ deferred(매니페스트 reason)로 회계되어야 하고, 게이트는 사유의 <em>존재만</em> 강제한다(질은 리뷰 몫). Status 없는 레거시 스펙·기본값 config는 전부 현행 동작 그대로다(점진 도입 — advisory→strict 승격 경로).</p>
+
+  <h3>재도출 소스 회계 — 재생성은 src만 읽으면 미완성이다</h3>
+  <p>두 프로젝트 재생성 비교에서 <strong>[검증]</strong>된 결론: 재생성은 레포 안에서 도출 가능한 모든 것을 손작성본보다 잘 뽑지만, 초기 재도출이 src 밖(terraform/k8s/CI)을 아예 안 읽어 INFRA FR을 잃었고, smoke 실증거·<code>@covers</code> 재연결·인간 의도는 수작업으로 남았다. 그 4개 잔여를 전부 문법화했다:</p>
+  <div class="pipe">
+    <div class="step"><span class="n">1</span><b>소스 9클래스 회계</b><span><code>sdd/derivation.json</code>에 code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent 전부를 mapped ∨ none ∨ deferred로 선언 — <code>derivation</code> 게이트가 미회계·"실재하는데 none"을 차단</span></div>
+    <div class="step"><span class="n">2</span><b>smoke 증거 자동 수집</b><span>증거가 사는 파일(CI 정의·스크립트·runbook)에 <code>@verifies</code> 태그 → <code>smoke-scan --write</code>가 매니페스트를 결정적 재생성(수동 연결 제거, 드리프트는 check가 차단)</span></div>
+    <div class="step"><span class="n">3</span><b>태그 재연결 자동화</b><span>재도출은 FR 키 보존이 기본 — 재번호가 불가피하면 마이그레이션 맵 + <code>retag --write</code>가 <code>@covers</code>/<code>@verifies</code>/매니페스트 키를 기계 이행(손 재태깅 금지)</span></div>
+    <div class="step"><span class="n">4</span><b>선제 캡처</b><span>어디에도 기록 안 된 순수 의도는 사후 재도출 불가 — Review Log·Dedup-Review·Clarifications에 더해 <b>Change Log 근거 칸</b>의 존재를 completeness가 검사(빈 근거 = 경고, <code>--strict</code> 차단)</span></div>
+  </div>
+  <p class="note gate"><strong>정직한 경계 = 선언된 클래스.</strong> 레포 밖 실체(운영 인프라 체인·빌드 로그)는 게이트가 아는 척하지 않는다 — mapped evidence가 좌표(빌드 #·URL·describe 명령)를 가리키는 방식으로만 선언되고, 그 좌표 검증은 <code>SSOT.md</code> §5b(live drift)와 리뷰 몫이다. 순수 인간 의도(human-intent)도 "정의되지 않은 예외"가 아니라 <em>회계되는 클래스</em>다 — 저술 시점 캡처만이 경로임을 매니페스트가 명시한다.</p>
 </div></section>
 
 <section id="orbit"><div class="wrap">

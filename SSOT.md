@@ -23,7 +23,7 @@
 - **FR 게이트**가 spec의 FR 선언과 태그를 대조 →
   - R1: 존재하지 않는 FR 참조 시 fail.
   - R2: 커버 테스트가 있는 spec은 **모든 FR 커버 필수**(strict). 0개인 spec은 incremental에선 warn(점진 도입).
-  - R3(선택, `requireAccounting`): 모든 FR이 **unit-covered ∨ smoke-verified ∨ deferred**로 회계(accounting)되어야 함 — "조용히 미검증"이 경고 속에 쌓이는 것을 제거. smoke/deferred는 `smokeManifest`(JSON: FR→`{method,evidence}` 또는 `{method:"deferred",reason}`)로 선언하고, 게이트는 dangling 키·빈 evidence/reason을 에러 처리한다. **evidence의 질은 기계가 못 본다 — 존재만 강제**(질은 리뷰 몫, 과장 금지). 리포트는 `accounted(unit/smoke/deferred/unaccounted)`.
+  - R3(선택, `requireAccounting`): 모든 FR이 **unit-covered ∨ smoke-verified ∨ deferred**로 회계(accounting)되어야 함 — "조용히 미검증"이 경고 속에 쌓이는 것을 제거. smoke/deferred는 `smokeManifest`(JSON: FR→`{method,evidence}` 또는 `{method:"deferred",reason}`)로 선언하고, 게이트는 dangling 키·빈 evidence/reason을 에러 처리한다. **evidence의 질은 기계가 못 본다 — 존재만 강제**(질은 리뷰 몫, 과장 금지). 리포트는 `accounted(unit/smoke/deferred/unaccounted)`. **비-unit 엔트리는 자동 채움(SPEC-010)**: 증거가 사는 파일의 검증 태그(`@verifies`)를 `smoke-scan`이 수집해 매니페스트를 재생성(`--write`)하고 check 모드가 드리프트를 차단 — 수동 연결 제거(수동 선언 경로는 보존).
   - `strictSpecs`(spec ID 배열): 전역 `--strict`의 **점진 도입 브리지** — 등재 spec만 R2를 하드로(모든 FR unit 커버 필수, smoke/deferred 대체 불가). 완전 커버에 도달한 spec부터 하나씩 잠근다. (SPEC-007)
 - 게이트는 **언어·런타임 무관 4판 동봉**: Go 바이너리 `sdd-gate fr`·셸 `sdd_gates.sh fr`·Python `sdd_gates.py fr`·Node `check-fr-coverage.mjs` — 핵심 3커맨드(fr·ownership·run)와 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생)은 4판 동일, **보강게이트·spec-first(§5)까지의 전 게이트는 Node·Python 두 판**(패리티 테스트로 강제 — 커버 매트릭스: `tooling/ci-examples.md`). 아래 본문은 Node 파일명으로 표기.
 - CI/CD는 매 변경에 `lint→typecheck→test→FR게이트→소유권게이트`를 **언어별 `commands`로** 실행(특정 CI/CD 도구 한정 아님 — 로컬·git훅·어떤 도구든, `tooling/ci-examples.md`).
@@ -31,6 +31,8 @@
 - **단, CI가 실제로 green이어야 효력.** 참조 프로젝트는 현재 lint 4 errors로 red → 적용 시 먼저 해소해야 함. (`REALITY_CHECK.md` §3)
 
 > **보강 게이트(advisory):** test-adequacy(빈 껍데기 @covers)·converge-drift(코드↔스펙)·orphan-surface(스펙 없는 코드)는 §방법론 한계를 *부분* 기계화한다. 기본 warn(빌드 안 깸), 익으면 `--strict`. 의미적 중복·스펙 정확성은 여전히 사람 몫.
+>
+> **재도출 소스 회계(SPEC-009):** brownfield 재도출의 SSOT 체인은 코드만이 아니다 — 소스 9클래스(code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent)가 `derivationManifest`에 전부 회계되어야 하고, 레포에 실재하는 클래스를 none으로 선언하면 `derivation` 게이트가 exit 1(조용한 미인제스트 금지). 레포 밖 실체(운영 인프라·빌드 로그)는 mapped evidence가 좌표를 가리키는 방식으로만 선언 가능(게이트는 레포 밖을 아는 척하지 않는다 — §5b의 live 검증과 상보). 재도출 불가능한 순수 인간 의도는 저술 시점 선제 캡처(Change Log 근거 존재 검사 포함)로만 남는다.
 >
 > **스펙 수명주기(SPEC-008):** 스펙 헤더 `Status:`는 enum(`Draft→Reviewed→Approved→Active→Deprecated→Removed`)이다. **Draft 스펙이 소유한 코드 변경은 spec-sync가 차단**(스펙 동반 여부 무관 — 리뷰 없는 스펙이 코드를 이끌 수 없다), Reviewed 이상은 `## Review Log`(일시·수행자·판정)·`## Dedup-Review`(이웃 검토 기록)의 **존재**를 completeness가 검사한다. 강제하는 것은 시간 순서가 아니라 **상태 순서**이며, Status 없는 레거시 스펙은 warn만(advisory → strict 승격 경로).
 

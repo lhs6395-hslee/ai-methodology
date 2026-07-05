@@ -120,6 +120,9 @@
 | `strictSpecs` | 전역 `--strict`의 점진 브리지 — 등재 spec만 R2 하드(모든 FR unit 커버 필수, smoke 대체 불가). 미존재 ID는 에러 | `[]` |
 | `requireAccounting` | R3: 모든 FR이 unit ∨ smoke ∨ deferred로 회계돼야 함("조용히 미검증" 제거) | `false` |
 | `smokeManifest` | 회계 매니페스트 JSON 경로 — `"SPEC-NNN/FR-NNN": {method,evidence}` 또는 `{method:"deferred",reason}`. dangling·빈 값은 fr 게이트가 exit 1(사유 존재만 강제) | `null` |
+| `smokeScanDirs` | 검증 태그(smoke 증거)를 스캔할 루트들 — CI 정의·스크립트·runbook이 scanDirs 밖이면 확장(SPEC-010). 미설정이면 `scanDirs` 재사용 | `null` |
+| `derivationManifest` | 재도출 소스 회계 매니페스트 JSON 경로 — 소스 9클래스가 전부 `{status: mapped\|none\|deferred, evidence\|reason}`으로 회계돼야 함. 실재하는데 none 선언은 derivation 게이트가 exit 1(SPEC-009). brownfield readopt에 켜기 | `null` |
+| `derivationClassGlobs` | 검출 가능 클래스(iac·ci·ops-docs)의 탐지 글롭(클래스 단위 교체). terraform/k8s/CI 정의가 표준 경로 밖이면 조정 | 내장 기본 |
 | `specSyncUnownedPolicy` | 어느 스펙 `Files`에도 미매치인 변경 파일 정책 — `silent`(현행)·`warn`·`error`(staged 차단=closed-world). 예외는 `specSyncExemptGlobs`로 선언. **소비 프로젝트 권장 시작값: `warn`**(안정 후 `error`) | `"silent"` |
 | `entityRegistry` | entity(aggregate-root 카테고리) 등록제 — `{"<entity>":"<도입 사유>"}`. 채우면 미등록 entity 소유·빈 사유는 ownership 게이트가 exit 1(PREFIX 거버넌스 동형). 비면 비활성 | `{}` |
 | `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀 | npm |

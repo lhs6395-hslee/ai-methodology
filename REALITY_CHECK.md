@@ -35,6 +35,10 @@
 | **스펙 수명주기(SPEC-008)** — Status enum·Draft 차단·Review Log/Dedup-Review 존재 | `[검증]` **동작**(2026-07-05) | Draft 스펙 소유 코드 staged=exit 1(스펙 동반해도), 트레일러로만 탈출. Status 없음/enum 밖/기록 없음은 completeness warn·`--strict` exit 1. Node↔Python 패리티 green |
 | **미소유 파일 정책(P2)** — `specSyncUnownedPolicy` | `[검증]` **동작**(2026-07-05) | warn=⚠+exit 0, error(staged)=exit 1, error(range)=advisory, 미정의 값 exit 1, exempt 탈출. 도그푸딩에서 비ASCII 경로 인용 버그 발견→`core.quotepath=off` 수정+회귀 테스트 |
 | **entity 레지스트리(P3)** — `entityRegistry` | `[검증]` **동작**(2026-07-05) | 미등록 entity exit 1, 빈 사유 exit 1, 유령 등록 ⚠, 빈 레지스트리=비활성(현행). Node↔Python 바이트 패리티 green |
+| **재도출 소스 회계(SPEC-009)** — `derivationManifest`·9클래스 enum·검출 교차검사 | `[검증]` **동작**(2026-07-05) | 미회계/미정의 클래스 exit 1, 빈 evidence/reason exit 1, IaC 실재+none 선언 exit 1(D3), mapped+검출 0은 ⚠(레포 밖 실체 허용), 미설정이면 no-op. Node↔Python 바이트 패리티 green. 이 레포 자신이 9클래스 회계로 상시 on |
+| **선제 캡처(SPEC-009)** — Change Log 실기록 행의 근거 존재 | `[검증]` **동작**(2026-07-05) | 근거 빈 값 warn·`--strict` exit 1, 플레이스홀더 행 면제. completeness 게이트 편입, Node↔Python 패리티 green |
+| **smoke 증거 자동 수집(SPEC-010)** — `@verifies` 태그 → `smoke-scan --write`/check | `[검증]` **동작**(2026-07-05) | CI 정의·스크립트 태그 수집→매니페스트 재생성(경로 provenance·정렬 결정성), 수동 엔트리 보존, 드리프트 check exit 1, dangling/형식 위반/method 충돌 exit 1. write 산출물까지 Node↔Python 바이트 동일 |
+| **추적 태그 마이그레이션(SPEC-011)** — `retag <map> [--write]` | `[검증]` **동작**(2026-07-05) | 맵 검증 실패 시 무변경(all-or-nothing), dry-run 계획 보고, write 적용·멱등, 서픽스 키 비오염, null=보고만(잔존은 R1 그물). Node↔Python 산출물 바이트 동일 |
 | **런타임 무관 — Go 단일 정적 바이너리(`go-gate/`, 인터프리터 0)** | `[검증]` 빌드·정적·크로스컴파일(2026-06-29) / `[미확인]` **2026-07-05 문법 정렬분 실행 재검증** | Go 1.26으로 빌드, 당시 Node/Python/셸판과 동일 결과. `CGO_ENABLED=0` linux/amd64 = `statically linked`, 6종 크로스컴파일(~2.5MB). **2026-07-05 요구 ID 문법·PREFIX 거버넌스 정렬은 소스 계약 테스트(`runtime-contract.test.mjs`)로만 검증** — 로컬 Go 툴체인 부재로 빌드·실행 패리티 재검증은 CI(`sdd-gate-release.yml`) 과제. 릴리스: `sdd-gate-release.yml` |
 
 ## 3. 그래서 "안 되는 것" 정리 (사용자 지적대로)

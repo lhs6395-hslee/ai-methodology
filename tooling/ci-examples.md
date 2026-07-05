@@ -22,6 +22,9 @@
 | spec 완전성(SC·인수조건 + **수명주기 기록** — Status enum·Review Log·Dedup-Review, SPEC-008) | `node check-spec-completeness.mjs` | `python sdd_gates.py completeness` |
 | spec 일관성 | `node check-spec-consistency.mjs` | `python sdd_gates.py consistency` |
 | **spec-first(§5, hard — Draft 소유 차단·`specSyncUnownedPolicy` 포함)** | `node check-spec-sync.mjs --staged --message-file <p>` / `[base]` | `python sdd_gates.py specsync --staged --message-file <p>` / `[base]` |
+| **재도출 소스 회계(SPEC-009 — 9클래스·검출 교차검사·미설정 no-op)** | `node check-derivation.mjs` | `python sdd_gates.py derivation` |
+| **smoke 증거 자동 수집(SPEC-010 — 태그 수집·`--write` 재생성·드리프트 check)** | `node sdd-smoke-scan.mjs [--write]` | `python sdd_gates.py smokescan [--write]` |
+| **추적 태그 마이그레이션(SPEC-011 — dry-run 기본·`--write` 적용)** | `node sdd-retag.mjs <map.json> [--write]` | `python sdd_gates.py retag <map.json> [--write]` |
 
 셸/Go판은 핵심 3커맨드만 제공한다 — 보강 게이트가 필요한 비-Node 프로젝트는 Python판을 쓴다(둘 다 없는 환경이 실제 생기면 그때 승격 판단).
 

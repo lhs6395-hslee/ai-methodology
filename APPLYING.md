@@ -87,7 +87,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 
 ## 5. 채택 순서 (점진)
-incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격.
+incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 비-unit 증거는 손으로 잇지 말고 검증 태그(`@verifies`) + `smoke-scan --write`로 자동 채움(SPEC-010). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격. brownfield 재도출(readopt)에는 `derivationManifest`를 켜서 소스 9클래스 회계를 강제(SPEC-009 — src만 읽는 재생성 차단, 절차는 `prompts/readopt.md`).
 
 ---
 
@@ -229,6 +229,9 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 | `⚠/✗ unowned: <파일>` | 소유 스펙의 `Files` glob에 편입, 또는 의도적 예외면 `specSyncExemptGlobs`에 선언 |
 | `✗ R3 unaccounted SPEC-NNN/FR-NNN` | 테스트에 `@covers` 태그, 또는 `smokeManifest`에 `{method,evidence}`/`{method:"deferred",reason}` 선언 |
 | `✗ 미등록 entity "<키>"` | `sdd.config.json` `entityRegistry`에 entity와 도입 사유 등록(신설 = config 리뷰 관문) |
+| `✗ D1 미회계 소스 클래스 / D3 … none 선언인데 검출` | `sdd/derivation.json`에 그 클래스를 mapped(evidence)로 회계하거나, 정말 없으면 실재 파일을 스펙 Files로 소유시킨 뒤 재확인(SPEC-009) |
+| `✗ S1 … --write로 재생성` | `smoke-scan --write` 실행 — 매니페스트는 태그 파생 재생성물(수동 엔트리는 보존됨) |
+| `✗ Change Log … 근거 칸이 빈 값` | 그 변경의 "왜"를 근거 칸에 기록 — 저술 시점에만 캡처 가능(선제 캡처, SPEC-009) |
 
 ---
 
@@ -240,4 +243,4 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 2. glob은 `**`와 `*` 만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
 3. `sdd-init` 이후 신규 스펙은 템플릿(`sdd/templates/spec-template.md`)에 Files 절이 포함되어 자동 안내된다.
 
-**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 4-spec(1 aggregate씩, `Files` glob으로 tooling 14파일 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 커버리지 갭(미커버 5 FR)도 게이트가 정직하게 드러낸다 — incremental 모드로 점진 보강.
+**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 11-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.

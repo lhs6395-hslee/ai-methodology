@@ -84,3 +84,4 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 | 2026-07-03 | 초안 — 채택 수명주기 3 명령(start/readopt/update)을 별도 aggregate로 신설(SPEC-004 install 메커니즘과 분리; cohesion 캡 준수) | feat/lifecycle-commands |
 | 2026-07-04 | 진입점 교정 — 로컬 절대경로(`~/Documents/claude/sdd/prompts/*`) 하드코딩 제거, 정본 진입을 GitHub **raw URL**로; tooling 확보를 repo URL 기반 **partial+sparse**로 명시(전체 clone 불필요, clean-machine 진입 보장). Edge Cases·Assumptions 갱신 | feat/lifecycle-commands |
 | 2026-07-04 | main 머지 후 ref 승격 — 진입 raw URL·`REF` 기본값·문서 주석의 `<ref>`를 `feat/lifecycle-commands`→`main`으로 교체(정본 ref=main, 자기참조 유지). Change Log 근거 열은 이력이라 보존 | main |
+| 2026-07-05 | /sdd-readopt 요약 절차에 소스 9클래스 재도출·인간 절 이월·키 보존/retag·smoke-scan 결선 반영(SSOT는 prompts/readopt.md — 요약 정렬) | SPEC-009~011 신설 동반 — 요약이 원본과 갈라지면 스킬 실행 경로가 구 절차로 재도출함 |

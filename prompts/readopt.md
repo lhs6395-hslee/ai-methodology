@@ -25,9 +25,21 @@
    sh "$KIT/tooling/sdd-init.sh" --gate=node --force      # ← 대상 프로젝트 루트에서
    ```
 4. **config 맞춤.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`).
-5. **구 산출물 정리.** 기존 `sdd/specs/*`를 걷어낸다 — 코드는 그대로, 1단계 스냅샷 태그에 남아 있음.
-6. **스펙 재도출.** 현재 코드 실태를 읽어 EARS FR 스펙을 새로 도출한다(reverse-engineer). spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
-7. **결선.** `@covers` 태깅 → 게이트 green → 커밋(자기 훅 통과).
+5. **구 산출물 정리 — 인간 절은 먼저 이월 목록으로.** 기존 `sdd/specs/*`를 걷어내기 **전에** 각 스펙의 인간 의도 절(User Story·Assumptions/Clarifications·Review Log·Dedup-Review·Change Log 근거)을 이월 목록으로 뽑아둔다(prior-intent 소스 — 사후 재생성 불가). 그다음 걷어낸다 — 코드는 그대로, 1단계 스냅샷 태그에 남아 있음.
+6. **스펙 재도출 — 소스 클래스 9종 전부 읽는다(SPEC-009).** src만 읽는 재도출은 미완성이다. 정의된 소스 클래스와 산출물 매핑:
+   | 클래스 | 읽을 것 | 착지 |
+   |---|---|---|
+   | `code` | scanDirs의 앱/툴 소스 | SPEC FR + Ownership |
+   | `iac` | terraform/k8s/helm/Dockerfile/compose | **INFRA 스펙**(FR·Files 소유) |
+   | `ci` | 워크플로우·Jenkinsfile·파이프라인 정의 | INFRA 스펙 + 검증 태그(smoke 증거) |
+   | `ops-docs` | runbook·운영 문서 | verification 절·검증 태그 |
+   | `build-evidence` | 빌드/CI 실행 로그·아티팩트(레포 밖) | 검증 태그 본문이 좌표(빌드 #·URL)를 가리킴 |
+   | `vcs-history` | git log·PR·커밋 메시지·Spec-Impact 트레일러 | Change Log 근거·마이그레이션 이력 |
+   | `prior-traceability` | 기존 `@covers`/검증 태그 인벤토리 | **FR 키 보존이 기본** — 태그가 참조하는 키를 새 스펙이 그대로 쓴다 |
+   | `prior-intent` | 5단계 이월 목록 | 새 스펙의 Story·Clarifications로 이월(버리면 사유 회계) |
+   | `human-intent` | 기록 안 된 순수 의도 — **사후 재도출 불가** | 사용자 인터뷰로 Clarifications에 선제 캡처, 불가면 deferred 회계 |
+   읽은 결과를 `sdd/derivation.json`에 클래스별 mapped/none/deferred로 회계하고 `sdd.config.json`에 `derivationManifest`를 선언한다 — `derivation` 게이트가 미회계·"실재하는데 none"을 차단한다. spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
+7. **결선 — 태깅은 보존·자동으로.** ① FR 키를 보존했으면 기존 `@covers`는 그대로 유효(R1이 검증). 재번호가 불가피했으면 마이그레이션 맵(old→new|null)을 만들어 `sdd-retag <map.json> --write`(또는 `sdd_gates.py retag`)로 기계 이행(SPEC-011) — 손 재태깅 금지. ② smoke 증거는 증거가 사는 파일(CI 정의·스크립트·runbook)에 검증 태그(`@verifies <SPEC-ID>/FR-NNN <method>: <evidence>`)로 남기고 `sdd-smoke-scan --write`로 매니페스트를 재생성(SPEC-010) — 손 연결 금지. ③ 게이트 green(derivation·smoke-scan check 포함) → 커밋(자기 훅 통과).
 
 ## 고정 규칙
 - [`adopt.md`](adopt.md)의 고정 규칙과 동일.
