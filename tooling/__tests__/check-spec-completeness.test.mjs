@@ -24,11 +24,11 @@ function run(dir, args = []) {
   catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }
 
-test("FR + SC + 인수조건 완비 → 통과", () => {
+test("FR + SC + 인수조건 + 수명주기 기록 완비 → 통과", () => {
   const dir = fixture({ "sdd/specs/SPEC-001.md":
-    "**Spec**: `SPEC-001`\n**FR-001** a\n**Given** x **When** y **Then** z\n## Success Criteria\n- **SC-001**: 정확도 ≥ 90%\n" });
+    "**Spec**: `SPEC-001`  **Status**: Active\n**FR-001** a\n**Given** x **When** y **Then** z\n## Success Criteria\n- **SC-001**: 정확도 ≥ 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n" });
   const r = run(dir);
-  assert.equal(r.code, 0);
+  assert.equal(r.code, 0, r.out);
   assert.match(r.out, /구비/);
 });
 

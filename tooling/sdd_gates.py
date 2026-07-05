@@ -499,33 +499,82 @@ def cmd_cohesion(cfg, strict):
     print("✓ 모든 spec이 입도 기준 내 — 분할 권고 없음.")
 
 
-# ── completeness — SC·인수조건 존재 (check-spec-completeness.mjs) ──
+# ── 수명주기 (lifecycle-lib.mjs 패리티, SPEC-008) ──
+
+STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"]
+_REVIEWED_PLUS = {"Reviewed", "Approved", "Active"}
+
+
+def parse_status(text):
+    m = re.search(r"\*\*Status\*\*\s*:\s*([A-Za-z]+)", text)
+    return m.group(1) if m else None
+
+
+def is_reviewed_plus(status):
+    return status in _REVIEWED_PLUS
+
+
+def section_block(text, heading):
+    m = re.search(rf"^##\s+{heading}\b", text, re.MULTILINE)
+    if not m:
+        return None
+    after = text[m.start():]
+    body = after[after.index("\n") + 1:]
+    nxt = re.search(r"^##\s", body, re.MULTILINE)
+    return body[: nxt.start()] if nxt else body
+
+
+def has_review_log_entry(text):
+    block = section_block(text, "Review Log")
+    return block is not None and re.search(r"\d{4}-\d{2}-\d{2}", block) is not None
+
+
+def has_dedup_review(text, spec_id_re):
+    block = section_block(text, "Dedup-Review")
+    if block is None:
+        return False
+    return spec_id_re.search(block) is not None or "이웃 없음" in block
+
+
+# ── completeness — SC·인수조건·수명주기 기록 존재 (check-spec-completeness.mjs) ──
 
 def cmd_completeness(cfg, strict):
     files = spec_md_files(cfg)
     findings = []
+    enum = "|".join(STATUS_ENUM)
     for file in files:
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
+        # 수명주기(SPEC-008) — FR 유무와 무관하게 전 spec 대상. Status 없는 레거시는 warn(점진 도입).
+        status = parse_status(text)
+        if status is None:
+            findings.append((spec_id, f"Status 헤더(수명주기 상태) 없음 — {enum} 중 선언"))
+        elif status not in STATUS_ENUM:
+            findings.append((spec_id, f'미정의 Status "{status}" — {enum} 외 값 금지'))
+        elif is_reviewed_plus(status):
+            if not has_review_log_entry(text):
+                findings.append((spec_id, f"Status {status}인데 Review Log 기록(일시·수행자·판정) 없음 — Reviewed 전이는 /analyze·/checklist 결과 기록 필수"))
+            if not has_dedup_review(text, cfg["__specId"]):
+                findings.append((spec_id, f'Status {status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음'))
         if not set(cfg["__frToken"].findall(text)):
             continue  # FR 없는 spec은 면제(순수 인프라 등)
         if not set(re.findall(r"\bSC-\d{3}\b", text)):
-            findings.append((spec_id, "SC(측정형 성공 기준)"))
+            findings.append((spec_id, "SC(측정형 성공 기준) 없음"))
         if not (re.search(r"\b(Given|Acceptance)\b", text, re.IGNORECASE) or re.search(r"수용\s*기준", text)):
-            findings.append((spec_id, "인수조건(Given-When-Then)"))
+            findings.append((spec_id, "인수조건(Given-When-Then) 없음"))
 
-    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건 필요).")
+    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요).")
     if findings:
         tag = "✗" if strict else "⚠"
         print(f"{tag} 완전성 미흡 {len(findings)}건:")
         for spec_id, miss in findings:
-            print(f"  {tag} {spec_id}: {miss} 없음")
+            print(f"  {tag} {spec_id}: {miss}")
         if strict:
-            print("\n✗ --strict: FR 있는 spec은 SC·인수조건 필요.", file=sys.stderr)
+            print("\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요.", file=sys.stderr)
             sys.exit(1)
         return
-    print("✓ FR 있는 spec 모두 SC·인수조건 구비.")
+    print("✓ 완전성 구비 — SC·인수조건·수명주기 기록 모두 충족.")
 
 
 # ── consistency — 선언 키의 본문 근거 (check-spec-consistency.mjs) ──
@@ -818,11 +867,11 @@ def cmd_specsync(cfg, staged, msg_file, base):
                 if g:
                     globs.add(g)
         specs.append((spec_id, p, [(g, compile_glob(g)) for g in sorted(globs)],
-                      idx is None and head is not None))
+                      idx is None and head is not None, parse_status(text)))
 
     # ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
     exempt = [compile_glob(g) for g in (cfg.get("specSyncExemptGlobs") or [])]
-    spec_set = set(p for _, p, _, _ in specs)
+    spec_set = set(p for _, p, _, _, _ in specs)
     violations = []
     memo = {}
 
@@ -852,11 +901,16 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if any(rx.match(f) for rx in exempt):
             print(f"· exempt: {f} (specSyncExemptGlobs — 영속 흔적 없음)")
             continue
-        for spec_id, path, globs, deleted in specs:
+        for spec_id, path, globs, deleted, status in specs:
             if not any(rx.match(f) for _, rx in globs):
                 continue
+            # Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
+            # 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
+            if status == "Draft" and not deleted:
+                violations.append((f, spec_id, True))
+                continue
             if not meaningful(spec_id, path, deleted):
-                violations.append((f, spec_id))
+                violations.append((f, spec_id, False))
 
     # ⑤ 리포트.
     mode = "staged(hard)" if staged else f"range(advisory, base:{base})"
@@ -864,11 +918,17 @@ def cmd_specsync(cfg, staged, msg_file, base):
     if not violations:
         print("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
-    for f, spec_id in violations:
-        print(f"  {'✗' if staged else '⚠'} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
+    for f, spec_id, draft in violations:
+        tag = "✗" if staged else "⚠"
+        if draft:
+            print(f"  {tag} {f} → 소유 스펙 {spec_id}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지")
+        else:
+            print(f"  {tag} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
     if staged:
         print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.", file=sys.stderr)
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
+        if any(d for _, _, d in violations):
+            print("  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
         sys.exit(1)
     print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { loadConfig } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
+import { parseStatus } from "./lifecycle-lib.mjs";
 
 const cfg = loadConfig();
 const args = process.argv.slice(2);
@@ -66,7 +67,7 @@ for (const p of specPaths) {
     }
     parseSection(src, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).forEach((g) => globs.add(g));
   }
-  specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null });
+  specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null, status: parseStatus(text) });
 }
 
 // ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
@@ -96,6 +97,9 @@ for (const f of changed) {
   if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
   for (const s of specs) {
     if (!s.globs.some(({ re }) => re.test(f))) continue;
+    // Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
+    // 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
+    if (s.status === "Draft" && !s.deletedInIndex) { violations.push({ file: f, spec: s.id, draft: true }); continue; }
     if (!meaningful(s)) violations.push({ file: f, spec: s.id });
   }
 }
@@ -104,10 +108,13 @@ for (const f of changed) {
 const mode = STAGED ? "staged(hard)" : `range(advisory, base:${BASE})`;
 console.log(`spec-sync 게이트 — mode:${mode} changed:${changed.size} specs:${specs.length}`);
 if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
-for (const v of violations) console.log(`  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
+for (const v of violations) console.log(v.draft
+  ? `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
+  : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
 if (STAGED) {
   console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.`);
   console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
+  if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
   process.exit(1);
 }

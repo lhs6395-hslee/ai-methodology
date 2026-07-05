@@ -70,6 +70,14 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 - 최초 채택(`/sdd-start`)은 배선 전 상태에서도 실행될 수 있으므로, 진정한 clean-machine 진입은 `prompts/adopt.md`(raw URL)로도 가능하다. 설치형 스킬은 채택 이후의 재채택·업데이트에서 특히 유용하다.
 - 진입점 문서(README·PROMPTS·`prompts/*`·SKILL)는 프롬프트를 **로컬 절대경로로 하드코딩하지 않는다** — 정본 진입은 GitHub raw URL이고, 로컬 키트 경로(`~/Documents/claude/sdd`)는 선택적 캐시 관례일 뿐 전제가 아니다.
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-004(harness-install): 비중복 — 설치 하네스는 참조(Dependencies), 채택 수명주기 스킬만 소유.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|

@@ -68,6 +68,15 @@
 ## Assumptions / Clarifications Retained
 - 키트는 원본이므로 훅·명령은 `tooling/`을 직접 호출하고, 소비 프로젝트에는 `scripts/`로 복사된다(설치기 대상 분리).
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-005(adoption-lifecycle): 비중복 — 설치 하네스(이 spec)와 채택 수명주기 스킬(SPEC-005)은 산출물·책임 상이.
+- 2026-07-05 이웃 SPEC-002·SPEC-003(게이트 소유 spec들): 비중복 — 이 spec은 배선(설치)만 소유.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
@@ -77,3 +86,4 @@
 | 2026-07-02 | sdd-run.mjs(CI 스테이지 러너) + FR-008 편입 — Symbols 7개(maxKeysPerCategoryPerSpec 7로 상향, sdd.config.json) | 하네스+설치기 aggregate는 6+1 엔트리포인트가 한 응집 묶음; SPEC-002의 5→6 선례와 동일 논리 |
 | 2026-07-03 | FR-003 확장 — sdd-init가 수명주기 스킬(`/sdd-start`·`/sdd-readopt`·`/sdd-update`)도 `.claude/skills/`에 설치. 스킬 정의·계약은 SPEC-005(adoption-lifecycle) 소유(설치 메커니즘과 분리) | feat/lifecycle-commands |
 | 2026-07-05 | `--gate=py`에 pre-commit·commit-msg(specsync) 훅 배선 — 낡은 "spec-sync는 Node 필요" 안내 제거(+ 테스트) | SPEC-006: Python판이 spec-first까지 전 게이트 패리티가 되어 Python-only 프로젝트도 hard 강제 가능 |
+| 2026-07-05 | sdd-init node 복사 목록에 `verification-accounting.mjs`·`lifecycle-lib.mjs` 추가(+ 픽스처 복사 목록 동기) | SPEC-007·SPEC-008 신설 동반 — fr·completeness·spec-sync 게이트의 새 import가 소비 프로젝트 scripts/에서 결손되면 ERR_MODULE_NOT_FOUND |

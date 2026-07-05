@@ -14,7 +14,7 @@
   "maxFRsPerSpec": 9,
   "requireAccounting": true,
   "smokeManifest": "sdd/smoke-manifest.json",
-  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007"],
+  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008"],
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"
   }

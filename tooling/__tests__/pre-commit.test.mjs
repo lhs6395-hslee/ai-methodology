@@ -14,7 +14,7 @@ function setupRepo() {
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"] }));
   // 게이트·훅 복사
-  for (const f of ["check-fr-coverage.mjs","check-ownership.mjs","ownership-keys.mjs","sdd-config.mjs"])
+  for (const f of ["check-fr-coverage.mjs","check-ownership.mjs","ownership-keys.mjs","sdd-config.mjs","verification-accounting.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   cpSync(join(process.cwd(), "tooling/harness/pre-commit"), join(root, "scripts/sdd-pre-commit.sh"));
   execFileSync("git", ["init", "-q"], { cwd: root });

@@ -5,7 +5,10 @@
 -->
 # Feature Specification: [FEATURE NAME]
 
-**Module**: `[MODULE-ID]`  **Spec**: `SPEC-NNN`  **Created**: [YYYY-MM-DD]  **Status**: Draft | Active | Deprecated | Removed (택1)
+**Module**: `[MODULE-ID]`  **Spec**: `SPEC-NNN`  **Created**: [YYYY-MM-DD]  **Status**: Draft | Reviewed | Approved | Active | Deprecated | Removed (택1 — 수명주기 enum, completeness 게이트가 검증)
+<!-- 수명주기(상태 순서 강제 — SPEC-008): Draft(작성 중 — 소유 코드 변경을 spec-sync가 차단) →
+  Reviewed(/analyze·/checklist 검토 후 아래 Review Log·Dedup-Review에 기록) → Approved(승인) →
+  Active(구현 진행/완료) → Deprecated → Removed(폐기 — STRUCTURE.md 절차). -->
 **Input**: [한 줄 의도]
 
 ---
@@ -82,6 +85,19 @@
 
 ## Assumptions / Clarifications Retained
 - [전제] / [인터뷰로 확정할 빈칸] → `CLARIFICATIONS.md`
+
+## Review Log
+<!-- Reviewed 승격 조건: /speckit.analyze + /checklist 실행 결과를 기록(일시·수행자·판정) —
+  Reviewed 이상 상태는 completeness 게이트가 실제 일시(YYYY-MM-DD)가 있는 기록 행의 존재를 검사.
+  판정의 질은 기계가 못 본다 — 기록 존재만 강제(과장 금지). -->
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| [YYYY-MM-DD] | [수행자 (/analyze·/checklist)] | [PASS/FAIL + 요지] |
+
+## Dedup-Review
+<!-- 이웃 스펙(같은 Entity/키를 참조·인접 소유하는 spec)과의 의미적 중복 검토 기록 — Reviewed 이상은
+  completeness 게이트가 존재·형식(이웃 spec ID 또는 "이웃 없음")을 검사. 판정은 사람/LLM 몫(DEDUP.md). -->
+- [YYYY-MM-DD] 이웃 [SPEC-NNN(모듈명)]: [비중복/통합 — 근거 한 줄]  · 이웃이 없으면: `[YYYY-MM-DD] 이웃 없음: <사유>`
 
 ## Change Log
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->

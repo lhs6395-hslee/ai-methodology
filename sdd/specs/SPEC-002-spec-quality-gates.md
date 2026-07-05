@@ -67,6 +67,15 @@
 ## Assumptions / Clarifications Retained
 - 의미적 중복(키는 다른데 의도 동일)은 이 계층이 못 잡는다 — 좁힌 사람 리뷰(SPEC_REVIEW.md)로 보완.
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-001(key-pipeline): 비중복 — 키 파이프라인은 참조(Dependencies), 게이트 판정만 소유.
+- 2026-07-05 이웃 SPEC-007(verification-accounting)·SPEC-008(spec-lifecycle): 비중복 — 회계·수명주기 판정 코어는 각 spec 소유, 이 spec의 게이트는 소비만.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
@@ -77,3 +86,4 @@
 | 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(PM솔루션): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |
 | 2026-07-05 | coverage·cohesion·completeness의 요구 ID 정규식을 `requirementIdPrefixes` 파생값으로 전환 + `check-req-prefix.test.mjs` Files 편입 | 진단 B-2: 사이트별 하드코딩이 접두어 확장 시 조용한 누락을 만듦 — SPEC-001 config 파생값 하나로 통일 |
 | 2026-07-05 | fr 게이트에 검증 회계 계층 통합(strictSpecs 하드 R2·R3 unaccounted·accounted 리포트) — 회계 판정 자체는 SPEC-007 소유 | 진단 B-3 승인: "조용히 미검증" 제거 — 게이트 본체는 회계 코어(verification-accounting)를 소비만 |
+| 2026-07-05 | completeness 게이트에 수명주기 검사 통합(Status enum·Reviewed 이상 Review Log/Dedup-Review 존재) — 판정 코어는 SPEC-008 소유 | 진단 Q3 승인(P1): 스펙 리뷰 계층 부재 — 존재만 검사(advisory, --strict 하드) |

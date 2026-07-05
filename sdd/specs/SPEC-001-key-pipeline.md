@@ -68,6 +68,15 @@
 ## Assumptions / Clarifications Retained
 - `ownershipCategories` 헤더 문자열은 config 값과 정확히 일치해야 게이트가 파싱한다(정규화 표기 규칙은 설계 §4 표를 따른다).
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-002(spec-quality-gates): 비중복 — 이 spec은 파싱·정규화·config 코어, SPEC-002는 그 소비 게이트.
+- 2026-07-05 이웃 SPEC-007(verification-accounting): 비중복 — 회계 키 문법은 이 spec의 파생값을 소비만.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|

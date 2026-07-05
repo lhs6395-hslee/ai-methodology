@@ -69,6 +69,15 @@
 ## Assumptions / Clarifications Retained
 - range 모드 base 기본값은 `origin/main`(또는 `SDD_DIFF_BASE`) — 브랜치에 스펙만 추가되는 경우 위반은 0이다.
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 게이트 전종·전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-001(key-pipeline): 비중복 — glob·섹션 파싱은 참조.
+- 2026-07-05 이웃 SPEC-008(spec-lifecycle): 비중복 — Draft 차단의 상태 판정은 SPEC-008 소유, 이 spec은 changeset 판정에 그 결과를 소비.
+
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
@@ -77,3 +86,4 @@
 | 2026-07-02 | FR 라인 패턴 레터 서픽스 지원 | SPEC-001/002와 FR ID 문법 통일(사이트 간 불일치 금지) — /speckit.fix |
 | 2026-07-02 | `[` 경고를 토큰-시작 위치로 한정(FR-005 개정) — 파일 라우팅 `.../[id]/**`는 리터럴 매치라 미경고 + 테스트 | 도그푸딩(PM솔루션): Next.js 동적 세그먼트를 Files glob에 쓰면 정확 매치되는데도 false-positive 경고 — parseSection 드롭 조건(토큰 시작 `[`)에 정렬 |
 | 2026-07-05 | FR 라인 판정 접두어를 `requirementIdPrefixes` 파생 주입으로 전환 + base positional 오배제 버그 수정(+ 회귀 테스트 2건) | 진단 B-2(전 사이트 문법 통일) + 패리티 작업 중 발견: `--message-file` 부재 시 첫 positional(base)이 조용히 무시됨 — 조용한 대체 금지(문법화, SPEC-006 연동) |
+| 2026-07-05 | Draft 스펙 소유 코드 차단 통합(스펙 동반 여부 무관 위반, staged 하드·range advisory) — 상태 판정 코어는 SPEC-008 소유 | 진단 Q1·Q3 승인(P1): 리뷰 없는 Draft 스펙이 코드를 이끄는 구멍 봉합, 탈출구는 기존 트레일러 하나 |

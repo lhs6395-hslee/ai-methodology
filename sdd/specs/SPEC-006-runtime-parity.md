@@ -65,9 +65,19 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 - Go판은 로컬 툴체인이 없어도 소스 계약 테스트로 문법 회귀를 잡는다 — 실행 패리티 재검증은 Go 툴체인이 있는 CI에서 수행(REALITY_CHECK.md 갱신 대상).
 - 셸/Go판의 ownership 키 정규화·형식검증(normalizeKey/validateKey)은 미포팅 상태다 — 소비 트리거 성립 시 승격(문서에 델타 명시, 조용한 패리티 주장 금지).
 
+## Review Log
+| 일시 | 수행자 | 판정 |
+|---|---|---|
+| 2026-07-05 | 세션 리뷰(수명주기 도입 — 패리티 테스트 포함 전 테스트 green 확인) | PASS |
+
+## Dedup-Review
+- 2026-07-05 이웃 SPEC-001·SPEC-002·SPEC-003(판정 정본 소유 spec들): 비중복 — 이 spec은 복제 충실도만 소유.
+- 2026-07-05 이웃 SPEC-007(verification-accounting)·SPEC-008(spec-lifecycle): 비중복 — 회계·수명주기 판정의 Python 미러 충실도만 이 spec 범위.
+
 ## Change Log
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-05 | 초안 — Python 전 게이트 패리티·requirementIdPrefixes 전 사이트 일반화·셸/Go 문법 정렬·preset 템플릿 앵커 패리티 | 진단 A-1/A-2/B-1/B-2: 런타임 간·경로 간 문법 불일치가 "조용히 빠지는" 클래스를 만듦 — 문법화(정의되지 않은 예외 제거) |
 | 2026-07-05 | Python fr 게이트에 검증 회계(strictSpecs·requireAccounting·smokeManifest) 미러 + DEFAULTS 5키 정렬 + 회계 바이트 패리티 테스트 | SPEC-007 신설 동반 — 셸/Go fr에는 회계 계층 없음(핵심 3커맨드 계약 밖, 정직한 델타) |
+| 2026-07-05 | Python completeness·specsync에 수명주기(Status·리뷰 기록·Draft 차단) 미러 + 바이트 패리티 테스트 + 템플릿 수명주기 앵커(Review Log·Dedup-Review·Status enum) 패리티 편입 | SPEC-008 신설 동반 — preset 경로 스펙이 수명주기 문법을 결여한 채 조용히 빠지는 것 방지 |
