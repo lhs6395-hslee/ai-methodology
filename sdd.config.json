@@ -14,7 +14,8 @@
   "maxFRsPerSpec": 10,
   "requireAccounting": true,
   "smokeManifest": "sdd/smoke-manifest.json",
-  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008"],
+  "derivationManifest": "sdd/derivation.json",
+  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008", "SPEC-009", "SPEC-010", "SPEC-011"],
   "specSyncUnownedPolicy": "warn",
   "entityRegistry": {
     "key-pipeline": "소유권 키 파싱·정규화·config 어댑터의 SSOT 모듈(SPEC-001)",
@@ -24,11 +25,14 @@
     "adoption-lifecycle": "채택 수명주기 스킬 3종(SPEC-005)",
     "runtime-parity": "비-Node 런타임 복제 충실도(SPEC-006)",
     "verification-accounting": "FR 검증 회계 — strictSpecs·requireAccounting·smokeManifest(SPEC-007)",
-    "spec-lifecycle": "스펙 수명주기 상태·리뷰 기록 문법(SPEC-008)"
+    "spec-lifecycle": "스펙 수명주기 상태·리뷰 기록 문법(SPEC-008)",
+    "derivation-accounting": "재도출 소스 클래스 회계 + Change Log 근거 선제 캡처(SPEC-009)",
+    "smoke-scan": "검증 태그 수집·smokeManifest 자동 채움·드리프트 검사(SPEC-010)",
+    "retag": "추적 태그 마이그레이션 — 재번호 맵의 기계 이행(SPEC-011)"
   },
   "specSyncExemptGlobs": [
     "*.md", "*.html", ".gitignore", "docs/**", "prompts/**", "templates/**",
-    "sdd.config.json", "sdd/smoke-manifest.json",
+    "sdd.config.json", "sdd/smoke-manifest.json", "sdd/derivation.json",
     "tooling/*.md", "tooling/*.yml", "tooling/vitest.config.ts"
   ],
   "commands": {

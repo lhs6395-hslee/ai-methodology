@@ -1,0 +1,11 @@
+{
+  "code": { "status": "mapped", "evidence": "tooling/ 전체가 SPEC-001~011의 Files glob으로 소유되고 @covers로 FR 추적됨(fr·ownership·spec-sync 게이트 상시 강제)" },
+  "iac": { "status": "none", "reason": "스캔함 — 이 레포는 문서·툴 키트로 IaC(terraform/k8s/Dockerfile) 없음" },
+  "ci": { "status": "none", "reason": "스캔함 — 실 CI 미배선(강제 지점은 git 훅·로컬). tooling/sdd-gates.yml·sdd-gate-release.yml은 소비자용 샘플 artifact(SPEC-004 소유)" },
+  "ops-docs": { "status": "none", "reason": "스캔함 — runbook류 없음. 방법론 문서군(METHODOLOGY 등)은 재도출 소스가 아니라 정본 산출물(specSyncExemptGlobs 선언 문서류)" },
+  "build-evidence": { "status": "deferred", "reason": "실 CI 부재 — Go 실행 패리티 재검증 등 빌드 증거는 CI 도입 시 검증 태그로 연결(ROADMAP: sdd-gate-release.yml CI 과제)" },
+  "vcs-history": { "status": "mapped", "evidence": "커밋 메시지·Spec-Impact 트레일러·스펙 Change Log 근거 칸이 변경 rationale의 SSOT(commit-msg 훅이 동반을 강제)" },
+  "prior-traceability": { "status": "mapped", "evidence": "tooling/__tests__ 전 테스트가 @covers로 FR 연결 — R1(dangling)·R3(회계)가 인벤토리 정합을 상시 강제" },
+  "prior-intent": { "status": "mapped", "evidence": "전 스펙(SPEC-001~011)이 User Story·Assumptions/Clarifications·Review Log·Dedup-Review 구비 — 재도출 시 이월 대상" },
+  "human-intent": { "status": "mapped", "evidence": "선제 캡처 문법으로 저술 시점 기록 — Review Log·Dedup-Review(SPEC-008)·Change Log 근거 칸(SPEC-009)·entityRegistry/prefixRationale 사유·Spec-Impact 트레일러 사유" }
+}

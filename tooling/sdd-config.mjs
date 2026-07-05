@@ -73,6 +73,23 @@ export const DEFAULTS = {
   // 형식: { "SPEC-NNN/FR-NNN": {method, evidence} | {method:"deferred", reason} }.
   // 게이트는 dangling 키·빈 evidence·빈 reason을 에러 처리 — 사유 "존재만" 강제(질은 리뷰 몫).
   smokeManifest: null,
+  // @verifies 태그(smoke 증거)를 스캔할 디렉토리들. null = scanDirs 재사용.
+  // CI 정의·스크립트·runbook 등 테스트 밖 파일의 검증 증거를 수집할 때 확장(SPEC-010).
+  smokeScanDirs: null,
+  // 재도출 소스 회계 매니페스트(JSON 파일 경로, 루트 기준). 미설정(null) = 게이트 no-op.
+  // 형식: { "<소스클래스>": {status:"mapped",evidence} | {status:"none"|"deferred",reason} }.
+  // 클래스 enum·검증 규칙은 derivation-lib.mjs(SPEC-009) — 전 클래스 회계 강제.
+  derivationManifest: null,
+  // 검출 가능 소스 클래스의 탐지 글롭(클래스 단위 교체 — 병합 아님). **·* 만 지원(§4.1).
+  // code(scanDirs)·prior-traceability(@covers)는 글롭이 아니라 스캔으로 검출.
+  derivationClassGlobs: {
+    iac: ["**/*.tf", "**/*.tfvars", "k8s/**", "helm/**", "manifests/**",
+      "Dockerfile*", "**/Dockerfile*", "docker-compose*", "compose.yml", "compose.yaml"],
+    ci: [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile*", "**/Jenkinsfile*",
+      ".circleci/**", "azure-pipelines*", "bitbucket-pipelines.yml", ".buildkite/**"],
+    "ops-docs": ["runbook*", "RUNBOOK*", "docs/runbook*", "docs/runbooks/**",
+      "docs/ops/**", "docs/operations/**", "ops/**"],
+  },
   // check-spec-sync: 어떤 스펙 Files에도 매치되지 않는 변경 파일의 정책.
   // "silent"(기본 = 현행 침묵 통과) | "warn"(advisory) | "error"(staged에서 차단 = closed-world).
   // 의도적 예외는 specSyncExemptGlobs로 선언(조합 탈출).

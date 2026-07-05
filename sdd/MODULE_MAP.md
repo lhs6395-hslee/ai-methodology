@@ -21,6 +21,12 @@
 | SPEC-003 | spec-first 강제(spec-sync) — staged hard / range advisory + commit-msg 훅 | `tooling/check-spec-sync.mjs`, `tooling/spec-sync-lib.mjs` | active |
 | SPEC-004 | 하네스(detect 집계) + 설치기(훅·settings·스킬 배선) | `tooling/sdd-sync.mjs`, `tooling/sdd-init.sh`, `tooling/harness/**` | active |
 | SPEC-005 | 채택 수명주기 명령(start/readopt/update) — prompts/ 정본 절차 실행 + 승인 게이트·안전망 불변식 | `tooling/harness/sdd-{start,readopt,update}.SKILL.md` | active |
+| SPEC-006 | 비-Node 런타임 복제 충실도(Python 전 게이트·셸/Go 핵심 3커맨드·preset 템플릿 앵커) | `tooling/sdd_gates.py`, `tooling/sdd_gates.sh`, `tooling/go-gate/main.go` | active |
+| SPEC-007 | FR 검증 회계 — strictSpecs·requireAccounting·smokeManifest | `tooling/verification-accounting.mjs` | active |
+| SPEC-008 | 스펙 수명주기 — Status enum·Draft 차단·리뷰 기록 존재 | `tooling/lifecycle-lib.mjs` | active |
+| SPEC-009 | 재도출 소스 회계 — 소스 클래스 9종·derivationManifest·검출 교차검사·Change Log 근거 선제 캡처 | `tooling/check-derivation.mjs`, `tooling/derivation-lib.mjs` | active |
+| SPEC-010 | smoke 증거 자동 수집 — 검증 태그 스캔·smokeManifest 재생성(--write)·드리프트 검사 | `tooling/sdd-smoke-scan.mjs` | active |
+| SPEC-011 | 추적 태그 마이그레이션 — 재번호 맵(old→new\|null)의 기계 이행·경계 강제 | `tooling/sdd-retag.mjs` | active |
 
 > "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 6으로 조정했다(사유는 SPEC-002 Change Log).
 

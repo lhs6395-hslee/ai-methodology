@@ -84,3 +84,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-05 | Python specsync에 `specSyncUnownedPolicy` 미러(silent/warn/error + 미정의 값 거부) + 패리티 테스트 | SPEC-003 FR-010 신설 동반(P2) |
 | 2026-07-05 | Python `_git`에 `core.quotepath=off` 미러 | SPEC-003 quotepath 수정 동반 — 비ASCII 경로 판정 패리티 |
 | 2026-07-05 | Python ownership에 `entityRegistry` 미러 + 바이트 패리티 테스트 | SPEC-002 FR-009 신설 동반(P3a) |
+| 2026-07-05 | Python에 derivation·smokescan·retag 3커맨드 미러 + completeness 근거(선제 캡처) 검사 미러 + DEFAULTS 3키 정렬 + 출력·산출물 바이트 패리티 테스트 | SPEC-009~011 신설 동반 — 셸/Go fr·ownership에는 없음(핵심 3커맨드 계약 밖, 정직한 델타 — ci-examples 매트릭스 명시) |

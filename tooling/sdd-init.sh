@@ -55,7 +55,8 @@ case "$GATE" in
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
                  check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs \
                  ownership-keys.mjs check-spec-consistency.mjs check-spec-sync.mjs spec-sync-lib.mjs \
-                 verification-accounting.mjs lifecycle-lib.mjs; do
+                 verification-accounting.mjs lifecycle-lib.mjs \
+                 derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
