@@ -435,6 +435,24 @@ def cmd_ownership(cfg, strict):
             if len(specs) > 1:
                 conflicts.append((cat, key, sorted(set(specs))))
 
+    # entity 레지스트리(SPEC-002 FR-009, P3): PREFIX 거버넌스와 동일 패턴 — 등록 = config 변경 = 리뷰 관문.
+    # 비어 있으면 비활성(현행). 채워지면 aggregate-root 카테고리의 소유 키는 등록된 것만, 사유는 빈 값 불가.
+    registry = cfg.get("entityRegistry") or {}
+    entity_errors, registry_warns = [], []
+    if registry:
+        ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
+        reg = {normalize_key(ent_cat, k, cfg): str(registry[k] or "").strip() for k in registry}
+        for key, rationale in reg.items():
+            if not rationale:
+                entity_errors.append(f'entityRegistry["{key}"] — 도입 사유 필요(빈 값 불가)')
+        for key, spec_ids in owners[ent_cat].items():
+            if key not in reg:
+                uniq = sorted(set(spec_ids), key=spec_ids.index)
+                entity_errors.append(f'미등록 entity "{key}" ({" + ".join(uniq)}) — entityRegistry에 사유와 함께 등록 필요(임의 신설 금지)')
+        for key in reg:
+            if key not in owners[ent_cat]:
+                registry_warns.append(f'entityRegistry의 "{key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상')
+
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
     if missing:
         tag = "✗" if strict else "⚠"
@@ -443,6 +461,13 @@ def cmd_ownership(cfg, strict):
         tag = "✗" if strict else "⚠"
         for spec_id, bad in format_issues:
             print(f"{tag} [{spec_id}] {bad}")
+    for w in registry_warns:
+        print(f"⚠ {w}")
+    if entity_errors:
+        print(f"\n✗ ENTITY 레지스트리 위반 {len(entity_errors)}건:", file=sys.stderr)
+        for e in entity_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
     if conflicts:
         print(f"\n✗ 중복 소유(구조적 중복) {len(conflicts)}건:", file=sys.stderr)
         for cat, key, specs in conflicts:

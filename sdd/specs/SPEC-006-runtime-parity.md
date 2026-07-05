@@ -83,3 +83,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-05 | Python completeness·specsync에 수명주기(Status·리뷰 기록·Draft 차단) 미러 + 바이트 패리티 테스트 + 템플릿 수명주기 앵커(Review Log·Dedup-Review·Status enum) 패리티 편입 | SPEC-008 신설 동반 — preset 경로 스펙이 수명주기 문법을 결여한 채 조용히 빠지는 것 방지 |
 | 2026-07-05 | Python specsync에 `specSyncUnownedPolicy` 미러(silent/warn/error + 미정의 값 거부) + 패리티 테스트 | SPEC-003 FR-010 신설 동반(P2) |
 | 2026-07-05 | Python `_git`에 `core.quotepath=off` 미러 | SPEC-003 quotepath 수정 동반 — 비ASCII 경로 판정 패리티 |
+| 2026-07-05 | Python ownership에 `entityRegistry` 미러 + 바이트 패리티 테스트 | SPEC-002 FR-009 신설 동반(P3a) |
