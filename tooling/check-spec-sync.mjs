@@ -18,7 +18,8 @@ const MSG = mi >= 0 ? args[mi + 1] : null;
 const positional = args.filter((a, i) => !a.startsWith("--") && (mi < 0 || i !== mi + 1)); // mi=-1일 때 args[0](base)이 mi+1=0으로 오배제되던 버그 수정
 const BASE = positional[0] || process.env.SDD_DIFF_BASE || "origin/main";
 
-const sh = (c) => execSync(c, { cwd: cfg.__root, encoding: "utf8" });
+// core.quotepath=off: 비ASCII 경로가 8진수 인용 문자열("\353…")로 나오면 glob 매칭이 조용히 깨진다(도그푸딩 발견).
+const sh = (c) => execSync(c.replace(/^git /, "git -c core.quotepath=off "), { cwd: cfg.__root, encoding: "utf8" });
 const shOk = (c) => { try { return sh(c); } catch { return null; } };
 const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 

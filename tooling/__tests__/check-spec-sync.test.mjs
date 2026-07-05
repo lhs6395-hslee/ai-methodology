@@ -254,3 +254,19 @@ test("unowned 정책: error도 range 모드에선 advisory(⚠ + exit 0) / 미�
     assert.match(bad.out, /specSyncUnownedPolicy 값 위반/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("비ASCII 경로(quotepath): 한글 파일명 소유 코드도 인용 없이 매치·판정된다", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
+    writeFileSync(join(root, "src/lib/pdf/한글모듈.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/lib/pdf/한글모듈.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "fix: hotfix\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out); // 소유 매치가 됐다는 증거(인용된 "\354…" 문자열이면 침묵 통과해버림)
+    assert.match(r.out, /한글모듈\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

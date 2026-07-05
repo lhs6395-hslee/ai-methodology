@@ -89,3 +89,4 @@
 | 2026-07-05 | FR 라인 판정 접두어를 `requirementIdPrefixes` 파생 주입으로 전환 + base positional 오배제 버그 수정(+ 회귀 테스트 2건) | 진단 B-2(전 사이트 문법 통일) + 패리티 작업 중 발견: `--message-file` 부재 시 첫 positional(base)이 조용히 무시됨 — 조용한 대체 금지(문법화, SPEC-006 연동) |
 | 2026-07-05 | Draft 스펙 소유 코드 차단 통합(스펙 동반 여부 무관 위반, staged 하드·range advisory) — 상태 판정 코어는 SPEC-008 소유 | 진단 Q1·Q3 승인(P1): 리뷰 없는 Draft 스펙이 코드를 이끄는 구멍 봉합, 탈출구는 기존 트레일러 하나 |
 | 2026-07-05 | FR-010 신설 — `specSyncUnownedPolicy`(silent\|warn\|error)로 미소유 파일 침묵 통과를 선언된 정책으로 승격(FR 10개 — maxFRsPerSpec 10 상향, sdd.config.json) | 진단 Q1 구멍 승인(P2): "Files 미매치 = 침묵"은 테스트로 고정된 의도였으나 미선언 정책 — 문법화(exempt 조합 탈출, error=closed-world) |
+| 2026-07-05 | git 호출에 `core.quotepath=off` — 비ASCII 경로가 8진수 인용 문자열로 나와 glob 매칭·디렉토리 귀속이 조용히 깨지던 것 수정(spec-sync·converge, + 한글 파일명 회귀 테스트) | 도그푸딩(이 레포 방법론.html): P2 warn이 인용된 경로를 unowned로 오판해 발견 — 조용한 미매치 금지 |

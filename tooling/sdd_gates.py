@@ -682,8 +682,9 @@ def cmd_orphan(cfg, strict):
 # ── converge — 코드만 변경·스펙 무변경 드리프트 (check-converge-drift.mjs) ──
 
 def _git(cfg, args):
+    # core.quotepath=off: 비ASCII 경로가 8진수 인용 문자열로 나오면 glob 매칭이 조용히 깨진다(도그푸딩 발견).
     try:
-        r = subprocess.run(["git"] + args, cwd=cfg["__root"], capture_output=True,
+        r = subprocess.run(["git", "-c", "core.quotepath=off"] + args, cwd=cfg["__root"], capture_output=True,
                            text=True, encoding="utf-8")
     except FileNotFoundError:
         return None
