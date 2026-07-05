@@ -20,6 +20,12 @@
   - **P3 의미중복 절차 문법화**: `entityRegistry`(entity 등록제 — PREFIX 거버넌스 동형) + `## Dedup-Review` 기록 의무화(존재·형식만 — DEDUP.md 경계 유지).
   - 부수 발견 수정: git `core.quotepath` 비ASCII 경로 인용이 glob 매칭을 조용히 깨던 버그(도그푸딩 발견, 회귀 테스트).
 
+- **완전 자동화 3차(2026-07-05)** — 두 프로젝트 재생성 비교[검증]에서 재생성이 지던 "레포 밖 맥락" 잔여 전부를 문법화:
+  - **재도출 소스 회계(SPEC-009)**: 소스 9클래스 고정 enum + `derivationManifest` 전 클래스 회계 + 검출 교차검사(IaC 실재+none 선언=exit 1 — PM의 "src 밖 안 읽음" 실패 모드 기계 차단) + **선제 캡처**(Change Log 실기록 행 근거 존재 검사 — 순수 인간 의도는 저술 시점에만 캡처 가능하다는 경계를 선언된 클래스(human-intent)로 명시).
+  - **smoke 증거 자동 수집(SPEC-010)**: `@verifies` 태그(CI 정의·스크립트·runbook 어디든) → `smoke-scan --write` 매니페스트 결정적 재생성 + check 드리프트 차단 — FinOps가 수동으로 잇던 실증거 연결 제거.
+  - **추적 태그 마이그레이션(SPEC-011)**: 재도출은 FR 키 보존이 기본, 재번호는 맵+`retag` 기계 이행 — @covers 재연결 비용 제거.
+  - 절차 정본화: `prompts/readopt.md` 6~7단계에 소스 클래스→산출물 매핑표·자동 결선 규칙. 키트 자신 `derivationManifest` 상시 on(9클래스 정직 회계).
+
 설계·계획 근거: `docs/superpowers/specs/` · `docs/superpowers/plans/`.
 
 > **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 5 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.

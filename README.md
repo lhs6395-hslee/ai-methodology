@@ -39,9 +39,9 @@
 정본은 **GitHub 레포**([github.com/lhs6395-hslee/ai-methodology](https://github.com/lhs6395-hslee/ai-methodology))다. 쓰는 데엔 두 계층이 있고, "다운로드 없이 되냐"의 답이 계층마다 다르다:
 
 - **① 작성·검토 계층 — 다운로드 불필요.** 에이전트에게 "이 방법론(위 URL)을 따라"라고 하면, 에이전트가 GitHub에서 `METHODOLOGY`·`STRUCTURE`·`STORAGE`·`APPLYING`·템플릿을 **직접 읽어** 그 규율대로 스펙을 작성/검토한다. 문서만으로 시작 가능(레포 public, raw 읽기 됨).
-- **② 강제 계층 — 파일 배선 필요(`sdd-init` 1회).** "스펙 없는 커밋 차단" 같은 *기계적 강제*는 git 훅·게이트가 **로컬에 실제 파일로** 있어야 돈다(git은 원격 파일을 훅으로 실행 못 함). 이때 필요한 건 레포 전체(526KB)가 아니라 런타임 폐포 **약 25파일**뿐 — `sdd-init`가 프로젝트의 `scripts/`·`sdd/`·`.claude/`·`.git/hooks/`에 심는다.
+- **② 강제 계층 — 파일 배선 필요(`sdd-init` 1회).** "스펙 없는 커밋 차단" 같은 *기계적 강제*는 git 훅·게이트가 **로컬에 실제 파일로** 있어야 돈다(git은 원격 파일을 훅으로 실행 못 함). 이때 필요한 건 레포 전체(526KB)가 아니라 런타임 폐포 **약 30파일**뿐 — `sdd-init`가 프로젝트의 `scripts/`·`sdd/`·`.claude/`·`.git/hooks/`에 심는다.
 
-> **clean machine(키트 로컬에 없음)에서도 clone 없이 시작된다:** 진입은 **GitHub raw URL**(아래 표) — 에이전트가 `prompts/adopt.md`를 raw로 읽어 실행하고, ②의 강제 tooling은 그 절차가 **partial+sparse**로만 확보한다(전체 526KB clone 아님). 키트가 이미 로컬(`~/Documents/claude/sdd`)에 있으면 그 경로로도 동일하게 되지만 **필수는 아니다**. 어느 경우든 **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~25파일뿐.
+> **clean machine(키트 로컬에 없음)에서도 clone 없이 시작된다:** 진입은 **GitHub raw URL**(아래 표) — 에이전트가 `prompts/adopt.md`를 raw로 읽어 실행하고, ②의 강제 tooling은 그 절차가 **partial+sparse**로만 확보한다(전체 526KB clone 아님). 키트가 이미 로컬(`~/Documents/claude/sdd`)에 있으면 그 경로로도 동일하게 되지만 **필수는 아니다**. 어느 경우든 **프로젝트마다 clone하지 않는다**(레포 밖·fork 금지·참조만). 프로젝트에 남는 건 위 ②의 ~30파일뿐.
 
 ### 한 줄로 쓰기 — GitHub raw URL 하나로 실행 (clone 불필요)
 각 상황의 **전체 절차는 [`prompts/`](prompts/)에 파일로** 있다(SSOT — 절차 원본은 여기 한 곳). **진입 = 그 파일의 raw URL 한 줄** — 키트가 로컬에 없어도(clean machine) 에이전트가 raw로 읽고 순서대로 수행한다(강제 tooling은 그 절차가 partial+sparse로 확보, 전체 clone 아님):

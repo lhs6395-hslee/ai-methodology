@@ -14,6 +14,8 @@
 | **모호어·검증불가** | should/적절히, 측정불가 SC, 2동작 | EARS 작성규칙 + `/checklist` | 반자동 |
 | **추적성 끊김** | FR↔plan↔task↔test 끊김 | `/analyze` + **FR-ID 태깅 + check-fr-coverage.mjs** | 자동(CI) |
 | **원칙 위반** | constitution 위배 | `/speckit.constitution` | 반자동 |
+| **재도출 스코프 누락** | 재생성이 src 밖 소스(IaC/CI/운영문서/이력/의도)를 조용히 안 읽음 | **`check-derivation.mjs`(SPEC-009)**: 소스 9클래스 회계 + 실재↔선언 교차검사 | ★자동(CI) |
+| **의도 기록 누락** | 변경의 "왜"가 어디에도 안 남음(사후 재도출 불가) | **completeness의 Change Log 근거 검사(SPEC-009)** + Review Log·Dedup-Review(SPEC-008) — 존재만 | ★자동(CI) |
 
 **요약:** 빈공란=`/clarify`, 한 기능 내 중복·모순·누락=`/analyze`, 체크리스트=`/checklist`, FR↔test=CI 게이트. **spec 간 중복**은 — **구조적**(같은 소유 키)=소유권 게이트로 **강제**, **의미적**(reworded)=좁힌 LLM 리뷰로 보조하되 *검토 기록의 존재*(`Dedup-Review`)와 *entity 어휘*(`entityRegistry`)는 게이트가 강제. (LLM은 누락을 내므로 결정적 게이트가 1차. 상세: `DEDUP.md` / `STRUCTURE.md` 소유권 유일성 규칙.)
 

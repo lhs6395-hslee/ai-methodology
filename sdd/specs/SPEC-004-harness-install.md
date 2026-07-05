@@ -87,3 +87,4 @@
 | 2026-07-03 | FR-003 확장 — sdd-init가 수명주기 스킬(`/sdd-start`·`/sdd-readopt`·`/sdd-update`)도 `.claude/skills/`에 설치. 스킬 정의·계약은 SPEC-005(adoption-lifecycle) 소유(설치 메커니즘과 분리) | feat/lifecycle-commands |
 | 2026-07-05 | `--gate=py`에 pre-commit·commit-msg(specsync) 훅 배선 — 낡은 "spec-sync는 Node 필요" 안내 제거(+ 테스트) | SPEC-006: Python판이 spec-first까지 전 게이트 패리티가 되어 Python-only 프로젝트도 hard 강제 가능 |
 | 2026-07-05 | sdd-init node 복사 목록에 `verification-accounting.mjs`·`lifecycle-lib.mjs` 추가(+ 픽스처 복사 목록 동기) | SPEC-007·SPEC-008 신설 동반 — fr·completeness·spec-sync 게이트의 새 import가 소비 프로젝트 scripts/에서 결손되면 ERR_MODULE_NOT_FOUND |
+| 2026-07-05 | sdd-init node 복사 목록에 `derivation-lib.mjs`·`check-derivation.mjs`·`sdd-smoke-scan.mjs`·`sdd-retag.mjs` 추가 | SPEC-009~011 신설 동반 — 재채택 프로젝트가 재도출 회계·증거 스캔·retag 게이트를 결손 없이 배선 |

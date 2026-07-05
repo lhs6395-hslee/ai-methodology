@@ -21,6 +21,9 @@
 #   python sdd_gates.py orphan [--strict]         # 스펙 없는 표면 파일(역방향 커버리지)
 #   python sdd_gates.py converge [base] [--strict]# 코드만 변경·스펙 무변경 드리프트
 #   python sdd_gates.py specsync [base] [--staged --message-file <p>]  # spec-first 강제(§5)
+#   python sdd_gates.py derivation                 # 재도출 소스 회계(SPEC-009)
+#   python sdd_gates.py smokescan [--write]        # smoke 증거 자동 수집(SPEC-010)
+#   python sdd_gates.py retag <map.json> [--write] # 추적 태그 마이그레이션(SPEC-011)
 #   python sdd_gates.py run <stage>               # commands.<stage> 실행(언어무관 CI)
 
 import json
@@ -56,6 +59,16 @@ DEFAULTS = {
     "strictSpecs": [],
     "requireAccounting": False,
     "smokeManifest": None,
+    "smokeScanDirs": None,
+    "derivationManifest": None,
+    "derivationClassGlobs": {
+        "iac": ["**/*.tf", "**/*.tfvars", "k8s/**", "helm/**", "manifests/**",
+                "Dockerfile*", "**/Dockerfile*", "docker-compose*", "compose.yml", "compose.yaml"],
+        "ci": [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile*", "**/Jenkinsfile*",
+               ".circleci/**", "azure-pipelines*", "bitbucket-pipelines.yml", ".buildkite/**"],
+        "ops-docs": ["runbook*", "RUNBOOK*", "docs/runbook*", "docs/runbooks/**",
+                     "docs/ops/**", "docs/operations/**", "ops/**"],
+    },
     "specSyncUnownedPolicy": "silent",
     "entityRegistry": {},
     "capabilityVerbs": [],
@@ -561,6 +574,84 @@ def has_dedup_review(text, spec_id_re):
     return spec_id_re.search(block) is not None or "이웃 없음" in block
 
 
+# ── 재도출 소스 회계 (derivation-lib.mjs 패리티, SPEC-009) ──
+
+SOURCE_CLASSES = [
+    "code", "iac", "ci", "ops-docs", "build-evidence",
+    "vcs-history", "prior-traceability", "prior-intent", "human-intent",
+]
+DERIVATION_STATUS = ["mapped", "none", "deferred"]
+GLOB_DETECTABLE = ["iac", "ci", "ops-docs"]
+
+
+def validate_derivation_manifest(data):
+    """D1(클래스·status 문법·전 클래스 회계) · D2(evidence/reason 존재)."""
+    errors = []
+    known = set(SOURCE_CLASSES)
+    for key in data.keys():
+        if key not in known:
+            errors.append(f'D1 미정의 소스 클래스 "{key}" — 고정 enum 외 값 금지(정의되지 않은 예외 금지)')
+    for cls in SOURCE_CLASSES:
+        if cls not in data:
+            errors.append(f'D1 미회계 소스 클래스 "{cls}" — mapped|none|deferred 중 하나로 선언 필요(조용한 미인제스트 금지)')
+            continue
+        v = data[cls]
+        status = str((v or {}).get("status") or "").strip() if isinstance(v, dict) else ""
+        if status not in DERIVATION_STATUS:
+            errors.append(f'D1 "{cls}": status는 mapped|none|deferred 중 하나여야 함')
+            continue
+        if status == "mapped":
+            if not str(v.get("evidence") or "").strip():
+                errors.append(f'D2 "{cls}": mapped는 evidence 필수(빈 값 불가 — 존재만 강제, 질은 리뷰 몫)')
+        elif not str(v.get("reason") or "").strip():
+            errors.append(f'D2 "{cls}": {status}는 reason 필수(빈 값 불가)')
+    return errors
+
+
+def change_log_rationale_findings(text):
+    """선제 캡처(SPEC-009 FR-006) — 실제 날짜(YYYY-MM-DD) 행의 근거 칸이 빈 값이면 그 날짜."""
+    block = section_block(text, "Change Log")
+    if block is None:
+        return []
+    missing = []
+    for line in block.split("\n"):
+        if not re.match(r"^\s*\|", line):
+            continue
+        cells = [c.strip() for c in line.split("|")[1:-1]]
+        if len(cells) < 3:
+            continue
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", cells[0]):
+            continue
+        if not cells[2]:
+            missing.append(cells[0])
+    return missing
+
+
+def walk_all_rel(root_dir, cfg, rel_base=""):
+    """레포 상대경로 전 파일 순회(ignoreDirs 제외, 이름 정렬 인라인 재귀 — Node walkAll 순서 미러)."""
+    ignore = set(cfg["ignoreDirs"])
+    acc = []
+    try:
+        entries = sorted(os.listdir(root_dir))
+    except OSError:
+        return acc
+    for name in entries:
+        p = os.path.join(root_dir, name)
+        r = f"{rel_base}/{name}" if rel_base else name
+        if os.path.isdir(p):
+            if name in ignore:
+                continue
+            acc.extend(walk_all_rel(p, cfg, r))
+        elif os.path.exists(p):
+            acc.append(r)
+    return acc
+
+
+def read_text_lossy(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
 # ── completeness — SC·인수조건·수명주기 기록 존재 (check-spec-completeness.mjs) ──
 
 def cmd_completeness(cfg, strict):
@@ -582,6 +673,9 @@ def cmd_completeness(cfg, strict):
                 findings.append((spec_id, f"Status {status}인데 Review Log 기록(일시·수행자·판정) 없음 — Reviewed 전이는 /analyze·/checklist 결과 기록 필수"))
             if not has_dedup_review(text, cfg["__specId"]):
                 findings.append((spec_id, f'Status {status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음'))
+        # 선제 캡처(SPEC-009) — 실기록 Change Log 행의 근거 칸은 빈 값 불가(변경 의도는 저술 시점에만 남는다).
+        for d in change_log_rationale_findings(text):
+            findings.append((spec_id, f"Change Log {d} 행의 근거 칸이 빈 값 — 변경 의도는 저술 시점에만 캡처 가능(선제 캡처)"))
         if not set(cfg["__frToken"].findall(text)):
             continue  # FR 없는 spec은 면제(순수 인프라 등)
         if not set(re.findall(r"\bSC-\d{3}\b", text)):
@@ -589,17 +683,17 @@ def cmd_completeness(cfg, strict):
         if not (re.search(r"\b(Given|Acceptance)\b", text, re.IGNORECASE) or re.search(r"수용\s*기준", text)):
             findings.append((spec_id, "인수조건(Given-When-Then) 없음"))
 
-    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요).")
+    print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요).")
     if findings:
         tag = "✗" if strict else "⚠"
         print(f"{tag} 완전성 미흡 {len(findings)}건:")
         for spec_id, miss in findings:
             print(f"  {tag} {spec_id}: {miss}")
         if strict:
-            print("\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록 필요.", file=sys.stderr)
+            print("\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요.", file=sys.stderr)
             sys.exit(1)
         return
-    print("✓ 완전성 구비 — SC·인수조건·수명주기 기록 모두 충족.")
+    print("✓ 완전성 구비 — SC·인수조건·수명주기·근거 기록 모두 충족.")
 
 
 # ── consistency — 선언 키의 본문 근거 (check-spec-consistency.mjs) ──
@@ -980,6 +1074,367 @@ def cmd_specsync(cfg, staged, msg_file, base):
     print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")
 
 
+# ── derivation — 재도출 소스 회계 (check-derivation.mjs 패리티, SPEC-009) ──
+
+def cmd_derivation(cfg):
+    if not cfg.get("derivationManifest"):
+        print("Derivation 게이트: derivationManifest 미설정 — no-op")
+        return
+    rel = str(cfg["derivationManifest"])
+    try:
+        raw = read_text(resolve(cfg, rel))
+    except OSError:
+        print(f"✗ D0 derivationManifest 파일 없음: {rel}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        data = json.loads(raw)
+    except ValueError as e:
+        print(f"✗ D0 derivationManifest JSON 파싱 실패: {rel} — {e}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"✗ D0 derivationManifest 최상위는 객체여야 함: {rel}", file=sys.stderr)
+        sys.exit(1)
+
+    errors = validate_derivation_manifest(data)
+    warnings = []
+
+    # 클래스 글롭: DEFAULTS ⊕ 사용자 config(클래스 단위 교체). 미정의 클래스 키는 D1.
+    user_globs = cfg.get("derivationClassGlobs") or {}
+    for key in user_globs.keys():
+        if key not in GLOB_DETECTABLE:
+            errors.append(f'D1 derivationClassGlobs 미정의 클래스 "{key}" — {"|".join(GLOB_DETECTABLE)}만 글롭 검출 대상')
+    class_globs = {}
+    for cls in GLOB_DETECTABLE:
+        globs = user_globs.get(cls) or DEFAULTS["derivationClassGlobs"].get(cls) or []
+        class_globs[cls] = [compile_glob(g) for g in globs]
+
+    all_files = walk_all_rel(cfg["__root"], cfg)
+    detected = {}
+    for cls in GLOB_DETECTABLE:
+        hits = [f for f in all_files if any(rx.match(f) for rx in class_globs[cls])]
+        detected[cls] = (len(hits), hits[0] if hits else None)
+    # code: scanDirs에 파일이 하나라도 실재하는가.
+    hits = []
+    for d in cfg["scanDirs"]:
+        for f in walk_all_rel(resolve(cfg, d), cfg, d):
+            hits.append(f)
+            break
+        if hits:
+            break
+    detected["code"] = (len(hits), hits[0] if hits else None)
+    # prior-traceability: scanDirs 테스트 파일의 @covers 태그 실재.
+    count, example = 0, None
+    for d in cfg["scanDirs"]:
+        for f in walk_all_rel(resolve(cfg, d), cfg, d):
+            if not is_test_file(os.path.basename(f), cfg):
+                continue
+            text = read_text_lossy(os.path.join(cfg["__root"], f))
+            if cfg["__covers"].search(text):
+                count += 1
+                if example is None:
+                    example = f
+    detected["prior-traceability"] = (count, example)
+
+    # D3 교차검사: 검출됐는데 none 선언 = 에러 / mapped 선언인데 검출 0 = 경고(레포 밖 실체 허용).
+    counts = {"mapped": 0, "none": 0, "deferred": 0}
+    accounted = 0
+    for cls in SOURCE_CLASSES:
+        v = data.get(cls)
+        status = str((v or {}).get("status") or "").strip() if isinstance(v, dict) else ""
+        if status not in DERIVATION_STATUS:
+            continue
+        accounted += 1
+        counts[status] += 1
+        det = detected.get(cls)
+        if det is None:
+            continue  # 검출 불가 클래스 — 존재 회계만
+        n, example = det
+        if status == "none" and n > 0:
+            errors.append(f"D3 {cls}: none 선언인데 검출 {n}건(예: {example}) — 스캔 누락(조용한 미인제스트) 금지")
+        elif status == "mapped" and n == 0:
+            warnings.append(f"{cls}: mapped 선언이나 레포 내 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 정리 대상")
+
+    print(f"Derivation 게이트 — classes:{len(SOURCE_CLASSES)} accounted:{accounted} "
+          f"(mapped:{counts['mapped']} none:{counts['none']} deferred:{counts['deferred']}) config:{cfg_tag(cfg)}")
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print("\nDerivation violations:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    print("Derivation 게이트: OK — 전 소스 클래스 회계됨.")
+
+
+# ── smokescan — smoke 증거 자동 수집 (sdd-smoke-scan.mjs 패리티, SPEC-010) ──
+
+_VTAG = "@veri" + "fies"  # 자기 소스가 스캔에 걸리지 않게 분절
+
+
+def _collect_specs(cfg):
+    """spec별 선언 FR 수집(fr 게이트와 동일 문법 파생)."""
+    spec_dir = resolve(cfg, cfg["specDir"])
+    specs = {}
+    try:
+        names = sorted(os.listdir(spec_dir))
+    except OSError:
+        return specs
+    for f in names:
+        if not f.endswith(".md"):
+            continue
+        m = cfg["__specId"].search(f)
+        if not m:
+            continue
+        text = read_text(os.path.join(spec_dir, f))
+        specs[m.group(0)] = set(cfg["__frDecl"].findall(text))
+    return specs
+
+
+def _json_same(a, b):
+    return json.dumps(a, ensure_ascii=False, separators=(",", ":")) == \
+        json.dumps(b, ensure_ascii=False, separators=(",", ":"))
+
+
+def cmd_smokescan(cfg, write):
+    specs = _collect_specs(cfg)
+    scan_dirs = list(dict.fromkeys(cfg.get("smokeScanDirs") or cfg["scanDirs"]))
+    manifest_rel = str(cfg["smokeManifest"]) if cfg.get("smokeManifest") else None
+    tag_re = re.compile(rf"{_VTAG}\s+((?:{_alt(cfg.get('specIdPrefixes'), DEFAULTS['specIdPrefixes'])})-\d{{3}})/"
+                        rf"((?:{cfg['__reqAlt']})-\d{{3}}[a-z]?)\b([^\n]*)")
+    rest_re = re.compile(r"^\s+([A-Za-z0-9_-]+)\s*:\s*(\S.*)$")
+
+    errors = []
+    by_key = {}
+    tag_count = 0
+    for d in scan_dirs:
+        for f in walk_all_rel(resolve(cfg, d), cfg, d):
+            if manifest_rel and f == manifest_rel:
+                continue  # 매니페스트 자신은 소스 아님
+            try:
+                text = read_text_lossy(os.path.join(cfg["__root"], f))
+            except OSError:
+                continue
+            for m in tag_re.finditer(text):
+                tag_count += 1
+                spec, fr, rest = m.group(1), m.group(2), m.group(3)
+                key = f"{spec}/{fr}"
+                if spec not in specs or fr not in specs[spec]:
+                    errors.append(f"V1 dangling {_VTAG} {key} in {f} — no such FR in {spec}")
+                    continue
+                r = rest_re.match(rest)
+                if not r:
+                    errors.append(f'V0 태그 형식 위반 in {f} — "{_VTAG} {key} <method>: <evidence>" 형식이어야 함(빈 값 불가)')
+                    continue
+                method, body = r.group(1), r.group(2)
+                by_key.setdefault(key, {}).setdefault(method, []).append((f, body.strip()))
+
+    # 태그 → 엔트리 (결정적: 경로·본문 정렬 후 " · " 결합, 파일 경로가 provenance).
+    tag_entries = {}
+    for key in sorted(by_key.keys()):
+        methods = by_key[key]
+        if len(methods) > 1:
+            errors.append(f'V3 "{key}": method 충돌({" vs ".join(sorted(methods.keys()))}) — 한 FR의 태그 method는 하나여야 함')
+            continue
+        method, sites = next(iter(methods.items()))
+        joined = " · ".join(sorted(f"{path} — {text}" for path, text in sites))
+        tag_entries[key] = {"method": method, "reason": joined} if method == "deferred" \
+            else {"method": method, "evidence": joined}
+
+    if not manifest_rel:
+        if tag_count > 0:
+            print(f"✗ {_VTAG} 태그 {tag_count}건 발견인데 smokeManifest 미설정 — sdd.config.json에 매니페스트 경로 선언 필요",
+                  file=sys.stderr)
+            sys.exit(1)
+        print(f"Smoke-scan — tags:0 keys:0 manifest:미설정 mode:{'write' if write else 'check'} config:{cfg_tag(cfg)}")
+        print("Smoke-scan: no-op — 태그도 매니페스트도 없음.")
+        sys.exit(0)
+    manifest = {}
+    manifest_missing = False
+    try:
+        raw_m = read_text(resolve(cfg, manifest_rel))
+        try:
+            manifest = json.loads(raw_m)
+        except ValueError as e:
+            print(f"✗ M0 smokeManifest JSON 파싱 실패: {manifest_rel} — {e}", file=sys.stderr)
+            sys.exit(1)
+        if not isinstance(manifest, dict):
+            print(f"✗ M0 smokeManifest 최상위는 객체여야 함: {manifest_rel}", file=sys.stderr)
+            sys.exit(1)
+    except OSError:
+        manifest_missing = True
+    if manifest_missing and not write:
+        if tag_entries:
+            errors.append(f"S1 매니페스트 파일 없음({manifest_rel})인데 태그 파생 엔트리 {len(tag_entries)}건 — --write로 생성")
+        manifest = {}
+
+    print(f"Smoke-scan — tags:{tag_count} keys:{len(tag_entries)} manifest:{0 if manifest_missing else len(manifest)} "
+          f"mode:{'write' if write else 'check'} config:{cfg_tag(cfg)}")
+
+    if errors:
+        print("\nSmoke-scan violations:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if write:
+        next_manifest = {}
+        added = updated = kept = 0
+        for key in sorted(set(list(manifest.keys()) + list(tag_entries.keys()))):
+            if key in tag_entries:
+                entry = tag_entries[key]
+                if key not in manifest:
+                    added += 1
+                elif not _json_same(manifest[key], entry):
+                    updated += 1
+                else:
+                    kept += 1
+                next_manifest[key] = entry
+            else:
+                next_manifest[key] = manifest[key]
+                kept += 1
+        with open(resolve(cfg, manifest_rel), "w", encoding="utf-8") as f:
+            f.write(json.dumps(next_manifest, ensure_ascii=False, indent=2) + "\n")
+        print(f"Smoke-scan: {manifest_rel} 재생성 — added:{added} updated:{updated} kept:{kept}")
+        sys.exit(0)
+
+    drift = []
+    for key in tag_entries:
+        if key not in manifest:
+            drift.append(f'S1 "{key}": manifest에 없음(태그 파생 엔트리 누락) — --write로 재생성')
+        elif not _json_same(manifest[key], tag_entries[key]):
+            drift.append(f'S1 "{key}": 값 불일치(태그 ↔ manifest) — --write로 재생성')
+    if drift:
+        print("\nSmoke-scan violations:", file=sys.stderr)
+        for e in drift:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Smoke-scan: OK — 태그 파생 엔트리 {len(tag_entries)}건이 매니페스트와 일치(수동 엔트리 {len(manifest) - len(tag_entries)}건 보존).")
+
+
+# ── retag — 추적 태그 마이그레이션 (sdd-retag.mjs 패리티, SPEC-011) ──
+
+_CTAG = "@cov" + "ers"  # 자기 소스가 fr 게이트 스캔에 걸리지 않게 분절
+
+
+def cmd_retag(cfg, map_path, write):
+    if not map_path:
+        print("usage: sdd-retag <map.json> [--write]", file=sys.stderr)
+        sys.exit(2)
+    try:
+        mapping = json.loads(read_text(map_path))
+    except (OSError, ValueError) as e:
+        print(f"✗ T0 맵 로드 실패: {map_path} — {e}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(mapping, dict):
+        print(f"✗ T0 맵 최상위는 객체여야 함: {map_path}", file=sys.stderr)
+        sys.exit(1)
+    alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
+    key_re = re.compile(rf"^((?:{alt})-\d{{3}})/((?:{cfg['__reqAlt']})-\d{{3}}[a-z]?)$")
+    errors = []
+    specs = _collect_specs(cfg)
+    for old_key, new_key in mapping.items():
+        if not key_re.match(old_key):
+            errors.append(f'T1 맵 키 형식 위반 "{old_key}" — "SPEC-NNN/FR-NNN" 형식이어야 함')
+        if new_key is None:
+            continue  # 폐기 선언 — 수동 제거 대상으로 보고
+        if not isinstance(new_key, str) or not key_re.match(new_key):
+            errors.append(f'T1 맵 값 형식 위반 "{old_key}" → {json.dumps(new_key, ensure_ascii=False)} — "SPEC-NNN/FR-NNN" 또는 null(폐기)')
+            continue
+        m = key_re.match(new_key)
+        if m.group(1) not in specs or m.group(2) not in specs[m.group(1)]:
+            errors.append(f'T2 dangling 대상 "{old_key}" → "{new_key}" — no such FR(현재 spec에 실재해야 함)')
+
+    if errors:
+        print(f"Retag — map:{len(mapping)}키 mode:{'write' if write else 'dry-run'} config:{cfg_tag(cfg)}")
+        print("\nRetag violations:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    dirs = list(dict.fromkeys(list(cfg["scanDirs"]) + list(cfg.get("smokeScanDirs") or [])))
+    manifest_rel = str(cfg["smokeManifest"]) if cfg.get("smokeManifest") else None
+    plans = []      # (path, line, tag, old, new)
+    removals = []   # (path, line, tag, old)
+    seen = {k: 0 for k in mapping}
+    files = []
+    for d in dirs:
+        files.extend(walk_all_rel(resolve(cfg, d), cfg, d))
+    for f in sorted(set(files)):
+        if manifest_rel and f == manifest_rel:
+            continue  # 매니페스트 키는 아래에서 별도 처리
+        try:
+            text = read_text_lossy(os.path.join(cfg["__root"], f))
+        except OSError:
+            continue
+        for i, line in enumerate(text.split("\n")):
+            for tag in (_CTAG, _VTAG):
+                for old_key, new_key in mapping.items():
+                    if not re.search(rf"{re.escape(tag)}\s+{re.escape(old_key)}(?![a-z0-9])", line):
+                        continue
+                    seen[old_key] += 1
+                    if new_key is None:
+                        removals.append((f, i + 1, tag, old_key))
+                    else:
+                        plans.append((f, i + 1, tag, old_key, new_key))
+    manifest_plans = []
+    manifest = None
+    if manifest_rel:
+        try:
+            manifest = json.loads(read_text(resolve(cfg, manifest_rel)))
+        except (OSError, ValueError):
+            manifest = None
+        if isinstance(manifest, dict):
+            for old_key, new_key in mapping.items():
+                if old_key not in manifest:
+                    continue
+                seen[old_key] += 1
+                manifest_plans.append((old_key, new_key))
+        else:
+            manifest = None
+
+    rewrites = len(plans) + sum(1 for _, nk in manifest_plans if nk is not None)
+    manual = len(removals) + sum(1 for _, nk in manifest_plans if nk is None)
+    print(f"Retag — map:{len(mapping)}키 rewrites:{rewrites} manual-removal:{manual} "
+          f"mode:{'write' if write else 'dry-run'} config:{cfg_tag(cfg)}")
+    for path, line, tag, old_key, new_key in plans:
+        print(f"  · {path}:{line} {tag} {old_key} → {new_key}")
+    for old_key, new_key in manifest_plans:
+        if new_key is None:
+            print(f"  · {manifest_rel} 키 {old_key} → (폐기 — 수동 제거 대상)")
+        else:
+            print(f"  · {manifest_rel} 키 {old_key} → {new_key}")
+    for path, line, tag, old_key in removals:
+        print(f"  · {path}:{line} {tag} {old_key} → (폐기 — 수동 제거 대상, 잔존 시 fr 게이트 R1이 차단)")
+    for old_key, n in seen.items():
+        if n == 0:
+            print(f'  ⚠ "{old_key}": 참조 0건 — 이미 이행됐거나 오타')
+
+    if not write:
+        print("Retag: dry-run — 적용하려면 --write.")
+        sys.exit(0)
+
+    by_file = {}
+    for path, line, tag, old_key, new_key in plans:
+        by_file.setdefault(path, []).append((tag, old_key, new_key))
+    for f, ps in by_file.items():
+        path = os.path.join(cfg["__root"], f)
+        text = read_text_lossy(path)
+        for tag, old_key, new_key in ps:
+            text = re.sub(rf"({re.escape(tag)}\s+){re.escape(old_key)}(?![a-z0-9])",
+                          lambda m, nk=new_key: m.group(1) + nk, text)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(text)
+    renames = [(o, n) for o, n in manifest_plans if n is not None]
+    if manifest is not None and renames:
+        rename = dict(renames)
+        next_manifest = {}
+        for key in sorted(manifest.keys(), key=lambda k: rename.get(k, k)):
+            next_manifest[rename.get(key, key)] = manifest[key]
+        with open(resolve(cfg, manifest_rel), "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(next_manifest, ensure_ascii=False, indent=2) + "\n")
+    print(f"Retag: 적용 완료 — 파일 {len(by_file)}개 치환, manifest 키 {len(renames)}건 rename.")
+
+
 # ── run — commands.<stage> 실행 ──────────────────────────────
 
 def cmd_run(cfg, stage):
@@ -994,7 +1449,7 @@ def cmd_run(cfg, stage):
         sys.exit(r.returncode)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|run> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run> [...]"
 
 
 def main():
@@ -1040,6 +1495,12 @@ def main():
             mi = args.index("--message-file")
             msg_file = args[mi + 1] if mi + 1 < len(args) else None
         cmd_specsync(cfg, staged, msg_file, positional[0] if positional else base_default)
+    elif sub == "derivation":
+        cmd_derivation(cfg)
+    elif sub == "smokescan":
+        cmd_smokescan(cfg, "--write" in args)
+    elif sub == "retag":
+        cmd_retag(cfg, positional[0] if positional else None, "--write" in args)
     elif sub == "run":
         if len(args) < 2:
             print("usage: python sdd_gates.py run <stage>", file=sys.stderr)

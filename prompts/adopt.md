@@ -23,7 +23,7 @@
    fi
    sh "$KIT/tooling/sdd-init.sh" --gate=node              # ← 이 프로젝트 루트에서 실행
    ```
-   → `sdd/` 레이아웃 · 게이트(~25파일) · git 훅(`pre-commit`·`commit-msg`) · SessionStart/PreToolUse · 스킬 설치. (언어 무관 — 게이트는 node 런타임만 쓰고 언어차는 `sdd.config.json`으로 흡수.)
+   → `sdd/` 레이아웃 · 게이트(~30파일) · git 훅(`pre-commit`·`commit-msg`) · SessionStart/PreToolUse · 스킬 설치. (언어 무관 — 게이트는 node 런타임만 쓰고 언어차는 `sdd.config.json`으로 흡수.)
 3. **config 맞춤.** `sdd.config.json`의 `scanDirs`·`testFileRegex`·`commands`·`specIdPrefixes`·`ownershipCategories`를 이 프로젝트 언어로 맞춘다(프리셋: `tooling/sdd.config.presets.md`).
 4. **확인.** 세션 재시작(SessionStart가 방법론 주입) 후 게이트를 돌려 green 확인.
 
