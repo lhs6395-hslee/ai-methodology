@@ -18,6 +18,8 @@
 │
 ├─ sdd/                         # ┌─ SDD 구역 (문서·메타 = "무엇을/왜"). 실행 코드 아님.
 │  ├─ MODULE_MAP.md             # │  이 레포 단일 모듈 매니페스트(정체성+spec 인덱스)
+│  ├─ smoke-manifest.json       # │  (선택) FR 검증 회계 매니페스트 — requireAccounting/smoke-scan이 소비(SPEC-007/010)
+│  ├─ derivation.json           # │  (선택) 재도출 소스 회계 매니페스트 — readopt 시 9클래스 회계(SPEC-009)
 │  └─ specs/                    # │  spec = EARS FR + ## Ownership (1 spec = 1 파일)
 │     ├─ SPEC-001.md            # │
 │     └─ <PREFIX>-NNN.md        # │  다른 접두어는 config 등록 필수(§2.2)
@@ -65,7 +67,15 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
   "scanDirs": ["src","tests"],                   // @covers를 어디서 찾나
   "ignoreDirs": ["…"],                           // 순회 제외
   "testFileRegex": ["…"],                        // 무엇이 테스트 파일인가
-  "commands": { "lint":"…","typecheck":"…","test":"…" }  // 게이트가 부를 언어별 명령
+  "commands": { "lint":"…","typecheck":"…","test":"…" },  // 게이트가 부를 언어별 명령
+  // ── 강제 강도·회계(선택 — 기본값이면 현행 동작, 켜는 만큼 강해진다. 필드 상세: presets §필드 의미):
+  "specSyncUnownedPolicy": "warn",               // 미소유 파일 정책 silent|warn|error
+  "strictSpecs": [], "requireAccounting": false, // spec 단위 strict 브리지 · FR 전수 회계(SPEC-007)
+  "smokeManifest": "sdd/smoke-manifest.json",    // 회계 매니페스트 경로(위 트리)
+  "smokeScanDirs": null,                          // 검증 태그 스캔 범위 — 기본 scanDirs(SPEC-010)
+  "entityRegistry": {},                           // entity 등록제(신설 = config 리뷰 관문)
+  "derivationManifest": "sdd/derivation.json",   // 재도출 소스 회계(readopt 시 — SPEC-009)
+  "derivationClassGlobs": {}                     // iac/ci/ops-docs 검출 글롭 조정(기본 내장)
 }
 ```
 언어 프리셋: `tooling/sdd.config.presets.md`.
@@ -73,7 +83,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 ## 4. 저장 vs 참조 (한눈에)
 | | 항목 |
 |---|---|
-| **레포에 저장 — SDD 구역** | `sdd/specs/*` · `sdd/MODULE_MAP.md` · `.specify/…/constitution.md` |
+| **레포에 저장 — SDD 구역** | `sdd/specs/*` · `sdd/MODULE_MAP.md` · `.specify/…/constitution.md` · (회계 켜면) `sdd/smoke-manifest.json` · (readopt 시) `sdd/derivation.json` |
 | **레포에 저장 — TDD 구역** | `src/*`(코드) · `tests/*`(테스트, `@covers`로 FR 연결) — 언어 관례 위치 |
 | **레포에 저장 — 배선** | `sdd.config.json` · 게이트 1판(`scripts/`) · CI/CD 설정 |
 | **키트에서 참조**(복사 X) | METHODOLOGY · STRUCTURE · SSOT · DEDUP · SPEC_REVIEW · principles · REALITY_CHECK · STORAGE |

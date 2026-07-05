@@ -12,10 +12,12 @@ test("session-context: 궤도·진입규칙·PREFIX·spec위치를 출력", () =
   assert.match(out, /sdd\/specs/);                        // spec 위치
 });
 
-test("session-context: 광고된 게이트 목록에 check-fr-coverage·check-spec-consistency가 포함", () => {
+test("session-context: 광고된 게이트 목록 = 실제 스위트 전종(품질·보강·spec-first·회계·재도출)", () => {
   const out = execFileSync("sh", [join(process.cwd(), "tooling/harness/sdd-session-context.sh")], { encoding: "utf8" });
-  assert.match(out, /check-fr-coverage/, "check-fr-coverage가 SessionStart 광고에 포함");
-  assert.match(out, /check-spec-consistency/, "check-spec-consistency가 SessionStart 광고에 포함");
-  assert.match(out, /check-ownership/, "check-ownership이 SessionStart 광고에 포함");
-  assert.match(out, /check-spec-cohesion/, "check-spec-cohesion이 SessionStart 광고에 포함");
+  // 광고 목록이 실제 게이트 스위트보다 좁으면 세션 컨텍스트가 낡은 궤도를 가르친다(드리프트).
+  for (const gate of [
+    "check-fr-coverage", "check-ownership", "check-spec-cohesion", "check-spec-completeness",
+    "check-spec-consistency", "check-test-adequacy", "check-converge-drift", "check-orphan-surfaces",
+    "check-spec-sync", "check-derivation", "sdd-smoke-scan",
+  ]) assert.match(out, new RegExp(gate), `${gate}가 SessionStart 광고에 포함`);
 });

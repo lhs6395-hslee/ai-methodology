@@ -63,6 +63,15 @@ jobs:
       # - run: node scripts/check-test-adequacy.mjs
       # - run: node scripts/check-converge-drift.mjs ${{ github.event.pull_request.base.ref || 'origin/main' }}
       # - run: node scripts/check-orphan-surfaces.mjs
+      # - run: node scripts/check-spec-cohesion.mjs
+      # - run: node scripts/check-spec-completeness.mjs   # SC·인수조건·수명주기 기록·Change Log 근거
+      # - run: node scripts/check-spec-consistency.mjs
+      # spec-first(range advisory — hard 강제는 commit-msg 훅이 담당):
+      # - run: node scripts/check-spec-sync.mjs ${{ github.event.pull_request.base.ref || 'origin/main' }}
+      # 재도출 회계·smoke 증거 드리프트(각 매니페스트를 config에 선언한 프로젝트만 — 미설정이면 no-op/no-tag):
+      # - run: node scripts/check-derivation.mjs          # derivationManifest 9클래스 회계(SPEC-009)
+      # - run: node scripts/sdd-smoke-scan.mjs            # 검증 태그↔smokeManifest 드리프트 check(SPEC-010)
+      # (전 게이트 명령 매트릭스 — Node·Python 두 판: tooling/ci-examples.md)
 
 # ─────────────────────────────────────────────────────────────
 # Python-only 프로젝트용 (Node 불필요) — 위 jobs.gates를 이걸로 대체:

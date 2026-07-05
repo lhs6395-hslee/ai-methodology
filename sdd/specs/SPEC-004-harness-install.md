@@ -88,3 +88,4 @@
 | 2026-07-05 | `--gate=py`에 pre-commit·commit-msg(specsync) 훅 배선 — 낡은 "spec-sync는 Node 필요" 안내 제거(+ 테스트) | SPEC-006: Python판이 spec-first까지 전 게이트 패리티가 되어 Python-only 프로젝트도 hard 강제 가능 |
 | 2026-07-05 | sdd-init node 복사 목록에 `verification-accounting.mjs`·`lifecycle-lib.mjs` 추가(+ 픽스처 복사 목록 동기) | SPEC-007·SPEC-008 신설 동반 — fr·completeness·spec-sync 게이트의 새 import가 소비 프로젝트 scripts/에서 결손되면 ERR_MODULE_NOT_FOUND |
 | 2026-07-05 | sdd-init node 복사 목록에 `derivation-lib.mjs`·`check-derivation.mjs`·`sdd-smoke-scan.mjs`·`sdd-retag.mjs` 추가 | SPEC-009~011 신설 동반 — 재채택 프로젝트가 재도출 회계·증거 스캔·retag 게이트를 결손 없이 배선 |
+| 2026-07-06 | SessionStart 주입 텍스트의 게이트 광고를 실제 스위트 전종(품질 5·보강/spec-first 4·재도출/증거 2)으로 갱신 + 테스트가 전종 포함을 회귀로 고정 | 문서 동기 감사[검증]: 광고 목록이 4종에 멈춰 세션 컨텍스트가 낡은 궤도를 가르침(2차부터 누적 드리프트) — 열거를 테스트로 고정해 재발 차단 |
