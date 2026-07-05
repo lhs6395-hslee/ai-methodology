@@ -70,3 +70,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-05 | 초안 — Python 전 게이트 패리티·requirementIdPrefixes 전 사이트 일반화·셸/Go 문법 정렬·preset 템플릿 앵커 패리티 | 진단 A-1/A-2/B-1/B-2: 런타임 간·경로 간 문법 불일치가 "조용히 빠지는" 클래스를 만듦 — 문법화(정의되지 않은 예외 제거) |
+| 2026-07-05 | Python fr 게이트에 검증 회계(strictSpecs·requireAccounting·smokeManifest) 미러 + DEFAULTS 5키 정렬 + 회계 바이트 패리티 테스트 | SPEC-007 신설 동반 — 셸/Go fr에는 회계 계층 없음(핵심 3커맨드 계약 밖, 정직한 델타) |

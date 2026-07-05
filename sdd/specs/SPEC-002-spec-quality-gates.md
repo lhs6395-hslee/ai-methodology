@@ -76,3 +76,4 @@
 | 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(PM솔루션): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |
 | 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(PM솔루션): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |
 | 2026-07-05 | coverage·cohesion·completeness의 요구 ID 정규식을 `requirementIdPrefixes` 파생값으로 전환 + `check-req-prefix.test.mjs` Files 편입 | 진단 B-2: 사이트별 하드코딩이 접두어 확장 시 조용한 누락을 만듦 — SPEC-001 config 파생값 하나로 통일 |
+| 2026-07-05 | fr 게이트에 검증 회계 계층 통합(strictSpecs 하드 R2·R3 unaccounted·accounted 리포트) — 회계 판정 자체는 SPEC-007 소유 | 진단 B-3 승인: "조용히 미검증" 제거 — 게이트 본체는 회계 코어(verification-accounting)를 소비만 |

@@ -53,6 +53,11 @@ DEFAULTS = {
     "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
     "prefixRationale": {},
     "requirementIdPrefixes": ["FR"],
+    "strictSpecs": [],
+    "requireAccounting": False,
+    "smokeManifest": None,
+    "specSyncUnownedPolicy": "silent",
+    "entityRegistry": {},
     "capabilityVerbs": [],
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
@@ -221,6 +226,71 @@ def validate_key(category, key, cfg):
     return None  # Entity는 형식 제약 없음(스키마 식별자 그대로)
 
 
+# ── 검증 회계 (verification-accounting.mjs 패리티, SPEC-007) ──
+
+def load_manifest(cfg, specs):
+    """smokeManifest 로드+검증. 미설정 → (None, []). 반환: (entries, errors)."""
+    if not cfg.get("smokeManifest"):
+        return None, []
+    rel = str(cfg["smokeManifest"])
+    path = resolve(cfg, rel)
+    try:
+        raw = read_text(path)
+    except OSError:
+        return None, [f"M0 smokeManifest 파일 없음: {rel}"]
+    try:
+        data = json.loads(raw)
+    except ValueError as e:
+        return None, [f"M0 smokeManifest JSON 파싱 실패: {rel} — {e}"]
+    if not isinstance(data, dict):
+        return None, [f"M0 smokeManifest 최상위는 객체여야 함: {rel}"]
+
+    alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
+    key_re = re.compile(rf"^((?:{alt})-\d{{3}})/((?:{cfg['__reqAlt']})-\d{{3}}[a-z]?)$")
+    errors = []
+    entries = {}
+    for key in data.keys():
+        m = key_re.match(key)
+        if not m:
+            errors.append(f'M1 manifest 키 형식 위반 "{key}" — "SPEC-NNN/FR-NNN" 형식이어야 함')
+            continue
+        spec, fr = m.group(1), m.group(2)
+        if spec not in specs or fr not in specs[spec]:
+            errors.append(f'M1 dangling manifest 키 "{key}" — no such FR')
+            continue
+        v = data[key]
+        method = str((v or {}).get("method") or "").strip() if isinstance(v, dict) else ""
+        if not method:
+            errors.append(f'M2 "{key}": method 없음(빈 값 불가)')
+            continue
+        if method == "deferred":
+            if not str(v.get("reason") or "").strip():
+                errors.append(f'M2 "{key}": method=deferred는 reason 필수(빈 값 불가)')
+                continue
+        elif not str(v.get("evidence") or "").strip():
+            errors.append(f'M2 "{key}": evidence 필수(빈 값 불가 — 존재만 강제, 질은 리뷰 몫)')
+            continue
+        entries[key] = {"method": method}
+    return entries, errors
+
+
+def classify_accounting(specs, covered, entries):
+    """FR별 분류(unit > smoke > deferred > unaccounted) + 카운트."""
+    classes = {}
+    counts = {"unit": 0, "smoke": 0, "deferred": 0, "unaccounted": 0}
+    for spec, frs in specs.items():
+        for fr in frs:
+            key = f"{spec}/{fr}"
+            cls = "unaccounted"
+            if fr in covered.get(spec, set()):
+                cls = "unit"  # unit이 manifest보다 우선
+            elif entries is not None and key in entries:
+                cls = "deferred" if entries[key]["method"] == "deferred" else "smoke"
+            classes[key] = cls
+            counts[cls] += 1
+    return classes, counts
+
+
 # ── fr — FR↔test 추적 + PREFIX 거버넌스 (check-fr-coverage.mjs) ──
 
 def cmd_fr(cfg, strict):
@@ -278,26 +348,50 @@ def cmd_fr(cfg, strict):
     for file, spec, fr in bad_refs:
         errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
 
+    # 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
+    #     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
+    manifest, manifest_errors = load_manifest(cfg, specs)
+    errors.extend(manifest_errors)
+    strict_specs = set(cfg.get("strictSpecs") or [])
+    for sid in sorted(strict_specs):
+        if sid not in specs:
+            errors.append(f'strictSpecs에 존재하지 않는 spec "{sid}" — 오타/삭제 확인(조용한 스킵 금지)')
+    accounting_active = manifest is not None or bool(cfg.get("requireAccounting"))
+    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest)
+                                 if accounting_active else (None, None))
+
     for spec, frs in specs.items():
         cov = covered.get(spec, set())
+        hard = strict or spec in strict_specs
+        label = "R2(strict)" if strict else "R2(strictSpecs)"
         if not cov:
             msg = f"{spec}: 0/{len(frs)} FRs covered (not yet implemented)"
-            if strict and frs:
-                errors.append(f"R2(strict) {msg}")
+            if hard and frs:
+                errors.append(f"{label} {msg}")
             else:
                 warnings.append(msg)
             continue
         missing = sorted(fr for fr in frs if fr not in cov)
         if missing:
             msg = f"{spec}: {len(cov)}/{len(frs)} FRs covered — missing {', '.join(missing)}"
-            (errors if strict else warnings).append(f"R2(strict) {msg}" if strict else msg)
+            (errors if hard else warnings).append(f"{label} {msg}" if hard else msg)
         else:
             warnings.append(f"{spec}: {len(cov)}/{len(frs)} FRs covered ✓")
+
+    # R3(requireAccounting): 모든 FR이 unit ∨ smoke ∨ deferred — "조용히 미검증" 제거.
+    if cfg.get("requireAccounting"):
+        for spec, frs in specs.items():
+            for fr in sorted(frs):
+                if acct_classes.get(f"{spec}/{fr}") == "unaccounted":
+                    errors.append(f"R3 unaccounted {spec}/{fr} — unit·smoke·deferred 어느 것도 아님(requireAccounting)")
 
     total_fr = sum(len(s) for s in specs.values())
     total_cov = sum(len(s) for s in covered.values())
     mode = "strict" if strict else "incremental"
-    print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov} mode:{mode} config:{cfg_tag(cfg)}")
+    acct_tag = (f" accounted(unit:{acct_counts['unit']} smoke:{acct_counts['smoke']}"
+                f" deferred:{acct_counts['deferred']} unaccounted:{acct_counts['unaccounted']})"
+                if accounting_active else "")
+    print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov}{acct_tag} mode:{mode} config:{cfg_tag(cfg)}")
     for w in warnings:
         print(f"  · {w}")
     if errors:

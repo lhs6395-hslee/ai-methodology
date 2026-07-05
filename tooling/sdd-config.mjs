@@ -64,6 +64,23 @@ export const DEFAULTS = {
   // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
   // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).
   requirementIdPrefixes: ["FR"],
+  // 전역 --strict의 점진 도입 브리지: 나열된 spec ID만 R2를 strict로(모든 FR unit 커버 필수,
+  // smoke/deferred 대체 불가). 존재하지 않는 spec ID는 에러(조용한 오타 금지).
+  strictSpecs: [],
+  // true면 R3: 모든 FR이 unit-covered ∨ smoke-verified ∨ deferred여야 한다("조용히 미검증" 제거).
+  requireAccounting: false,
+  // FR 검증 회계 매니페스트(JSON 파일 경로, 루트 기준). 미설정(null) = 현행 동작.
+  // 형식: { "SPEC-NNN/FR-NNN": {method, evidence} | {method:"deferred", reason} }.
+  // 게이트는 dangling 키·빈 evidence·빈 reason을 에러 처리 — 사유 "존재만" 강제(질은 리뷰 몫).
+  smokeManifest: null,
+  // check-spec-sync: 어떤 스펙 Files에도 매치되지 않는 변경 파일의 정책.
+  // "silent"(기본 = 현행 침묵 통과) | "warn"(advisory) | "error"(staged에서 차단 = closed-world).
+  // 의도적 예외는 specSyncExemptGlobs로 선언(조합 탈출).
+  specSyncUnownedPolicy: "silent",
+  // entity(=aggregate-root 카테고리) 레지스트리: { "<정규화 키>": "<도입 사유>" }.
+  // 비어 있으면 비활성(현행). 채워지면 Ownership의 entity 키는 등록된 것만 허용되고
+  // 사유가 빈 등록은 에러 — PREFIX 거버넌스(specIdPrefixes+prefixRationale)와 동일 패턴.
+  entityRegistry: {},
   // CRUD 기본에 더할 도메인 verb
   capabilityVerbs: [],
   // Surface path param 표준 표기

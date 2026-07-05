@@ -274,6 +274,56 @@ test("py specsync range: 코드-only 브랜치 → advisory(exit 0) + base posit
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ── fr 검증 회계(SPEC-007 패리티): strictSpecs·requireAccounting·smokeManifest ──
+
+test("py fr 회계: strictSpecs 부분커버 exit 1 · R3 unaccounted exit 1 · manifest 검증 에러", skip, () => {
+  const spec = "**Spec**: `SPEC-001`\n- **FR-001** (event): x.\n- **FR-002** (event): y.\n";
+  const cover = TAG + "SPEC-001/FR-001\ntest('x', () => { assert.ok(1); });\n";
+  const strict = fixture({ "sdd/specs/SPEC-001.md": spec, "src/a.test.mjs": cover },
+    { strictSpecs: ["SPEC-001"] });
+  const r3 = fixture({ "sdd/specs/SPEC-001.md": spec, "src/a.test.mjs": cover },
+    { requireAccounting: true });
+  const dangling = fixture({
+    "sdd/specs/SPEC-001.md": spec,
+    "sdd/smoke.json": JSON.stringify({ "SPEC-001/FR-999": { method: "smoke", evidence: "x" } }),
+  }, { smokeManifest: "sdd/smoke.json" });
+  try {
+    const a = runPy(strict, ["fr"]);
+    assert.equal(a.code, 1, a.out);
+    assert.match(a.out, /R2\(strictSpecs\) SPEC-001: 1\/2/);
+    const b = runPy(r3, ["fr"]);
+    assert.equal(b.code, 1, b.out);
+    assert.match(b.out, /R3 unaccounted SPEC-001\/FR-002/);
+    const c = runPy(dangling, ["fr"]);
+    assert.equal(c.code, 1, c.out);
+    assert.match(c.out, /M1 dangling manifest 키/);
+  } finally {
+    for (const d of [strict, r3, dangling]) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("패리티: fr 회계 활성(smokeManifest+requireAccounting+strictSpecs) — Node와 Python 출력 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** (event): x.\n- **FR-002** (event): y.\n- **FR-003** (event): z.\n",
+    "sdd/specs/SPEC-002.md": "**Spec**: `SPEC-002`\n- **FR-001** (event): w.\n",
+    "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => { assert.ok(1); });\n",
+    "sdd/smoke.json": JSON.stringify({
+      "SPEC-001/FR-002": { method: "smoke", evidence: "scripts/smoke.sh 왕복" },
+      "SPEC-001/FR-999": { method: "smoke", evidence: "dangling" },
+      "SPEC-002/FR-001": { method: "deferred", reason: "" },
+    }),
+  };
+  const cfg = { smokeManifest: "sdd/smoke.json", requireAccounting: true, strictSpecs: ["SPEC-001", "SPEC-404"] };
+  const a = fixture(files, cfg);
+  const b = fixture(files, cfg);
+  try {
+    const p = runPy(a, ["fr"]);
+    const n = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 // ── Node ↔ Python 패리티: 같은 픽스처, 같은 판정·같은 출력 ──
 
 test("패리티: fr/ownership/cohesion/completeness — Node와 Python 출력 동일", skip, () => {

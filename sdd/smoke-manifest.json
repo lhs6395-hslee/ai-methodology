@@ -1,0 +1,7 @@
+{
+  "SPEC-001/FR-005": { "method": "deferred", "reason": "Surface 형식 위반 분기(http/path/any)의 unit @covers 태깅 미부착 — 태깅 승격 백로그(2026-07-05 회계 도입 시점 스냅샷)" },
+  "SPEC-001/FR-008": { "method": "deferred", "reason": "config JSON 파싱 실패 exit 경로의 unit @covers 태깅 미부착 — 태깅 승격 백로그" },
+  "SPEC-004/FR-006": { "method": "deferred", "reason": "pre-push SDD_SYNC_BLOCK 분기의 e2e(임시 저장소 훅 실행) 테스트 미작성 — 백로그" },
+  "SPEC-004/FR-007": { "method": "deferred", "reason": "sdd-init 키트 내부 실행 거부 분기의 e2e 테스트 미작성 — 백로그" },
+  "SPEC-004/FR-008": { "method": "deferred", "reason": "sdd-run 스테이지 러너의 exit code 전파 e2e 테스트 미작성 — 백로그" }
+}

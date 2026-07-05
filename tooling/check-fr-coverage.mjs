@@ -25,6 +25,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
+import { loadManifest, classify } from "./verification-accounting.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -117,24 +118,48 @@ for (const { file, spec, fr } of badRefs) {
   errors.push(`R1 dangling @covers ${spec}/${fr} in ${file.replace(ROOT + "/", "")} — no such FR in ${spec}`);
 }
 
+// 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
+//     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
+const { entries: manifest, errors: manifestErrors } = loadManifest(cfg, specs);
+errors.push(...manifestErrors);
+const strictSpecs = new Set(cfg.strictSpecs || []);
+for (const id of [...strictSpecs].sort()) {
+  if (!specs.has(id)) errors.push(`strictSpecs에 존재하지 않는 spec "${id}" — 오타/삭제 확인(조용한 스킵 금지)`);
+}
+const accountingActive = manifest !== null || !!cfg.requireAccounting;
+const acct = accountingActive ? classify(specs, covered, manifest) : null;
+
 // R2: coverage completeness.
 //   - incremental (default): partial coverage WARNS (adopt FR by FR).
-//   - strict: every FR of every non-empty spec MUST be covered, else error.
+//   - strict / strictSpecs 등재: every FR MUST be unit-covered(smoke/deferred 대체 불가), else error.
 for (const [spec, frs] of specs) {
   const cov = covered.get(spec) ?? new Set();
+  const hard = STRICT || strictSpecs.has(spec);
+  const label = STRICT ? "R2(strict)" : "R2(strictSpecs)";
   if (cov.size === 0) {
     const msg = `${spec}: 0/${frs.size} FRs covered (not yet implemented)`;
-    if (STRICT && frs.size > 0) errors.push(`R2(strict) ${msg}`);
+    if (hard && frs.size > 0) errors.push(`${label} ${msg}`);
     else warnings.push(msg);
     continue;
   }
   const missing = [...frs].filter((fr) => !cov.has(fr));
   if (missing.length) {
     const msg = `${spec}: ${cov.size}/${frs.size} FRs covered — missing ${missing.join(", ")}`;
-    if (STRICT) errors.push(`R2(strict) ${msg}`);
+    if (hard) errors.push(`${label} ${msg}`);
     else warnings.push(msg);
   } else {
     warnings.push(`${spec}: ${cov.size}/${frs.size} FRs covered ✓`);
+  }
+}
+
+// R3(requireAccounting): 모든 FR이 unit ∨ smoke ∨ deferred — "조용히 미검증" 제거.
+if (cfg.requireAccounting) {
+  for (const [spec, frs] of specs) {
+    for (const fr of [...frs].sort()) {
+      if (acct.classes.get(`${spec}/${fr}`) === "unaccounted") {
+        errors.push(`R3 unaccounted ${spec}/${fr} — unit·smoke·deferred 어느 것도 아님(requireAccounting)`);
+      }
+    }
   }
 }
 
@@ -142,7 +167,8 @@ for (const [spec, frs] of specs) {
 const totalFR = [...specs.values()].reduce((n, s) => n + s.size, 0);
 const totalCov = [...covered.values()].reduce((n, s) => n + s.size, 0);
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
-console.log(`FR coverage gate — specs:${specs.size} FRs:${totalFR} covered:${totalCov} mode:${STRICT ? "strict" : "incremental"} config:${cfgTag}`);
+const acctTag = acct ? ` accounted(unit:${acct.counts.unit} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} unaccounted:${acct.counts.unaccounted})` : "";
+console.log(`FR coverage gate — specs:${specs.size} FRs:${totalFR} covered:${totalCov}${acctTag} mode:${STRICT ? "strict" : "incremental"} config:${cfgTag}`);
 for (const w of warnings) console.log(`  · ${w}`);
 if (errors.length) {
   console.error("\nFR coverage violations:");
