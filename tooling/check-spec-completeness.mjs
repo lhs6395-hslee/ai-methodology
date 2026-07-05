@@ -33,7 +33,7 @@ const findings = [];
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   const specId = (text.match(cfg.__specIdRe) || [file.split("/").pop()])[0];
-  if (countIds(/\bFR-\d{3}[a-z]?\b/g, text) === 0) continue;     // FR 없는 spec은 면제(서픽스 FR도 FR)
+  if (countIds(cfg.__frTokenRe, text) === 0) continue;     // FR 없는 spec은 면제 — 문법은 requirementIdPrefixes에서 파생(서픽스 FR도 FR)
   if (countIds(/\bSC-\d{3}\b/g, text) === 0)
     findings.push({ specId, miss: "SC(측정형 성공 기준)" });
   if (!(/\b(Given|Acceptance)\b/i.test(text) || /수용\s*기준/.test(text)))

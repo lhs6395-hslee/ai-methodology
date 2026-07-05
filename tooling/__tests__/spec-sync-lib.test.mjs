@@ -82,3 +82,9 @@ test("hasMeaningfulSpecChange: 레터 서픽스 FR 라인(FR-001a) 추가 → tr
   const diff = "@@ -9,1 +9,2 @@\n **FR-001** THE SYSTEM SHALL x.\n+**FR-001a** THE SYSTEM SHALL y.";
   assert.equal(hasMeaningfulSpecChange(post, diff), true);
 });
+
+test("hasMeaningfulSpecChange: reqAlt 주입 시 커스텀 요구 접두어(NFR) 라인도 의미 변경", () => {
+  const diff = "@@ -9,0 +10,1 @@\n+**NFR-002** THE SYSTEM SHALL y.";
+  assert.equal(hasMeaningfulSpecChange(POST, diff), false);            // 기본(FR)에선 불인정
+  assert.equal(hasMeaningfulSpecChange(POST, diff, "FR|NFR"), true);   // requirementIdPrefixes 파생 alt 주입
+});

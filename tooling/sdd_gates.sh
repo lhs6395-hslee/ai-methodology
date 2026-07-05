@@ -52,9 +52,13 @@ SCAN_DIRS=$(cfg_arr scanDirs | arr_or_default src tests)
 IGNORE=$(cfg_arr ignoreDirs | arr_or_default node_modules .next coverage dist build out target vendor __pycache__ .venv venv .git .idea .gradle bin obj Pods .dart_tool)
 TESTRX=$(cfg_arr testFileRegex | arr_or_default '\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$')
 CATS=$(cfg_arr ownershipCategories | arr_or_default Entities Surfaces Capabilities)
-PREFIXES=$(cfg_arr specIdPrefixes | arr_or_default SPEC)
+PREFIXES=$(cfg_arr specIdPrefixes | arr_or_default SPEC INFRA TEST)
 # spec ID 접두어 → ERE alt. 예: SPEC\nTEST → "SPEC|TEST"
 PREFALT=$(printf '%s' "$PREFIXES" | awk 'NR>1{printf "|"}{printf "%s",$0}')
+# 요구 ID 접두어(requirementIdPrefixes, 기본 FR) → ERE alt. FR 문법은 전 런타임 공통:
+# <접두어>-3자리+선택적 소문자 서픽스 1자(FR-003a). 2자 서픽스는 통째 불인정(절단 캡처 금지).
+REQPREFIXES=$(cfg_arr requirementIdPrefixes | arr_or_default FR)
+REQALT=$(printf '%s' "$REQPREFIXES" | awk 'NR>1{printf "|"}{printf "%s",$0}')
 
 # ignore 디렉토리 → 경로 필터용 ERE: /(a|b|c)/
 ignore_ere() { printf '%s' "$IGNORE" | awk 'NR>1{printf "|"}{printf "%s",$0}' ; }
@@ -79,7 +83,35 @@ cfg_tag() { if [ -n "$CFG" ]; then printf '%s' "${CFG#$ROOT/}"; else printf 'def
 gate_fr() {
   TMP=$(mktemp -d)
   trap 'rm -rf "$TMP"' EXIT
-  : > "$TMP/declared"; : > "$TMP/specset"; : > "$TMP/covered"
+  : > "$TMP/declared"; : > "$TMP/specset"; : > "$TMP/covered"; : > "$TMP/pfxerr"
+
+  # 0. PREFIX 화이트리스트 사전 검사 — 미등록 접두어는 조용히 건너뛰지 않고 exit 1(Node판 패리티).
+  if [ -d "$SPEC_DIR" ]; then
+    for f in "$SPEC_DIR"/*.md; do
+      [ -e "$f" ] || continue
+      b=${f##*/}
+      pfx=$(printf '%s' "$b" | grep -oE '^[A-Z]+-[0-9]{3}' | grep -oE '^[A-Z]+' || true)
+      [ -n "$pfx" ] || continue
+      if ! printf '%s\n' "$PREFIXES" | grep -qx "$pfx"; then
+        printf '미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가\n' "$pfx" "$b" >> "$TMP/pfxerr"
+      else
+        case "$pfx" in
+          SPEC|INFRA|TEST) ;;
+          *)
+            rat=""
+            [ -n "$CFG" ] && rat=$(jq -r ".prefixRationale.\"$pfx\" // empty" "$CFG")
+            if [ -z "$(printf '%s' "$rat" | tr -d '[:space:]')" ]; then
+              printf '표준 밖 접두어 "%s" — prefixRationale["%s"]에 도입 사유 필요(빈 값 불가)\n' "$pfx" "$pfx" >> "$TMP/pfxerr"
+            fi ;;
+        esac
+      fi
+    done
+  fi
+  if [ -s "$TMP/pfxerr" ]; then
+    echo "✗ PREFIX 위반:" >&2
+    sed 's/^/  ✗ /' "$TMP/pfxerr" >&2
+    exit 1
+  fi
 
   if [ -d "$SPEC_DIR" ]; then
     for f in "$SPEC_DIR"/*.md; do
@@ -89,14 +121,17 @@ gate_fr() {
       sid=$(printf '%s' "$b" | grep -oE "(${PREFALT})-[0-9]{3}" | head -1 || true)
       [ -n "$sid" ] || continue
       printf '%s\n' "$sid" >> "$TMP/specset"
-      grep -oE '\*\*FR-[0-9]{3}\*\*' "$f" 2>/dev/null | grep -oE 'FR-[0-9]{3}' | sort -u | while IFS= read -r fr; do
+      # FR 선언: **<REQ>-NNN[a]** — 닫는 **가 경계를 강제(2자 서픽스는 통째 불인정)
+      grep -oE "\*\*(${REQALT})-[0-9]{3}[a-z]?\*\*" "$f" 2>/dev/null | grep -oE "(${REQALT})-[0-9]{3}[a-z]?" | sort -u | while IFS= read -r fr; do
         printf '%s %s\n' "$sid" "$fr" >> "$TMP/declared"
       done
     done
   fi
 
   list_test_files | while IFS= read -r tf; do
-    grep -oE "@covers (${PREFALT})-[0-9]{3}/FR-[0-9]{3}" "$tf" 2>/dev/null | while IFS= read -r m; do
+    # 과포집(뒤 워드문자 포함) 후 정확형만 통과 — FR-003ab·FR-003a1 같은 비문법 태그의 절단 캡처 금지
+    grep -oE "@covers (${PREFALT})-[0-9]{3}/(${REQALT})-[0-9]{3}[a-zA-Z0-9_]*" "$tf" 2>/dev/null | while IFS= read -r m; do
+      printf '%s' "$m" | grep -Eq "/(${REQALT})-[0-9]{3}[a-z]?$" || continue
       pair=${m#@covers }
       spec=${pair%/*}; fr=${pair#*/}
       printf '%s %s %s\n' "$spec" "$fr" "$tf" >> "$TMP/covered"

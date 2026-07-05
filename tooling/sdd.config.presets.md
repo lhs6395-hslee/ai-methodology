@@ -2,7 +2,7 @@
 
 > `sdd.config.json` **한 장**만 바꾸면 게이트와 CI가 그 언어/스택에 맞게 동작한다. 게이트 자체는 텍스트 파서라 코드는 손대지 않는다. 아래에서 프로젝트 언어 블록을 골라 복사해 루트에 두면 끝.
 >
-> **게이트 런타임(4판, 동작 동일):** 사실상 모든 언어를 커버하는 권장 배포물은 **Go 단일 정적 바이너리**(`go-gate/`, `CGO_ENABLED=0`) — 소비자는 Go조차 없이 `./sdd-gate fr|ownership|run <stage>`. 빌드 없이 즉시 돌릴 땐 **`sh sdd_gates.sh …`**(POSIX 셸, `sh`+`grep`+`awk`+`jq`). 그 스택에 인터프리터가 있으면 `python sdd_gates.py …`/`node …`도 가능. 특정 런타임을 강요하지 않는다.
+> **게이트 런타임(4판):** 사실상 모든 언어를 커버하는 권장 배포물은 **Go 단일 정적 바이너리**(`go-gate/`, `CGO_ENABLED=0`) — 소비자는 Go조차 없이 `./sdd-gate fr|ownership|run <stage>`. 빌드 없이 즉시 돌릴 땐 **`sh sdd_gates.sh …`**(POSIX 셸, `sh`+`grep`+`awk`+`jq`). 핵심 3커맨드·ID 문법은 4판 동일하고, **보강게이트·spec-first까지의 전 게이트는 Node·Python 두 판**(패리티 테스트 강제 — 매트릭스: `ci-examples.md`). 특정 런타임을 강요하지 않는다.
 >
 > `@covers` 태그는 **주석 스타일과 무관**(`// @covers …`·`# @covers …`·`-- @covers …` 모두 인식). 바꿔야 하는 건 `testFileRegex`·`scanDirs`·`commands`뿐이다.
 
@@ -16,7 +16,7 @@
 ```
 
 ## Python
-> Python-only 프로젝트는 **Node 없이** `python scripts/sdd_gates.py fr|ownership|run <stage>`로 게이트를 돌린다(Node판과 동작 동일, 표준 라이브러리만).
+> Python-only 프로젝트는 **Node 없이** `python scripts/sdd_gates.py <게이트>`로 돌린다 — fr·ownership·run뿐 아니라 cohesion·completeness·consistency·adequacy·orphan·converge·specsync까지 **Node판 전 게이트 패리티**(표준 라이브러리만, 3.7+).
 ```json
 {
   "scanDirs": ["src", "tests"],
@@ -107,9 +107,10 @@
 | `ignoreDirs` | 순회 제외 폴더명 | 언어별 빌드/의존 폴더 다수 |
 | `testFileRegex` | 테스트 **파일명** 매칭 정규식(소스 문자열) 배열 | JS/TS |
 | `ownershipCategories` | 구조적 중복 키 종류 | `Entities/Surfaces/Capabilities` |
-| `specIdPrefixes` | spec 파일·ID·`@covers`에서 인정할 ID 접두어. 인프라/테스트를 1급 spec으로 다루면 확장(예: `["SPEC","TEST","INFRA"]`) | `["SPEC"]` |
+| `specIdPrefixes` | spec 파일·ID·`@covers`에서 인정할 ID 접두어. 표준 밖 접두어는 `prefixRationale` 사유 필수(미등록은 fr 게이트가 exit 1) | `["SPEC","INFRA","TEST"]` |
+| `requirementIdPrefixes` | 요구 ID 접두어 — FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 여기서 파생(레터 서픽스 1자 포함). 확장 예: `["FR","NFR"]` | `["FR"]` |
 | `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀 | npm |
 
 > **모델 무관:** 이 config에는 어떤 LLM/에이전트 가정도 없다. 게이트는 모델과 독립적으로 CI에서 강제된다.
 > **컴포넌트 무관:** DB(RDB·NoSQL)·캐시(Redis…)·브로커/스트림(Kafka…)·검색·스토리지 등 **어떤 미들웨어 제품도 config·게이트·spec에 박지 않는다.** spec은 *역량/요구*만 적고(예: "이벤트 로그 필요") 제품 선택은 프로젝트 몫이다(`principles.md` §10, `SSOT.md` §5b).
-> **런타임 무관:** 게이트 4판 동봉 — **Go 정적 바이너리(`go-gate/`)가 사실상 모든 언어 커버**(인터프리터 0, 네이티브 Windows 포함), 셸판은 빌드 없이 즉시 실행, Python·Node판은 그 스택 편의. 전부 같은 config·동작 동일·실행 검증됨.
+> **런타임 무관:** 게이트 4판 동봉 — **Go 정적 바이너리(`go-gate/`)가 사실상 모든 언어 커버**(인터프리터 0, 네이티브 Windows 포함), 셸판은 빌드 없이 즉시 실행, Python판은 Node 전 게이트 패리티, Node판이 정본. 전부 같은 config — 커버 매트릭스·검증 상태는 `ci-examples.md`·`REALITY_CHECK.md`.

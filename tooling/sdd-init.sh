@@ -44,7 +44,14 @@ case "$GATE" in
   sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh"
         say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py"
-        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
+        # Python판은 spec-first(specsync) 포함 Node 전 게이트 패리티(SPEC-006) — 훅도 배선.
+        if [ -d "$T/.git" ]; then
+          printf '#!/bin/sh\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$T/.git/hooks/pre-commit"
+          # merge commit은 skip(§5.6) — harness/commit-msg와 동일 의미론.
+          printf '#!/bin/sh\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
+          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/commit-msg"
+          say "  → git pre-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
+        fi ;;
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
                  check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs \
                  ownership-keys.mjs check-spec-consistency.mjs check-spec-sync.mjs spec-sync-lib.mjs; do

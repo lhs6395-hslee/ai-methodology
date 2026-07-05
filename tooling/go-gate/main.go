@@ -25,19 +25,22 @@ import (
 )
 
 type Config struct {
-	SpecDir             string            `json:"specDir"`
-	ScanDirs            []string          `json:"scanDirs"`
-	IgnoreDirs          []string          `json:"ignoreDirs"`
-	TestFileRegex       []string          `json:"testFileRegex"`
-	OwnershipCategories []string          `json:"ownershipCategories"`
-	SpecIdPrefixes      []string          `json:"specIdPrefixes"`
-	Commands            map[string]string `json:"commands"`
+	SpecDir               string            `json:"specDir"`
+	ScanDirs              []string          `json:"scanDirs"`
+	IgnoreDirs            []string          `json:"ignoreDirs"`
+	TestFileRegex         []string          `json:"testFileRegex"`
+	OwnershipCategories   []string          `json:"ownershipCategories"`
+	SpecIdPrefixes        []string          `json:"specIdPrefixes"`
+	PrefixRationale       map[string]string `json:"prefixRationale"`
+	RequirementIdPrefixes []string          `json:"requirementIdPrefixes"`
+	Commands              map[string]string `json:"commands"`
 
-	path    string
-	root    string
-	tre     []*regexp.Regexp
-	specID  *regexp.Regexp // (?:SPEC|TEST|…)-\d{3}  (specIdPrefixes에서 파생)
-	covers  *regexp.Regexp // @covers <PREFIX>-NNN/FR-NNN
+	path   string
+	root   string
+	tre    []*regexp.Regexp
+	specID *regexp.Regexp // (?:SPEC|TEST|…)-\d{3}  (specIdPrefixes에서 파생)
+	frDecl *regexp.Regexp // \*\*<REQ>-NNN[a]\*\*   (requirementIdPrefixes에서 파생)
+	covers *regexp.Regexp // @covers <PREFIX>-NNN/<REQ>-NNN[a]
 }
 
 func defaults() Config {
@@ -51,8 +54,11 @@ func defaults() Config {
 		},
 		TestFileRegex:       []string{`\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$`},
 		OwnershipCategories: []string{"Entities", "Surfaces", "Capabilities"},
-		SpecIdPrefixes:      []string{"SPEC"},
-		Commands:            map[string]string{},
+		// Node판 sdd-config.mjs DEFAULTS의 미러 — 값이 다르면 config 없는 프로젝트에서 판정이 갈라진다.
+		SpecIdPrefixes:        []string{"SPEC", "INFRA", "TEST"},
+		PrefixRationale:       map[string]string{},
+		RequirementIdPrefixes: []string{"FR"},
+		Commands:              map[string]string{},
 	}
 }
 
@@ -104,6 +110,12 @@ func loadConfig() Config {
 		if len(user.SpecIdPrefixes) > 0 {
 			cfg.SpecIdPrefixes = user.SpecIdPrefixes
 		}
+		if len(user.PrefixRationale) > 0 {
+			cfg.PrefixRationale = user.PrefixRationale
+		}
+		if len(user.RequirementIdPrefixes) > 0 {
+			cfg.RequirementIdPrefixes = user.RequirementIdPrefixes
+		}
 		if len(user.Commands) > 0 {
 			cfg.Commands = user.Commands
 		}
@@ -122,8 +134,16 @@ func loadConfig() Config {
 		parts = append(parts, reSafe.ReplaceAllString(p, ""))
 	}
 	alt := strings.Join(parts, "|")
+	// 요구 ID 접두어 파생값(requirementIdPrefixes, 기본 FR) — 문법은 전 런타임 공통:
+	// 3자리 + 선택적 소문자 서픽스 1자, \b로 경계 강제(2자 서픽스 절단 캡처 금지).
+	var reqParts []string
+	for _, p := range cfg.RequirementIdPrefixes {
+		reqParts = append(reqParts, reSafe.ReplaceAllString(p, ""))
+	}
+	reqAlt := strings.Join(reqParts, "|")
 	cfg.specID = regexp.MustCompile(`(?:` + alt + `)-\d{3}`)
-	cfg.covers = regexp.MustCompile(`@covers\s+((?:` + alt + `)-\d{3})/(FR-\d{3})`)
+	cfg.frDecl = regexp.MustCompile(`\*\*((?:` + reqAlt + `)-\d{3}[a-z]?)\*\*`)
+	cfg.covers = regexp.MustCompile(`@covers\s+((?:` + alt + `)-\d{3})/((?:` + reqAlt + `)-\d{3}[a-z]?)\b`)
 	return cfg
 }
 
@@ -181,15 +201,48 @@ func (c Config) walkTests(root string) []string {
 }
 
 var (
-	reFRDecl  = regexp.MustCompile(`\*\*(FR-\d{3})\*\*`) // FR만 — 접두어 무관
-	reWS      = regexp.MustCompile(`\s+`)
-	reOwnHdr  = regexp.MustCompile(`(?m)^##\s+Ownership`)
-	reNextSec = regexp.MustCompile(`(?m)^##\s`)
-	// spec ID / @covers 정규식은 cfg.specID / cfg.covers (specIdPrefixes에서 파생).
+	reWS        = regexp.MustCompile(`\s+`)
+	reOwnHdr    = regexp.MustCompile(`(?m)^##\s+Ownership`)
+	reNextSec   = regexp.MustCompile(`(?m)^##\s`)
+	reSpecFname = regexp.MustCompile(`^([A-Z]+)-\d{3}`)
+	// FR 선언 / spec ID / @covers 정규식은 cfg.frDecl / cfg.specID / cfg.covers
+	// (requirementIdPrefixes·specIdPrefixes에서 파생 — 하드코딩 사이트 금지).
 )
+
+var standardPrefixes = map[string]bool{"SPEC": true, "INFRA": true, "TEST": true}
 
 func gateFR(c Config, strict bool) {
 	specDir := c.resolve(c.SpecDir)
+
+	// 0. PREFIX 화이트리스트 사전 검사 — 미등록 접두어는 조용히 건너뛰지 않고 exit 1(Node판 패리티).
+	allowed := map[string]bool{}
+	for _, p := range c.SpecIdPrefixes {
+		allowed[p] = true
+	}
+	var prefixErrors []string
+	if entries, err := os.ReadDir(specDir); err == nil {
+		for _, e := range entries {
+			n := e.Name()
+			m := reSpecFname.FindStringSubmatch(n)
+			if e.IsDir() || !strings.HasSuffix(n, ".md") || m == nil {
+				continue
+			}
+			pfx := m[1]
+			if !allowed[pfx] {
+				prefixErrors = append(prefixErrors, fmt.Sprintf(`미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가`, pfx, n))
+			} else if !standardPrefixes[pfx] && strings.TrimSpace(c.PrefixRationale[pfx]) == "" {
+				prefixErrors = append(prefixErrors, fmt.Sprintf(`표준 밖 접두어 "%s" — prefixRationale["%s"]에 도입 사유 필요(빈 값 불가)`, pfx, pfx))
+			}
+		}
+	}
+	if len(prefixErrors) > 0 {
+		fmt.Fprintln(os.Stderr, "✗ PREFIX 위반:")
+		for _, e := range prefixErrors {
+			fmt.Fprintf(os.Stderr, "  ✗ %s\n", e)
+		}
+		os.Exit(1)
+	}
+
 	specs := map[string]map[string]bool{} // SPEC -> set(FR)
 	if entries, err := os.ReadDir(specDir); err == nil {
 		for _, e := range entries {
@@ -203,7 +256,7 @@ func gateFR(c Config, strict bool) {
 			}
 			data, _ := os.ReadFile(filepath.Join(specDir, n))
 			frs := map[string]bool{}
-			for _, m := range reFRDecl.FindAllStringSubmatch(string(data), -1) {
+			for _, m := range c.frDecl.FindAllStringSubmatch(string(data), -1) {
 				frs[m[1]] = true
 			}
 			specs[id] = frs

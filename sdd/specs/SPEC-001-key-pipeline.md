@@ -22,7 +22,8 @@
 - `normalizeKey`의 Surface 경로에 매칭되는 `<METHOD> <path>` 형태가 없으면(공백 분리 실패) 전체를 소문자화한 fallback을 반환한다. `surfaceFormat: "path"|"any"`이면 애초에 METHOD 파싱을 생략하고 소문자 경로(trailing slash 제거)로 정규화한다(파일 라우팅·비-HTTP 자원용).
 - `loadConfig`가 `sdd.config.json` JSON 파싱에 실패하면 stderr로 경로·사유를 출력하고 `process.exit(1)`한다(조용한 무시 금지).
 - `validateKey`의 Capability는 점 1개(`entity.verb`)가 아니거나 verb가 `__allVerbs`(CRUD + 등록 verb)에 없으면 위반 사유 문자열을 돌려준다.
-- `__coversRe`의 FR ID 문법은 `FR-` + 3자리 + 선택적 소문자 서픽스 1자(`FR-003a`)이며 경계까지 요구한다 — 2자 서픽스(`FR-003ab`)는 부분 캡처(`FR-003a`/`FR-003`) 없이 통째로 불인정(절단 오판 금지).
+- `__coversRe`의 요구 ID 문법은 접두어(`requirementIdPrefixes` 파생, 기본 `FR`) + 3자리 + 선택적 소문자 서픽스 1자이며 경계까지 요구한다 — 2자 서픽스 토큰은 부분(절단) 캡처 없이 통째로 불인정(절단 오판 금지). (ID 예시를 리터럴로 안 쓰는 이유: 게이트가 예시 토큰을 이 spec의 FR로 집계하기 때문 — SPEC-003과 동일 규칙.)
+- 요구 ID 정규식 3종(`__frDeclRe`·`__frTokenRe`·`__coversRe`)은 전부 `requirementIdPrefixes` 한 곳에서 파생된다 — 게이트가 자체 요구 정규식을 하드코딩하면 사이트 간 문법 불일치(절단 태그·조용한 누락)가 재발한다.
 
 ---
 
@@ -37,6 +38,7 @@
 - **FR-006** (ubiquitous): THE SYSTEM SHALL resolve the config by walking upward from the start directory for `sdd.config.json`, merge the parsed user object over `DEFAULTS`, and shallow-merge the `commands` map.
 - **FR-007** (event): WHEN config is loaded, THE SYSTEM SHALL derive the shared regexes `__specIdRe` and `__coversRe` from `specIdPrefixes`, set `__root` to the config directory (or the start directory when no config file exists), and build `__allVerbs` from CRUD plus `capabilityVerbs`.
 - **FR-008** (unwanted): IF `sdd.config.json` exists but fails to parse as JSON, THEN THE SYSTEM SHALL print the path and error to stderr and exit with a non-zero code.
+- **FR-009** (event): WHEN config is loaded, THE SYSTEM SHALL derive the requirement-ID regexes — declaration (`__frDeclRe`), token (`__frTokenRe`), and covers (`__coversRe`) — from `requirementIdPrefixes` (default FR) with an optional single lowercase-letter suffix and boundary enforcement, as the single grammar shared by every parsing site.
 
 ### Key Entities
 - **config object** — the merged runtime config: `specDir`, `scanDirs`, `ignoreDirs`, `testFileRegex`, `ownershipCategories`, `specIdPrefixes`, plus derived `__root`/`__testRegex`/`__specIdRe`/`__coversRe`/`__allVerbs`.
@@ -70,5 +72,6 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
-| 2026-07-02 | `__coversRe` 레터 서픽스(FR-003a) 지원 + 경계 강제 | 도그푸딩(PM솔루션 f36494a): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |
+| 2026-07-02 | `__coversRe` 레터 서픽스(소문자 1자) 지원 + 경계 강제 | 도그푸딩(PM솔루션 f36494a): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |
 | 2026-07-02 | `surfaceFormat`(http\|path\|any) config 추가 — FR-002/005 개정 + `normalizeKey`/`validateKey` 분기 + 테스트 | 도그푸딩(PM솔루션): Next.js 파일 라우팅·비-HTTP 자원(Dockerfile·IaC)을 Surface로 모델링 — HTTP 강제를 config로 완화 |
+| 2026-07-05 | `requirementIdPrefixes` config + 요구 ID 정규식 3종 파생(FR-009) | 진단 B-2: 요구 접두어가 전 사이트에 하드코딩 — specIdPrefixes와 같은 config 파생으로 일반화(문법화, SPEC-006 연동) |

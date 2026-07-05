@@ -88,7 +88,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 | `sdd.config.json`(루트) · `sdd/specs/` · `sdd/MODULE_MAP.md` · `sdd/templates/` | `scanDirs` (코드/테스트 위치) |
 | 스펙 형식 `<PREFIX>-NNN-<slug>.md` · `**FR-NNN**`(EARS) · `## Ownership` | `testFileRegex` · `commands` |
 | `@covers <PREFIX>-NNN/FR-NNN` 태그 형식 | `specIdPrefixes` · `ownershipCategories` |
-| `scripts/`의 게이트(4판 중 1, 출력 동일) | 게이트 런타임 선택 |
+| `scripts/`의 게이트(4판 중 1 — 핵심 3커맨드·ID 문법 동일, Node·Python은 전 게이트 패리티) | 게이트 런타임 선택 |
 
 **보장 방식 — 손 cp가 아니라 스캐폴더.** 수동 배선은 프로젝트마다 드리프트한다(실제: 게이트 fork·문서 복사·config 누락). 그래서 **결정적 스캐폴더**가 고정 레이아웃을 만든다:
 ```sh
