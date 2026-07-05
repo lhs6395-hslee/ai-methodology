@@ -31,6 +31,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
+import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -38,6 +39,15 @@ const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
 
 const CATEGORIES = cfg.ownershipCategories;
+
+// ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
+// 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
+const catErrors = ownershipCategoriesFindings(CATEGORIES);
+if (catErrors.length) {
+  console.error("✗ ownershipCategories 위반:");
+  for (const e of catErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
 
 function specFiles() {
   let names;

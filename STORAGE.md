@@ -52,7 +52,8 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 2. **PREFIX 표준 3종**: `SPEC`(기능 명세, 기본) · `INFRA`(인프라 prerequisite spec) · `TEST`(테스트 전용 spec). `specIdPrefixes` 기본값 = `["SPEC","INFRA","TEST"]`. (표준 밖은 `prefixRationale` 등록 필수 — `check-fr-coverage`가 강제)
    - **표준 밖 접두어**(예: `FEAT`)를 쓰려면 **먼저 등록 + 사유 필수**: `sdd.config.json`에 `specIdPrefixes`에 추가 AND `prefixRationale`에 사유 기재. 사유 없으면 PREFIX 사유 검증 게이트가 exit 1.
    - **조용한 누락 제거**: 게이트는 `specDir`의 **모든** `^[A-Z]+-\d{3}.*\.md` 파일을 스캔한다. 허용 집합 밖 접두어 파일이 있으면 **조용히 건너뛰지 않고 exit 1**. (과거: 미등록 접두어 파일은 조용히 `continue`되어 그 spec의 FR이 추적에서 통째로 빠져 거짓 green — PM솔루션 FEAT-001 실측 사례.) ← 가장 흔한 함정.
-3. 본문 필수: `Module` 헤더 · **`**FR-NNN**`(EARS 5패턴)** · `## Ownership`(키 종류 = config의 `ownershipCategories`). 선택: SC·NFR·Infrastructure Prerequisites(인프라 의존 없으면 생략). 단 **FR이 있으면 SC·인수조건 권장** — `check-spec-completeness`가 *존재*를 advisory로 점검(SC 충족·측정가능성은 런타임/`/checklist` 담당). 인수조건·SC 리뷰 자체는 Spec Kit 네이티브가 맡는다. **왜 Ownership만 필수인가:** dedup 게이트의 "한 키=한 spec" 판정은 *모든 spec이 키를 선언해야* 성립한다 — Ownership을 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(**미선언 1개 = 보장에 뚫린 구멍**). SC·NFR 누락은 *그 기능 하나*의 로컬 약점이지만, Ownership 누락은 *시스템 전체* 중복 보장을 깬다 — 그래서 SC·NFR은 선택, Ownership은 필수.
+   - **접두어 의미도 기계 강제(SPEC-012)**: 등록·사유만이 아니라 **접두어↔derivation 클래스 정합**을 fr 게이트가 검사한다 — 스펙이 소유한(Files) 비-테스트 실파일이 **전적으로** iac/ci 클래스(`derivationClassGlobs` 파생)인데 접두어가 `INFRA-`가 아니면 exit 1(인프라 실체를 SPEC-에 착지시키면 차단). 기능 SPEC-이 코드와 함께 부수적 IaC/CI를 소유하는 정당 케이스는 비-인프라 파일이 하나라도 있으면 자동 통과(전체성 임계). 예외는 `prefixClassExemptions`에 **사유와 함께** 등록(빈 사유·존재하지 않는 ID는 에러). INFRA- 스펙에서 iac/ci 검출 0건은 warn(레포 밖 인프라 실체 허용). 스펙 본문이 "정말 인프라 명세인가"는 리뷰 경계(`METHODOLOGY.md` 리뷰 경계 선언).
+3. 본문 필수: `Module` 헤더 · **`**FR-NNN**`(EARS 5패턴)** · `## Ownership`(키 종류 = config의 `ownershipCategories`). Module 헤더의 존재·값 단일성(1 레포 = 1 모듈)과 FR 선언 라인의 SHALL은 `check-spec-completeness`가 advisory로 점검한다(`--strict` 하드 — SPEC-013). 선택: SC·NFR·Infrastructure Prerequisites(인프라 의존 없으면 생략). 단 **FR이 있으면 SC·인수조건 권장** — `check-spec-completeness`가 *존재*를 advisory로 점검(SC 충족·측정가능성은 런타임/`/checklist` 담당). 인수조건·SC 리뷰 자체는 Spec Kit 네이티브가 맡는다. **왜 Ownership만 필수인가:** dedup 게이트의 "한 키=한 spec" 판정은 *모든 spec이 키를 선언해야* 성립한다 — Ownership을 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(**미선언 1개 = 보장에 뚫린 구멍**). SC·NFR 누락은 *그 기능 하나*의 로컬 약점이지만, Ownership 누락은 *시스템 전체* 중복 보장을 깬다 — 그래서 SC·NFR은 선택, Ownership은 필수.
 4. **추적 닻 = 언어중립 ID** `FR-NNN`. 테스트는 `@covers <PREFIX>-NNN/FR-NNN`(주석 스타일 자유 `//`·`#`·`--`)로 연결.
 5. **정본 언어 = 영어**, 현지어본은 생성만(병행 편집 금지).
 6. 폐기 = 통제 제거(spec+코드+테스트 같은 PR 원자 삭제, `MODULE_MAP`에 기록) — `STRUCTURE.md` 수명주기.
@@ -70,6 +71,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
   "commands": { "lint":"…","typecheck":"…","test":"…" },  // 게이트가 부를 언어별 명령
   // ── 강제 강도·회계(선택 — 기본값이면 현행 동작, 켜는 만큼 강해진다. 필드 상세: presets §필드 의미):
   "specSyncUnownedPolicy": "warn",               // 미소유 파일 정책 silent|warn|error
+  "prefixClassExemptions": {},                   // 접두어↔클래스 정합 면제(사유 필수 — SPEC-012)
   "strictSpecs": [], "requireAccounting": false, // spec 단위 strict 브리지 · FR 전수 회계(SPEC-007)
   "smokeManifest": "sdd/smoke-manifest.json",    // 회계 매니페스트 경로(위 트리)
   "smokeScanDirs": null,                          // 검증 태그 스캔 범위 — 기본 scanDirs(SPEC-010)

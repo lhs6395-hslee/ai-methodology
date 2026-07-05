@@ -42,7 +42,7 @@
 2. 그 키를 이미 소유한 spec이 있나? (`MODULE_MAP` 레지스트리 / `check-ownership` 조회)
    - **있음 → 그 spec 개정(새 spec 금지).** 없지만 같은 범위 → owner 개정. 완전 새 범위 → 새 spec + Owns 등록.
 
-**`Files:` 필드는 dedup 대상이 아니다:** `## Ownership`의 `Files:` 필드는 `check-spec-sync` 전용 파일→스펙 매핑 입력이며, 소유권 유일성 게이트(`check-ownership`)의 dedup 대상이 아니다. `sdd.config.json`의 `ownershipCategories`에 `Files`를 추가하면 dedup·cohesion 키 카운트에 glob 문자열이 유입되고 `validateKey`가 형식 위반으로 오판한다 — **`ownershipCategories`에 `Files` 추가 금지.**
+**`Files:` 필드는 dedup 대상이 아니다:** `## Ownership`의 `Files:` 필드는 `check-spec-sync` 전용 파일→스펙 매핑 입력이며, 소유권 유일성 게이트(`check-ownership`)의 dedup 대상이 아니다. `sdd.config.json`의 `ownershipCategories`에 `Files`를 추가하면 dedup·cohesion 키 카운트에 glob 문자열이 유입되고 `validateKey`가 형식 위반으로 오판한다 — **`ownershipCategories`에 `Files` 추가 금지**(ownership 게이트가 config 검증으로 exit 1, 대소문자 무관 — SPEC-013).
 
 **강제(게이트):** 소유권 게이트가 전 spec의 `## Ownership`을 파싱해 키별 소유 spec이 1개인지 CI에서 검증(중복 = exit 1). FR↔test 게이트의 형제. Ownership 미선언 spec은 warn(점진 도입), `--strict`로 완전 강제. **왜 모든 spec이 선언해야 하나(=필수):** 미선언 spec은 dedup 레이더 밖이라 그 spec의 중복이 안 걸린다 — 미선언 1개 = 보장에 뚫린 구멍. 보장은 *선언된 집합만큼만* 완전하다(SC·NFR 누락은 로컬 약점이지만 Ownership 누락은 cross-spec 보장을 깬다). **유일성 범위 = 이 레포(=한 모듈)의 전 spec** — 모듈 간(레포 간)은 MSA 계약 경계로 분리되어 dedup 대상이 아니다(`STRUCTURE.md` 1 레포=1 모듈). **거울상(`check-spec-cohesion`):** dedup이 "2 spec이 같은 키"(과편화)를 막는다면, cohesion 게이트는 "1 spec이 키/FR 과다"(under-fragmentation = 한 spec에 여러 기능 욱여넣기)를 advisory로 잡아 분할을 권고한다.
 > **게이트 표기 규약:** 이 문서는 Node 파일명(`check-ownership.mjs`)으로 적지만, 게이트는 **언어·런타임 무관 4판 동봉**(Go 바이너리 `sdd-gate ownership`·셸 `sdd_gates.sh`·Python `sdd_gates.py`·Node — `principles.md` §10). dedup(키 유일성) 판정은 4판 동일하고, **키 정규화·형식검증(normalizeKey/validateKey)은 Node·Python판**이 수행한다(커버 매트릭스: `tooling/ci-examples.md`). 키 종류(Entity/Surface/Capability)도 웹 기본일 뿐 `sdd.config.json`의 `ownershipCategories`로 교체한다(비-웹: `Modules·Symbols·Artifacts` 등).
@@ -55,7 +55,7 @@
 - **같은 Entity 이웃 spec과만** LLM diff 리뷰(범위를 전체→이웃으로 축소).
 - (선택) FR 임베딩 유사도.
 
-**절차의 문법화(P3, SPEC-008 연동):** 판정은 여전히 사람/LLM 몫이지만, *검토했다는 사실*은 기계가 강제한다 — Reviewed 이상 스펙은 `## Dedup-Review` 섹션에 **검토한 이웃 스펙 ID + 판정**(이웃이 없으면 명시적 "이웃 없음")을 기록해야 하고, completeness 게이트가 그 **존재·형식만** 검사한다(내용의 질은 검사하지 않음 — 이 경계는 유지). Review Log(P1)와 한 리뷰 절차로 통합해 별도 마찰 없이 수행한다. 어휘 측면은 위 `entityRegistry`가 담당(등록 없는 entity로는 reworded 스펙을 만들 수 없다).
+**절차의 문법화(P3, SPEC-008 연동):** 판정은 여전히 사람/LLM 몫이지만, *검토했다는 사실*은 기계가 강제한다 — Reviewed 이상 스펙은 `## Dedup-Review` 섹션에 **검토한 이웃 스펙 ID + 판정**(이웃이 없으면 명시적 "이웃 없음")을 기록해야 하고, completeness 게이트가 그 **존재·형식만** 검사한다(내용의 질은 검사하지 않음 — 이 경계는 유지). 형식 검사에는 **참조 실재**가 포함된다 — 기록이 언급한 스펙 ID가 실재하지 않으면(오타·삭제 잔재) advisory로 표면화된다(SPEC-013; 삭제된 이웃의 이력은 "이웃 없음(삭제됨)" 등 ID 없는 서술로 갱신). Review Log(P1)와 한 리뷰 절차로 통합해 별도 마찰 없이 수행한다. 어휘 측면은 위 `entityRegistry`가 담당(등록 없는 entity로는 reworded 스펙을 만들 수 없다).
 
 **학술 근거:** Malik, Yildirim, Cevik, Bener, Parikh — *Transfer learning for conflict and duplicate detection in software requirement pairs*, [arXiv:2301.03709](https://arxiv.org/abs/2301.03709) (2023). 요구사항 "쌍 분류" 문제로 형식화, **SR-BERT**(Sentence-BERT + Bi-encoder)를 다단계 파인튜닝해 중복/충돌 탐지. 이 논문이 키트에 주는 것: (a) "말이 다른 같은 요구"는 실재하며 별도 기법이 필요하다는 근거, (b) 계층 ③의 참고 구현(문장쌍 임베딩 유사도/분류).
 

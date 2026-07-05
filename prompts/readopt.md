@@ -38,7 +38,7 @@
    | `prior-traceability` | 기존 `@covers`/검증 태그 인벤토리 | **FR 키 보존이 기본** — 태그가 참조하는 키를 새 스펙이 그대로 쓴다 |
    | `prior-intent` | 5단계 이월 목록 | 새 스펙의 Story·Clarifications로 이월(버리면 사유 회계) |
    | `human-intent` | 기록 안 된 순수 의도 — **사후 재도출 불가** | 사용자 인터뷰로 Clarifications에 선제 캡처, 불가면 deferred 회계 |
-   읽은 결과를 `sdd/derivation.json`에 클래스별 mapped/none/deferred로 회계하고 `sdd.config.json`에 `derivationManifest`를 선언한다 — `derivation` 게이트가 미회계·"실재하는데 none"을 차단한다. spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
+   읽은 결과를 `sdd/derivation.json`에 클래스별 mapped/none/deferred로 회계하고 `sdd.config.json`에 `derivationManifest`를 선언한다 — `derivation` 게이트가 미회계·"실재하는데 none"을 차단한다. spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **iac/ci→INFRA 착지는 fr 게이트가 강제한다(SPEC-012)** — 소유 실파일이 전적으로 iac/ci 클래스인 스펙이 SPEC- 접두어면 exit 1이므로, 재도출 시점에 접두어를 바로 착지시킨다(부수 소유 정당 케이스는 자동 통과, 예외는 `prefixClassExemptions` 사유 등록). **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
 7. **결선 — 태깅은 보존·자동으로.** ① FR 키를 보존했으면 기존 `@covers`는 그대로 유효(R1이 검증). 재번호가 불가피했으면 마이그레이션 맵(old→new|null)을 만들어 `sdd-retag <map.json> --write`(또는 `sdd_gates.py retag`)로 기계 이행(SPEC-011) — 손 재태깅 금지. ② smoke 증거는 증거가 사는 파일(CI 정의·스크립트·runbook)에 검증 태그(`@verifies <SPEC-ID>/FR-NNN <method>: <evidence>`)로 남기고 `sdd-smoke-scan --write`로 매니페스트를 재생성(SPEC-010) — 손 연결 금지. ③ 게이트 green(derivation·smoke-scan check 포함) → 커밋(자기 훅 통과).
 
 ## 고정 규칙

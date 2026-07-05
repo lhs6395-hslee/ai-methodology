@@ -27,6 +27,8 @@
 | SPEC-009 | 재도출 소스 회계 — 소스 클래스 9종·derivationManifest·검출 교차검사·Change Log 근거 선제 캡처 | `tooling/check-derivation.mjs`, `tooling/derivation-lib.mjs` | active |
 | SPEC-010 | smoke 증거 자동 수집 — 검증 태그 스캔·smokeManifest 재생성(--write)·드리프트 검사 | `tooling/sdd-smoke-scan.mjs` | active |
 | SPEC-011 | 추적 태그 마이그레이션 — 재번호 맵(old→new\|null)의 기계 이행·경계 강제 | `tooling/sdd-retag.mjs` | active |
+| SPEC-012 | 접두어↔derivation 클래스 정합 — 전체성 판정·prefixClassExemptions 거버넌스 | `tooling/prefix-class-lib.mjs` | active |
+| SPEC-013 | 스펙 문법 규범 강제 — Module 존재·단일성, FR 라인 SHALL, Dedup 참조 실재, Files 카테고리 금지, 글롭 문법 staged 차단 | `tooling/grammar-lib.mjs` | active |
 
 > "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 6으로 조정했다(사유는 SPEC-002 Change Log).
 

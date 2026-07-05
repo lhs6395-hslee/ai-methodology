@@ -90,3 +90,4 @@
 | 2026-07-05 | completeness 게이트에 수명주기 검사 통합(Status enum·Reviewed 이상 Review Log/Dedup-Review 존재) — 판정 코어는 SPEC-008 소유 | 진단 Q3 승인(P1): 스펙 리뷰 계층 부재 — 존재만 검사(advisory, --strict 하드) |
 | 2026-07-05 | FR-009 신설 — `entityRegistry`(entity→사유)로 Ownership entity를 등록제 화이트리스트로(capabilityVerbs·PREFIX 거버넌스 동형) | 진단 Q2 승인(P3a): 의미적 중복의 절차·어휘 문법화 — 신규 entity 신설이 config 리뷰 관문을 거치게 |
 | 2026-07-05 | completeness 게이트에 Change Log 근거(선제 캡처) 검사 통합 — 판정 코어는 SPEC-009 소유 | SPEC-009 신설 동반: 변경 의도는 저술 시점에만 캡처 가능 — 존재만 검사(advisory, --strict 하드, SPEC-008 편입과 동형 패턴) |
+| 2026-07-06 | fr 게이트에 접두어↔클래스 정합(0b) 통합, ownership 게이트에 Files 카테고리 금지, completeness 게이트에 문법 규범(Module 존재·단일성·SHALL·Dedup 참조 실재) 통합 — 판정 코어는 SPEC-012·SPEC-013 소유 | 고도화 4차: 미강제 규범(STORAGE §2.2 접두어 의미·§2.3 Module 필수·EARS SHALL·DEDUP Files 금지) 감사 결과를 게이트로 — 존재·정합 등 기계 신호만(의미 판정은 리뷰 경계, SPEC-009 편입과 동형 패턴) |

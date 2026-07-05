@@ -10,7 +10,7 @@
 | Python | `python sdd_gates.py fr` | `python sdd_gates.py ownership` | `python sdd_gates.py run <stage>` |
 | Node | `node check-fr-coverage.mjs` | `node check-ownership.mjs` | `node sdd-run.mjs <stage>` |
 
-4판 모두 같은 `sdd.config.json`을 읽고, `fr`은 PREFIX 거버넌스(미등록 접두어 exit 1)를 포함하며, spec/요구 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생, 레터 서픽스 포함)이 전 런타임 동일하다(런타임 간 문법 드리프트는 `runtime-contract.test.mjs`가 회귀로 차단). 단 **다음은 Node·Python 두 판만**(정직한 델타, SPEC-006): ownership 키 정규화·형식검증(normalizeKey/validateKey)·**entity 레지스트리(`entityRegistry`)**, fr의 **검증 회계**(`strictSpecs`·`requireAccounting`·`smokeManifest`, SPEC-007) — 셸/Go판 fr·ownership은 핵심 판정(커버리지·PREFIX·소문자 dedup)까지다.
+4판 모두 같은 `sdd.config.json`을 읽고, `fr`은 PREFIX 거버넌스(미등록 접두어 exit 1)를 포함하며, spec/요구 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생, 레터 서픽스 포함)이 전 런타임 동일하다(런타임 간 문법 드리프트는 `runtime-contract.test.mjs`가 회귀로 차단). 단 **다음은 Node·Python 두 판만**(정직한 델타, SPEC-006): ownership 키 정규화·형식검증(normalizeKey/validateKey)·**entity 레지스트리(`entityRegistry`)**·**Files 카테고리 금지(SPEC-013)**, fr의 **검증 회계**(`strictSpecs`·`requireAccounting`·`smokeManifest`, SPEC-007)·**접두어↔클래스 정합**(`prefixClassExemptions`, SPEC-012), completeness의 **문법 규범**(Module 존재·단일성·SHALL·Dedup 참조 실재, SPEC-013), spec-sync의 **글롭 문법 staged 차단**(SPEC-013) — 셸/Go판 fr·ownership은 핵심 판정(커버리지·PREFIX 등록·사유·소문자 dedup)까지다.
 
 보강 게이트(advisory)와 spec-first 게이트는 **Node·Python 두 판 완전 동봉**(같은 픽스처에 같은 판정 — 패리티 테스트로 강제):
 | 게이트 | Node | Python |
@@ -19,7 +19,7 @@
 | converge drift | `node check-converge-drift.mjs [base]` | `python sdd_gates.py converge [base]` |
 | orphan surface | `node check-orphan-surfaces.mjs` | `python sdd_gates.py orphan` |
 | spec 입도(cohesion) | `node check-spec-cohesion.mjs` | `python sdd_gates.py cohesion` |
-| spec 완전성(SC·인수조건 + **수명주기 기록** — Status enum·Review Log·Dedup-Review, SPEC-008) | `node check-spec-completeness.mjs` | `python sdd_gates.py completeness` |
+| spec 완전성(SC·인수조건 + **수명주기 기록** — Status enum·Review Log·Dedup-Review, SPEC-008 + **문법 규범** — Module 존재·단일성·SHALL·Dedup 참조 실재, SPEC-013) | `node check-spec-completeness.mjs` | `python sdd_gates.py completeness` |
 | spec 일관성 | `node check-spec-consistency.mjs` | `python sdd_gates.py consistency` |
 | **spec-first(§5, hard — Draft 소유 차단·`specSyncUnownedPolicy` 포함)** | `node check-spec-sync.mjs --staged --message-file <p>` / `[base]` | `python sdd_gates.py specsync --staged --message-file <p>` / `[base]` |
 | **재도출 소스 회계(SPEC-009 — 9클래스·검출 교차검사·미설정 no-op)** | `node check-derivation.mjs` | `python sdd_gates.py derivation` |

@@ -26,6 +26,9 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
+import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
+import { parseSection } from "./ownership-keys.mjs";
+import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -73,6 +76,55 @@ for (const f of readdirSync(SPEC_DIR)) {
     prefixErrors.push(`표준 밖 접두어 "${pfx}" — prefixRationale["${pfx}"]에 도입 사유 필요(빈 값 불가)`);
   }
 }
+// 0b. 접두어↔클래스 정합(SPEC-012): 소유(Files) 비-테스트 실파일이 **전적으로** iac/ci
+//     클래스인 스펙은 INFRA- 접두어여야 한다 — STORAGE §2.2의 접두어 의미(readopt 착지
+//     규칙 iac/ci→INFRA)를 기계 강제. 비-인프라 소유 파일이 하나라도 있으면 통과(전체성
+//     임계 — 기능 SPEC-의 부수 IaC/CI 소유는 정당). 면제는 prefixClassExemptions(사유 필수).
+const exemptions = cfg.prefixClassExemptions || {};
+const specMdNames = readdirSync(SPEC_DIR).filter((f) => f.endsWith(".md") && /^[A-Z]+-\d{3}/.test(f)).sort();
+const knownIds = new Set(specMdNames.map((f) => f.match(SPEC_ID)?.[0]).filter(Boolean));
+prefixErrors.push(...validateExemptions(exemptions, knownIds));
+const classGlobs = {};
+{
+  const userGlobs = cfg.derivationClassGlobs || {};
+  for (const cls of INFRA_SOURCE_CLASSES) classGlobs[cls] = (userGlobs[cls] || DEFAULTS.derivationClassGlobs[cls] || []).map(compileGlob);
+}
+// 레포 실재 순회 — ignoreDirs 제외·정렬(check-derivation과 동형, 결정성).
+function walkAll(dir, relBase = "", acc = []) {
+  let entries;
+  try { entries = readdirSync(dir).sort(); } catch { return acc; }
+  for (const name of entries) {
+    const p = join(dir, name);
+    const r = relBase ? `${relBase}/${name}` : name;
+    let st;
+    try { st = statSync(p); } catch { continue; }
+    if (st.isDirectory()) {
+      if (IGNORE.has(name)) continue;
+      walkAll(p, r, acc);
+    } else acc.push(r);
+  }
+  return acc;
+}
+const allRepoFiles = walkAll(ROOT);
+const prefixClassWarnings = [];
+for (const f of specMdNames) {
+  const id = f.match(SPEC_ID)?.[0];
+  if (!id) continue; // 미등록 접두어는 위 0단계가 이미 에러 처리
+  const pfx = f.match(/^([A-Z]+)-/)[1];
+  const text = readFileSync(join(SPEC_DIR, f), "utf8");
+  const globs = parseSection(text, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).map(compileGlob);
+  const owned = globs.length
+    ? allRepoFiles.filter((p) => !isTestFile(p.split("/").pop(), cfg) && globs.some((re) => re.test(p))).sort()
+    : [];
+  const finding = prefixClassFinding(pfx, owned, classGlobs);
+  const exempted = !!String(exemptions[id] ?? "").trim();
+  if (finding && finding.kind === "error") {
+    if (!exempted) prefixErrors.push(`접두어↔클래스 부정합 "${id}" — 소유 실파일 ${finding.infra.length}건 전부 iac/ci 클래스(예: ${finding.infra[0]}) → INFRA- 접두어여야 함(STORAGE §2.2). 부수 소유가 정당하면 prefixClassExemptions["${id}"]에 사유 등록`);
+    continue;
+  }
+  if (exempted) prefixClassWarnings.push(`prefixClassExemptions["${id}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상`);
+  if (finding && finding.kind === "warn") prefixClassWarnings.push(`${id}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토`);
+}
 if (prefixErrors.length) {
   console.error("✗ PREFIX 위반:");
   for (const e of prefixErrors) console.error(`  ✗ ${e}`);
@@ -111,7 +163,7 @@ for (const dir of SCAN_DIRS) {
 
 // 3. Evaluate rules.
 const errors = [];
-const warnings = [];
+const warnings = [...prefixClassWarnings]; // 0b의 advisory(미사용 면제·INFRA 검출 0건)
 
 // R1: bad references
 for (const { file, spec, fr } of badRefs) {

@@ -38,7 +38,7 @@ function run(bin, root, args = []) {
 
 // 완비 스펙 조각(수명주기 기록 포함) — Status만 갈아끼움.
 const full = (status, extra = "") =>
-  `**Spec**: \`SPEC-001\`  **Status**: ${status}\n- **FR-001** (event): x.\n**Given** x **When** y **Then** z\n- **SC-001**: 90%\n${extra}`;
+  `**Module**: \`m\`  **Spec**: \`SPEC-001\`  **Status**: ${status}\n- **FR-001** (event): THE SYSTEM SHALL x.\n**Given** x **When** y **Then** z\n- **SC-001**: 90%\n${extra}`;
 const REVIEW_LOG = "## Review Log\n| 일시 | 수행자 | 판정 |\n|---|---|---|\n| 2026-07-05 | 세션 리뷰 | PASS |\n";
 const DEDUP_REVIEW = "## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n";
 

@@ -1,7 +1,7 @@
 # 구조 — module > spec (범용)
 
 ## 큰 틀 = 1 레포 = 1 모듈, 그 안에 spec
-- **1 레포 = 1 모듈** (무조건). 레포 하나 = 안정적 bounded context 하나 = 그 능력 영역의 SSOT 홈. 모듈이 늘면 **레포가 는다**(한 레포에 여러 모듈을 넣지 않는다).
+- **1 레포 = 1 모듈** (무조건). 레포 하나 = 안정적 bounded context 하나 = 그 능력 영역의 SSOT 홈. 모듈이 늘면 **레포가 는다**(한 레포에 여러 모듈을 넣지 않는다). 기계 신호: 전 스펙의 `Module` 헤더 값이 하나여야 하며, 갈라지면 `check-spec-completeness`가 advisory로 표면화한다(`--strict` 하드 — SPEC-013). "무엇이 한 모듈인가"의 판정 자체는 리뷰 경계(`METHODOLOGY.md`).
 - **spec** = 그 모듈 안의 응집된 기능 단위. 각 spec = 그 기능의 **살아있는 기능명세서**. 한 모듈(레포)은 spec 다수를 가진다.
 - **큰 프로그램 = 여러 모듈-레포의 MSA 합성** — 모듈 간은 공개 계약(API/이벤트)으로만 결합한다. 그 계약을 1급 SSOT로 강제하는 **MSA 계약 프로파일은 다중 모듈일 때 켜는 선택 계층**(Phase 2).
 - **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 aggregate(핵심 Entity) — dedup이 경계 강제(§3.1)**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조(읽기/호출만). "응집 묶음"보다 훨씬 결정적인 경계 닻으로, dedup 게이트가 "1 Entity=1 spec" 판정을 사후 강제하고, cohesion 게이트가 Ownership.Entities ≥2이면 "여러 aggregate 삼킴 의심"을 advisory로 신호한다. — 서로 다른 aggregate root를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **aggregate별로 분할**한다. 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
@@ -52,7 +52,7 @@
 
 ## Files 소유 glob — 완전성·과광역 경고·INFRA 관행
 
-**Files 완전성:** 각 spec의 `Files:` glob은 소유 코드를 **빠짐없이** 덮어야 한다 — API route(`src/app/api/<f>/**`)뿐 아니라 그 기능의 라이브러리(`src/lib/<f>/**`)까지. 라이브러리가 누락되면 그 파일은 check-spec-sync 레이더 밖에 놓여 코드 변경이 스펙 동반 없이 통과한다(pdf-parse 사례의 근본 원인). Files 완전성 자체는 자연어 판단이라 **규칙·리뷰**로 관리한다(게이트 강제 안 함).
+**Files 완전성:** 각 spec의 `Files:` glob은 소유 코드를 **빠짐없이** 덮어야 한다 — API route(`src/app/api/<f>/**`)뿐 아니라 그 기능의 라이브러리(`src/lib/<f>/**`)까지. 라이브러리가 누락되면 그 파일은 check-spec-sync 레이더 밖에 놓여 코드 변경이 스펙 동반 없이 통과한다(pdf-parse 사례의 근본 원인). "이 glob이 이 기능의 코드 전부인가"는 자연어 판단이라 **규칙·리뷰**로 관리하되, 여집합은 기계로 닫을 수 있다 — `specSyncUnownedPolicy: "error"`(closed-world, SPEC-003)를 켜면 *어느 스펙도 소유하지 않는* 변경 파일이 staged에서 차단된다(의도적 예외는 `specSyncExemptGlobs` 선언). glob **문법**의 미지원 토큰(`{`·`?`·선두 `[`)은 매치 실패 = 소유가 조용히 풀리므로 staged에서 hard 차단된다(SPEC-013).
 
 **과광역 glob 경고:** 여러 spec의 Files glob이 같은 파일을 덮으면(겹침) `check-spec-sync`가 **AND**로 동작 — 해당 파일 변경 시 *모든* 소유 스펙에 의미 있는 변경을 요구한다. 공유 유틸이 N개 스펙 편집을 강요하는 부담이 되므로 겹침은 최소화를 권장한다. 공유 코드는 별도 스펙(또는 미소유→converge-drift 소관)으로 두는 것이 좋다.
 
