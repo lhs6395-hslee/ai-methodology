@@ -308,10 +308,11 @@
   <p>여기까지가 <em>구조</em>다. 그런데 구조를 문서로 "이렇게 합시다"라고만 적으면 사람도 LLM도 빠뜨린다. <strong>LLM은 누락을 낸다</strong> — 그래서 확률적 리뷰가 아니라 <strong>결정적 게이트가 1차</strong>다. 게이트는 CI(또는 git 훅)에서 돌고, 규칙을 어기면 빌드를 막는다(<code>exit 1</code>).</p>
   <div class="tablewrap"><table>
     <tr><th>게이트</th><th>무엇을 잡나</th><th>강제</th><th>비유</th></tr>
-    <tr><td><code>check-fr-coverage</code></td><td>테스트 없는 FR (사슬 끊김)</td><td class="blk">차단</td><td>도면엔 있는데 안 지은 방</td></tr>
-    <tr><td><code>check-ownership</code> <span style="color:var(--muted)">(dedup)</span></td><td><strong>2개 spec이 같은 키 소유</strong> = 중복</td><td class="blk">차단</td><td>같은 방을 두 도면이 그림</td></tr>
+    <tr><td><code>check-fr-coverage</code></td><td>테스트 없는 FR (사슬 끊김) + <strong>검증 회계</strong>(<code>requireAccounting</code>: 전 FR이 unit ∨ smoke ∨ deferred, <code>strictSpecs</code>: spec 단위 strict 잠금, <code>smokeManifest</code>: dangling·빈 사유)</td><td class="blk">차단</td><td>도면엔 있는데 안 지은 방 / 검사 안 받고 "됐다"는 방</td></tr>
+    <tr><td><code>check-ownership</code> <span style="color:var(--muted)">(dedup)</span></td><td><strong>2개 spec이 같은 키 소유</strong> = 중복 + <strong>entity 등록제</strong>(<code>entityRegistry</code> — 미등록 entity·빈 사유)</td><td class="blk">차단</td><td>같은 방을 두 도면이 그림 / 무허가 지번</td></tr>
     <tr><td><code>check-spec-cohesion</code> <span style="color:var(--muted)">(거울상)</span></td><td><strong>1개 spec이 키/FR 과다</strong> = 욱여넣기</td><td class="pass">권고</td><td>한 도면에 집 전체를 우겨넣음</td></tr>
-    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong></td><td class="pass">권고</td><td>도면에 합격 기준이 안 적힘</td></tr>
+    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장이 안 적힘</td></tr>
+    <tr><td><code>check-spec-sync</code> <span style="color:var(--muted)">(spec-first)</span></td><td>소유 코드 변경에 스펙 미동반 + <strong>Draft 스펙 소유 코드</strong>(리뷰 전 코드 금지) + <strong>미소유 파일</strong>(<code>specSyncUnownedPolicy</code>)</td><td class="blk">차단(commit-msg)</td><td>도면 갱신 없이 공사 / 검토 안 된 도면으로 착공</td></tr>
     <tr><td>보강 4종</td><td>빈 테스트 / 코드만 바뀜 / 명세 없는 코드 / 근거 없는 키</td><td class="pass">권고</td><td>advisory 경고</td></tr>
   </table></div>
   <p class="note">런타임: 게이트는 <strong>4판 동봉</strong>(Go 정적 바이너리·셸·Python·Node) — 핵심 3커맨드(FR·소유권·러너)와 ID 문법(<code>specIdPrefixes</code>·<code>requirementIdPrefixes</code> 파생, 레터 서픽스 포함)은 4판 동일하고, 위 표의 <strong>전 게이트는 Node·Python 두 판</strong>이 같은 판정을 낸다(같은 픽스처 → 같은 exit code·같은 출력, 패리티 테스트로 강제). 런타임 간 문법이 갈라지면 "조용히 빠지는" 스펙·태그가 생기므로, 문법 드리프트 자체를 테스트가 회귀로 차단한다.</p>
@@ -343,7 +344,7 @@
     <text x="612" y="220" font-size="12.5" font-weight="700" fill="#e2620a" text-anchor="middle">1 spec → 키/FR 과다 ⚠ 분할 권고</text>
   </svg></div>
   <figcaption><strong>dedup</strong>: 두 spec이 <code>staff.recommend</code>를 동시에 소유 → 같은 기능 중복 → 차단. <strong>cohesion(거울상)</strong>: 한 spec이 키/FR을 과다 소유 → 여러 기능 욱여넣음 → 쪼개라 권고. <strong>왜 cohesion이 필요한가:</strong> 한 spec이 모든 걸 삼키면 FR↔test 사슬도 소유권 dedup도 무의미해진다(게이트가 잡을 경계가 사라짐) — 그게 메우려는 빈칸이다. (그 빈칸에 빠진 실제 사례가 finops였을 뿐 — 사례가 아니라 원리가 핵심.)</figcaption></figure>
-  <p class="note gate"><strong>2계층(정직).</strong> 게이트는 "키가 같은" 구조적 중복만 막는다. "말만 다른 같은 요구"(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다.</p>
+  <p class="note gate"><strong>2계층(정직).</strong> 게이트는 "키가 같은" 구조적 중복만 막는다. "말만 다른 같은 요구"(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다. <strong>단, 절차와 어휘는 문법화했다:</strong> 검토했다는 <em>기록</em>(<code>## Dedup-Review</code> — 검토한 이웃 spec ID+판정)은 completeness가 존재를 검사하고, entity <em>어휘</em>는 <code>entityRegistry</code> 등록제(신설 = config 리뷰 관문)가 막는다 — 판정의 질만 사람 몫으로 남는다.</p>
 
   <h3>"SC·인수조건이 빠진 것 같다" — 왜 그렇게 보이고, 실제로는</h3>
   <p>이 키트로 직접 만들다 보면 SC와 인수조건이 사라진 것처럼 느껴진다. 맞다 — 위 표에서 보듯 <strong>게이트·<code>@covers</code> 사슬·하네스가 전부 FR 중심</strong>이라 그렇게 보인다. 하지만 <em>빠진 게 아니라 담당이 나뉘어</em> 있다:</p>
@@ -575,6 +576,15 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
     <div class="step"><span class="n">4</span><b>git add + 재커밋</b><span>스펙 파일도 스테이징해야 통과</span></div>
   </div>
   <p class="note">스펙과 진짜 무관한 변경(리팩터링·포맷팅·설정 파일)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러를 달면 즉시 통과. 사유 없이 <code>Spec-Impact: none</code>만 쓰면 차단(사유 필수).</p>
+
+  <h3>스펙 수명주기 — 리뷰 안 된 스펙은 코드를 이끌 수 없다</h3>
+  <p>스펙 헤더 <code>Status:</code>는 enum이다 — <code>Draft → Reviewed → Approved → Active → Deprecated → Removed</code>. 강제하는 것은 <strong>시간 순서가 아니라 상태 순서</strong>다:</p>
+  <div class="pipe">
+    <div class="step"><span class="n">1</span><b>Draft</b><span>작성 중 — 이 스펙이 소유한 코드 변경은 commit-msg가 차단(스펙을 같이 고쳐도)</span></div>
+    <div class="step"><span class="n">2</span><b>Reviewed</b><span><code>/analyze</code>+<code>/checklist</code> 결과를 <code>## Review Log</code>(일시·수행자·판정)와 <code>## Dedup-Review</code>(이웃 검토)에 기록해야 승격 — 기록 존재를 completeness가 검사</span></div>
+    <div class="step"><span class="n">3</span><b>Approved → Active</b><span>승인 후 구현 — 이때부터 소유 코드가 자유롭게 흐른다(동반 변경 규칙은 그대로)</span></div>
+  </div>
+  <p class="note gate"><strong>미소유 파일 정책(<code>specSyncUnownedPolicy</code>):</strong> 어느 스펙의 <code>Files</code>에도 안 잡히는 변경 파일은 원래 침묵 통과였다 — 이제 <code>silent</code>(현행)/<code>warn</code>/<code>error</code>(closed-world) 중 하나를 <em>선언</em>한다. 의도적 예외는 <code>specSyncExemptGlobs</code>로. <strong>검증 회계(<code>requireAccounting</code>):</strong> 커버 안 된 FR이 경고 속에 쌓이는 것도 막는다 — 모든 FR은 unit(@covers) ∨ smoke(매니페스트 evidence) ∨ deferred(매니페스트 reason)로 회계되어야 하고, 게이트는 사유의 <em>존재만</em> 강제한다(질은 리뷰 몫). Status 없는 레거시 스펙·기본값 config는 전부 현행 동작 그대로다(점진 도입 — advisory→strict 승격 경로).</p>
 </div></section>
 
 <section id="orbit"><div class="wrap">

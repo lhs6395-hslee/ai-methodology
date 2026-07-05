@@ -37,7 +37,7 @@
 ## 기능이 줄 때 — 폐기·삭제 수명주기 (REMOVED)
 명세는 "현재 진실"이라야 하므로 **안 쓰는 spec은 삭제가 권장**(남기면 거짓 SSOT). 단 `rm`이 아니라 통제된 제거 — 추가의 반대, 동일 파이프라인.
 
-상태: `Draft → Active → Deprecated(예고) → Removed`
+상태: `Draft → Reviewed → Approved → Active → Deprecated(예고) → Removed` — 전체 enum과 게이트 강제(Draft 코드 차단·Reviewed 이상 리뷰 기록)는 SPEC-008·`METHODOLOGY.md` 수명주기 절.
 
 1. 사람이 제거 결정(spec-first) → 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
 2. tasks 생성: "FR-NNN 코드·테스트 삭제".
