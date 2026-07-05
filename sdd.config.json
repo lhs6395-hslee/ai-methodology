@@ -11,10 +11,16 @@
   ],
   "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
   "maxKeysPerCategoryPerSpec": 7,
-  "maxFRsPerSpec": 9,
+  "maxFRsPerSpec": 10,
   "requireAccounting": true,
   "smokeManifest": "sdd/smoke-manifest.json",
   "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008"],
+  "specSyncUnownedPolicy": "warn",
+  "specSyncExemptGlobs": [
+    "*.md", "*.html", ".gitignore", "docs/**", "prompts/**", "templates/**",
+    "sdd.config.json", "sdd/smoke-manifest.json",
+    "tooling/*.md", "tooling/*.yml", "tooling/vitest.config.ts"
+  ],
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"
   }

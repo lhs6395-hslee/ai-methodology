@@ -39,6 +39,7 @@
 - **FR-007** (ubiquitous): THE SYSTEM SHALL compile `Ownership.Files` globs as anchored, case-sensitive POSIX patterns where `**` spans zero-or-more path segments and `*` matches within one segment, stripping trailing inline comments before compiling.
 - **FR-008** (event): WHEN `check-converge-drift.mjs` runs against a base ref, THE SYSTEM SHALL report code changes (files under `scanDirs`) not accompanied by any spec change as a drift advisory, exiting zero in advisory mode and non-zero under `--strict`; WHERE git diff is unavailable, THE SYSTEM SHALL skip judgment and exit zero.
 - **FR-009** (event): WHEN `check-orphan-surfaces.mjs` runs and `surfaceGlobs` is non-empty, THE SYSTEM SHALL report any surface file matched by `surfaceGlobs` that is not declared in any spec's `Ownership` block as an orphan advisory, exiting zero in advisory mode and non-zero under `--strict`; WHERE `surfaceGlobs` is empty, THE SYSTEM SHALL exit zero as a no-op.
+- **FR-010** (event): WHEN a changed code file matches no spec's `Files` glob, THE SYSTEM SHALL apply the declared `specSyncUnownedPolicy` — silent (default, current behavior), warn (advisory line in any mode), or error (hard violation in staged mode, advisory in range mode) — with `specSyncExemptGlobs` as the declared escape; an out-of-enum policy value SHALL exit non-zero.
 
 ### Key Entities
 - **changeset** — the union of staged files and `base...HEAD` diff on the branch, against which ownership matching runs.
@@ -87,3 +88,4 @@
 | 2026-07-02 | `[` 경고를 토큰-시작 위치로 한정(FR-005 개정) — 파일 라우팅 `.../[id]/**`는 리터럴 매치라 미경고 + 테스트 | 도그푸딩(PM솔루션): Next.js 동적 세그먼트를 Files glob에 쓰면 정확 매치되는데도 false-positive 경고 — parseSection 드롭 조건(토큰 시작 `[`)에 정렬 |
 | 2026-07-05 | FR 라인 판정 접두어를 `requirementIdPrefixes` 파생 주입으로 전환 + base positional 오배제 버그 수정(+ 회귀 테스트 2건) | 진단 B-2(전 사이트 문법 통일) + 패리티 작업 중 발견: `--message-file` 부재 시 첫 positional(base)이 조용히 무시됨 — 조용한 대체 금지(문법화, SPEC-006 연동) |
 | 2026-07-05 | Draft 스펙 소유 코드 차단 통합(스펙 동반 여부 무관 위반, staged 하드·range advisory) — 상태 판정 코어는 SPEC-008 소유 | 진단 Q1·Q3 승인(P1): 리뷰 없는 Draft 스펙이 코드를 이끄는 구멍 봉합, 탈출구는 기존 트레일러 하나 |
+| 2026-07-05 | FR-010 신설 — `specSyncUnownedPolicy`(silent\|warn\|error)로 미소유 파일 침묵 통과를 선언된 정책으로 승격(FR 10개 — maxFRsPerSpec 10 상향, sdd.config.json) | 진단 Q1 구멍 승인(P2): "Files 미매치 = 침묵"은 테스트로 고정된 의도였으나 미선언 정책 — 문법화(exempt 조합 탈출, error=closed-world) |

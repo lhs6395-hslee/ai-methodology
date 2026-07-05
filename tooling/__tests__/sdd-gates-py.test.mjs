@@ -324,6 +324,29 @@ test("패리티: fr 회계 활성(smokeManifest+requireAccounting+strictSpecs) �
   } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
 });
 
+// ── unowned 정책(SPEC-003 FR-010 패리티): silent/warn/error ──
+
+test("py specsync: unowned 정책 warn=⚠ 통과 · error(staged)=✗ exit 1 · 미정의 값 exit 1", skip, () => {
+  const { root, g } = gitFixture();
+  const setPolicy = (policy) => writeFileSync(join(root, "sdd.config.json"),
+    JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: policy }));
+  try {
+    writeFileSync(join(root, "src/stray.ts"), "unowned\n");
+    g("add", "src/stray.ts");
+    writeFileSync(join(root, "msg"), "chore\n");
+    setPolicy("warn");
+    const warn = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    assert.equal(warn.code, 0, warn.out);
+    assert.match(warn.out, /⚠ unowned: src\/stray\.ts/);
+    setPolicy("error");
+    const err = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    assert.equal(err.code, 1, err.out);
+    assert.match(err.out, /✗ unowned: src\/stray\.ts/);
+    setPolicy("everything-goes");
+    assert.equal(runPy(root, ["specsync", "--staged", "--message-file", "msg"]).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── 수명주기(SPEC-008 패리티): completeness Status·리뷰 기록 + specsync Draft 차단 ──
 
 test("py specsync staged: Draft 스펙 소유 코드 → 스펙 동반해도 exit 1 (Draft 차단 패리티)", skip, () => {

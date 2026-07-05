@@ -870,9 +870,16 @@ def cmd_specsync(cfg, staged, msg_file, base):
                       idx is None and head is not None, parse_status(text)))
 
     # ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
+    # 미소유 파일은 specSyncUnownedPolicy가 선언한 대로 — silent(현행)/warn/error(closed-world).
+    policy = cfg.get("specSyncUnownedPolicy") or "silent"
+    if policy not in ("silent", "warn", "error"):
+        print(f'✗ specSyncUnownedPolicy 값 위반 "{policy}" — silent|warn|error 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     exempt = [compile_glob(g) for g in (cfg.get("specSyncExemptGlobs") or [])]
     spec_set = set(p for _, p, _, _, _ in specs)
     violations = []
+    unowned = []  # 어떤 스펙 Files에도 매치 안 된 변경 파일(exempt 제외)
     memo = {}
 
     def meaningful(spec_id, path, deleted):
@@ -901,9 +908,11 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if any(rx.match(f) for rx in exempt):
             print(f"· exempt: {f} (specSyncExemptGlobs — 영속 흔적 없음)")
             continue
+        owned = False
         for spec_id, path, globs, deleted, status in specs:
             if not any(rx.match(f) for _, rx in globs):
                 continue
+            owned = True
             # Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
             # 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
             if status == "Draft" and not deleted:
@@ -911,10 +920,19 @@ def cmd_specsync(cfg, staged, msg_file, base):
                 continue
             if not meaningful(spec_id, path, deleted):
                 violations.append((f, spec_id, False))
+        if not owned and policy != "silent":
+            unowned.append(f)
 
-    # ⑤ 리포트.
+    # ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
+    unowned_hard = policy == "error" and staged and len(unowned) > 0
     mode = "staged(hard)" if staged else f"range(advisory, base:{base})"
     print(f"spec-sync 게이트 — mode:{mode} changed:{len(changed)} specs:{len(specs)}")
+    for f in unowned:
+        print(f"  {'✗' if unowned_hard else '⚠'} unowned: {f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy={policy})")
+    if unowned_hard and not violations:
+        print("\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.",
+              file=sys.stderr)
+        sys.exit(1)
     if not violations:
         print("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
@@ -929,6 +947,8 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
         if any(d for _, _, d in violations):
             print("  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
+        if unowned_hard:
+            print("  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
         sys.exit(1)
     print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")
