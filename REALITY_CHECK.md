@@ -39,6 +39,8 @@
 | **선제 캡처(SPEC-009)** — Change Log 실기록 행의 근거 존재 | `[검증]` **동작**(2026-07-05) | 근거 빈 값 warn·`--strict` exit 1, 플레이스홀더 행 면제. completeness 게이트 편입, Node↔Python 패리티 green |
 | **smoke 증거 자동 수집(SPEC-010)** — `@verifies` 태그 → `smoke-scan --write`/check | `[검증]` **동작**(2026-07-05) | CI 정의·스크립트 태그 수집→매니페스트 재생성(경로 provenance·정렬 결정성), 수동 엔트리 보존, 드리프트 check exit 1, dangling/형식 위반/method 충돌 exit 1. write 산출물까지 Node↔Python 바이트 동일 |
 | **추적 태그 마이그레이션(SPEC-011)** — `retag <map> [--write]` | `[검증]` **동작**(2026-07-05) | 맵 검증 실패 시 무변경(all-or-nothing), dry-run 계획 보고, write 적용·멱등, 서픽스 키 비오염, null=보고만(잔존은 R1 그물). Node↔Python 산출물 바이트 동일 |
+| **접두어↔클래스 정합(SPEC-012)** — 소유 실파일 전체성 판정·`prefixClassExemptions` | `[검증]` **동작**(2026-07-06) | iac/ci 전용 소유 스펙이 SPEC- 접두어면 exit 1(예시 파일 지목), 코드+IaC 혼합 소유는 통과(과잉발동 없음), 테스트 파일 비분류, 면제 사유 등록=통과·빈 사유/유령 ID=exit 1·미사용 면제=⚠, INFRA 검출 0=⚠. Node↔Python 바이트 패리티 green |
+| **스펙 문법 규범(SPEC-013)** — Module·SHALL·Dedup 참조·Files 카테고리·글롭 문법 | `[검증]` **동작**(2026-07-06) | Module 부재/값 불일치·SHALL 없는 FR 라인·dangling Dedup 참조는 completeness warn·`--strict` exit 1, `ownershipCategories`의 Files는 ownership exit 1, 미지원 글롭 문법은 spec-sync staged exit 1(range advisory 유지). Node↔Python 바이트 패리티 green |
 | **런타임 무관 — Go 단일 정적 바이너리(`go-gate/`, 인터프리터 0)** | `[검증]` 빌드·정적·크로스컴파일(2026-06-29) / `[미확인]` **2026-07-05 문법 정렬분 실행 재검증** | Go 1.26으로 빌드, 당시 Node/Python/셸판과 동일 결과. `CGO_ENABLED=0` linux/amd64 = `statically linked`, 6종 크로스컴파일(~2.5MB). **2026-07-05 요구 ID 문법·PREFIX 거버넌스 정렬은 소스 계약 테스트(`runtime-contract.test.mjs`)로만 검증** — 로컬 Go 툴체인 부재로 빌드·실행 패리티 재검증은 CI(`sdd-gate-release.yml`) 과제. 릴리스: `sdd-gate-release.yml` |
 
 ## 3. 그래서 "안 되는 것" 정리 (사용자 지적대로)

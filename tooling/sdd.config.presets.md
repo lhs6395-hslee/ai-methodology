@@ -116,6 +116,7 @@
 | `testFileRegex` | 테스트 **파일명** 매칭 정규식(소스 문자열) 배열 | JS/TS |
 | `ownershipCategories` | 구조적 중복 키 종류 | `Entities/Surfaces/Capabilities` |
 | `specIdPrefixes` | spec 파일·ID·`@covers`에서 인정할 ID 접두어. 표준 밖 접두어는 `prefixRationale` 사유 필수(미등록은 fr 게이트가 exit 1) | `["SPEC","INFRA","TEST"]` |
+| `prefixClassExemptions` | 접두어↔클래스 정합(SPEC-012) 면제 — `{"<SPEC-ID>":"<사유>"}`. 소유 실파일이 전적으로 iac/ci 클래스인데 INFRA-가 아니면 fr 게이트가 exit 1인데, 정당한 예외를 사유와 함께 선언(빈 사유·미존재 ID는 에러, 미사용 면제는 warn) | `{}` |
 | `requirementIdPrefixes` | 요구 ID 접두어 — FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 여기서 파생(레터 서픽스 1자 포함). 확장 예: `["FR","NFR"]` | `["FR"]` |
 | `strictSpecs` | 전역 `--strict`의 점진 브리지 — 등재 spec만 R2 하드(모든 FR unit 커버 필수, smoke 대체 불가). 미존재 ID는 에러 | `[]` |
 | `requireAccounting` | R3: 모든 FR이 unit ∨ smoke ∨ deferred로 회계돼야 함("조용히 미검증" 제거) | `false` |

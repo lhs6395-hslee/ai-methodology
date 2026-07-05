@@ -11,8 +11,8 @@ cat <<'EOF'
   3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
-게이트(품질): check-fr-coverage(+검증회계)·check-ownership(+entity 레지스트리)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거)·check-spec-consistency
-게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책)
+게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency
+게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책·글롭 문법)
 게이트(재도출·증거): check-derivation(소스 9클래스 회계)·sdd-smoke-scan(검증 태그↔smokeManifest 드리프트)
 동기화: /sdd-sync (drift 점검), pre-push 훅
 EOF

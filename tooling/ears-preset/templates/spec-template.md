@@ -25,7 +25,7 @@
 | Unwanted | `IF <비정상>, THEN THE SYSTEM SHALL <응답>.` |
 | Optional | `WHERE <옵션 포함 시>, THE SYSTEM SHALL <응답>.` |
 | Complex | `WHILE <상태>, WHEN <트리거>, THE SYSTEM SHALL …` |
-> 금지: should/가능하면/적절히, 한 문장 2동작(and), 측정불가.
+> 금지: should/가능하면/적절히, 한 문장 2동작(and), 측정불가. (기계 하한: FR 선언 라인의 **SHALL 존재**는 completeness 게이트가 advisory 점검 — SPEC-013. 어휘의 질·측정가능성 판정은 리뷰 몫: `METHODOLOGY.md` 리뷰 경계 선언.)
 
 ---
 
@@ -55,11 +55,11 @@
 
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 **유일하게 소유(권위)**하는 키. 한 키는 전 spec에서 **정확히 한 spec**만 소유한다(`check-ownership.mjs`가 CI에서 강제 — DEDUP.md, STRUCTURE.md 중복 규칙). 새 요구가 오면 그 키의 owner를 조회해 **이미 있으면 그 spec 개정, 없으면 여기 등록**. 이 spec이 변경하는 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)가 소유의 경계 닻이다. 다른 aggregate의 키는 아래 Dependencies로.
-> ⚠ **키 종류는 `sdd.config.json`의 `ownershipCategories`와 일치해야 한다.** 아래는 웹/CRUD 기본. 비-웹은 바꿔 쓴다(라이브러리/CLI=`Modules·Symbols·Artifacts`, 데이터=`Datasets·Jobs·Sinks`, IaC=`Resources·…`). 헤더(`- **<Category>**:`)는 config의 카테고리명과 정확히 같아야 게이트가 파싱한다.
+> ⚠ **키 종류는 `sdd.config.json`의 `ownershipCategories`와 일치해야 한다.** 아래는 웹/CRUD 기본. 비-웹은 바꿔 쓴다(라이브러리/CLI=`Modules·Symbols·Artifacts`, 데이터=`Datasets·Jobs·Sinks`, IaC=`Resources·…`). 헤더(`- **<Category>**:`)는 config의 카테고리명과 이름이 같아야 게이트가 파싱한다(파서는 대소문자 무관 — 다만 표기는 config와 동일하게 유지). `ownershipCategories`에 `Files`는 넣지 않는다(ownership 게이트가 exit 1 — SPEC-013, `DEDUP.md` §3).
 - **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분. 스키마 식별자 그대로(trim+소문자, 단복수 임의변환 금지)]
 - **Surfaces**: [이 spec이 관할하는 route·화면·job/event — 예: `POST /api/{id}`, `event:<name>`. METHOD 대문자·path 소문자·param `{name}` 표준형·trailing slash 없음]
 - **Capabilities**: [entity.verb 형태 — 예: `project.create`, `staff.assign`. verb ∈ CRUD 기본(create/read/update/delete/list) + config `capabilityVerbs` 등록 verb만 허용]
-- **Files**: [이 spec이 소유하는 코드 파일 glob — 예: `src/lib/<feature>/**, src/app/api/<feature>/**`. **`**`·`*`만 지원**(중괄호·`?`·`[` 금지), 콤마 구분, 인라인 주석 금지. route뿐 아니라 그 기능의 라이브러리까지 빠짐없이(§Files 완전성). check-spec-sync가 이 glob으로 코드→스펙 동반을 강제]
+- **Files**: [이 spec이 소유하는 코드 파일 glob — 예: `src/lib/<feature>/**, src/app/api/<feature>/**`. **`**`·`*`만 지원**(중괄호·`?`·`[` 금지 — 미지원 문법은 spec-sync staged가 exit 1로 차단, SPEC-013), 콤마 구분, 인라인 주석 금지. route뿐 아니라 그 기능의 라이브러리까지 빠짐없이(§Files 완전성). check-spec-sync가 이 glob으로 코드→스펙 동반을 강제]
 
 ## Dependencies (참조 — dedup 제외)
 > 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화 표기를 권장하되, 게이트의 형식검증·dedup 대상은 아니다.

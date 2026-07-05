@@ -81,3 +81,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-05 | 초안 — Status enum 문법화 + Draft 차단 + Reviewed 이상 리뷰 기록 존재 검사(Node·Python 동시) | 진단 Q1·Q3 승인(P1): 스펙 리뷰 계층 부재 — 상태 순서 강제, advisory→strict 승격 경로 |
+| 2026-07-06 | Dedup-Review 기록의 형식 검사에 참조 실재(dangling 이웃 ID) 판정이 연장됨 — 판정 코어(grammar-lib)는 SPEC-013 소유, 이 spec의 존재 판정은 불변(테스트 픽스처만 Module·SHALL 규범에 정렬) | SPEC-013 신설 동반 — 기록이 언급한 스펙 ID의 실재까지가 "형식", 내용의 질은 여전히 리뷰 몫 |

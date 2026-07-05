@@ -55,6 +55,7 @@ DEFAULTS = {
     "specSyncExemptGlobs": [],
     "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
     "prefixRationale": {},
+    "prefixClassExemptions": {},
     "requirementIdPrefixes": ["FR"],
     "strictSpecs": [],
     "requireAccounting": False,
@@ -329,6 +330,46 @@ def cmd_fr(cfg, strict):
                 f"필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가")
         elif pfx not in STANDARD_PREFIXES and not str(rationale.get(pfx, "")).strip():
             prefix_errors.append(f'표준 밖 접두어 "{pfx}" — prefixRationale["{pfx}"]에 도입 사유 필요(빈 값 불가)')
+    # 0b. 접두어↔클래스 정합(SPEC-012): 소유(Files) 비-테스트 실파일이 **전적으로** iac/ci
+    #     클래스인 스펙은 INFRA- 접두어여야 한다 — STORAGE §2.2의 접두어 의미(readopt 착지
+    #     규칙 iac/ci→INFRA)를 기계 강제. 비-인프라 소유 파일이 하나라도 있으면 통과.
+    exemptions = cfg.get("prefixClassExemptions") or {}
+    spec_md_names = sorted(f for f in spec_names if f.endswith(".md") and re.match(r"^[A-Z]+-\d{3}", f))
+    known_ids = set()
+    for f in spec_md_names:
+        m = cfg["__specId"].search(f)
+        if m:
+            known_ids.add(m.group(0))
+    prefix_errors.extend(validate_prefix_class_exemptions(exemptions, known_ids))
+    user_globs = cfg.get("derivationClassGlobs") or {}
+    class_globs = {cls: [compile_glob(g) for g in (user_globs.get(cls) or DEFAULTS["derivationClassGlobs"][cls])]
+                   for cls in INFRA_SOURCE_CLASSES}
+    all_repo_files = walk_all_rel(root, cfg)
+    prefix_class_warnings = []
+    for f in spec_md_names:
+        m = cfg["__specId"].search(f)
+        if not m:
+            continue  # 미등록 접두어는 위 0단계가 이미 에러 처리
+        sid = m.group(0)
+        pfx = re.match(r"^([A-Z]+)-", f).group(1)
+        text = read_text(os.path.join(spec_dir, f))
+        globs = [compile_glob(g) for g in
+                 (strip_inline_comment(x) for x in parse_section(text, "Ownership", ["Files"])["Files"]) if g]
+        owned = sorted(p for p in all_repo_files
+                       if not is_test_file(os.path.basename(p), cfg) and any(rx.search(p) for rx in globs)) if globs else []
+        finding = prefix_class_finding(pfx, owned, class_globs)
+        exempted = bool(str(exemptions.get(sid) or "").strip())
+        if finding and finding[0] == "error":
+            if not exempted:
+                infra = finding[1]
+                prefix_errors.append(
+                    f'접두어↔클래스 부정합 "{sid}" — 소유 실파일 {len(infra)}건 전부 iac/ci 클래스(예: {infra[0]}) '
+                    f'→ INFRA- 접두어여야 함(STORAGE §2.2). 부수 소유가 정당하면 prefixClassExemptions["{sid}"]에 사유 등록')
+            continue
+        if exempted:
+            prefix_class_warnings.append(f'prefixClassExemptions["{sid}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상')
+        if finding and finding[0] == "warn":
+            prefix_class_warnings.append(f"{sid}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토")
     if prefix_errors:
         print("✗ PREFIX 위반:", file=sys.stderr)
         for e in prefix_errors:
@@ -357,7 +398,7 @@ def cmd_fr(cfg, strict):
                 if spec not in specs or fr not in specs[spec]:
                     bad_refs.append((file, spec, fr))
 
-    errors, warnings = [], []
+    errors, warnings = [], list(prefix_class_warnings)  # 0b의 advisory(미사용 면제·INFRA 검출 0건)
     for file, spec, fr in bad_refs:
         errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
 
@@ -419,6 +460,16 @@ def cmd_fr(cfg, strict):
 
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
+
+    # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
+    # 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
+    cat_errors = ownership_categories_findings(categories)
+    if cat_errors:
+        print("✗ ownershipCategories 위반:", file=sys.stderr)
+        for e in cat_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
     files = spec_md_files(cfg)
 
     owners = {c: {} for c in categories}
@@ -627,6 +678,72 @@ def change_log_rationale_findings(text):
     return missing
 
 
+# ── 접두어↔클래스 정합 (prefix-class-lib.mjs 패리티, SPEC-012) ──
+
+INFRA_SOURCE_CLASSES = ["iac", "ci"]  # readopt 착지 규칙상 INFRA 스펙으로 가는 소스 클래스
+
+
+def classify_infra_file(rel_path, class_globs):
+    for cls in INFRA_SOURCE_CLASSES:
+        if any(rx.search(rel_path) for rx in class_globs.get(cls, [])):
+            return cls
+    return None
+
+
+def prefix_class_finding(prefix, owned_files, class_globs):
+    """전체성(totality) 임계 — 비-테스트 소유 실파일 전부가 iac/ci면 INFRA- 필수."""
+    infra, other = [], []
+    for f in owned_files:
+        (infra if classify_infra_file(f, class_globs) else other).append(f)
+    if prefix != "INFRA" and infra and not other:
+        return ("error", infra, other)
+    if prefix == "INFRA" and not infra:
+        return ("warn", infra, other)
+    return None
+
+
+def validate_prefix_class_exemptions(exemptions, known_ids):
+    errors = []
+    for sid in sorted((exemptions or {}).keys()):
+        if sid not in known_ids:
+            errors.append(f'prefixClassExemptions에 존재하지 않는 spec "{sid}" — 오타/삭제 확인(조용한 스킵 금지)')
+        elif not str(exemptions[sid] or "").strip():
+            errors.append(f'prefixClassExemptions["{sid}"] — 사유 필요(빈 값 불가)')
+    return errors
+
+
+# ── 스펙 문법 규범 (grammar-lib.mjs 패리티, SPEC-013) ──
+
+
+def parse_module(text):
+    m = re.search(r"\*\*Module\*\*\s*:\s*`?([^`\n]+?)`?\s*(?:\*\*|$)", text, re.MULTILINE)
+    val = m.group(1).strip() if m else ""
+    return val or None
+
+
+def fr_lines_missing_shall(text, fr_decl_re):
+    line_re = re.compile(r"^\s*-\s*" + fr_decl_re.pattern)
+    out = []
+    for line in text.split("\n"):
+        m = line_re.match(line)
+        if m and not re.search(r"\bSHALL\b", line):
+            out.append(m.group(1))
+    return out
+
+
+def dedup_review_dangling_ids(text, spec_id_re, known_ids):
+    block = section_block(text, "Dedup-Review")
+    if block is None:
+        return []
+    seen = {m.group(0) for m in re.finditer(spec_id_re.pattern, block)}
+    return sorted(i for i in seen if i not in known_ids)
+
+
+def ownership_categories_findings(categories):
+    return [f'ownershipCategories에 "{c}" 금지 — Files는 spec-sync 소유선언 전용(dedup 키 아님, DEDUP.md §3)'
+            for c in (categories or []) if str(c).strip().lower() == "files"]
+
+
 def walk_all_rel(root_dir, cfg, rel_base=""):
     """레포 상대경로 전 파일 순회(ignoreDirs 제외, 이름 정렬 인라인 재귀 — Node walkAll 순서 미러)."""
     ignore = set(cfg["ignoreDirs"])
@@ -656,12 +773,16 @@ def read_text_lossy(path):
 
 def cmd_completeness(cfg, strict):
     files = spec_md_files(cfg)
-    findings = []
-    enum = "|".join(STATUS_ENUM)
+    texts = []
     for file in files:
         text = read_text(file)
         m = cfg["__specId"].search(text)
-        spec_id = m.group(0) if m else os.path.basename(file)
+        texts.append((text, m.group(0) if m else os.path.basename(file)))
+    known_ids = {sid for _, sid in texts}  # Dedup-Review 이웃 ID 실재 판정용
+    module_values = {}  # Module 값 -> [spec_id] (1 레포 = 1 모듈 판정용)
+    findings = []
+    enum = "|".join(STATUS_ENUM)
+    for text, spec_id in texts:
         # 수명주기(SPEC-008) — FR 유무와 무관하게 전 spec 대상. Status 없는 레거시는 warn(점진 도입).
         status = parse_status(text)
         if status is None:
@@ -673,15 +794,32 @@ def cmd_completeness(cfg, strict):
                 findings.append((spec_id, f"Status {status}인데 Review Log 기록(일시·수행자·판정) 없음 — Reviewed 전이는 /analyze·/checklist 결과 기록 필수"))
             if not has_dedup_review(text, cfg["__specId"]):
                 findings.append((spec_id, f'Status {status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음'))
+        # Module 헤더(SPEC-013): STORAGE §2.3 "본문 필수" — 존재 검사 + 값 수집(단일성은 루프 뒤).
+        mod = parse_module(text)
+        if mod is None:
+            findings.append((spec_id, "Module 헤더 없음 — 이 스펙이 속한 모듈 선언 필수(STORAGE §2.3)"))
+        else:
+            module_values.setdefault(mod, []).append(spec_id)
         # 선제 캡처(SPEC-009) — 실기록 Change Log 행의 근거 칸은 빈 값 불가(변경 의도는 저술 시점에만 남는다).
         for d in change_log_rationale_findings(text):
             findings.append((spec_id, f"Change Log {d} 행의 근거 칸이 빈 값 — 변경 의도는 저술 시점에만 캡처 가능(선제 캡처)"))
+        # Dedup-Review 이웃 ID 실재(SPEC-013) — 기록 형식 검사의 연장(오타·삭제 잔재 표면화; 내용의 질은 리뷰 몫).
+        for i in dedup_review_dangling_ids(text, cfg["__specId"], known_ids):
+            findings.append((spec_id, f'Dedup-Review가 존재하지 않는 스펙 "{i}" 참조 — 오타/삭제 잔재(삭제된 이웃은 "이웃 없음(삭제됨)"으로 갱신)'))
         if not set(cfg["__frToken"].findall(text)):
             continue  # FR 없는 spec은 면제(순수 인프라 등)
         if not set(re.findall(r"\bSC-\d{3}\b", text)):
             findings.append((spec_id, "SC(측정형 성공 기준) 없음"))
         if not (re.search(r"\b(Given|Acceptance)\b", text, re.IGNORECASE) or re.search(r"수용\s*기준", text)):
             findings.append((spec_id, "인수조건(Given-When-Then) 없음"))
+        # EARS 기계 신호(SPEC-013): FR 선언 라인은 SHALL 포함 — 어휘 질·측정가능성은 리뷰 몫.
+        for fr in fr_lines_missing_shall(text, cfg["__frDecl"]):
+            findings.append((spec_id, f"{fr} 선언 라인에 SHALL 없음 — EARS 5패턴 공통 필수 토큰(다중행 서술이면 선언 라인에 SHALL 포함)"))
+
+    # 1 레포 = 1 모듈(SPEC-013, STRUCTURE.md): Module 값이 갈라지면 레포 분할 신호.
+    if len(module_values) > 1:
+        names = sorted(module_values.keys())
+        findings.append(("(전 스펙)", f"Module 값 {len(names)}개({', '.join(names)}) — 1 레포 = 1 모듈(STRUCTURE.md): 모듈이 더 필요하면 레포를 나눈다"))
 
     print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요).")
     if findings:
@@ -980,7 +1118,8 @@ def cmd_specsync(cfg, staged, msg_file, base):
                     issues = scan_files_line_issues(raw)
                     if issues and spec_id not in warned_glob_spec:
                         warned_glob_spec.add(spec_id)
-                        print(f"⚠ [{spec_id}] Files에 미지원 glob 문법 {' '.join(issues)} — "
+                        # staged(hard)에서는 위반(SPEC-013): 미지원 토큰은 매치 실패 = 소유가 조용히 풀린다(금지 문법).
+                        print(f"{'✗' if staged else '⚠'} [{spec_id}] Files에 미지원 glob 문법 {' '.join(issues)} — "
                               f"**·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음")
             for g in parse_section(src, "Ownership", ["Files"])["Files"]:
                 g = strip_inline_comment(g)
@@ -1051,6 +1190,12 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print(f"  {'✗' if unowned_hard else '⚠'} unowned: {f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy={policy})")
     if unowned_hard and not violations:
         print("\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.",
+              file=sys.stderr)
+        sys.exit(1)
+    # 미지원 glob 문법은 staged(hard)에서 차단(SPEC-013) — range는 advisory 유지(점진 도입 경로).
+    glob_hard = staged and len(warned_glob_spec) > 0
+    if glob_hard and not violations:
+        print("\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).",
               file=sys.stderr)
         sys.exit(1)
     if not violations:

@@ -60,6 +60,10 @@ export const DEFAULTS = {
   specIdPrefixes: ["SPEC", "INFRA", "TEST"],
   // 표준 밖 접두어 → 도입 사유(빈 값이면 게이트 exit 1)
   prefixRationale: {},
+  // 접두어↔클래스 면제 레지스트리: { "<SPEC-ID>": "<사유>" }(SPEC-012). 소유 실파일이
+  // 전적으로 iac/ci 클래스인데 INFRA-가 아닌 스펙을 사유와 함께 면제. 빈 사유·존재하지
+  // 않는 ID는 에러 — prefixRationale·entityRegistry와 동형 패턴(등록 = config 리뷰 관문).
+  prefixClassExemptions: {},
   // 요구 ID 접두어들(FR 라인·@covers·FR 집계가 인정할 접두어). 기본 ["FR"].
   // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
   // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).

@@ -311,7 +311,7 @@
     <tr><td><code>check-fr-coverage</code></td><td>테스트 없는 FR (사슬 끊김) + <strong>검증 회계</strong>(<code>requireAccounting</code>: 전 FR이 unit ∨ smoke ∨ deferred, <code>strictSpecs</code>: spec 단위 strict 잠금, <code>smokeManifest</code>: dangling·빈 사유)</td><td class="blk">차단</td><td>도면엔 있는데 안 지은 방 / 검사 안 받고 "됐다"는 방</td></tr>
     <tr><td><code>check-ownership</code> <span style="color:var(--muted)">(dedup)</span></td><td><strong>2개 spec이 같은 키 소유</strong> = 중복 + <strong>entity 등록제</strong>(<code>entityRegistry</code> — 미등록 entity·빈 사유)</td><td class="blk">차단</td><td>같은 방을 두 도면이 그림 / 무허가 지번</td></tr>
     <tr><td><code>check-spec-cohesion</code> <span style="color:var(--muted)">(거울상)</span></td><td><strong>1개 spec이 키/FR 과다</strong> = 욱여넣기</td><td class="pass">권고</td><td>한 도면에 집 전체를 우겨넣음</td></tr>
-    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음) + <strong>Change Log 근거 빈 값</strong>(선제 캡처 — 변경의 "왜"는 저술 시점에만 남는다)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장·변경 사유가 안 적힘</td></tr>
+    <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음) + <strong>Change Log 근거 빈 값</strong>(선제 캡처 — 변경의 "왜"는 저술 시점에만 남는다) + <strong>문법 규범</strong>(Module 헤더 존재·값 단일성=1레포 1모듈, FR 라인 SHALL, Dedup-Review 참조 실재)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장·변경 사유가 안 적힘</td></tr>
     <tr><td><code>check-spec-sync</code> <span style="color:var(--muted)">(spec-first)</span></td><td>소유 코드 변경에 스펙 미동반 + <strong>Draft 스펙 소유 코드</strong>(리뷰 전 코드 금지) + <strong>미소유 파일</strong>(<code>specSyncUnownedPolicy</code>)</td><td class="blk">차단(commit-msg)</td><td>도면 갱신 없이 공사 / 검토 안 된 도면으로 착공</td></tr>
     <tr><td><code>check-derivation</code> <span style="color:var(--muted)">(재도출 회계)</span></td><td>재생성이 <strong>소스 클래스를 조용히 안 읽음</strong> — 9클래스(code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent) 전부 mapped ∨ none ∨ deferred 회계 + <strong>실재↔선언 교차검사</strong>(IaC 있는데 none = 차단)</td><td class="blk">차단</td><td>현장 실사 없이 도면만 보고 "다 봤다"는 감리</td></tr>
     <tr><td><code>sdd-smoke-scan</code> <span style="color:var(--muted)">(증거 자동 수집)</span></td><td>smoke 증거의 <strong>수동 연결·드리프트</strong> — 검증 태그(<code>@verifies</code>)를 CI 정의·스크립트·runbook에서 수집해 매니페스트를 재생성(<code>--write</code>), check 모드가 태그↔매니페스트 불일치 차단</td><td class="blk">차단(check)</td><td>검사 성적서를 손으로 옮겨 적다 틀리는 것</td></tr>
@@ -346,7 +346,7 @@
     <text x="612" y="220" font-size="12.5" font-weight="700" fill="#e2620a" text-anchor="middle">1 spec → 키/FR 과다 ⚠ 분할 권고</text>
   </svg></div>
   <figcaption><strong>dedup</strong>: 두 spec이 <code>staff.recommend</code>를 동시에 소유 → 같은 기능 중복 → 차단. <strong>cohesion(거울상)</strong>: 한 spec이 키/FR을 과다 소유 → 여러 기능 욱여넣음 → 쪼개라 권고. <strong>왜 cohesion이 필요한가:</strong> 한 spec이 모든 걸 삼키면 FR↔test 사슬도 소유권 dedup도 무의미해진다(게이트가 잡을 경계가 사라짐) — 그게 메우려는 빈칸이다. (그 빈칸에 빠진 실제 사례가 finops였을 뿐 — 사례가 아니라 원리가 핵심.)</figcaption></figure>
-  <p class="note gate"><strong>2계층(정직).</strong> 게이트는 "키가 같은" 구조적 중복만 막는다. "말만 다른 같은 요구"(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다. <strong>단, 절차와 어휘는 문법화했다:</strong> 검토했다는 <em>기록</em>(<code>## Dedup-Review</code> — 검토한 이웃 spec ID+판정)은 completeness가 존재를 검사하고, entity <em>어휘</em>는 <code>entityRegistry</code> 등록제(신설 = config 리뷰 관문)가 막는다 — 판정의 질만 사람 몫으로 남는다.</p>
+  <p class="note gate"><strong>2계층(정직).</strong> 게이트는 "키가 같은" 구조적 중복만 막는다. "말만 다른 같은 요구"(의미적 중복)는 못 잡는다 → 같은 Entity를 소유한 <em>이웃 spec과만</em> 좁혀서 LLM 리뷰. 100% 자동화는 불가하니, 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다. <strong>단, 절차와 어휘는 문법화했다:</strong> 검토했다는 <em>기록</em>(<code>## Dedup-Review</code> — 검토한 이웃 spec ID+판정)은 completeness가 존재와 <em>참조 실재</em>(언급한 ID가 실재하는 spec인가)를 검사하고, entity <em>어휘</em>는 <code>entityRegistry</code> 등록제(신설 = config 리뷰 관문)가 막는다 — 판정의 질만 사람 몫으로 남는다. 이렇게 "게이트가 판정하지 않는 것"은 전부 <strong>선언된 리뷰 경계</strong>다(METHODOLOGY.md 리뷰 경계 선언 표 — 정의되지 않은 예외 0).</p>
 
   <h3>"SC·인수조건이 빠진 것 같다" — 왜 그렇게 보이고, 실제로는</h3>
   <p>이 키트로 직접 만들다 보면 SC와 인수조건이 사라진 것처럼 느껴진다. 맞다 — 위 표에서 보듯 <strong>게이트·<code>@covers</code> 사슬·하네스가 전부 FR 중심</strong>이라 그렇게 보인다. 하지만 <em>빠진 게 아니라 담당이 나뉘어</em> 있다:</p>
@@ -505,6 +505,10 @@
   <p class="termlbl">$ node scripts/check-fr-coverage.mjs (FEAT-001.md 있고 FEAT 미등록 시 — 실측)</p>
   <pre><span class="r">✗ PREFIX 위반:</span>
   <span class="r">✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가</span></pre>
+  <p><strong>접두어 의미도 강제된다(접두어↔클래스 정합):</strong> 등록·사유만이 아니다 — 스펙이 소유한(<code>Files</code>) 비-테스트 실파일이 <em>전적으로</em> iac/ci 클래스(재도출 회계의 <code>derivationClassGlobs</code>에서 파생)인데 접두어가 <code>INFRA-</code>가 아니면 fr 게이트가 <strong>exit 1</strong>. 재도출이 terraform/CI에서 도출한 스펙을 SPEC-으로 착지시키는 실패 모드를 기계 차단한다. 임계는 비율이 아니라 <em>전체성</em> — 기능 SPEC-이 코드와 함께 부수 IaC를 소유하면 자동 통과(과잉발동 없음). 정당한 예외는 <code>prefixClassExemptions</code>에 사유와 함께 등록(빈 사유·유령 ID는 에러, 미사용 면제는 경고). INFRA- 스펙에서 iac/ci 검출 0건은 경고만(레포 밖 인프라 실체 허용).</p>
+  <p class="termlbl">$ node scripts/check-fr-coverage.mjs (terraform만 소유한 SPEC-001 — 실측)</p>
+  <pre><span class="r">✗ PREFIX 위반:</span>
+  <span class="r">✗ 접두어↔클래스 부정합 "SPEC-001" — 소유 실파일 1건 전부 iac/ci 클래스(예: infra/main.tf) → INFRA- 접두어여야 함(STORAGE §2.2). 부수 소유가 정당하면 prefixClassExemptions["SPEC-001"]에 사유 등록</span></pre>
 </div></section>
 
 <section id="spec-first"><div class="wrap">
@@ -541,7 +545,7 @@
     <rect x="14" y="162" width="792" height="24" rx="12" fill="#fcefe2" stroke="#e2620a"/>
     <text x="410" y="178" font-size="11.5" font-weight="700" fill="#e2620a" text-anchor="middle">check-spec-sync: 소유 코드 변경 → 스펙 의미 변경(FR/Edge Cases/Change Log) 동반 여부 commit-msg hard 차단</text>
   </svg></div>
-  <figcaption>glob은 <code>**</code>와 <code>*</code>만 지원. 여러 스펙이 같은 파일을 소유(다중 소유)하면 <strong>AND 조건</strong> — 모든 소유 스펙에 의미 변경이 있어야 통과한다.</figcaption></figure>
+  <figcaption>glob은 <code>**</code>와 <code>*</code>만 지원 — 미지원 토큰(<code>{</code>·<code>?</code>·선두 <code>[</code>)은 매치 실패 = 소유가 조용히 풀리므로 staged(commit-msg hard)에서 exit 1로 차단된다(range는 경고). 여러 스펙이 같은 파일을 소유(다중 소유)하면 <strong>AND 조건</strong> — 모든 소유 스펙에 의미 변경이 있어야 통과한다.</figcaption></figure>
 
   <h3>커밋 분류 — 3가지로 나뉜다</h3>
   <div class="tablewrap"><table>
@@ -591,7 +595,7 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
   <h3>재도출 소스 회계 — 재생성은 src만 읽으면 미완성이다</h3>
   <p>두 프로젝트 재생성 비교에서 <strong>[검증]</strong>된 결론: 재생성은 레포 안에서 도출 가능한 모든 것을 손작성본보다 잘 뽑지만, 초기 재도출이 src 밖(terraform/k8s/CI)을 아예 안 읽어 INFRA FR을 잃었고, smoke 실증거·<code>@covers</code> 재연결·인간 의도는 수작업으로 남았다. 그 4개 잔여를 전부 문법화했다:</p>
   <div class="pipe">
-    <div class="step"><span class="n">1</span><b>소스 9클래스 회계</b><span><code>sdd/derivation.json</code>에 code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent 전부를 mapped ∨ none ∨ deferred로 선언 — <code>derivation</code> 게이트가 미회계·"실재하는데 none"을 차단</span></div>
+    <div class="step"><span class="n">1</span><b>소스 9클래스 회계</b><span><code>sdd/derivation.json</code>에 code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent 전부를 mapped ∨ none ∨ deferred로 선언 — <code>derivation</code> 게이트가 미회계·"실재하는데 none"을 차단. <b>착지도 강제</b>: iac/ci에서 도출한 스펙이 <code>INFRA-</code>가 아니면 fr 게이트의 접두어↔클래스 정합이 차단(§PREFIX 거버넌스)</span></div>
     <div class="step"><span class="n">2</span><b>smoke 증거 자동 수집</b><span>증거가 사는 파일(CI 정의·스크립트·runbook)에 <code>@verifies</code> 태그 → <code>smoke-scan --write</code>가 매니페스트를 결정적 재생성(수동 연결 제거, 드리프트는 check가 차단)</span></div>
     <div class="step"><span class="n">3</span><b>태그 재연결 자동화</b><span>재도출은 FR 키 보존이 기본 — 재번호가 불가피하면 마이그레이션 맵 + <code>retag --write</code>가 <code>@covers</code>/<code>@verifies</code>/매니페스트 키를 기계 이행(손 재태깅 금지)</span></div>
     <div class="step"><span class="n">4</span><b>선제 캡처</b><span>어디에도 기록 안 된 순수 의도는 사후 재도출 불가 — Review Log·Dedup-Review·Clarifications에 더해 <b>Change Log 근거 칸</b>의 존재를 completeness가 검사(빈 근거 = 경고, <code>--strict</code> 차단)</span></div>
@@ -620,8 +624,8 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
   3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers &lt;PREFIX&gt;-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
-게이트(품질): check-fr-coverage(+검증회계)·check-ownership(+entity 레지스트리)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거)·check-spec-consistency
-게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책)
+게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency
+게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책·글롭 문법)
 게이트(재도출·증거): check-derivation(소스 9클래스 회계)·sdd-smoke-scan(검증 태그↔smokeManifest 드리프트)
 동기화: /sdd-sync (drift 점검), pre-push 훅</pre>
       </div>
@@ -708,6 +712,7 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
         <div class="tablewrap"><table style="min-width:420px;font-size:.88rem">
           <tr><th>메시지</th><th>해소</th></tr>
           <tr><td><code>미등록 접두어 "FEAT"</code></td><td><code>specIdPrefixes</code>에 등록 + 표준 밖이면 <code>prefixRationale</code>에 사유</td></tr>
+          <tr><td><code>접두어↔클래스 부정합 "SPEC-013"</code></td><td>인프라 전용 소유 스펙이면 <code>INFRA-</code>로 재번호(<code>retag</code>), 부수 소유가 정당하면 <code>prefixClassExemptions</code>에 사유</td></tr>
           <tr><td><code>중복 소유 SPEC-001 + SPEC-002</code></td><td>한 spec으로 통합·ownership 이전</td></tr>
           <tr><td><code>missing FR-002</code></td><td>테스트에 <code>// @covers SPEC-001/FR-002</code> 추가</td></tr>
           <tr><td><code>code→spec drift</code></td><td><code>/sdd-sync</code> → spec 개정 또는 의도적 무시 선택</td></tr>

@@ -62,7 +62,8 @@ for (const p of specPaths) {
         const issues = scanFilesLineIssues(raw);
         if (issues.length && !warnedGlobSpec.has(id)) {
           warnedGlobSpec.add(id);
-          console.log(`⚠ [${id}] Files에 미지원 glob 문법 ${issues.join(" ")} — **·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음`);
+          // staged(hard)에서는 위반(SPEC-013): 미지원 토큰은 매치 실패 = 소유가 조용히 풀린다(금지 문법).
+          console.log(`${STAGED ? "✗" : "⚠"} [${id}] Files에 미지원 glob 문법 ${issues.join(" ")} — **·* 만 지원(§4.1), 해당 토큰은 매치되지 않을 수 있음`);
         }
       }
     }
@@ -124,6 +125,12 @@ for (const f of unowned) {
 }
 if (unownedHard && !violations.length) {
   console.error(`\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.`);
+  process.exit(1);
+}
+// 미지원 glob 문법은 staged(hard)에서 차단(SPEC-013) — range는 advisory 유지(점진 도입 경로).
+const globHard = STAGED && warnedGlobSpec.size > 0;
+if (globHard && !violations.length) {
+  console.error(`\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).`);
   process.exit(1);
 }
 if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
