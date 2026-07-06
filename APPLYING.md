@@ -252,4 +252,11 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 4. **회계·맵 갱신**: 이동한 FR의 검증 회계 엔트리(smoke-manifest)·`MODULE_MAP.md`를 갱신. 재검증은 `sdd-sync`로 clean 도달까지.
 5. **일시 유예**: 한 번에 못 나누면 `prefixClassExemptions`에 사유와 함께 등록해 게이트를 유예하고 점진 이관(빈 사유·유령 ID는 에러).
 
+**마이그레이션 — 제품 스펙에 잘못 든 QA/테스트 도구를 TEST 도메인으로 재분류.** 개발/QA 기간용 삭제 예정 도구(예: 페이지 메모)가 제품 SPEC/INFRA 스펙에 승격돼 도메인이 누수됐을 때, TEST 도메인(SPEC-015)으로 이관한다:
+1. **경계 판정**: 그 기능이 프로덕션 전 삭제 예정인가? 그렇다면 TEST 도메인. 제품과 함께 남는다면 SPEC/INFRA 유지.
+2. **TEST 스펙 신설**: `sdd/specs/TEST-001-*.md`(접두어별 001부터 — SPEC-014). `## Ownership`의 `Files`에 그 도구의 런타임 코드 + 전용 인프라(iac/ci) 글롭을 이관 — TEST는 인프라 소유가 prefix-class 면제다. 헤더에 `Lifecycle: removable`(SPEC-008) 명시.
+3. **테스트 인프라 격리**: 그 도구 전용 인프라를 네임스페이스로 구분(리소스명·경로에 qa/test 마커)하고 `sdd.config.json`의 `testInfraGlobs`에 그 패턴을 등록(예: `["**/qa/**"]`). 이후 제품 스펙이 그 인프라를 소유하면 fr 게이트가 exit 1로 막는다.
+4. **원본 정리**: 이관한 FR·`Files`·`@covers` 태그·검증 회계 엔트리(smoke-manifest)를 원 제품 스펙에서 제거(재번호 필요 시 `sdd-retag`). `MODULE_MAP.md` 갱신.
+5. **삭제 시**: 도구를 지울 때 TEST 스펙 하나 + 그 격리된 인프라만 제거하면 된다 — 제품 스펙을 수술할 필요가 없다(도메인 격리의 값어치).
+
 **실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 11-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.
