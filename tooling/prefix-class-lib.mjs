@@ -38,7 +38,8 @@ export function prefixClassFinding(prefix, ownedFiles, classGlobs) {
     const c = classifyInfraFile(f, classGlobs);
     if (c) { byClass[c].push(f); infra.push(f); } else other.push(f);
   }
-  if (infra.length > 0 && other.length === 0) {
+  // TEST는 자기완결 도메인이라 자기 인프라(iac/ci) 소유를 면제(격리는 testInfraGlobs가 별도 강제 — SPEC-015).
+  if (infra.length > 0 && other.length === 0 && prefix !== "TEST") {
     const expected = [...new Set(INFRA_SOURCE_CLASSES.filter((c) => byClass[c].length).map((c) => CLASS_PREFIX[c]))];
     if (!expected.includes(prefix)) return { kind: "error", infra, other, expected };
   }

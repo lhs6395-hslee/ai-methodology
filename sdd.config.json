@@ -15,7 +15,7 @@
   "requireAccounting": true,
   "smokeManifest": "sdd/smoke-manifest.json",
   "derivationManifest": "sdd/derivation.json",
-  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008", "SPEC-009", "SPEC-010", "SPEC-011", "SPEC-012", "SPEC-013", "SPEC-014", "SPEC-016"],
+  "strictSpecs": ["SPEC-002", "SPEC-003", "SPEC-005", "SPEC-006", "SPEC-007", "SPEC-008", "SPEC-009", "SPEC-010", "SPEC-011", "SPEC-012", "SPEC-013", "SPEC-014", "SPEC-015", "SPEC-016"],
   "specSyncUnownedPolicy": "warn",
   "entityRegistry": {
     "key-pipeline": "소유권 키 파싱·정규화·config 어댑터의 SSOT 모듈(SPEC-001)",
@@ -32,6 +32,7 @@
     "prefix-class-consistency": "접두어 의미(iac/ci→INFRA)의 기계 강제 — 소유 실파일 클래스 전체성 판정(SPEC-012)",
     "spec-grammar-hardening": "문서 규범↔게이트 동기 — Module·SHALL·Dedup 참조·Files 카테고리·글롭 문법(SPEC-013)",
     "spec-id-numbering": "접두어별 spec-ID 번호 무결성 — 001시작·중복 hard·중간 gap advisory(SPEC-014)",
+    "test-domain": "TEST 삭제가능 도메인 — 인프라 소유 허용(prefix-class 면제)+testInfraGlobs 격리(SPEC-015)",
     "object-storage-decision": "오브젝트 스토리지 프로비저닝 결정 게이트 — 마커 매치 시 버킷 선택·이전 기준 기록 강제(SPEC-016)"
   },
   "specSyncExemptGlobs": [

@@ -88,3 +88,4 @@
 | 2026-07-06 | 분류 기본값 보정의 전체성 판정 효과를 회귀로 고정 — Jenkinsfile+.github+Dockerfile+.dockerignore만 소유한 SPEC-은 "전적으로 인프라"로 exit 1 | B안: .dockerignore가 other로 분류되면 인프라 전용 스펙이 혼합 소유로 오판돼 게이트를 빠져나감 — 동반 파일 편입으로 판정 정확도 회복 |
 | 2026-07-06 | prefix-class.test.mjs fixture INFRA-002→INFRA-001 정규화 | SPEC-014(접두어별 번호 001 시작 강제) 신설로 기존 INFRA-002 fixture가 번호 게이트에 걸림 — 테스트 의도(prefix-class warn) 보존하며 규칙 준수 |
 | 2026-07-06 | 클래스→접두어 일반화 — 단일 INFRA_SOURCE_CLASSES→INFRA에서 `CLASS_PREFIX{iac:INFRA, ci:CICD}`로. 전부 ci면 CICD 강제·전부 iac면 INFRA·iac+ci 혼합은 둘 다 허용, warn·에러 메시지가 기대 접두어 지목. FR-001 갱신 | CICD 표준 접두어 신설 동반 — CI/CD가 INFRA에 얹혀 경계 흐려짐, ci 파일→CICD 스펙 귀속 강제(Node·Python 패리티) |
+| 2026-07-06 | prefixClassFinding에 TEST 면제(`prefix !== "TEST"`) — TEST 스펙의 iac/ci 전용 소유는 위반 아님 | SPEC-015 신설 동반 — TEST는 자기 인프라 소유(격리는 SPEC-015 testInfraGlobs가 별도 강제) |

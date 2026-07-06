@@ -57,6 +57,7 @@ DEFAULTS = {
     "prefixRationale": {},
     "prefixClassExemptions": {},
     "objectStorageMarkers": ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
+    "testInfraGlobs": [],
     "requirementIdPrefixes": ["FR"],
     "strictSpecs": [],
     "requireAccounting": False,
@@ -378,6 +379,7 @@ def cmd_fr(cfg, strict):
     class_globs = {cls: [compile_glob(g) for g in (user_globs.get(cls) or DEFAULTS["derivationClassGlobs"][cls])]
                    for cls in INFRA_SOURCE_CLASSES}
     all_repo_files = walk_all_rel(root, cfg)
+    test_infra_globs = [compile_glob(g) for g in (cfg.get("testInfraGlobs") or [])]  # SPEC-015
     prefix_class_warnings = []
     for f in spec_md_names:
         m = cfg["__specId"].search(f)
@@ -403,6 +405,10 @@ def cmd_fr(cfg, strict):
             prefix_class_warnings.append(f'prefixClassExemptions["{sid}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상')
         if finding and finding[0] == "warn":
             prefix_class_warnings.append(f"{sid}: {finding[3]}- 접두어인데 소유 Files의 해당 클래스({'iac' if finding[3] == 'INFRA' else 'ci'}) 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 접두어 재검토")
+        # 테스트 인프라 격리(SPEC-015): testInfraGlobs 매치 파일은 TEST 스펙만 소유.
+        ti = test_infra_finding(pfx, owned, test_infra_globs)
+        if ti:
+            prefix_errors.append(f'테스트 인프라 격리 위반 "{sid}" — testInfraGlobs 매치 파일(예: {ti["files"][0]})은 TEST 스펙이 소유해야 함(제품 스펙 소유 금지, SPEC-015)')
     # 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
     n_hard, n_advisory = numbering_issues(known_ids)
     prefix_errors.extend(n_hard)
@@ -746,7 +752,7 @@ def prefix_class_finding(prefix, owned_files, class_globs):
             by_class[c].append(f); infra.append(f)
         else:
             other.append(f)
-    if infra and not other:
+    if infra and not other and prefix != "TEST":  # TEST는 자기 인프라 소유 면제(격리는 test_infra_finding — SPEC-015)
         expected = []
         for c in INFRA_SOURCE_CLASSES:
             if by_class[c] and CLASS_PREFIX[c] not in expected:
@@ -757,6 +763,15 @@ def prefix_class_finding(prefix, owned_files, class_globs):
     if own_class and not by_class[own_class]:
         return ("warn", infra, other, prefix)
     return None
+
+
+def test_infra_finding(prefix, owned_files, test_infra_globs):
+    """테스트 인프라 격리 (test-domain-lib.mjs 미러, SPEC-015). testInfraGlobs 매치 파일을
+    비-TEST 스펙이 소유하면 위반. prefix=TEST면 항상 None(정당 소유자). [] 이면 비활성."""
+    if not test_infra_globs or prefix == "TEST":
+        return None
+    files = [f for f in owned_files if any(rx.search(f) for rx in test_infra_globs)]
+    return {"files": files} if files else None
 
 
 def validate_prefix_class_exemptions(exemptions, known_ids):

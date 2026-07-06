@@ -30,6 +30,7 @@ import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
 import { numberingIssues } from "./numbering-lib.mjs";
+import { testInfraFinding } from "./test-domain-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -107,6 +108,7 @@ function walkAll(dir, relBase = "", acc = []) {
   return acc;
 }
 const allRepoFiles = walkAll(ROOT);
+const testInfraGlobs = (cfg.testInfraGlobs || []).map(compileGlob); // SPEC-015: 테스트 인프라 네임스페이스
 const prefixClassWarnings = [];
 for (const f of specMdNames) {
   const id = f.match(SPEC_ID)?.[0];
@@ -125,6 +127,9 @@ for (const f of specMdNames) {
   }
   if (exempted) prefixClassWarnings.push(`prefixClassExemptions["${id}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상`);
   if (finding && finding.kind === "warn") prefixClassWarnings.push(`${id}: ${finding.prefix}- 접두어인데 소유 Files의 해당 클래스(${finding.prefix === "INFRA" ? "iac" : "ci"}) 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 접두어 재검토`);
+  // 테스트 인프라 격리(SPEC-015): testInfraGlobs 매치 파일은 TEST 스펙만 소유.
+  const tiFinding = testInfraFinding(pfx, owned, testInfraGlobs);
+  if (tiFinding) prefixErrors.push(`테스트 인프라 격리 위반 "${id}" — testInfraGlobs 매치 파일(예: ${tiFinding.files[0]})은 TEST 스펙이 소유해야 함(제품 스펙 소유 금지, SPEC-015)`);
 }
 // 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
 {

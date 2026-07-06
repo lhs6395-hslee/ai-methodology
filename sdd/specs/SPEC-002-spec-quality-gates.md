@@ -95,3 +95,4 @@
 | 2026-07-06 | completeness 게이트에 오브젝트 스토리지 결정 검사 배선 — 판정 코어는 SPEC-016(object-storage-lib) 소유, 본체는 마커 매치 스펙의 Object Storage Decision(Bucket·Consolidation) 존재를 findings로 호출만 | SPEC-016 신설 동반 — 스토리지 도입 시 버킷 선택·이전 기준 기록을 completeness advisory로 강제 |
 | 2026-07-06 | fr 게이트 PREFIX 화이트리스트(STANDARD)에 `CICD` 편입 + 접두어↔클래스 에러/warn 메시지가 기대 접두어(INFRA/CICD)를 지목하도록 갱신 | CICD 표준 접두어 신설 동반 — 사유 없이 1급 수용, 판정 코어는 SPEC-012 |
 | 2026-07-06 | completeness 게이트에 Lifecycle enum 검증 배선(있으면 removable\|permanent) — 판정 코어는 SPEC-008(lifecycle-lib) 소유, 본체는 호출만 | SPEC-008 FR-006 동반 — 선택 필드라 없으면 무관(하위호환) |
+| 2026-07-06 | fr 게이트에 테스트 인프라 격리(testInfraGlobs) 배선 — 판정 코어는 SPEC-015(test-domain-lib) 소유, 본체는 호출·prefixErrors만 | SPEC-015 신설 동반 — testInfra 파일의 비-TEST 소유 차단 |

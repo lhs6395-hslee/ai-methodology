@@ -68,6 +68,9 @@ export const DEFAULTS = {
   // Object Storage Decision 섹션(Bucket·Consolidation)을 요구(advisory·--strict hard).
   // []로 두면 검사 비활성(포터블 하위호환). 멀티클라우드 기본값(대소문자 무시 매치).
   objectStorageMarkers: ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
+  // 테스트/QA 인프라 네임스페이스 마커(SPEC-015). 매치 파일은 TEST 스펙만 소유(제품 스펙이 소유하면
+  // exit 1 — 테스트 인프라 격리). []이면 비활성(하위호환). 예: ["**/qa/**", "**/test-infra/**"].
+  testInfraGlobs: [],
   // 요구 ID 접두어들(FR 라인·@covers·FR 집계가 인정할 접두어). 기본 ["FR"].
   // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
   // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).

@@ -49,7 +49,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 
 ## 2. 스펙 저장 규칙 (명시적)
 1. **1 스펙 = 1 파일** = `<specDir>/<PREFIX>-NNN.md` (기본 `sdd/specs/`).
-2. **PREFIX 표준 4종**: `SPEC`(제품 기능·런타임 동작, 기본) · `INFRA`(프로비저닝 자원 — 네트워크·컴퓨트·DB·스토리지·IAM 등 선언적 클라우드/플랫폼 자원) · `CICD`(CI/CD·릴리스 자동화 — 소스 변경→빌드·테스트·게이트→아티팩트/이미지 게시→배포 트리거의 **동작·정책**; 검증은 build-evidence(파이프라인·배포 로그), 수명주기 permanent) · `TEST`(테스트/QA 도메인). `specIdPrefixes` 기본값 = `["SPEC","INFRA","TEST","CICD"]`. (표준 밖은 `prefixRationale` 등록 필수 — `check-fr-coverage`가 강제)
+2. **PREFIX 표준 4종**: `SPEC`(제품 기능·런타임 동작, 기본) · `INFRA`(프로비저닝 자원 — 네트워크·컴퓨트·DB·스토리지·IAM 등 선언적 클라우드/플랫폼 자원) · `CICD`(CI/CD·릴리스 자동화 — 소스 변경→빌드·테스트·게이트→아티팩트/이미지 게시→배포 트리거의 **동작·정책**; 검증은 build-evidence(파이프라인·배포 로그), 수명주기 permanent) · `TEST`(테스트/QA 도메인 — 테스트 스위트 + **런타임·전용 인프라를 자기완결로 소유하는 삭제 예정 비제품 도구**; `Lifecycle: removable` 관례, TEST 스펙의 인프라 소유는 prefix-class 면제, 테스트 인프라는 `testInfraGlobs` 네임스페이스로 제품과 격리 — SPEC-015). `specIdPrefixes` 기본값 = `["SPEC","INFRA","TEST","CICD"]`. (표준 밖은 `prefixRationale` 등록 필수 — `check-fr-coverage`가 강제)
    - **경계 규칙(도메인 충돌 방지)**: CICD↔INFRA — 전달 자동화 '동작'(CICD) vs 프로비저닝된 자원(INFRA); 이미지 '빌드 방법'은 CICD, '런타임 베이스 자원'은 INFRA. CICD↔TEST — 테스트 '코드'는 TEST, 그 테스트/게이트를 '실행하는 파이프라인'은 CICD. CICD↔SPEC — 배포 '대상'(런타임 코드)은 SPEC, 배포 '방법·게이팅'은 CICD.
    - **표준 밖 접두어**(예: `FEAT`)를 쓰려면 **먼저 등록 + 사유 필수**: `sdd.config.json`에 `specIdPrefixes`에 추가 AND `prefixRationale`에 사유 기재. 사유 없으면 PREFIX 사유 검증 게이트가 exit 1.
    - **조용한 누락 제거**: 게이트는 `specDir`의 **모든** `^[A-Z]+-\d{3}.*\.md` 파일을 스캔한다. 허용 집합 밖 접두어 파일이 있으면 **조용히 건너뛰지 않고 exit 1**. (과거: 미등록 접두어 파일은 조용히 `continue`되어 그 spec의 FR이 추적에서 통째로 빠져 거짓 green — PM솔루션 FEAT-001 실측 사례.) ← 가장 흔한 함정.
