@@ -58,6 +58,7 @@ DEFAULTS = {
     "prefixClassExemptions": {},
     "objectStorageMarkers": ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
     "testInfraGlobs": [],
+    "trackerCloseout": {},
     "requirementIdPrefixes": ["FR"],
     "strictSpecs": [],
     "requireAccounting": False,

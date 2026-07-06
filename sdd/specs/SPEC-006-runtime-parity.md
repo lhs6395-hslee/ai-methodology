@@ -93,3 +93,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-06 | Python STANDARD_PREFIXES·DEFAULTS.specIdPrefixes에 `CICD` + `prefix_class_finding`를 `CLASS_PREFIX{iac:INFRA,ci:CICD}`로 일반화(에러/warn 메시지 바이트 동일) + 패리티 테스트 1종(ci 전용 INFRA→CICD) | CICD 표준 접두어 신설 동반 — 접두어 거버넌스·prefix-class도 런타임 중립 필수 |
 | 2026-07-06 | Python에 `parse_lifecycle`·`LIFECYCLE_ENUM` + completeness Lifecycle enum 검증 미러 + 패리티 테스트 1종 | SPEC-008 FR-006 동반 — Lifecycle 필드도 런타임 중립(Node↔Python 동일 출력) |
 | 2026-07-06 | Python에 `test_infra_finding` + prefix_class TEST 면제 + fr 배선 미러 + 패리티 테스트 1종 | SPEC-015 신설 동반 — 테스트 인프라 격리·TEST 소유 허용도 런타임 중립 |
+| 2026-07-06 | Python DEFAULTS에 `trackerCloseout {}` 동기 | 완료 루프 close-out knob의 DEFAULTS 런타임 패리티(runtime-contract 강제) — 게이트 소비는 없으나 기본값 자체가 패리티 대상 |

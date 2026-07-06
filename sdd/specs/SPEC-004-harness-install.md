@@ -97,3 +97,4 @@
 | 2026-07-06 | sdd-init node 복사 목록에 `numbering-lib.mjs` 추가 | SPEC-014 신설 동반 — 채택 프로젝트가 접두어별 spec-ID 번호 게이트를 결손 없이 배선 |
 | 2026-07-06 | sdd-init node 복사 목록에 `object-storage-lib.mjs` 추가 | SPEC-016 신설 동반 — 채택 프로젝트가 오브젝트 스토리지 결정 게이트를 결손 없이 배선 |
 | 2026-07-06 | sdd-init node 복사 목록에 `test-domain-lib.mjs` 추가 | SPEC-015 신설 동반 — 채택 프로젝트가 테스트 인프라 격리 게이트를 결손 없이 배선 |
+| 2026-07-06 | `speckit-fix.SKILL.md`에 6단계 "원점 트래커 close-out"(dev-done→보고→confirm) 추가 | 완료 루프 close-out 규범 — 트래커 유래 작업의 완료형 스킬 실행기(trackerCloseout knob 소비) |

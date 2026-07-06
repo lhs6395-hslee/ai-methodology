@@ -71,6 +71,11 @@ export const DEFAULTS = {
   // 테스트/QA 인프라 네임스페이스 마커(SPEC-015). 매치 파일은 TEST 스펙만 소유(제품 스펙이 소유하면
   // exit 1 — 테스트 인프라 격리). []이면 비활성(하위호환). 예: ["**/qa/**", "**/test-infra/**"].
   testInfraGlobs: [],
+  // 완료 루프의 꼬리 — 원점 트래커 close-out(METHODOLOGY 루프·speckit-fix 스킬이 소비, 게이트 아님).
+  // 작업이 tracked issue에서 유래했으면 verify/merge 후: ①트래커 dev-done ②이해관계자 완료 보고
+  // ③리포터 confirm(2인 책임분리 — dev는 confirm 미접촉). {}이면 비활성. 값은 프로젝트가 인스턴스화:
+  //   { tracker, devDoneState, confirmState, reportChannel } — 트래커 정체·보고 채널은 하드코딩 금지.
+  trackerCloseout: {},
   // 요구 ID 접두어들(FR 라인·@covers·FR 집계가 인정할 접두어). 기본 ["FR"].
   // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
   // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).

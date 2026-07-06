@@ -473,8 +473,10 @@
     <div class="step"><span class="n">6</span><b>구현</b><span>TDD RED→GREEN — 테스트 먼저, 통과시킴</span></div>
     <div class="step"><span class="n">7</span><b>머지</b><span>사람 PR 리뷰·승인</span></div>
     <div class="step"><span class="n">8</span><b>converge</b><span>시간 지나 drift났나 검사 → 갭 표면화</span></div>
+    <div class="step"><span class="n">9</span><b>close-out</b><span>트래커 유래 작업이면 — 트래커 dev-done → 이해관계자 보고 → 리포터 confirm</span></div>
   </div>
   <p class="note"><strong>양방향 동기화 — 작성은 LLM, 승인은 사람.</strong><br>· <strong>위→아래</strong>(spec→code): 사람이 spec 작성 → 미구현을 구현.<br>· <strong>아래→위</strong>(code→spec, 핫픽스 후): 코드가 먼저 바뀜 → <em>사람이 "무슨 기능·왜"(intent) 한 줄 입력</em> → LLM이 코드+intent로 spec 갱신 → 사람이 "정본화 vs 되돌리기" 승인. — 코드만 보고 spec을 자동으로 덮어쓰지 않는다(그러면 spec이 코드의 거울로 전락해 drift 탐지가 무의미해진다).</p>
+  <p class="note gate">⑨ <strong>완료 루프의 꼬리 — 원점 트래커 close-out.</strong> 실무 작업의 상당수는 QA/이슈 트래커에서 유래한다(예: 페이지별 QA 메모, open→done→confirmed). 그런 작업은 verify/merge로 끝이 아니라 — <strong>①트래커 dev-done</strong>(개발자) → <strong>②이해관계자 완료 보고</strong>(무엇·왜·어떻게+검증 경로) → <strong>③리포터 confirm</strong>(리포터/QA)까지가 완료다. <strong>2인 책임분리</strong>: 개발자는 confirm을 건드리지 않는다. 트래커·보고 채널은 킷에 하드코딩하지 않고 <code>trackerCloseout</code> config로 인스턴스화 — 외부 시스템·사람 몫이라 게이트가 아니라 규범이다.</p>
 </div></section>
 
 <section id="harness"><div class="wrap">

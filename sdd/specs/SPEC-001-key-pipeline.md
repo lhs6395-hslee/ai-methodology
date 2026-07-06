@@ -91,3 +91,4 @@
 | 2026-07-06 | DEFAULTS에 `objectStorageMarkers`(멀티클라우드 기본 목록) 추가 | SPEC-016 신설 동반 — 오브젝트 스토리지 결정 게이트의 감지 마커를 config 어댑터가 파생·병합([]로 비활성) |
 | 2026-07-06 | DEFAULTS.specIdPrefixes에 `CICD` 편입 → `["SPEC","INFRA","TEST","CICD"]` | CICD 표준 접두어 신설 — 파일명·SPEC_ID·@covers 정규식이 이 목록에서 파생되므로 CICD-NNN이 1급 수용됨 |
 | 2026-07-06 | DEFAULTS에 `testInfraGlobs`(기본 []) 추가 | SPEC-015 신설 동반 — 테스트 인프라 네임스페이스 마커를 config 어댑터가 파생([]로 비활성) |
+| 2026-07-06 | DEFAULTS에 `trackerCloseout`(기본 {}) 추가 | 완료 루프 close-out 규범 — 원점 트래커/보고 채널 인스턴스화 knob(게이트 아닌 스킬·사람 소비, {}로 비활성) |
