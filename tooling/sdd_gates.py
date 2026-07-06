@@ -56,6 +56,7 @@ DEFAULTS = {
     "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
     "prefixRationale": {},
     "prefixClassExemptions": {},
+    "objectStorageMarkers": ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
     "requirementIdPrefixes": ["FR"],
     "strictSpecs": [],
     "requireAccounting": False,
@@ -808,6 +809,30 @@ def read_text_lossy(path):
 
 # ── completeness — SC·인수조건·수명주기 기록 존재 (check-spec-completeness.mjs) ──
 
+def _section_body(text, heading):
+    m = re.search(rf"^#{{1,6}}\s*{re.escape(heading)}\s*$", text, re.IGNORECASE | re.MULTILINE)
+    if not m:
+        return None
+    rest = text[m.end():]
+    nxt = re.search(r"^#{1,6}\s", rest, re.MULTILINE)
+    return rest if not nxt else rest[:nxt.start()]
+
+
+def object_storage_findings(text, markers):
+    """오브젝트 스토리지 결정 검사 (object-storage-lib.mjs 미러 — 바이트 동일, SPEC-016)."""
+    if not markers:
+        return []
+    if not any(re.search(re.escape(m), text, re.IGNORECASE) for m in markers):
+        return []
+    section = _section_body(text, "Object Storage Decision")
+    if section is None:
+        return ["오브젝트 스토리지(S3 등) 마커 매치 — '## Object Storage Decision' 섹션 없음(버킷 선택·이전 기준 기록 필요, SPEC-016)"]
+    missing = [lbl for lbl in ("Bucket", "Consolidation") if not re.search(re.escape(lbl), section, re.IGNORECASE)]
+    if missing:
+        return [f"Object Storage Decision 섹션에 필수 라벨 없음: {', '.join(missing)} (버킷 선택·이전 기준, SPEC-016)"]
+    return []
+
+
 def cmd_completeness(cfg, strict):
     files = spec_md_files(cfg)
     texts = []
@@ -843,6 +868,9 @@ def cmd_completeness(cfg, strict):
         # Dedup-Review 이웃 ID 실재(SPEC-013) — 기록 형식 검사의 연장(오타·삭제 잔재 표면화; 내용의 질은 리뷰 몫).
         for i in dedup_review_dangling_ids(text, cfg["__specId"], known_ids):
             findings.append((spec_id, f'Dedup-Review가 존재하지 않는 스펙 "{i}" 참조 — 오타/삭제 잔재(삭제된 이웃은 "이웃 없음(삭제됨)"으로 갱신)'))
+        # 오브젝트 스토리지 결정(SPEC-016): 마커 매치 스펙은 Object Storage Decision(Bucket·Consolidation) 필수.
+        for m in object_storage_findings(text, cfg.get("objectStorageMarkers") or []):
+            findings.append((spec_id, m))
         if not set(cfg["__frToken"].findall(text)):
             continue  # FR 없는 spec은 면제(순수 인프라 등)
         if not set(re.findall(r"\bSC-\d{3}\b", text)):

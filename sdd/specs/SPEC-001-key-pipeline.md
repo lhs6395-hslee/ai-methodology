@@ -88,3 +88,4 @@
 | 2026-07-05 | DEFAULTS에 재도출·증거 스캔 키 3종 추가(`smokeScanDirs`·`derivationManifest`·`derivationClassGlobs`) — 전부 비활성 기본값(하위호환) | SPEC-009·SPEC-010 신설 동반 — 새 문법의 기본값도 config 어댑터 한 곳에서 선언(런타임 DEFAULTS 패리티는 계약 테스트가 강제) |
 | 2026-07-06 | DEFAULTS에 `prefixClassExemptions` 추가 — 비활성 기본값(하위호환) | SPEC-012 신설 동반 — 접두어↔클래스 면제 레지스트리도 config 어댑터 한 곳에서 선언(런타임 DEFAULTS 패리티는 계약 테스트가 강제) |
 | 2026-07-06 | `derivationClassGlobs` 기본값 보정 — 분류 원칙을 "정의 파일 + 동반·보조 파일"로: iac에 .dockerignore·kustomization·*.hcl·서브디렉토리 compose, ci에 .github/actions·.gitlab/ci·cloudbuild·travis·drone 편입(중복 루트 전용 항목은 `**/X`로 정리 — 루트 X 매치 동일) | B안: .dockerignore 등 인프라 동반 파일이 "other"로 새서 전체성 판정·D3 검출을 약화 — 접두어↔클래스 게이트(SPEC-012)와 재도출 회계(SPEC-009)의 분류 SSOT를 한 곳에서 보정 |
+| 2026-07-06 | DEFAULTS에 `objectStorageMarkers`(멀티클라우드 기본 목록) 추가 | SPEC-016 신설 동반 — 오브젝트 스토리지 결정 게이트의 감지 마커를 config 어댑터가 파생·병합([]로 비활성) |

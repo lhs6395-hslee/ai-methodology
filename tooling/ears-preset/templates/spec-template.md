@@ -83,6 +83,15 @@
 ## Infrastructure Prerequisites (해당 시에만 — 없으면 절 삭제)
 - **IP-001**: [이 spec 실현에 필요한 인프라 선행조건 — *역량*으로]. **제품이 아니라 요구를 적는다**: "내구성 있는 이벤트 로그 필요"(O) vs "Kafka 필요"(X), "저지연 키-값 캐시 필요"(O) vs "Redis 필요"(X), "객체 스토리지 필요"(O) vs "S3 필요"(X). 특정 DB·캐시·브로커·클라우드 제품은 그 프로젝트 결정이라 spec이 강요하지 않는다. 배포 실제 drift 검증은 `SSOT.md` §5b. 인프라 의존이 없는 순수 코드 spec이면 이 절을 통째로 생략.
 
+## Object Storage Decision (S3 등 오브젝트 스토리지 도입 시 필수 — 없으면 절 삭제)
+> 오브젝트 스토리지(S3·GCS·Blob)를 도입하면 **버킷을 자동 생성하지 말고** 여기에 결정을 기록한다(SPEC-016). `objectStorageMarkers`에 매치하는데 이 절이 없으면 completeness가 경고한다.
+- **Bucket**: [신규 전용 버킷 vs 기존(또는 예정) 버킷의 네임스페이스 prefix/디렉토리 — 어느 쪽인지 명시]
+- **Consolidation**: 임시/QA 버킷이면 제품 스토리지 확보 시 이전(consolidation) 기준을 적는다 —
+  - (a) 이전 트리거: [제품 버킷 생성 / prod 승격 / 도구 삭제 등]
+  - (b) 대상 경로 규약: [예 임시 `…-qa-files/page-notes/*` → 제품 `…-files/qa/page-notes/*`]
+  - (c) 이전 방식: [s3 mv/sync + DB key 갱신, 무중단 여부]
+  - (d) 키 네임스페이스 전제: [처음부터 `qa/` prefix로 두어 경로 이동만으로 이전 가능하게]
+
 ## Assumptions / Clarifications Retained
 - [전제] / [인터뷰로 확정할 빈칸] → `CLARIFICATIONS.md`
 

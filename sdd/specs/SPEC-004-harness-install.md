@@ -95,3 +95,4 @@
 | 2026-07-06 | sdd-init node 복사 목록에 `prefix-class-lib.mjs`·`grammar-lib.mjs` 추가 (+ 하네스 detect 리포트가 새 신호를 그대로 표면화) | SPEC-012·SPEC-013 신설 동반 — 채택 프로젝트가 접두어↔클래스·문법 규범 게이트를 결손 없이 배선 |
 | 2026-07-06 | FR-009 신설 — `sdd-sync.mjs --json` 결정적 기계 판독 리포트(스키마 v1) + `/sdd-sync` 스킬이 텍스트 스크래핑 대신 이를 소비 | 하네스 ask 층 입력 결정성 강화: 리포트가 스킬 계약이라 에이전트 해석에 의존했음 → 안정 스키마로 잠가 어느 실행기든 동일 소비 |
 | 2026-07-06 | sdd-init node 복사 목록에 `numbering-lib.mjs` 추가 | SPEC-014 신설 동반 — 채택 프로젝트가 접두어별 spec-ID 번호 게이트를 결손 없이 배선 |
+| 2026-07-06 | sdd-init node 복사 목록에 `object-storage-lib.mjs` 추가 | SPEC-016 신설 동반 — 채택 프로젝트가 오브젝트 스토리지 결정 게이트를 결손 없이 배선 |

@@ -64,6 +64,10 @@ export const DEFAULTS = {
   // 전적으로 iac/ci 클래스인데 INFRA-가 아닌 스펙을 사유와 함께 면제. 빈 사유·존재하지
   // 않는 ID는 에러 — prefixRationale·entityRegistry와 동형 패턴(등록 = config 리뷰 관문).
   prefixClassExemptions: {},
+  // 오브젝트 스토리지 감지 마커(SPEC-016). 스펙 본문이 하나라도 매치하면 completeness가
+  // Object Storage Decision 섹션(Bucket·Consolidation)을 요구(advisory·--strict hard).
+  // []로 두면 검사 비활성(포터블 하위호환). 멀티클라우드 기본값(대소문자 무시 매치).
+  objectStorageMarkers: ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
   // 요구 ID 접두어들(FR 라인·@covers·FR 집계가 인정할 접두어). 기본 ["FR"].
   // 확장 예: ["FR","NFR"] — FR 선언·@covers·집계 정규식이 전부 여기서 파생되어,
   // 도메인 요구 접두어 추가가 코드 fork 없이 config로 표현된다(specIdPrefixes의 거울).

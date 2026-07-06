@@ -92,3 +92,4 @@
 | 2026-07-05 | completeness 게이트에 Change Log 근거(선제 캡처) 검사 통합 — 판정 코어는 SPEC-009 소유 | SPEC-009 신설 동반: 변경 의도는 저술 시점에만 캡처 가능 — 존재만 검사(advisory, --strict 하드, SPEC-008 편입과 동형 패턴) |
 | 2026-07-06 | fr 게이트에 접두어↔클래스 정합(0b) 통합, ownership 게이트에 Files 카테고리 금지, completeness 게이트에 문법 규범(Module 존재·단일성·SHALL·Dedup 참조 실재) 통합 — 판정 코어는 SPEC-012·SPEC-013 소유 | 고도화 4차: 미강제 규범(STORAGE §2.2 접두어 의미·§2.3 Module 필수·EARS SHALL·DEDUP Files 금지) 감사 결과를 게이트로 — 존재·정합 등 기계 신호만(의미 판정은 리뷰 경계, SPEC-009 편입과 동형 패턴) |
 | 2026-07-06 | fr 게이트에 접두어별 spec-ID 번호 무결성(0c) 배선 — 판정 코어는 SPEC-014(numbering-lib) 소유, 본체는 hard→prefixErrors·gap advisory(--strict 승격) 호출만 | SPEC-014 신설 동반 — PREFIX 거버넌스(0)·접두어↔클래스(0b) 옆 번호 무결성(0c), 접두어별 001 순차 강제 |
+| 2026-07-06 | completeness 게이트에 오브젝트 스토리지 결정 검사 배선 — 판정 코어는 SPEC-016(object-storage-lib) 소유, 본체는 마커 매치 스펙의 Object Storage Decision(Bucket·Consolidation) 존재를 findings로 호출만 | SPEC-016 신설 동반 — 스토리지 도입 시 버킷 선택·이전 기준 기록을 completeness advisory로 강제 |

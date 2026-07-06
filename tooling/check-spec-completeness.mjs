@@ -18,6 +18,7 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupReview } from "./lifecycle-lib.mjs";
 import { changeLogRationaleFindings } from "./derivation-lib.mjs";
 import { parseModule, frLinesMissingShall, dedupReviewDanglingIds } from "./grammar-lib.mjs";
+import { objectStorageFindings } from "./object-storage-lib.mjs";
 
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -64,6 +65,9 @@ for (const { text, specId } of texts) {
   // Dedup-Review 이웃 ID 실재(SPEC-013) — 기록 형식 검사의 연장(오타·삭제 잔재 표면화; 내용의 질은 리뷰 몫).
   for (const id of dedupReviewDanglingIds(text, cfg.__specIdRe, knownIds))
     findings.push({ specId, miss: `Dedup-Review가 존재하지 않는 스펙 "${id}" 참조 — 오타/삭제 잔재(삭제된 이웃은 "이웃 없음(삭제됨)"으로 갱신)` });
+  // 오브젝트 스토리지 결정(SPEC-016): 마커 매치 스펙은 Object Storage Decision(Bucket·Consolidation) 필수.
+  for (const m of objectStorageFindings(text, cfg.objectStorageMarkers))
+    findings.push({ specId, miss: m });
   if (countIds(cfg.__frTokenRe, text) === 0) continue;     // FR 없는 spec은 면제 — 문법은 requirementIdPrefixes에서 파생(서픽스 FR도 FR)
   if (countIds(/\bSC-\d{3}\b/g, text) === 0)
     findings.push({ specId, miss: "SC(측정형 성공 기준) 없음" });
