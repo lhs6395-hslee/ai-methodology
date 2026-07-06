@@ -25,6 +25,7 @@
 - 4개 세부(이전 트리거·대상 경로·이전 방식·키 네임스페이스)는 템플릿 체크리스트로 안내한다 — 게이트는 `Bucket`·`Consolidation` 라벨 존재만 검사(존재만 강제, 질은 리뷰 몫).
 - 규칙을 정의할 뿐 스토리지를 만들지 않는 스펙(이 SPEC-016 자신)은 결정 섹션을 `해당 없음(N/A)`으로 둬 자기 게이트를 통과한다.
 - 실제 버킷 생성·객체 이전 실행은 프로젝트 IaC/런북의 몫이다 — 게이트는 결정의 *기록*만 강제한다.
+- 감사 트레일 섹션(Review Log·Dedup-Review·Change Log)의 마커 언급은 스캔 대상이 아니다 — 스펙이 스토리지를 *도입*하는 신호는 설계 본문(FR·User Story·Infrastructure Prerequisites·결정 섹션)에 있지, 감사 기록의 자기 서술("S3 게이트 배선함")에 있지 않다(게이트의 자기·이웃 서술 오탐 방지).
 
 ---
 
@@ -86,3 +87,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-06 | 초안 — `objectStorageMarkers` 감지 + Object Storage Decision 섹션(Bucket·Consolidation 라벨) completeness 검사(advisory·--strict), Node·Python 동시 | QA 도구가 전용 S3 버킷을 무계획 생성해 제품 버킷과 분리 방치[실측] — 스토리지 도입 시 버킷 선택·이전 기준을 설계 단계에 기록하도록 강제 |
+| 2026-07-06 | 마커 스캔에서 감사 트레일(Review Log/Dedup-Review/Change Log) 제외 (Node·Python) | 자기 서술 오탐[검증]: 메타 스펙(SPEC-001·002·004·006)의 Change Log가 "오브젝트 스토리지 게이트"를 언급하자 게이트가 자기·이웃을 물었음 — 도입 신호는 설계 본문에서만 판정 |

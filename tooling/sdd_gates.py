@@ -818,11 +818,18 @@ def _section_body(text, heading):
     return rest if not nxt else rest[:nxt.start()]
 
 
+def _before_audit_trail(text):
+    m = re.search(r"^#{1,6}\s*(Review Log|Dedup-Review|Change Log)\s*$", text, re.IGNORECASE | re.MULTILINE)
+    return text[:m.start()] if m else text
+
+
 def object_storage_findings(text, markers):
-    """오브젝트 스토리지 결정 검사 (object-storage-lib.mjs 미러 — 바이트 동일, SPEC-016)."""
+    """오브젝트 스토리지 결정 검사 (object-storage-lib.mjs 미러 — 바이트 동일, SPEC-016).
+    감사 트레일(Review Log/Dedup-Review/Change Log)의 마커 언급은 스캔 제외(자기 서술 오탐 방지)."""
     if not markers:
         return []
-    if not any(re.search(re.escape(m), text, re.IGNORECASE) for m in markers):
+    scan = _before_audit_trail(text)
+    if not any(re.search(re.escape(m), scan, re.IGNORECASE) for m in markers):
         return []
     section = _section_body(text, "Object Storage Decision")
     if section is None:

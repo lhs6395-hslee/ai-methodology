@@ -40,3 +40,8 @@ test("마커 대소문자 무시 매치", () => {
   const r = objectStorageFindings("we use object STORAGE here.\n", MARKERS);
   assert.equal(r.length, 1);
 });
+
+test("감사 섹션(Change Log·Review Log·Dedup-Review)의 마커 언급은 트리거 안 함 — 게이트 자기 서술 회피", () => {
+  const t = "본문은 순수 로직만 다룬다.\n## Review Log\n| 2026 | r | PASS |\n## Change Log\n| 2026 | S3 오브젝트 스토리지 결정 게이트 배선 | x |\n";
+  assert.deepEqual(objectStorageFindings(t, MARKERS), []);
+});

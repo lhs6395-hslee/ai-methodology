@@ -13,6 +13,14 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// 감사 트레일(Review Log/Dedup-Review/Change Log) 이전까지 — 마커 스캔 대상.
+// 스펙이 스토리지를 *도입*하는 신호는 설계 본문(FR·User Story·Infra Prereq·결정 섹션)에
+// 있지, 감사 기록의 서술("S3 게이트 배선함")에 있지 않다 — 게이트의 자기 서술 오탐 방지.
+function beforeAuditTrail(text) {
+  const m = /^#{1,6}\s*(Review Log|Dedup-Review|Change Log)\s*$/im.exec(text);
+  return m ? text.slice(0, m.index) : text;
+}
+
 // `## Object Storage Decision` 헤딩부터 다음 헤딩 전까지의 본문. 없으면 null.
 function sectionBody(text, heading) {
   const re = new RegExp(`^#{1,6}\\s*${escapeRegExp(heading)}\\s*$`, "im");
@@ -26,7 +34,8 @@ function sectionBody(text, heading) {
 // 반환: 경고 메시지 배열(없으면 []).
 export function objectStorageFindings(specText, markers) {
   if (!markers || !markers.length) return [];
-  const matched = markers.some((m) => new RegExp(escapeRegExp(m), "i").test(specText));
+  const scan = beforeAuditTrail(specText);
+  const matched = markers.some((m) => new RegExp(escapeRegExp(m), "i").test(scan));
   if (!matched) return [];
   const section = sectionBody(specText, "Object Storage Decision");
   if (section === null) {
