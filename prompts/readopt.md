@@ -24,14 +24,14 @@
    fi
    sh "$KIT/tooling/sdd-init.sh" --gate=node --force      # ← 대상 프로젝트 루트에서
    ```
-4. **config 맞춤.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`).
+4. **config 맞춤 + 새 knob 인스턴스화.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`). 프리셋 필드표의 knob을 전부 검토해 **값이 프로젝트별인 것**(예: `trackerCloseout` 트래커·채널, `testInfraGlobs`, `objectStorageMarkers`)은 CLAUDE.md 관례/사용자 확인으로 인스턴스화한다(자동 추정 금지, 해당 없으면 기본 비활성값).
 5. **구 산출물 정리 — 인간 절은 먼저 이월 목록으로.** 기존 `sdd/specs/*`를 걷어내기 **전에** 각 스펙의 인간 의도 절(User Story·Assumptions/Clarifications·Review Log·Dedup-Review·Change Log 근거)을 이월 목록으로 뽑아둔다(prior-intent 소스 — 사후 재생성 불가). 그다음 걷어낸다 — 코드는 그대로, 1단계 스냅샷 태그에 남아 있음.
 6. **스펙 재도출 — 소스 클래스 9종 전부 읽는다(SPEC-009).** src만 읽는 재도출은 미완성이다. 정의된 소스 클래스와 산출물 매핑:
    | 클래스 | 읽을 것 | 착지 |
    |---|---|---|
    | `code` | scanDirs의 앱/툴 소스 | SPEC FR + Ownership |
    | `iac` | terraform/k8s/helm/Dockerfile/compose | **INFRA 스펙**(FR·Files 소유) |
-   | `ci` | 워크플로우·Jenkinsfile·파이프라인 정의 | INFRA 스펙 + 검증 태그(smoke 증거) |
+   | `ci` | 워크플로우·Jenkinsfile·파이프라인 정의 | **CICD 스펙**(FR·Files 소유) + 검증 태그(build-evidence/smoke) |
    | `ops-docs` | runbook·운영 문서 | verification 절·검증 태그 |
    | `build-evidence` | 빌드/CI 실행 로그·아티팩트(레포 밖) | 검증 태그 본문이 좌표(빌드 #·URL)를 가리킴 |
    | `vcs-history` | git log·PR·커밋 메시지·Spec-Impact 트레일러 | Change Log 근거·마이그레이션 이력 |
