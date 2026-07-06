@@ -15,7 +15,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
-import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupReview } from "./lifecycle-lib.mjs";
+import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupReview, LIFECYCLE_ENUM, parseLifecycle } from "./lifecycle-lib.mjs";
 import { changeLogRationaleFindings } from "./derivation-lib.mjs";
 import { parseModule, frLinesMissingShall, dedupReviewDanglingIds } from "./grammar-lib.mjs";
 import { objectStorageFindings } from "./object-storage-lib.mjs";
@@ -55,6 +55,10 @@ for (const { text, specId } of texts) {
     if (!hasDedupReview(text, cfg.__specIdRe))
       findings.push({ specId, miss: `Status ${status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음` });
   }
+  // Lifecycle 필드(SPEC-008): 선택 — 있으면 removable|permanent enum 검증(없으면 무관, 하위호환).
+  const lc = parseLifecycle(text);
+  if (lc !== null && !LIFECYCLE_ENUM.includes(lc))
+    findings.push({ specId, miss: `미정의 Lifecycle "${lc}" — ${LIFECYCLE_ENUM.join("|")} 외 값 금지` });
   // Module 헤더(SPEC-013): STORAGE §2.3 "본문 필수" — 존재 검사 + 값 수집(단일성은 루프 뒤).
   const mod = parseModule(text);
   if (mod === null) findings.push({ specId, miss: "Module 헤더 없음 — 이 스펙이 속한 모듈 선언 필수(STORAGE §2.3)" });

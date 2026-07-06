@@ -630,10 +630,16 @@ def cmd_cohesion(cfg, strict):
 
 STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"]
 _REVIEWED_PLUS = {"Reviewed", "Approved", "Active"}
+LIFECYCLE_ENUM = ["removable", "permanent"]  # lifecycle-lib.mjs 미러(SPEC-008)
 
 
 def parse_status(text):
     m = re.search(r"\*\*Status\*\*\s*:\s*([A-Za-z]+)", text)
+    return m.group(1) if m else None
+
+
+def parse_lifecycle(text):
+    m = re.search(r"\*\*Lifecycle\*\*\s*:\s*([A-Za-z]+)", text)
     return m.group(1) if m else None
 
 
@@ -876,6 +882,10 @@ def cmd_completeness(cfg, strict):
                 findings.append((spec_id, f"Status {status}인데 Review Log 기록(일시·수행자·판정) 없음 — Reviewed 전이는 /analyze·/checklist 결과 기록 필수"))
             if not has_dedup_review(text, cfg["__specId"]):
                 findings.append((spec_id, f'Status {status}인데 Dedup-Review 기록(검토한 이웃 스펙 ID+판정 또는 "이웃 없음") 없음'))
+        # Lifecycle 필드(SPEC-008): 선택 — 있으면 removable|permanent enum 검증(없으면 무관).
+        lc = parse_lifecycle(text)
+        if lc is not None and lc not in LIFECYCLE_ENUM:
+            findings.append((spec_id, f'미정의 Lifecycle "{lc}" — {"|".join(LIFECYCLE_ENUM)} 외 값 금지'))
         # Module 헤더(SPEC-013): STORAGE §2.3 "본문 필수" — 존재 검사 + 값 수집(단일성은 루프 뒤).
         mod = parse_module(text)
         if mod is None:

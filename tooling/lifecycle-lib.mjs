@@ -11,6 +11,17 @@ export const STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecat
 // Reviewed 이상(리뷰를 통과한 상태) — Review Log·Dedup-Review 기록이 존재해야 하는 상태들.
 const REVIEWED_PLUS = new Set(["Reviewed", "Approved", "Active"]);
 
+// 수명 성격(Status와 직교) — removable(pre-prod 삭제 예정 비제품 도구) vs permanent(제품·영구).
+// Status가 "어느 단계인가"라면 Lifecycle은 "언젠가 지워질 것인가". 선택 필드(없으면 무관),
+// 있으면 enum 밖 값은 completeness가 warn(--strict 하드). TEST 도메인은 removable 관례(SPEC-015).
+export const LIFECYCLE_ENUM = ["removable", "permanent"];
+
+// 스펙 헤더의 `**Lifecycle**: <값>` 파싱. 없으면 null(선택 필드 — 하위호환).
+export function parseLifecycle(text) {
+  const m = text.match(/\*\*Lifecycle\*\*\s*:\s*([A-Za-z]+)/);
+  return m ? m[1] : null;
+}
+
 // 스펙 헤더의 `**Status**: <값>` 파싱. 없으면 null(레거시 — 수명주기 강제 밖, 점진 도입).
 export function parseStatus(text) {
   const m = text.match(/\*\*Status\*\*\s*:\s*([A-Za-z]+)/);

@@ -455,6 +455,22 @@ test("패리티: completeness 오브젝트 스토리지 결정(S3 마커+섹션 
   } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-008/FR-006
+test("패리티: completeness Lifecycle enum 밖 값(temporary) — Node와 Python 출력 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Active  **Lifecycle**: temporary\n- **FR-001** (event): x.\n**Given** x\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | r | PASS |\n## Dedup-Review\n- 이웃 없음\n",
+  };
+  const a = fixture(files);
+  const b = fixture(files);
+  try {
+    const p = runPy(a, ["completeness"]);
+    const n = runNode(b, "check-spec-completeness.mjs");
+    assert.equal(p.code, n.code, `exit\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(n.out, /미정의 Lifecycle "temporary"/);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 // ── 재도출 소스 회계(SPEC-009 패리티): derivation + completeness 근거 캡처 ──
 
 const VTAG = "# @veri" + "fies "; // 자기 게이트(스캔) 중화 — 픽스처 파일에만 실태그 기록

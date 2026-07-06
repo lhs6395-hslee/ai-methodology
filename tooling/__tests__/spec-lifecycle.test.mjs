@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseLifecycle, LIFECYCLE_ENUM } from "../lifecycle-lib.mjs";
 
 const COMPLETENESS = new URL("../check-spec-completeness.mjs", import.meta.url).pathname;
 const SPECSYNC = new URL("../check-spec-sync.mjs", import.meta.url).pathname;
@@ -41,6 +42,28 @@ const full = (status, extra = "") =>
   `**Module**: \`m\`  **Spec**: \`SPEC-001\`  **Status**: ${status}\n- **FR-001** (event): THE SYSTEM SHALL x.\n**Given** x **When** y **Then** z\n- **SC-001**: 90%\n${extra}`;
 const REVIEW_LOG = "## Review Log\n| 일시 | 수행자 | 판정 |\n|---|---|---|\n| 2026-07-05 | 세션 리뷰 | PASS |\n";
 const DEDUP_REVIEW = "## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n";
+
+// ── Lifecycle 필드(SPEC-008 FR-006): removable|permanent ──
+// @covers SPEC-008/FR-006
+test("parseLifecycle: 헤더 파싱 + enum", () => {
+  assert.equal(parseLifecycle("**Lifecycle**: removable\n"), "removable");
+  assert.equal(parseLifecycle("**Lifecycle**: permanent\n"), "permanent");
+  assert.equal(parseLifecycle("헤더 없음"), null);
+  assert.deepEqual(LIFECYCLE_ENUM, ["removable", "permanent"]);
+});
+
+// @covers SPEC-008/FR-006
+test("completeness: Lifecycle 값이 enum 밖 → warn·--strict 실패 / 없거나 유효하면 무관", () => {
+  const bad = fixture({ "sdd/specs/SPEC-001.md": full("Active", "**Lifecycle**: temporary\n" + REVIEW_LOG + DEDUP_REVIEW) });
+  const ok = fixture({ "sdd/specs/SPEC-001.md": full("Active", "**Lifecycle**: removable\n" + REVIEW_LOG + DEDUP_REVIEW) });
+  try {
+    const b = run(COMPLETENESS, bad);
+    assert.equal(b.code, 0, b.out);
+    assert.match(b.out, /미정의 Lifecycle "temporary"/);
+    assert.equal(run(COMPLETENESS, bad, ["--strict"]).code, 1);
+    assert.doesNotMatch(run(COMPLETENESS, ok).out, /Lifecycle/); // removable = 유효, 무관
+  } finally { rmSync(bad, { recursive: true, force: true }); rmSync(ok, { recursive: true, force: true }); }
+});
 
 // ── completeness: Status enum (FR-001) ──
 
