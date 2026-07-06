@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 test("config: 새 필드 기본값", () => {
   const cfg = loadConfig("/nonexistent"); // config 파일 없음 → DEFAULTS
-  assert.deepEqual(cfg.specIdPrefixes, ["SPEC", "INFRA", "TEST"]);
+  assert.deepEqual(cfg.specIdPrefixes, ["SPEC", "INFRA", "TEST", "CICD"]);
   assert.deepEqual(cfg.prefixRationale, {});
   assert.deepEqual(cfg.capabilityVerbs, []);
   assert.equal(cfg.surfacePathParam, "{name}");

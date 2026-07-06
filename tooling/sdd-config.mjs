@@ -57,7 +57,7 @@ export const DEFAULTS = {
   // spec 파일·ID·@covers 태그에서 인정할 ID 접두어들(언어중립 추적 닻).
   // 기본 = ["SPEC","INFRA","TEST"](§5.1 표준 3종). 파일명·SPEC_ID·COVERS 정규식이
   // 모두 이 목록에서 파생되어, 접두어 추가가 코드 fork 없이 config로 표현된다.
-  specIdPrefixes: ["SPEC", "INFRA", "TEST"],
+  specIdPrefixes: ["SPEC", "INFRA", "TEST", "CICD"],
   // 표준 밖 접두어 → 도입 사유(빈 값이면 게이트 exit 1)
   prefixRationale: {},
   // 접두어↔클래스 면제 레지스트리: { "<SPEC-ID>": "<사유>" }(SPEC-012). 소유 실파일이

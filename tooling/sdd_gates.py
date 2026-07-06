@@ -53,7 +53,7 @@ DEFAULTS = {
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
     "specSyncExemptGlobs": [],
-    "specIdPrefixes": ["SPEC", "INFRA", "TEST"],
+    "specIdPrefixes": ["SPEC", "INFRA", "TEST", "CICD"],
     "prefixRationale": {},
     "prefixClassExemptions": {},
     "objectStorageMarkers": ["S3", "오브젝트 스토리지", "object storage", "bucket", "버킷", "blob storage", "GCS", "Cloud Storage"],
@@ -82,7 +82,7 @@ DEFAULTS = {
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
-STANDARD_PREFIXES = {"SPEC", "INFRA", "TEST"}
+STANDARD_PREFIXES = {"SPEC", "INFRA", "TEST", "CICD"}
 
 
 def find_config(start):
@@ -396,13 +396,13 @@ def cmd_fr(cfg, strict):
             if not exempted:
                 infra = finding[1]
                 prefix_errors.append(
-                    f'접두어↔클래스 부정합 "{sid}" — 소유 실파일 {len(infra)}건 전부 iac/ci 클래스(예: {infra[0]}) '
-                    f'→ INFRA- 접두어여야 함(STORAGE §2.2). 부수 소유가 정당하면 prefixClassExemptions["{sid}"]에 사유 등록')
+                    f'접두어↔클래스 부정합 "{sid}" — 소유 실파일 {len(infra)}건 전부 인프라-계열(예: {infra[0]}) '
+                    f'→ {"/".join(finding[3])}- 접두어여야 함(STORAGE §2.2: iac→INFRA·ci→CICD). 부수 소유가 정당하면 prefixClassExemptions["{sid}"]에 사유 등록')
             continue
         if exempted:
             prefix_class_warnings.append(f'prefixClassExemptions["{sid}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상')
         if finding and finding[0] == "warn":
-            prefix_class_warnings.append(f"{sid}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토")
+            prefix_class_warnings.append(f"{sid}: {finding[3]}- 접두어인데 소유 Files의 해당 클래스({'iac' if finding[3] == 'INFRA' else 'ci'}) 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 접두어 재검토")
     # 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
     n_hard, n_advisory = numbering_issues(known_ids)
     prefix_errors.extend(n_hard)
@@ -718,7 +718,8 @@ def change_log_rationale_findings(text):
 
 # ── 접두어↔클래스 정합 (prefix-class-lib.mjs 패리티, SPEC-012) ──
 
-INFRA_SOURCE_CLASSES = ["iac", "ci"]  # readopt 착지 규칙상 INFRA 스펙으로 가는 소스 클래스
+INFRA_SOURCE_CLASSES = ["iac", "ci"]  # 접두어↔클래스 정합 대상 인프라-계열 소스 클래스
+CLASS_PREFIX = {"iac": "INFRA", "ci": "CICD"}  # iac=프로비저닝 자원, ci=전달 자동화
 
 
 def classify_infra_file(rel_path, class_globs):
@@ -729,14 +730,26 @@ def classify_infra_file(rel_path, class_globs):
 
 
 def prefix_class_finding(prefix, owned_files, class_globs):
-    """전체성(totality) 임계 — 비-테스트 소유 실파일 전부가 iac/ci면 INFRA- 필수."""
+    """전체성 임계 — 소유 실파일 전부가 한 인프라 클래스면 그 클래스 접두어 강제(iac→INFRA·ci→CICD).
+    prefix-class-lib.mjs 미러(바이트 동일). 반환 (kind, infra, other, expected|prefix) | None."""
+    by_class = {"iac": [], "ci": []}
     infra, other = [], []
     for f in owned_files:
-        (infra if classify_infra_file(f, class_globs) else other).append(f)
-    if prefix != "INFRA" and infra and not other:
-        return ("error", infra, other)
-    if prefix == "INFRA" and not infra:
-        return ("warn", infra, other)
+        c = classify_infra_file(f, class_globs)
+        if c:
+            by_class[c].append(f); infra.append(f)
+        else:
+            other.append(f)
+    if infra and not other:
+        expected = []
+        for c in INFRA_SOURCE_CLASSES:
+            if by_class[c] and CLASS_PREFIX[c] not in expected:
+                expected.append(CLASS_PREFIX[c])
+        if prefix not in expected:
+            return ("error", infra, other, expected)
+    own_class = next((c for c in INFRA_SOURCE_CLASSES if CLASS_PREFIX[c] == prefix), None)
+    if own_class and not by_class[own_class]:
+        return ("warn", infra, other, prefix)
     return None
 
 

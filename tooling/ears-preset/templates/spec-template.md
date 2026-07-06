@@ -9,6 +9,7 @@
 <!-- 수명주기(상태 순서 강제 — SPEC-008): Draft(작성 중 — 소유 코드 변경을 spec-sync가 차단) →
   Reviewed(/analyze·/checklist 검토 후 아래 Review Log·Dedup-Review에 기록) → Approved(승인) →
   Active(구현 진행/완료) → Deprecated → Removed(폐기 — STRUCTURE.md 절차). -->
+<!-- 접두어(STORAGE §2.2): SPEC(제품 기능·런타임) · INFRA(프로비저닝 자원) · CICD(CI/CD·릴리스 자동화 — 파이프라인 동작·정책) · TEST(테스트/QA). ci 파이프라인 정의 소유 스펙은 CICD-, iac 자원은 INFRA- (fr 게이트가 접두어↔클래스 강제 — SPEC-012). -->
 **Input**: [한 줄 의도]
 
 ---

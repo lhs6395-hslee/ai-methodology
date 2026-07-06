@@ -43,6 +43,31 @@ test("prefixClassFinding: INFRA 접두어 정합 = null / 인프라 검출 0 = w
   assert.equal(prefixClassFinding("SPEC", [], GLOBS), null);
 });
 
+test("prefixClassFinding: 전부 ci → CICD 강제 (INFRA면 error·CICD면 통과)", () => {
+  const ci = [".github/workflows/ci.yml"];
+  assert.equal(prefixClassFinding("CICD", ci, GLOBS), null);
+  const e = prefixClassFinding("INFRA", ci, GLOBS);
+  assert.equal(e?.kind, "error");
+  assert.ok(e.expected.includes("CICD"));
+});
+
+test("prefixClassFinding: 전부 iac → INFRA 강제 (CICD면 error)", () => {
+  const e = prefixClassFinding("CICD", ["infra/main.tf"], GLOBS);
+  assert.equal(e?.kind, "error");
+  assert.ok(e.expected.includes("INFRA"));
+});
+
+test("prefixClassFinding: iac+ci 혼합 → INFRA·CICD 둘 다 통과(과잉발동 없음)", () => {
+  const mix = ["infra/main.tf", ".github/workflows/ci.yml"];
+  assert.equal(prefixClassFinding("INFRA", mix, GLOBS), null);
+  assert.equal(prefixClassFinding("CICD", mix, GLOBS), null);
+});
+
+test("prefixClassFinding: CICD인데 ci 검출 0 → warn", () => {
+  assert.equal(prefixClassFinding("CICD", ["src/app.mjs"], GLOBS)?.kind, "warn");
+  assert.equal(prefixClassFinding("CICD", [], GLOBS)?.kind, "warn");
+});
+
 test("validateExemptions: dangling ID·빈 사유 = 에러", () => {
   const known = new Set(["SPEC-001"]);
   assert.equal(validateExemptions({ "SPEC-001": "부수 IaC 소유 정당" }, known).length, 0);
@@ -88,6 +113,16 @@ test("fr: 같은 소유가 INFRA- 접두어면 통과", () => {
     "infra/main.tf": "resource {}\n",
   });
   assert.equal(r.code, 0, r.out);
+});
+
+test("fr: ci 전용 소유 스펙은 CICD- 접두어여야 (INFRA-면 exit 1, CICD-면 통과)", () => {
+  const CI = (id) => `# ${id}\n**Spec**: \`${id}\`\n- **FR-001** THE SYSTEM SHALL deliver x.\n\n## Ownership\n- **Files**: .github/workflows/**\n`;
+  const wf = { ".github/workflows/ci.yml": "on: push\n" };
+  const bad = run({ "sdd/specs/INFRA-001.md": CI("INFRA-001"), ...wf });
+  assert.equal(bad.code, 1, bad.out);
+  assert.match(bad.out, /CICD/);
+  const ok = run({ "sdd/specs/CICD-001.md": CI("CICD-001"), ...wf });
+  assert.equal(ok.code, 0, ok.out);
 });
 
 test("fr: 기능 SPEC-이 코드+부수 IaC를 함께 소유 → 통과(과잉발동 없음)", () => {
@@ -160,5 +195,6 @@ test("fr: Jenkinsfile+.github+Dockerfile+.dockerignore만 소유한 SPEC- → �
     ".dockerignore": "node_modules\n",
   });
   assert.equal(r.code, 1, r.out);
-  assert.match(r.out, /접두어↔클래스 부정합 "SPEC-013" — 소유 실파일 4건 전부 iac\/ci 클래스/);
+  assert.match(r.out, /접두어↔클래스 부정합 "SPEC-013" — 소유 실파일 4건 전부 인프라-계열/);
+  assert.match(r.out, /INFRA\/CICD- 접두어여야/); // iac+ci 혼합 → 둘 다 허용 접두어
 });

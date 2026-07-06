@@ -10,9 +10,13 @@
 // 게이트(등록·사유만 검사)가 통과 — STORAGE §2.2의 접두어 의미가 미강제 규범이었다.
 // 설계: SPEC-012 (Python판 sdd_gates.py가 동일 동작을 미러 — SPEC-006 패리티).
 
-// readopt 절차(prompts/readopt.md 6단계)상 INFRA 스펙으로 착지하는 소스 클래스.
+// 접두어↔클래스 정합 대상인 인프라-계열 소스 클래스.
 // ops-docs는 verification 절·검증 태그로 착지하므로 대상이 아니다.
 export const INFRA_SOURCE_CLASSES = ["iac", "ci"];
+
+// 인프라-계열 클래스 → 표준 접두어. iac=프로비저닝 자원(INFRA), ci=전달 자동화(CICD).
+// 소유 실파일이 한 클래스에 전적이면 그 클래스의 접두어를 강제한다(readopt 착지 규칙).
+export const CLASS_PREFIX = { iac: "INFRA", ci: "CICD" };
 
 // 파일 → 인프라 클래스("iac"|"ci") 또는 null. classGlobs = {iac:[RegExp], ci:[RegExp]}.
 export function classifyInfraFile(relPath, classGlobs) {
@@ -23,14 +27,23 @@ export function classifyInfraFile(relPath, classGlobs) {
 }
 
 // 스펙 1건 판정 — 순수(파일시스템 비의존). ownedFiles = 이 스펙 Files 글롭에 매치된
-// 레포 실파일(비-테스트, 정렬됨). 반환: {kind:"error"|"warn", infra, other} | null.
-//   error: 접두어 ≠ INFRA 인데 소유 실파일 전부가 iac/ci 클래스(∧ ≥1건).
-//   warn : 접두어 = INFRA 인데 iac/ci 클래스 검출 0건(레포 밖 인프라 실체는 선언 가능 — 과장 금지).
+// 레포 실파일(비-테스트, 정렬됨). 반환: {kind, infra, other, expected?/prefix?} | null.
+//   error: 소유 실파일이 전부 인프라-계열(∧ ≥1건)인데 접두어가 존재 클래스의 표준 접두어 밖.
+//          expected = 존재 클래스들의 접두어 합집합(iac+ci 혼합이면 INFRA·CICD 둘 다 허용).
+//   warn : 인프라-계열 접두어(INFRA/CICD)인데 자기 클래스(iac/ci) 검출 0건(레포 밖 실체 허용 — 과장 금지).
 export function prefixClassFinding(prefix, ownedFiles, classGlobs) {
+  const byClass = { iac: [], ci: [] };
   const infra = [], other = [];
-  for (const f of ownedFiles) (classifyInfraFile(f, classGlobs) ? infra : other).push(f);
-  if (prefix !== "INFRA" && infra.length > 0 && other.length === 0) return { kind: "error", infra, other };
-  if (prefix === "INFRA" && infra.length === 0) return { kind: "warn", infra, other };
+  for (const f of ownedFiles) {
+    const c = classifyInfraFile(f, classGlobs);
+    if (c) { byClass[c].push(f); infra.push(f); } else other.push(f);
+  }
+  if (infra.length > 0 && other.length === 0) {
+    const expected = [...new Set(INFRA_SOURCE_CLASSES.filter((c) => byClass[c].length).map((c) => CLASS_PREFIX[c]))];
+    if (!expected.includes(prefix)) return { kind: "error", infra, other, expected };
+  }
+  const ownClass = INFRA_SOURCE_CLASSES.find((c) => CLASS_PREFIX[c] === prefix);
+  if (ownClass && byClass[ownClass].length === 0) return { kind: "warn", infra, other, prefix };
   return null;
 }
 

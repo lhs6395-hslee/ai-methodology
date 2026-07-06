@@ -245,4 +245,11 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 2. glob은 `**`와 `*` 만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
 3. `sdd-init` 이후 신규 스펙은 템플릿(`sdd/templates/spec-template.md`)에 Files 절이 포함되어 자동 안내된다.
 
+**마이그레이션 — CI/CD를 INFRA 스펙에서 CICD로 이관.** CI/CD·릴리스 자동화가 관행적으로 INFRA 계열 스펙에 얹혀 있던 프로젝트는 이제 `CICD` 표준 접두어로 분리한다(iac 자원=INFRA, ci 파이프라인=CICD — fr 게이트가 강제). 절차:
+1. **분리 대상 식별**: INFRA 스펙이 소유한 파이프라인 파일(CI 워크플로·빌드 정의·배포 커밋/태그 기전)을 골라낸다. 소유 실파일이 전적으로 `ci` 클래스인 스펙은 fr 게이트가 `→ CICD- 접두어여야 함`으로 이미 지목한다.
+2. **CICD 스펙 신설**: `sdd/specs/CICD-001-*.md`(접두어별 001부터 — SPEC-014 번호 게이트) 생성. `## Ownership`의 `Files`에 파이프라인 글롭 이관, FR을 파이프라인 동작·정책으로 재서술(검증은 build-evidence → `sdd/smoke-manifest.json`에 smoke/deferred 회계, 유닛 비대상). `Lifecycle`은 permanent.
+3. **원본 INFRA 정리**: 이관한 `Files`·FR·`@covers` 태그를 원 INFRA 스펙에서 제거(재번호 필요 시 `sdd-retag` 맵). INFRA는 프로비저닝 자원만 남긴다.
+4. **회계·맵 갱신**: 이동한 FR의 검증 회계 엔트리(smoke-manifest)·`MODULE_MAP.md`를 갱신. 재검증은 `sdd-sync`로 clean 도달까지.
+5. **일시 유예**: 한 번에 못 나누면 `prefixClassExemptions`에 사유와 함께 등록해 게이트를 유예하고 점진 이관(빈 사유·유령 ID는 에러).
+
 **실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 11-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.

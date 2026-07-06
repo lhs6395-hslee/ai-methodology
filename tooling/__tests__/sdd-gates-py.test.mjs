@@ -127,6 +127,24 @@ test("py fr: 접두어별 번호 001 미시작(INFRA-011/013) → Node·Python �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-012/FR-001
+test("py fr: ci 전용 소유 INFRA 스펙 → CICD 요구, Node·Python 바이트 동일 (CICD 접두어 패리티)", skip, () => {
+  const files = {
+    "sdd/specs/INFRA-001.md": "# INFRA-001\n**Spec**: `INFRA-001`\n- **FR-001** THE SYSTEM SHALL deliver.\n## Ownership\n- **Files**: .github/workflows/**\n",
+    ".github/workflows/ci.yml": "on: push\n",
+  };
+  const a = fixture(files);
+  const b = fixture(files);
+  try {
+    const p = runPy(a, ["fr"]);
+    const n = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(p.code, 1, p.out);
+    assert.equal(n.code, 1, n.out);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(n.out, /CICD- 접두어여야/);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 const OWN = (id, keys) => `**Spec**: \`${id}\`\nbody mentions thing and stuff.\n## Ownership\n${keys}\n`;
 
 test("py ownership: 정규화 후 같은 키 → 중복 소유 exit 1 (Surfaces 표기 차이 흡수)", skip, () => {

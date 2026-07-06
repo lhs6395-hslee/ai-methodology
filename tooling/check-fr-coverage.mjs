@@ -62,7 +62,7 @@ function walk(dir, acc = []) {
 // 0. PREFIX whitelist pre-check — must run before spec collection.
 //    Scans ALL ^[A-Z]+-NNN.md files; unregistered prefix → exit 1 (no silent skip).
 //    Non-standard prefix without rationale → exit 1.
-const STANDARD = new Set(["SPEC", "INFRA", "TEST"]);
+const STANDARD = new Set(["SPEC", "INFRA", "TEST", "CICD"]);
 const allowed = new Set(cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes);
 const rationale = cfg.prefixRationale || {};
 const prefixErrors = [];
@@ -120,11 +120,11 @@ for (const f of specMdNames) {
   const finding = prefixClassFinding(pfx, owned, classGlobs);
   const exempted = !!String(exemptions[id] ?? "").trim();
   if (finding && finding.kind === "error") {
-    if (!exempted) prefixErrors.push(`접두어↔클래스 부정합 "${id}" — 소유 실파일 ${finding.infra.length}건 전부 iac/ci 클래스(예: ${finding.infra[0]}) → INFRA- 접두어여야 함(STORAGE §2.2). 부수 소유가 정당하면 prefixClassExemptions["${id}"]에 사유 등록`);
+    if (!exempted) prefixErrors.push(`접두어↔클래스 부정합 "${id}" — 소유 실파일 ${finding.infra.length}건 전부 인프라-계열(예: ${finding.infra[0]}) → ${finding.expected.join("/")}- 접두어여야 함(STORAGE §2.2: iac→INFRA·ci→CICD). 부수 소유가 정당하면 prefixClassExemptions["${id}"]에 사유 등록`);
     continue;
   }
   if (exempted) prefixClassWarnings.push(`prefixClassExemptions["${id}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상`);
-  if (finding && finding.kind === "warn") prefixClassWarnings.push(`${id}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토`);
+  if (finding && finding.kind === "warn") prefixClassWarnings.push(`${id}: ${finding.prefix}- 접두어인데 소유 Files의 해당 클래스(${finding.prefix === "INFRA" ? "iac" : "ci"}) 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 접두어 재검토`);
 }
 // 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
 {
