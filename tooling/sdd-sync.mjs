@@ -3,15 +3,17 @@
 // HARNESS.md 규칙표의 detect 단계: 규칙별 detector 게이트를 일괄 실행하고
 // "확인 필요/clean"을 규칙별로 리포트한다. 스킬 /sdd-sync 과 pre-push 훅이 소비.
 // advisory(기본): 리포트 + exit 0. --strict: 발견 있으면 exit 1.
+// --json: 기계 판독 리포트(스키마 v1)만 stdout에 출력(사람 텍스트 억제) — ask 층이 소비.
 //
 // 탐지 로직은 게이트에 있다(판정 신규 0). 이 파일은 오케스트레이션만.
-// Usage: node scripts/sdd-sync.mjs [--strict]
+// Usage: node scripts/sdd-sync.mjs [--strict] [--json]
 
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 
 const STRICT = process.argv.includes("--strict");
+const JSON_OUT = process.argv.includes("--json");
 const HERE = dirname(new URL(import.meta.url).pathname);
 
 // 규칙 → detector 게이트(HARNESS.md 규칙표). 같은 디렉토리에서 게이트를 찾는다.
@@ -34,24 +36,32 @@ function runGate(file) {
   }
 }
 
-console.log("SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)");
-const flaggedRules = [];
-for (const { rule, gates } of RULES) {
-  let flagged = false;
-  const lines = [];
-  for (const g of gates) {
+// 규칙별 detector 실행 → 데이터 모델(사람/JSON 공통). rule id는 안정 계약(R1/R2/R3).
+const rules = RULES.map(({ rule, gates }) => {
+  const sp = rule.indexOf(" ");
+  const id = rule.slice(0, sp); // "R1"
+  const title = rule.slice(sp + 1); // "spec→code"
+  const gateResults = gates.map((g) => {
     const r = runGate(g);
-    if (r.flagged) flagged = true;
-    lines.push(`    [${g}] ${r.last}`);
-  }
-  console.log(`\n● ${rule}: ${flagged ? "⚠ 확인 필요" : "✓ clean"}`);
-  for (const l of lines) console.log(l);
-  if (flagged) flaggedRules.push(rule);
-}
+    return { gate: g, flagged: r.flagged, summary: r.last };
+  });
+  return { id, title, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
+});
+const flaggedRules = rules.filter((r) => r.flagged).map((r) => r.id);
+const clean = flaggedRules.length === 0;
 
-console.log(
-  flaggedRules.length
-    ? `\n요약: 확인 필요 — ${flaggedRules.join(", ")} → '/sdd-sync'로 의사결정`
-    : `\n요약: 전부 sync ✓`
-);
-if (STRICT && flaggedRules.length) process.exit(1);
+if (JSON_OUT) {
+  process.stdout.write(JSON.stringify({ schemaVersion: 1, clean, flaggedRules, rules }, null, 2) + "\n");
+} else {
+  console.log("SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)");
+  for (const r of rules) {
+    console.log(`\n● ${r.id} ${r.title}: ${r.flagged ? "⚠ 확인 필요" : "✓ clean"}`);
+    for (const g of r.gates) console.log(`    [${g.gate}] ${g.summary}`);
+  }
+  console.log(
+    clean
+      ? `\n요약: 전부 sync ✓`
+      : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → '/sdd-sync'로 의사결정`
+  );
+}
+if (STRICT && !clean) process.exit(1);

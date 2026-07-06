@@ -38,10 +38,12 @@
 - **FR-006** (state): WHILE the `pre-push` hook runs, THE SYSTEM SHALL report drift advisorily and pass the push unless `SDD_SYNC_BLOCK=1` is set.
 - **FR-007** (unwanted): IF `sdd-init.sh` is executed from inside the kit directory itself, THEN THE SYSTEM SHALL refuse and exit non-zero.
 - **FR-008** (event): WHEN `sdd-run.mjs` is invoked with a stage name, THE SYSTEM SHALL execute the command declared in `commands.<stage>` from `sdd.config.json` and exit with that command's exit code; WHERE the stage is not declared in `commands`, THE SYSTEM SHALL skip and exit zero without error.
+- **FR-009** (event): WHEN `sdd-sync.mjs` is invoked with `--json`, THE SYSTEM SHALL emit to stdout only a machine-readable report — an object with `schemaVersion`, `clean`, `flaggedRules` (stable rule ids), and `rules` (each with a stable `id`, a `title`, a `flagged` flag, and `gates` each carrying `gate`, `flagged`, and `summary`) — suppressing the human-readable report, and SHALL keep the `--strict` contract of exiting non-zero when any rule is flagged.
 
 ### Key Entities
 - **install layout** — the deterministic `sdd/` tree, `sdd.config.json`, and wired hooks/settings/skills produced by init.
 - **detector rule group** — R1/R2/R3 mapping of a rule to the gates the harness runs for it.
+- **sync report** — the machine-readable `--json` contract the ask layer (`/sdd-sync`) consumes: a versioned object whose stable rule ids and gate flags let any executor route decisions deterministically instead of scraping human text.
 
 ---
 
@@ -61,6 +63,7 @@
 ## Success Criteria (측정형)
 - **SC-001**: `sdd-sync.test.mjs`·`init-gates.test.mjs`·`init-hooks.test.mjs`·`init-spec-sync.test.mjs`·`pre-commit.test.mjs`·`session-context.test.mjs`·`edit-check.test.mjs`가 모두 통과한다(현재 green).
 - **SC-002**: 신선한 프로젝트에서 `sdd-init.sh --gate=node` 후 설치된 파일만으로 게이트가 `ERR_MODULE_NOT_FOUND` 없이 실행된다.
+- **SC-003**: `sdd-sync.mjs --json` 출력이 유효 JSON(사람 텍스트 누출 0)이며 스키마 회귀 테스트(`sdd-sync.test.mjs`)가 최상위 키·타입·rule id 집합·내부 정합(clean⟺flaggedRules 빔)을 green으로 잠근다.
 
 ## Non-Functional Requirements
 - **NFR-001**: 재실행(idempotency) 시 `.claude/settings.json`에 SDD 훅 항목이 중복되지 않는다.
@@ -90,3 +93,4 @@
 | 2026-07-05 | sdd-init node 복사 목록에 `derivation-lib.mjs`·`check-derivation.mjs`·`sdd-smoke-scan.mjs`·`sdd-retag.mjs` 추가 | SPEC-009~011 신설 동반 — 재채택 프로젝트가 재도출 회계·증거 스캔·retag 게이트를 결손 없이 배선 |
 | 2026-07-06 | SessionStart 주입 텍스트의 게이트 광고를 실제 스위트 전종(품질 5·보강/spec-first 4·재도출/증거 2)으로 갱신 + 테스트가 전종 포함을 회귀로 고정 | 문서 동기 감사[검증]: 광고 목록이 4종에 멈춰 세션 컨텍스트가 낡은 궤도를 가르침(2차부터 누적 드리프트) — 열거를 테스트로 고정해 재발 차단 |
 | 2026-07-06 | sdd-init node 복사 목록에 `prefix-class-lib.mjs`·`grammar-lib.mjs` 추가 (+ 하네스 detect 리포트가 새 신호를 그대로 표면화) | SPEC-012·SPEC-013 신설 동반 — 채택 프로젝트가 접두어↔클래스·문법 규범 게이트를 결손 없이 배선 |
+| 2026-07-06 | FR-009 신설 — `sdd-sync.mjs --json` 결정적 기계 판독 리포트(스키마 v1) + `/sdd-sync` 스킬이 텍스트 스크래핑 대신 이를 소비 | 하네스 ask 층 입력 결정성 강화: 리포트가 스킬 계약이라 에이전트 해석에 의존했음 → 안정 스키마로 잠가 어느 실행기든 동일 소비 |
