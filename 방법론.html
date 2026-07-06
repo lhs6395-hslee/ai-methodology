@@ -135,10 +135,10 @@
 <nav><div class="wrap">
   <span class="brand"><b>SDD</b> 방법론</span>
   <div class="links">
-    <a href="#why">왜</a><a href="#pillars">4 기둥</a><a href="#core">핵심 구조</a>
+    <a href="#origin">출발점</a><a href="#compare">전환</a><a href="#why">왜</a><a href="#pillars">4 기둥</a><a href="#core">핵심 구조</a>
     <a href="#msa">MSA</a><a href="#gates">게이트</a><a href="#loop">생애주기</a>
     <a href="#harness">하네스</a><a href="#run">하네스 실전</a>
-    <a href="#determinism">결정성</a><a href="#spec-first">spec-first</a><a href="#orbit">궤도 운영</a><a href="#big">빅 픽처</a>
+    <a href="#determinism">결정성</a><a href="#spec-first">spec-first</a><a href="#orbit">궤도 운영</a><a href="#big">빅 픽처</a><a href="#summary">요약</a>
   </div>
 </div></nav>
 
@@ -151,6 +151,105 @@
   </div>
   <p class="runex">이 글은 하나의 가상 기능 — <b>"프로젝트에 직원을 추천해주는 기능"</b> — 을 처음부터 끝까지 따라가며 설명한다. 추천 서비스가 한 모듈, 그 안의 <code>SPEC-001</code>이 그 기능의 명세다.</p>
 </div></header>
+
+<section id="origin"><div class="wrap">
+  <span class="eyebrow">출발점</span>
+  <h2>대부분은 "바이브 코딩"에서 시작했다 — prompt-driven · feature 단위</h2>
+  <p>AI 개발에서 가장 흔한 방식은 <strong>바이브 코딩</strong>이다 — 말로 기능을 던지면 코드가 나오고, "돌아가 보이면" 다음으로. <strong>빠르고 · 무계획 · 직관적</strong>이라 지배적 방식이 됐다. 문제는 작업 단위인 <strong>"feature"가 너무 굵다</strong>는 것 — 겉은 ✓ 하나여도 속의 미완성이 숨는다.</p>
+  <figure><div class="figscroll"><svg viewBox="0 0 720 250" role="img" aria-label="feature 단위로 보면 겉은 완료 하나지만 속의 세부 요구는 넷 중 하나만 완성이고 셋은 미완성으로 숨는다">
+    <text x="360" y="26" font-size="13" font-weight="800" fill="#171f3a" text-anchor="middle">"직원 추천 됨 ✓" 하나에 숨은 것</text>
+    <rect x="70" y="48" width="580" height="150" rx="12" fill="#fff" stroke="#c9cee3" stroke-width="1.5"/>
+    <rect x="86" y="40" width="160" height="26" rx="13" fill="#e4f5ef" stroke="#0a946c"/><text x="166" y="57" font-size="11.5" font-weight="700" fill="#0a946c" text-anchor="middle">feature: 직원 추천 ✓</text>
+    <text x="360" y="92" font-size="11.5" fill="#5a6489" text-anchor="middle">겉보기엔 "돌아가네" — 하지만 이 안에는…</text>
+    <rect x="96" y="110" width="250" height="30" rx="7" fill="#e4f5ef" stroke="#0a946c"/><text x="114" y="130" font-size="11.5" fill="#0a946c">✓ 적합도 순 정렬</text>
+    <rect x="374" y="110" width="250" height="30" rx="7" fill="#fbe9ec" stroke="#cf3b4b"/><text x="392" y="130" font-size="11.5" fill="#cf3b4b">✗ 빈 결과 처리</text>
+    <rect x="96" y="148" width="250" height="30" rx="7" fill="#fbe9ec" stroke="#cf3b4b"/><text x="114" y="168" font-size="11.5" fill="#cf3b4b">✗ 권한 체크</text>
+    <rect x="374" y="148" width="250" height="30" rx="7" fill="#fbe9ec" stroke="#cf3b4b"/><text x="392" y="168" font-size="11.5" fill="#cf3b4b">✗ 페이징</text>
+    <text x="360" y="226" font-size="12" font-weight="700" fill="#e2620a" text-anchor="middle">feature 단위로 보면 ✓ 1개 — 속의 미완성 3개가 안 보인다</text>
+  </svg></div><figcaption>바이브 코딩은 기능 하나씩(feature-by-feature) 굴러간다. 그 "하나"가 너무 굵어서, 뭘 빼먹었는지가 "돼 보임" 뒤에 뭉개진다.</figcaption></figure>
+</div></section>
+
+<section id="compare"><div class="wrap">
+  <span class="eyebrow">왜 이 방식인가</span>
+  <h2>바이브 코딩에서 명세 기반으로</h2>
+  <p>왜 바이브 코딩이 대세였고, 왜 우리는 명세 기반으로 옮겼나 — 한눈에.</p>
+  <figure><div class="figscroll"><svg viewBox="0 0 820 200" role="img" aria-label="바이브 코딩은 빨라서 널리 쓰였지만 3개월쯤 지나며 미완성 표류 중복으로 무너져 명세 기반으로 전환했다">
+    <rect x="20" y="55" width="220" height="95" rx="12" fill="#e4f5ef" stroke="#0a946c"/>
+    <text x="130" y="86" font-size="12.5" font-weight="800" fill="#0a946c" text-anchor="middle">① 빨라서 널리 씀</text>
+    <text x="130" y="110" font-size="11" fill="#5a6489" text-anchor="middle">말하면 바로 코드</text>
+    <text x="130" y="128" font-size="11" fill="#5a6489" text-anchor="middle">무계획 · 직관적</text>
+    <path d="M244 102 L292 102" stroke="#9aa2c0" stroke-width="2" marker-end="url(#ar6)"/>
+    <text x="268" y="92" font-size="10" fill="#5a6489" text-anchor="middle">3개월</text>
+    <rect x="300" y="55" width="220" height="95" rx="12" fill="#fcefe2" stroke="#e2620a"/>
+    <text x="410" y="86" font-size="12.5" font-weight="800" fill="#e2620a" text-anchor="middle">② 무너진다</text>
+    <text x="410" y="110" font-size="11" fill="#5a6489" text-anchor="middle">미완성 · 표류(drift)</text>
+    <text x="410" y="128" font-size="11" fill="#5a6489" text-anchor="middle">흩어짐 · 중복</text>
+    <path d="M524 102 L572 102" stroke="#9aa2c0" stroke-width="2" marker-end="url(#ar6)"/>
+    <rect x="580" y="55" width="220" height="95" rx="12" fill="#eef1fd" stroke="#3a57d6"/>
+    <text x="690" y="86" font-size="12.5" font-weight="800" fill="#3a57d6" text-anchor="middle">③ 명세 기반으로</text>
+    <text x="690" y="110" font-size="11" fill="#5a6489" text-anchor="middle">요구를 FR로 고정</text>
+    <text x="690" y="128" font-size="11" fill="#5a6489" text-anchor="middle">기계가 미완성 표시</text>
+    <defs><marker id="ar6" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#9aa2c0"/></marker></defs>
+  </svg></div></figure>
+
+  <h3>실제로 무엇이 달라지나 — 같은 일, 다른 방식</h3>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>바이브 코딩</th><th>이 방법론</th></tr>
+    <tr><td>작업 단위</td><td>Feature (굵음)</td><td><strong>FR — 요구 하나하나</strong></td></tr>
+    <tr><td>완료 기준</td><td>"돌아가 보임"</td><td><strong>unit · smoke · deferred 회계</strong></td></tr>
+    <tr><td>미구현</td><td>안 보임 (기억에만)</td><td><strong>deferred로 명시</strong></td></tr>
+    <tr><td>추적</td><td>채팅 히스토리</td><td><strong>spec ↔ code ↔ test</strong></td></tr>
+  </table></div>
+  <p class="sub">쉽게 말하면 — 바이브 코딩은 <strong>"말하면 바로 만들기"</strong>, 이 방법론은 <strong>"무엇을 만들지 먼저 적고, 빠짐없이 만들었는지 확인하기"</strong>다.</p>
+
+  <h3>표에 나온 말 풀이 — 요구(FR)와 "회계"</h3>
+  <p class="sub">기능 요청 하나를 <strong>요구(FR) 여러 개</strong>로 쪼개고, 각 FR을 아래 <strong>셋 중 하나</strong>로 표시한다. 이 분류가 <strong>"회계(accounting)"</strong> — 셋 중 아무것도 아니면 게이트가 <strong>통과시키지 않는다</strong>. 그래서 미완성이 숨지 못한다.</p>
+  <div class="grid g3">
+    <div class="card"><span class="chip code">unit</span><h4>자동 테스트로 검증됨</h4><p>그 요구를 확인하는 단위 테스트가 있고, 코드와 <code>@covers</code>로 묶인다 — <strong>기계가 매번 확인</strong>.</p></div>
+    <div class="card"><span class="chip spec">smoke</span><h4>실행 증거로 검증됨</h4><p>단위 테스트 대신 <strong>실제 동작 증거</strong>(CI 로그·스크립트·runbook)로 확인. 증거에 <code>@verifies</code> 태그를 남긴다.</p></div>
+    <div class="card"><span class="chip gate">deferred</span><h4>아직 안 만듦 (미룸)</h4><p>일부러 뒤로 미룬 요구. <strong>이유를 적어</strong> 미완성임을 드러낸다 — 숨기지 않고 명시.</p></div>
+  </div>
+
+  <h3>추적 — 한 요구가 spec ↔ code ↔ test에 묶인다</h3>
+  <figure><div class="figscroll"><svg viewBox="0 0 740 170" role="img" aria-label="spec의 FR-001이 code로 구현되고 test로 검증되며 @covers로 서로 묶여 양방향으로 추적된다">
+    <path d="M120 46 C 300 6, 440 6, 620 46" fill="none" stroke="#3a57d6" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#tc)"/>
+    <text x="370" y="22" font-size="11" font-weight="700" fill="#3a57d6" text-anchor="middle">@covers FR-001 — 서로 묶여 양방향 추적</text>
+    <rect x="30" y="54" width="180" height="52" rx="10" fill="#eef1fd" stroke="#3a57d6"/><text x="120" y="78" font-size="12" font-weight="700" fill="#3a57d6" text-anchor="middle">spec · FR-001</text><text x="120" y="95" font-size="10" fill="#5a6489" text-anchor="middle">무엇을 · 왜</text>
+    <rect x="280" y="54" width="180" height="52" rx="10" fill="#e4f5ef" stroke="#0a946c"/><text x="370" y="78" font-size="12" font-weight="700" fill="#0a946c" text-anchor="middle">code</text><text x="370" y="95" font-size="10" fill="#5a6489" text-anchor="middle">추천 로직 구현</text>
+    <rect x="530" y="54" width="180" height="52" rx="10" fill="#e4f5ef" stroke="#0a946c"/><text x="620" y="78" font-size="12" font-weight="700" fill="#0a946c" text-anchor="middle">test</text><text x="620" y="95" font-size="10" fill="#5a6489" text-anchor="middle">그 요구를 검증</text>
+    <path d="M212 80 L276 80" stroke="#9aa2c0" stroke-width="2" marker-end="url(#tc2)"/><text x="244" y="72" font-size="10" fill="#5a6489" text-anchor="middle">구현</text>
+    <path d="M462 80 L526 80" stroke="#9aa2c0" stroke-width="2" marker-end="url(#tc2)"/><text x="494" y="72" font-size="10" fill="#5a6489" text-anchor="middle">검증</text>
+    <defs>
+      <marker id="tc" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#3a57d6"/></marker>
+      <marker id="tc2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#9aa2c0"/></marker>
+    </defs>
+  </svg></div><figcaption>셋 중 하나만 봐도 나머지를 따라갈 수 있다. spec이 코드와 어긋나면(낡으면) 게이트가 잡아낸다.</figcaption></figure>
+
+  <h3>단점은 있다 — 그리고 이렇게 보완했다</h3>
+  <p class="sub">명세 기반이 완벽하다는 말이 아니다. SDD가 흔히 지적받는 약점을, 우리는 다음 장치로 메운다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>SDD가 지적받는 단점</th><th>우리의 보완</th></tr>
+    <tr><td>작은 수정에도 절차가 붙는 <strong>오버헤드</strong></td><td><code>Spec-Impact: none</code> 탈출구·hotfix 경로로 <strong>사소한 변경은 가볍게</strong> 통과</td></tr>
+    <tr><td>코드와 스펙을 <strong>함께 관리하는 부담</strong></td><td><code>retag</code>·<code>smoke-scan</code>이 연결을 <strong>자동 갱신</strong> — 손품 최소화</td></tr>
+    <tr><td>스펙이 낡으면 오히려 <strong>오해를 부름</strong></td><td>drift 게이트가 어긋남을 <strong>상시 감지</strong> — 낡기 전에 되돌림</td></tr>
+    <tr><td>회계를 <strong>형식적으로 채울 위험</strong></td><td>근거·담당(<code>entityRegistry</code>) 등록을 <strong>필수화</strong> — 빈 양식 차단</td></tr>
+    <tr><td>"옳은 방향"까지 게이트가 <strong>보장하진 못함</strong></td><td>마지막 판단은 <strong>사람 승인</strong> — 기계는 정합성, 사람은 옳음</td></tr>
+    <tr><td>탐색 단계엔 <strong>과할 수 있음</strong></td><td>탐색은 바이브로, <strong>굳으면 채택</strong>하는 수명주기로 설계</td></tr>
+  </table></div>
+
+  <h3>언제 무엇을 쓰나 — 둘은 경쟁이 아니라 단계다</h3>
+  <div class="tablewrap"><table>
+    <tr><th>바이브 코딩이 맞을 때 <span style="color:var(--muted)">(탐색 · 단기)</span></th><th>이 방법론이 맞을 때 <span style="color:var(--muted)">(운영 · 장기)</span></th></tr>
+    <tr><td>프로토타입 · MVP · 해커톤 · 데모</td><td>오래 유지하고 계속 커질 코드</td></tr>
+    <tr><td>한 번 쓰고 버릴 코드 · 아이디어 검증</td><td>프로덕션 · 핵심 시스템</td></tr>
+    <tr><td>요구가 아직 불확실 (탐색 중)</td><td>요구가 굳음 · 정확성/규정이 중요</td></tr>
+    <tr><td>혼자 · 단기 작업</td><td>여러 사람 · 여러 모듈 협업</td></tr>
+    <tr><td><strong>"빨리 돌아가는 것"이 최우선</strong></td><td><strong>"무너지지 않는 것"이 최우선</strong></td></tr>
+  </table></div>
+  <p class="sub">한 프로젝트 안에서도 섞인다 — <strong>탐색은 바이브로 빠르게 훑고, 방향이 굳으면 그 부분부터 이 방법론으로 채택</strong>한다(채택 수명주기).</p>
+
+  <div class="note"><strong>한 줄로:</strong> 탐색은 바이브 코딩으로 빠르게, 굳으면 명세 기반으로 붙든다. 단점을 없앴다고 말하지 않는다 — 장치로 메우고, "옳음"은 끝까지 사람이 승인한다.</div>
+</div></section>
 
 <section id="why"><div class="wrap">
   <span class="eyebrow">왜 필요한가</span>
@@ -758,6 +857,30 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
       <li><b>운영</b> — 하네스가 수시로 detect → 사람에게 묻고 → 정렬한다. 작성=LLM, 승인=사람.</li>
     </ol>
   </div>
+</div></section>
+
+<section id="summary"><div class="wrap">
+  <span class="eyebrow">요약</span>
+  <h2>우리 방법론, 한 장으로</h2>
+  <p>바이브 코딩의 속도는 살리되, 거기에 <strong>빠짐없음</strong>과 <strong>추적</strong>을 더한 것 — 그게 전부다.</p>
+  <figure><div class="figscroll"><svg viewBox="0 0 860 150" role="img" aria-label="적는다 만든다 검증과 회계 상시점검 순서로 돌고 작성은 LLM 최종 승인은 사람이다">
+    <rect x="16" y="42" width="185" height="62" rx="11" fill="#eef1fd" stroke="#3a57d6"/><text x="108" y="70" font-size="12" font-weight="700" fill="#3a57d6" text-anchor="middle">① 먼저 적는다</text><text x="108" y="89" font-size="10" fill="#5a6489" text-anchor="middle">spec · 요구(FR)</text>
+    <path d="M205 73 L233 73" stroke="#9aa2c0" stroke-width="2" marker-end="url(#sm)"/>
+    <rect x="237" y="42" width="185" height="62" rx="11" fill="#e4f5ef" stroke="#0a946c"/><text x="329" y="70" font-size="12" font-weight="700" fill="#0a946c" text-anchor="middle">② 만든다</text><text x="329" y="89" font-size="10" fill="#5a6489" text-anchor="middle">code (TDD)</text>
+    <path d="M426 73 L454 73" stroke="#9aa2c0" stroke-width="2" marker-end="url(#sm)"/>
+    <rect x="458" y="42" width="185" height="62" rx="11" fill="#e4f5ef" stroke="#0a946c"/><text x="550" y="70" font-size="12" font-weight="700" fill="#0a946c" text-anchor="middle">③ 검증 · 회계</text><text x="550" y="89" font-size="9.5" fill="#5a6489" text-anchor="middle">test · unit/smoke/deferred</text>
+    <path d="M647 73 L675 73" stroke="#9aa2c0" stroke-width="2" marker-end="url(#sm)"/>
+    <rect x="679" y="42" width="185" height="62" rx="11" fill="#fcefe2" stroke="#e2620a"/><text x="771" y="70" font-size="12" font-weight="700" fill="#e2620a" text-anchor="middle">④ 상시 점검</text><text x="771" y="89" font-size="10" fill="#5a6489" text-anchor="middle">게이트 · 하네스</text>
+    <text x="440" y="132" font-size="11" font-weight="700" fill="#171f3a" text-anchor="middle">작성은 LLM · 최종 승인은 사람 — 어긋나면 게이트가 잡아 ①로 되돌린다</text>
+    <defs><marker id="sm" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#9aa2c0"/></marker></defs>
+  </svg></div></figure>
+  <div class="grid g4">
+    <div class="card"><span class="chip spec">무엇을</span><h4>먼저 적는다</h4><p>기능 요청을 요구(FR)로 쪼개 <strong>spec에 고정</strong> — 코드보다 명세가 먼저.</p></div>
+    <div class="card"><span class="chip code">빠짐없이</span><h4>회계한다</h4><p>모든 FR을 <strong>unit · smoke · deferred</strong> 중 하나로 — 미완성도 숨지 않고 드러난다.</p></div>
+    <div class="card"><span class="chip code">서로 묶어</span><h4>추적한다</h4><p><strong>spec ↔ code ↔ test</strong>가 <code>@covers</code>로 연결 — 하나만 봐도 나머지를 따라간다.</p></div>
+    <div class="card"><span class="chip gate">기계가 지키고</span><h4>사람이 승인</h4><p>게이트·하네스가 <strong>상시 강제</strong>하고, 옳은 방향은 <strong>사람이 최종 승인</strong>.</p></div>
+  </div>
+  <div class="note"><strong>한 문장으로:</strong> 무엇을 만들지 먼저 적고, 빠짐없이 만들었는지 기계가 확인하고, 옳은지는 사람이 승인한다 — 언어·모델·인프라가 무엇이든 같게.</div>
 </div></section>
 
 <footer><div class="wrap">
