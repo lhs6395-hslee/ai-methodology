@@ -309,6 +309,36 @@ def classify_accounting(specs, covered, entries):
 
 # ── fr — FR↔test 추적 + PREFIX 거버넌스 (check-fr-coverage.mjs) ──
 
+def numbering_issues(spec_ids):
+    """접두어별 spec-ID 번호 무결성 (SPEC-014, numbering-lib.mjs 미러 — 바이트 동일).
+    hard: 중복 / 001 미시작. advisory: 실제 최소~최대 내부 gap. (hard, advisory) 반환."""
+    by_prefix = {}
+    for sid in spec_ids or []:
+        m = re.match(r"^([A-Z]+)-(\d{3})$", sid)
+        if not m:
+            continue
+        by_prefix.setdefault(m.group(1), []).append(int(m.group(2)))
+    hard, advisory = [], []
+    for pfx in sorted(by_prefix):
+        seen, dups = set(), set()
+        for n in by_prefix[pfx]:
+            (dups if n in seen else seen).add(n)
+        for d in sorted(dups):
+            hard.append(f"{pfx}-{d:03d} 번호 중복 — 같은 접두어·번호가 둘 이상(유일해야 함)")
+        uniq = sorted(seen)
+        if not uniq:
+            continue
+        if uniq[0] != 1:
+            hard.append(f"{pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{uniq[0]:03d} "
+                        f"(접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag")
+        present, mx = set(uniq), uniq[-1]
+        missing = [n for n in range(uniq[0], mx + 1) if n not in present]
+        if missing:
+            joined = ", ".join(f"{pfx}-{n:03d}" for n in missing)
+            advisory.append(f"{pfx} 번호 중간 gap: {joined} — 제거·retag 잔분(정상일 수 있음)")
+    return hard, advisory
+
+
 def cmd_fr(cfg, strict):
     root = cfg["__root"]
     spec_dir = resolve(cfg, cfg["specDir"])
@@ -372,6 +402,11 @@ def cmd_fr(cfg, strict):
             prefix_class_warnings.append(f'prefixClassExemptions["{sid}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상')
         if finding and finding[0] == "warn":
             prefix_class_warnings.append(f"{sid}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토")
+    # 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
+    n_hard, n_advisory = numbering_issues(known_ids)
+    prefix_errors.extend(n_hard)
+    for a in n_advisory:
+        (prefix_errors if strict else prefix_class_warnings).append(a)
     if prefix_errors:
         print("✗ PREFIX 위반:", file=sys.stderr)
         for e in prefix_errors:

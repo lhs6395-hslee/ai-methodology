@@ -29,6 +29,7 @@ import { loadManifest, classify } from "./verification-accounting.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
+import { numberingIssues } from "./numbering-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -124,6 +125,12 @@ for (const f of specMdNames) {
   }
   if (exempted) prefixClassWarnings.push(`prefixClassExemptions["${id}"]: 현재 접두어↔클래스 위반 아님 — 선등록이 아니면 정리 대상`);
   if (finding && finding.kind === "warn") prefixClassWarnings.push(`${id}: INFRA- 접두어인데 소유 Files의 iac/ci 클래스 검출 0건 — 레포 밖 인프라 실체(evidence로 확인) 또는 접두어 재검토`);
+}
+// 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
+{
+  const { hard, advisory } = numberingIssues([...knownIds]);
+  prefixErrors.push(...hard);
+  for (const a of advisory) (STRICT ? prefixErrors : prefixClassWarnings).push(a);
 }
 if (prefixErrors.length) {
   console.error("✗ PREFIX 위반:");

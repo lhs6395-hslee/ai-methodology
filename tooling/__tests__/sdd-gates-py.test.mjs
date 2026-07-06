@@ -111,6 +111,22 @@ test("py fr: dangling @covers → exit 1 (R1)", skip, () => {
 
 // ── ownership: dedup + 정규화·형식검증 패리티 ──
 
+// @covers SPEC-014/FR-001
+test("py fr: 접두어별 번호 001 미시작(INFRA-011/013) → Node·Python 둘 다 exit 1 + 출력 바이트 동일 (SPEC-014 패리티)", skip, () => {
+  const root = fixture({
+    "sdd/specs/INFRA-011.md": "**Spec**: `INFRA-011`\n**FR-001** THE SYSTEM SHALL x.\n",
+    "sdd/specs/INFRA-013.md": "**Spec**: `INFRA-013`\n**FR-001** THE SYSTEM SHALL x.\n",
+  });
+  try {
+    const py = runPy(root, ["fr"]);
+    const nd = runNode(root, "check-fr-coverage.mjs");
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out); // 바이트 동일(패리티)
+    assert.match(nd.out, /INFRA 번호가 001부터 시작하지 않음/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 const OWN = (id, keys) => `**Spec**: \`${id}\`\nbody mentions thing and stuff.\n## Ownership\n${keys}\n`;
 
 test("py ownership: 정규화 후 같은 키 → 중복 소유 exit 1 (Surfaces 표기 차이 흡수)", skip, () => {
