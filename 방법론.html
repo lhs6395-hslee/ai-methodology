@@ -536,7 +536,31 @@
     <div class="sc"><div class="role human">사람<small>승인</small></div><div class="body">
       <b>8. bless(정본화)</b><p>사람이 명세 변경을 승인한다. 끝 — 도면과 건물이 다시 일치한다. <strong>작성은 LLM이 했지만, 무엇을 진실로 삼을지는 사람이 정했다.</strong></p></div></div>
   </div>
-  <p class="note">반대 방향(<strong>R1, spec→code</strong>)은 더 단순하다: 명세에 <code>FR-008</code>을 새로 쓰면 → <code>/sdd-sync</code>의 <code>check-fr-coverage</code>가 "이 FR엔 검증 테스트가 없다"를 잡고 → "구현할까요?"를 물어 → TDD(RED→GREEN)로 코드를 만든다. <strong>어느 방향이든: 기계가 어긋남을 찾고, 사람이 결정하고, LLM이 작성한다.</strong></p>
+  <h3>새 기능이 하네스를 한 바퀴 도는 모습 — 위→아래 전체 루프</h3>
+  <p>핫픽스가 <em>아래→위</em> 특수 케이스라면, 이번엔 <strong>정공법(위→아래)</strong>이다. 트래커에서 온 새 요구 — <em>"사용자가 추천 항목을 즐겨찾기하고 싶다"</em> — 가 명세부터 시작해 코드·검증·close-out까지 한 바퀴 도는 모습.</p>
+  <div class="scenario">
+    <div class="sc"><div class="role human">사람<small>요구</small></div><div class="body">
+      <b>1. 새 요구 도착</b><p>트래커(<code>page_notes</code>)에 "추천 항목 즐겨찾기" 접수. <strong>코드부터 짜지 않고 명세부터</strong> 시작한다.</p></div></div>
+    <div class="sc"><div class="role harness">하네스<small>판정</small></div><div class="body">
+      <b>2. aggregate 경계 판정 — 001에 붙일까, 002로 뗄까?</b><p>즐겨찾기가 추천 Entity의 동작인가, 독립 Entity인가? <code>Favorite</code>는 사용자가 임의로 <strong>생성·삭제하는 자체 수명 Entity</strong> → 새 aggregate → <strong>SPEC-002 신설</strong>(SPEC-001에 안 붙인다).</p></div></div>
+    <div class="sc"><div class="role harness">LLM<small>작성</small></div><div class="body">
+      <b>3. spec 먼저 (작성=LLM)</b><p>SPEC-002에 <code>FR-001: WHEN 사용자가 항목을 즐겨찾기하면, THE SYSTEM SHALL 그 항목을 사용자 즐겨찾기에 저장한다</code>를 EARS로. <code>## Ownership</code>에 <code>Favorite</code> Entity·<code>Files: src/lib/favorite/**</code> 등록.</p></div></div>
+    <div class="sc"><div class="role hook">게이트<small>R3</small></div><div class="body">
+      <b>4. R3 — 중복·입도·완전성 검사</b><p><code>check-ownership</code>: <code>Favorite</code> 키를 딴 spec이 이미 소유? (중복이면 exit 1) → 유일 ✓. <code>check-spec-cohesion</code>: 1 aggregate만? ✓. <code>check-spec-completeness</code>: SC·인수조건·Status·Lifecycle 있나? ✓</p></div></div>
+    <div class="sc"><div class="role human">사람<small>승인</small></div><div class="body">
+      <b>5. spec bless</b><p>사람이 명세를 승인 — "무엇을 진실로 삼을지"를 정한다.</p></div></div>
+    <div class="sc"><div class="role dev">개발<small>TDD</small></div><div class="body">
+      <b>6. RED → GREEN</b><p><code>// @covers SPEC-002/FR-001</code> 실패 테스트 먼저(RED) → 최소 구현으로 통과(GREEN). Superpowers TDD.</p></div></div>
+    <div class="sc"><div class="role hook">게이트<small>R1</small></div><div class="body">
+      <b>7. R1 — FR↔test 추적</b><p><code>check-fr-coverage</code>: FR-001이 <code>@covers</code> 테스트로 덮였나 ✓ (미커버면 exit 1, 또는 smoke/deferred로 회계).</p></div></div>
+    <div class="sc"><div class="role hook">훅<small>commit·push</small></div><div class="body">
+      <b>8. 커밋·푸시 차단막</b><p>pre-commit(<code>fr·ownership</code>) + commit-msg(<code>spec-sync</code>): <code>src/lib/favorite/**</code> 변경에 SPEC-002가 동반됐나 hard 검사 ✓. pre-push <code>sdd-sync</code> → R1/R2/R3 전부 clean.</p></div></div>
+    <div class="sc"><div class="role human">사람<small>머지</small></div><div class="body">
+      <b>9. PR 리뷰 → 머지</b><p>사람이 리뷰·승인·머지. 도면(spec)과 건물(code)이 처음부터 함께 태어났다 — drift 0.</p></div></div>
+    <div class="sc"><div class="role human">사람<small>close-out</small></div><div class="body">
+      <b>10. 완료 루프의 꼬리 — 원점 트래커 close-out</b><p>트래커에서 왔으니 여기서 끝이 아니다: <code>page_notes</code>를 <strong>dev-done</strong>(개발자) → 이해관계자에게 <strong>완료 보고</strong>(무엇·왜·어떻게+검증 경로) → 리포터/QA가 <strong>confirmed</strong>로 마감. 개발자는 confirm을 건드리지 않는다(2인 책임분리).</p></div></div>
+  </div>
+  <p class="note"><strong>핫픽스(아래→위)와 새 기능(위→아래)의 공통 골격:</strong> 기계가 어긋남·누락을 찾고(게이트·훅), 사람이 결정·승인하고, LLM이 작성한다. 유일한 차이는 <em>출발점</em>(코드냐 명세냐)뿐 — 어느 쪽이든 spec↔code가 어긋난 채로는 커밋·푸시가 통과하지 못하고, 트래커에서 온 일은 close-out까지 가야 완료다.</p>
 </div></section>
 
 <section id="determinism"><div class="wrap">
