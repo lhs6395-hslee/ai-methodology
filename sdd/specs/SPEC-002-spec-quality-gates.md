@@ -96,3 +96,4 @@
 | 2026-07-06 | fr 게이트 PREFIX 화이트리스트(STANDARD)에 `CICD` 편입 + 접두어↔클래스 에러/warn 메시지가 기대 접두어(INFRA/CICD)를 지목하도록 갱신 | CICD 표준 접두어 신설 동반 — 사유 없이 1급 수용, 판정 코어는 SPEC-012 |
 | 2026-07-06 | completeness 게이트에 Lifecycle enum 검증 배선(있으면 removable\|permanent) — 판정 코어는 SPEC-008(lifecycle-lib) 소유, 본체는 호출만 | SPEC-008 FR-006 동반 — 선택 필드라 없으면 무관(하위호환) |
 | 2026-07-06 | fr 게이트에 테스트 인프라 격리(testInfraGlobs) 배선 — 판정 코어는 SPEC-015(test-domain-lib) 소유, 본체는 호출·prefixErrors만 | SPEC-015 신설 동반 — testInfra 파일의 비-TEST 소유 차단 |
+| 2026-07-09 | ownership 게이트에 Entity 관계 검사(`Dependencies.Entities`의 `Name (relation-type)` 구조화 표기 — 실재·소유 spec 해석 hard, 순환 advisory) 배선 — 판정 코어는 SPEC-017(relation-lib) 소유, 본체는 호출만 | SPEC-017 신설 동반 — 도그푸딩(FinOps): 과대 spec을 aggregate별로 쪼갤 때 쪼개진 Entity 간 관계를 적을 문법 부재 |

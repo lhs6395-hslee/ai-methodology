@@ -123,6 +123,10 @@ export const DEFAULTS = {
   // 비어 있으면 비활성(현행). 채워지면 Ownership의 entity 키는 등록된 것만 허용되고
   // 사유가 빈 등록은 에러 — PREFIX 거버넌스(specIdPrefixes+prefixRationale)와 동일 패턴.
   entityRegistry: {},
+  // Dependencies.Entities의 "EntityName (relation-type)" 구조화 표기에서 relation-type
+  // 어휘 — capabilityVerbs와 동형. 비어 있으면(기본) 어휘 무제한(형식만 kebab 1토큰 강제).
+  // 채우면 미등록 type은 ownership 게이트가 exit 1(SPEC-017).
+  relationTypes: [],
   // CRUD 기본에 더할 도메인 verb
   capabilityVerbs: [],
   // Surface path param 표준 표기

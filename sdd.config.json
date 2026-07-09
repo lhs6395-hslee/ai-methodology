@@ -33,7 +33,8 @@
     "spec-grammar-hardening": "문서 규범↔게이트 동기 — Module·SHALL·Dedup 참조·Files 카테고리·글롭 문법(SPEC-013)",
     "spec-id-numbering": "접두어별 spec-ID 번호 무결성 — 001시작·중복 hard·중간 gap advisory(SPEC-014)",
     "test-domain": "TEST 삭제가능 도메인 — 인프라 소유 허용(prefix-class 면제)+testInfraGlobs 격리(SPEC-015)",
-    "object-storage-decision": "오브젝트 스토리지 프로비저닝 결정 게이트 — 마커 매치 시 버킷 선택·이전 기준 기록 강제(SPEC-016)"
+    "object-storage-decision": "오브젝트 스토리지 프로비저닝 결정 게이트 — 마커 매치 시 버킷 선택·이전 기준 기록 강제(SPEC-016)",
+    "entity-relations": "Entity 관계 판정 코어 — Dependencies.Entities의 구조화 관계(실재·소유 spec hard, 순환 advisory, SPEC-017)"
   },
   "specSyncExemptGlobs": [
     "*.md", "*.html", ".gitignore", "docs/**", "prompts/**", "templates/**",

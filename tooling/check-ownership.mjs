@@ -32,6 +32,7 @@ import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
+import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -39,6 +40,7 @@ const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
 
 const CATEGORIES = cfg.ownershipCategories;
+const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
 // 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -61,6 +63,7 @@ function specFiles() {
 const files = specFiles();
 const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
 const missing = [], formatIssues = [];
+const specDeps = []; // {specId, entities:[{name,type}]} — 관계 판정용(SPEC-017)
 let declaredCount = 0;
 
 for (const file of files) {
@@ -84,9 +87,12 @@ for (const file of files) {
     }
   }
 
-  // Parse Dependencies section — do NOT add to owners (not a dedup target)
-  // This prevents false-positives where a referenced entity looks like a duplicate.
-  const _deps = parseSection(text, "Dependencies", CATEGORIES); // parsed but intentionally excluded from dedup
+  // Parse Dependencies section — do NOT add to owners (not a dedup target).
+  // `EntityName (relation-type)` 항목만 구조화 관계로 뽑아 SPEC-017 판정에 넘긴다 — 괄호 없는
+  // 레거시 자유참조는 여기서도 관여하지 않는다(하위호환, 관여 없음 = 무해).
+  const deps = parseSection(text, "Dependencies", CATEGORIES);
+  const relEntities = (deps[ENT_CAT] || []).map(parseRelationEntry).filter((e) => e.type);
+  if (relEntities.length) specDeps.push({ specId, entities: relEntities });
 }
 
 // 충돌(같은 키를 2+ spec이 소유) 수집
@@ -103,18 +109,34 @@ const REGISTRY = cfg.entityRegistry || {};
 const entityErrors = [];
 const registryWarns = [];
 if (Object.keys(REGISTRY).length) {
-  const entCat = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
-  const reg = new Map(Object.keys(REGISTRY).map((k) => [normalizeKey(entCat, k, cfg), String(REGISTRY[k] ?? "").trim()]));
+  const reg = new Map(Object.keys(REGISTRY).map((k) => [normalizeKey(ENT_CAT, k, cfg), String(REGISTRY[k] ?? "").trim()]));
   for (const [key, rationale] of reg) {
     if (!rationale) entityErrors.push(`entityRegistry["${key}"] — 도입 사유 필요(빈 값 불가)`);
   }
-  for (const [key, specIds] of owners[entCat]) {
+  for (const [key, specIds] of owners[ENT_CAT]) {
     if (!reg.has(key)) entityErrors.push(`미등록 entity "${key}" (${[...new Set(specIds)].join(" + ")}) — entityRegistry에 사유와 함께 등록 필요(임의 신설 금지)`);
   }
   for (const key of reg.keys()) {
-    if (!owners[entCat].has(key)) registryWarns.push(`entityRegistry의 "${key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상`);
+    if (!owners[ENT_CAT].has(key)) registryWarns.push(`entityRegistry의 "${key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상`);
   }
 }
+
+// Entity 관계(SPEC-017): 대상 실재·소유 spec 해석 = hard, 순환 참조 = advisory.
+// relationTypes가 비어있으면 어휘 무제한(capabilityVerbs 동형) — 형식(kebab 토큰)만 relation-lib가 이미 강제.
+const RELATION_TYPES = cfg.relationTypes || [];
+const relationErrors = [];
+for (const { specId, entities } of specDeps) {
+  for (const { type } of entities) {
+    const bad = relationTypeFinding(type, RELATION_TYPES);
+    if (bad) relationErrors.push(`[${specId}] ${bad}`);
+  }
+}
+const entityOwnerIndex = new Map([...owners[ENT_CAT].entries()].map(([key, specIds]) => [key, specIds[0]]));
+const { edges: relationEdges, missing: relationMissing } = resolveRelations(specDeps, entityOwnerIndex);
+for (const { specId, entity, type } of relationMissing) {
+  relationErrors.push(`[${specId}] 관계 대상 Entity "${entity}" (${type}) — 어느 spec의 Ownership에도 없음(오타·삭제 확인)`);
+}
+const relationCycles = findCycles(relationEdges);
 
 console.log(`Ownership 게이트: spec ${files.length}개 중 ${declaredCount}개가 Ownership 선언.`);
 if (missing.length) {
@@ -131,6 +153,13 @@ for (const w of registryWarns) console.log(`⚠ ${w}`);
 if (entityErrors.length) {
   console.error(`\n✗ ENTITY 레지스트리 위반 ${entityErrors.length}건:`);
   for (const e of entityErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+
+for (const c of relationCycles) console.log(`⚠ 관계 순환 참조: ${c.join(" → ")} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)`);
+if (relationErrors.length) {
+  console.error(`\n✗ Entity 관계(SPEC-017) 위반 ${relationErrors.length}건:`);
+  for (const e of relationErrors) console.error(`  ✗ ${e}`);
   process.exit(1);
 }
 

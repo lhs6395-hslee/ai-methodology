@@ -78,6 +78,7 @@ DEFAULTS = {
     "specSyncUnownedPolicy": "silent",
     "draftBlockPolicy": "advisory",
     "entityRegistry": {},
+    "relationTypes": [],
     "capabilityVerbs": [],
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
@@ -506,6 +507,7 @@ def cmd_fr(cfg, strict):
 
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
+    ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
     # 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -520,6 +522,7 @@ def cmd_ownership(cfg, strict):
 
     owners = {c: {} for c in categories}
     missing, format_issues = [], []
+    spec_deps = []  # (spec_id, [(name, type), ...]) — 관계 판정용(SPEC-017)
     declared = 0
     for file in files:
         text = read_text(file)
@@ -538,6 +541,12 @@ def cmd_ownership(cfg, strict):
                     format_issues.append((spec_id, bad))
                 owners[cat].setdefault(key, []).append(spec_id)
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
+        # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
+        deps = parse_section(text, "Dependencies", categories)
+        rel_entities = [parse_relation_entry(raw) for raw in deps.get(ent_cat, [])]
+        rel_entities = [(e["name"], e["type"]) for e in rel_entities if e["type"]]
+        if rel_entities:
+            spec_deps.append((spec_id, rel_entities))
 
     conflicts = []
     for cat in categories:
@@ -550,7 +559,6 @@ def cmd_ownership(cfg, strict):
     registry = cfg.get("entityRegistry") or {}
     entity_errors, registry_warns = [], []
     if registry:
-        ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
         reg = {normalize_key(ent_cat, k, cfg): str(registry[k] or "").strip() for k in registry}
         for key, rationale in reg.items():
             if not rationale:
@@ -562,6 +570,21 @@ def cmd_ownership(cfg, strict):
         for key in reg:
             if key not in owners[ent_cat]:
                 registry_warns.append(f'entityRegistry의 "{key}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상')
+
+    # Entity 관계(SPEC-017): 대상 실재·소유 spec 해석 = hard, 순환 참조 = advisory.
+    # relationTypes가 비어있으면 어휘 무제한(capabilityVerbs 동형) — 형식(kebab 토큰)만 이미 강제.
+    relation_types = cfg.get("relationTypes") or []
+    relation_errors = []
+    for spec_id, entities in spec_deps:
+        for _, rel_type in entities:
+            bad = relation_type_finding(rel_type, relation_types)
+            if bad:
+                relation_errors.append(f"[{spec_id}] {bad}")
+    entity_owner_index = {key: spec_ids[0] for key, spec_ids in owners[ent_cat].items()}
+    relation_edges, relation_missing = resolve_relations(spec_deps, entity_owner_index)
+    for spec_id, entity, rel_type in relation_missing:
+        relation_errors.append(f'[{spec_id}] 관계 대상 Entity "{entity}" ({rel_type}) — 어느 spec의 Ownership에도 없음(오타·삭제 확인)')
+    relation_cycles = find_cycles(relation_edges)
 
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
     if missing:
@@ -576,6 +599,13 @@ def cmd_ownership(cfg, strict):
     if entity_errors:
         print(f"\n✗ ENTITY 레지스트리 위반 {len(entity_errors)}건:", file=sys.stderr)
         for e in entity_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    for c in relation_cycles:
+        print(f"⚠ 관계 순환 참조: {' → '.join(c)} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)")
+    if relation_errors:
+        print(f"\n✗ Entity 관계(SPEC-017) 위반 {len(relation_errors)}건:", file=sys.stderr)
+        for e in relation_errors:
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
     if conflicts:
@@ -874,6 +904,73 @@ def object_storage_findings(text, markers):
     if missing:
         return [f"Object Storage Decision 섹션에 필수 라벨 없음: {', '.join(missing)} (버킷 선택·이전 기준, SPEC-016)"]
     return []
+
+
+# ── entity 관계(SPEC-017): Dependencies.Entities의 "Name (relation-type)" 구조화 표기 ──
+# `EntityName (relation-type)` 괄호 표기만 구조화 관계로 파싱한다. relation-type은 소문자
+# kebab 1토큰만 인정 — 공백·쉼표·대문자가 든 기존 서술 괄호("(deprecated, 검토 필요)")와
+# 우연히 겹치지 않게 방어. 괄호 없는 항목은 레거시 자유참조로 그대로 통과(하위호환).
+_RELATION_TYPE_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+
+
+def parse_relation_entry(raw):
+    """relation-lib.mjs 미러 — 바이트 동일 판정, SPEC-017."""
+    s = str(raw).strip()
+    m = re.match(r"^(.+?)\s*\(([^()]+)\)\s*$", s)
+    if m and _RELATION_TYPE_RE.match(m.group(2).strip()):
+        return {"name": m.group(1).strip(), "type": m.group(2).strip()}
+    return {"name": s, "type": None}
+
+
+def relation_type_finding(rel_type, allowed_types):
+    if not rel_type:
+        return None
+    if not allowed_types:
+        return None
+    if rel_type not in allowed_types:
+        return f'미등록 관계 종류 "{rel_type}" — relationTypes에 등록 필요(임의 신설 금지)'
+    return None
+
+
+def resolve_relations(spec_deps, entity_owner_index):
+    """구조화 관계(type 있음)만 해석 — 대상 미실재는 missing(hard 대상)."""
+    edges, missing = [], []
+    for spec_id, entities in spec_deps:
+        for name, rel_type in entities:
+            if not rel_type:
+                continue
+            owner = entity_owner_index.get(name)
+            if not owner:
+                missing.append((spec_id, name, rel_type))
+                continue
+            edges.append((spec_id, owner, rel_type, name))
+    return edges, missing
+
+
+def find_cycles(edges):
+    """spec 간 참조 그래프 순환 탐지(DFS 3색 마킹) — edges: [(from,to,type,entity), ...]."""
+    graph = {}
+    for frm, to, *_ in edges:
+        graph.setdefault(frm, []).append(to)
+    GRAY, BLACK = 1, 2
+    color, stack, cycles = {}, [], []
+
+    def dfs(node):
+        color[node] = GRAY
+        stack.append(node)
+        for nxt in graph.get(node, []):
+            if color.get(nxt) == GRAY:
+                idx = stack.index(nxt)
+                cycles.append(stack[idx:] + [nxt])
+            elif color.get(nxt) != BLACK:
+                dfs(nxt)
+        stack.pop()
+        color[node] = BLACK
+
+    for node in sorted(graph.keys()):
+        if color.get(node) != BLACK:
+            dfs(node)
+    return cycles
 
 
 def cmd_completeness(cfg, strict):

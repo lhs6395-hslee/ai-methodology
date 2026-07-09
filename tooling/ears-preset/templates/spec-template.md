@@ -64,7 +64,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 이 spec이 **읽기/호출만** 하는 다른 aggregate의 키(소유 아님). Ownership과 같은 정규화 표기를 권장하되, 게이트의 형식검증·dedup 대상은 아니다.
-- **Entities**: [다른 spec 소유 Entity 중 참조하는 것]
+- **Entities**: [다른 spec 소유 Entity 중 참조하는 것 — 관계를 구조화하려면 `EntityName (relation-type)`로 적는다(예: `investigation_finding (has-many)`). 소문자 kebab 1토큰만 인정되며, ownership 게이트가 대상 실재·소유 spec을 자동 해석한다(없으면 hard 차단, 순환 참조는 advisory — SPEC-017). 괄호 없이 이름만 적으면 지금처럼 검사 없는 자유참조]
 - **Surfaces**: [호출하는 외부 route·이벤트]
 
 <!-- 키 생성 결정 절차(사람=LLM 동일 결과):

@@ -78,6 +78,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
   "smokeManifest": "sdd/smoke-manifest.json",    // 회계 매니페스트 경로(위 트리)
   "smokeScanDirs": null,                          // 검증 태그 스캔 범위 — 기본 scanDirs(SPEC-010)
   "entityRegistry": {},                           // entity 등록제(신설 = config 리뷰 관문)
+  "relationTypes": [],                            // Dependencies.Entities 관계 어휘(빈 값=무제한 — SPEC-017)
   "derivationManifest": "sdd/derivation.json",   // 재도출 소스 회계(readopt 시 — SPEC-009)
   "derivationClassGlobs": {}                     // iac/ci/ops-docs 검출 글롭 조정(기본 내장)
 }

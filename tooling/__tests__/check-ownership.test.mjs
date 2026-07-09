@@ -2,6 +2,10 @@
 // @covers SPEC-002/FR-002
 // @covers SPEC-002/FR-007
 // @covers SPEC-002/FR-009
+// @covers SPEC-017/FR-001
+// @covers SPEC-017/FR-002
+// @covers SPEC-017/FR-003
+// @covers SPEC-017/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -93,4 +97,43 @@ test("entityRegistry: 빈 사유 → exit 1 / 소유 spec 없는 등록 키 → 
   const off = runWithConfig({ "SPEC-001.md": A }, { entityRegistry: {} });
   assert.equal(off.code, 0, off.out);
   assert.doesNotMatch(off.out, /레지스트리/);
+});
+
+// ── SPEC-017: Entity 관계(Dependencies.Entities의 "Name (type)" 구조화 표기) ──
+
+test("관계: 대상 Entity 실재 + 소유 spec 해석 → 통과, 존재하지 않으면 exit 1", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: investigation_run\n## Dependencies\n- **Entities**: investigation_finding (has-many)\n";
+  const B = "# SPEC-002\n## Ownership\n- **Entities**: investigation_finding\n";
+  const ok = run({ "SPEC-001.md": A, "SPEC-002.md": B });
+  assert.equal(ok.code, 0, ok.out);
+
+  const noTarget = run({ "SPEC-001.md": A }); // SPEC-002 없음 → investigation_finding 실재 X
+  assert.equal(noTarget.code, 1, noTarget.out);
+  assert.match(noTarget.out, /관계 대상 Entity "investigation_finding"/);
+});
+
+test("관계: 순환 참조(A→B→A)는 exit 0 유지 + ⚠ advisory로만 표시", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: b_thing (depends-on)\n";
+  const B = "# SPEC-002\n## Ownership\n- **Entities**: b_thing\n## Dependencies\n- **Entities**: a_thing (depends-on)\n";
+  const r = run({ "SPEC-001.md": A, "SPEC-002.md": B });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /⚠ 관계 순환 참조: SPEC-001 → SPEC-002 → SPEC-001/);
+});
+
+test("관계: 괄호 없는 레거시 참조는 그대로 무관(하위호환) — 대상 없어도 exit 0", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: nonexistent_legacy_ref\n";
+  const r = run({ "SPEC-001.md": A });
+  assert.equal(r.code, 0, r.out);
+});
+
+test("관계: relationTypes 등록 시 미등록 type은 exit 1, 등록·빈 목록(무제한)은 통과", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: b_thing (has-many)\n";
+  const B = "# SPEC-002\n## Ownership\n- **Entities**: b_thing\n";
+  const restricted = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { relationTypes: ["belongs-to", "references"] });
+  assert.equal(restricted.code, 1, restricted.out);
+  assert.match(restricted.out, /미등록 관계 종류 "has-many"/);
+  const registered = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { relationTypes: ["has-many"] });
+  assert.equal(registered.code, 0, registered.out);
+  const unrestricted = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { relationTypes: [] });
+  assert.equal(unrestricted.code, 0, unrestricted.out);
 });

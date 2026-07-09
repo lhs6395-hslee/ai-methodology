@@ -6,6 +6,7 @@
 // @covers SPEC-006/FR-002
 // @covers SPEC-006/FR-003
 // @covers SPEC-008/FR-007
+// @covers SPEC-017/FR-001
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -188,6 +189,54 @@ test("py ownership: 미등록 verb Capability는 형식위반 warn, --strict에�
     assert.equal(warn.code, 0, warn.out);
     assert.match(warn.out, /미등록 verb/);
     assert.equal(runPy(root, ["ownership", "--strict"]).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("py ownership: 관계(SPEC-017) — 대상 실재 확인(hard)·순환(advisory)·레거시 무관 (Node 패리티)", skip, () => {
+  const A = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: investigation_run\n## Dependencies\n- **Entities**: investigation_finding (has-many)\n";
+  const B = "**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: investigation_finding\n";
+  let root = fixture({ "sdd/specs/SPEC-001.md": A, "sdd/specs/SPEC-002.md": B });
+  try {
+    const ok = runPy(root, ["ownership"]);
+    assert.equal(ok.code, 0, ok.out);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+
+  root = fixture({ "sdd/specs/SPEC-001.md": A });
+  try {
+    const noTarget = runPy(root, ["ownership"]);
+    assert.equal(noTarget.code, 1, noTarget.out);
+    assert.match(noTarget.out, /관계 대상 Entity "investigation_finding"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+
+  const cycA = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: b_thing (depends-on)\n";
+  const cycB = "**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: b_thing\n## Dependencies\n- **Entities**: a_thing (depends-on)\n";
+  root = fixture({ "sdd/specs/SPEC-001.md": cycA, "sdd/specs/SPEC-002.md": cycB });
+  try {
+    const r = runPy(root, ["ownership"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /⚠ 관계 순환 참조: SPEC-001 → SPEC-002 → SPEC-001/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+
+  const legacy = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: nonexistent_legacy_ref\n";
+  root = fixture({ "sdd/specs/SPEC-001.md": legacy });
+  try {
+    assert.equal(runPy(root, ["ownership"]).code, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("py ownership: relationTypes 등록 시 미등록 type exit 1, 빈 목록은 무제한", skip, () => {
+  const A = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: a_thing\n## Dependencies\n- **Entities**: b_thing (has-many)\n";
+  const B = "**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: b_thing\n";
+  let root = fixture({ "sdd/specs/SPEC-001.md": A, "sdd/specs/SPEC-002.md": B }, { relationTypes: ["belongs-to", "references"] });
+  try {
+    const restricted = runPy(root, ["ownership"]);
+    assert.equal(restricted.code, 1, restricted.out);
+    assert.match(restricted.out, /미등록 관계 종류 "has-many"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+
+  root = fixture({ "sdd/specs/SPEC-001.md": A, "sdd/specs/SPEC-002.md": B }, { relationTypes: [] });
+  try {
+    assert.equal(runPy(root, ["ownership"]).code, 0);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
