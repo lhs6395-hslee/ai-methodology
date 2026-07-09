@@ -76,6 +76,7 @@ DEFAULTS = {
                      "docs/ops/**", "docs/operations/**", "ops/**"],
     },
     "specSyncUnownedPolicy": "silent",
+    "draftBlockPolicy": "advisory",
     "entityRegistry": {},
     "capabilityVerbs": [],
     "surfacePathParam": "{name}",
@@ -1246,6 +1247,13 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print(f'✗ specSyncUnownedPolicy 값 위반 "{policy}" — silent|warn|error 중 하나(문법화, 정의되지 않은 값 금지)',
               file=sys.stderr)
         sys.exit(1)
+    # Draft 소유 코드 차단(SPEC-008 FR-004)을 range 모드에서도 hard로 승격할지(SPEC-008 FR-007) —
+    # CI가 range 모드로 MR diff를 검사하면 로컬 commit-msg 훅을 안 타는 웹 UI 병합도 막을 수 있다.
+    draft_policy = cfg.get("draftBlockPolicy") or "advisory"
+    if draft_policy not in ("advisory", "hard"):
+        print(f'✗ draftBlockPolicy 값 위반 "{draft_policy}" — advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     exempt = [compile_glob(g) for g in (cfg.get("specSyncExemptGlobs") or [])]
     spec_set = set(p for _, p, _, _, _ in specs)
     violations = []
@@ -1312,8 +1320,11 @@ def cmd_specsync(cfg, staged, msg_file, base):
     if not violations:
         print("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
+    # draftBlockPolicy=hard: range 모드에서도 Draft 위반을 hard로 승격(SPEC-008 FR-007) — 웹 UI 병합이
+    # 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
+    draft_hard = (not staged) and draft_policy == "hard" and any(d for _, _, d in violations)
     for f, spec_id, draft in violations:
-        tag = "✗" if staged else "⚠"
+        tag = "✗" if (staged or (draft and draft_hard)) else "⚠"
         if draft:
             print(f"  {tag} {f} → 소유 스펙 {spec_id}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지")
         else:
@@ -1326,6 +1337,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if unowned_hard:
             print("  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
+        sys.exit(1)
+    if draft_hard:
+        print("\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).",
+              file=sys.stderr)
         sys.exit(1)
     print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")
 

@@ -125,6 +125,7 @@
 | `derivationManifest` | 재도출 소스 회계 매니페스트 JSON 경로 — 소스 9클래스가 전부 `{status: mapped\|none\|deferred, evidence\|reason}`으로 회계돼야 함. 실재하는데 none 선언은 derivation 게이트가 exit 1(SPEC-009). brownfield readopt에 켜기 | `null` |
 | `derivationClassGlobs` | 검출 가능 클래스(iac·ci·ops-docs)의 탐지 글롭(클래스 단위 교체). terraform/k8s/CI 정의가 표준 경로 밖이면 조정 | 내장 기본 — 정의 파일 + **동반·보조 파일**까지: iac = tf/tfvars/hcl·k8s/helm/manifests/kustomization·Dockerfile/.dockerignore/compose, ci = workflows/actions·gitlab-ci·Jenkinsfile·circleci·azure·bitbucket·buildkite·cloudbuild·travis·drone |
 | `specSyncUnownedPolicy` | 어느 스펙 `Files`에도 미매치인 변경 파일 정책 — `silent`(현행)·`warn`·`error`(staged 차단=closed-world). 예외는 `specSyncExemptGlobs`로 선언. **소비 프로젝트 권장 시작값: `warn`**(안정 후 `error`) | `"silent"` |
+| `draftBlockPolicy` | Draft 소유 코드 변경(FR-004) 위반을 range 모드에서도 hard로 승격 — `advisory`(현행, range는 exit 0)·`hard`(range도 exit 1, SPEC-008 FR-007). **로컬 `commit-msg` 훅은 GitHub/GitLab의 웹 UI(서버측) 병합엔 절대 실행되지 않는다** — CI가 `<GATE> specsync [base]`를 MR 파이프라인에 걸고 이 값을 `hard`로 두면, 로컬 훅이 안 타는 병합 경로도 막을 수 있다(도그푸딩 발견: CICD-001이 Draft인데 Jenkinsfile이 웹 UI 병합으로 새어나간 사례) | `"advisory"` |
 | `entityRegistry` | entity(aggregate-root 카테고리) 등록제 — `{"<entity>":"<도입 사유>"}`. 채우면 미등록 entity 소유·빈 사유는 ownership 게이트가 exit 1(PREFIX 거버넌스 동형). 비면 비활성 | `{}` |
 | `objectStorageMarkers` | 오브젝트 스토리지 감지 마커(SPEC-016) — 스펙 본문이 매치하면 completeness가 `## Object Storage Decision`(Bucket·Consolidation) 존재를 advisory로 요구. `[]`면 비활성 | 멀티클라우드 기본 목록 |
 | `testInfraGlobs` | 테스트/QA 인프라 네임스페이스 마커(SPEC-015) — 매치 파일은 TEST 스펙만 소유(제품 스펙 소유 시 fr 게이트 exit 1). `[]`면 비활성 | `[]` |

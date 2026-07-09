@@ -114,6 +114,11 @@ export const DEFAULTS = {
   // "silent"(기본 = 현행 침묵 통과) | "warn"(advisory) | "error"(staged에서 차단 = closed-world).
   // 의도적 예외는 specSyncExemptGlobs로 선언(조합 탈출).
   specSyncUnownedPolicy: "silent",
+  // check-spec-sync: Draft 소유 코드 변경(SPEC-008 FR-004) 위반을 range 모드에서도 hard로
+  // 승격할지 — "advisory"(기본=현행, range는 exit 0) | "hard"(range도 exit 1). CI가 range
+  // 모드로 MR diff를 검사하면 로컬 commit-msg 훅을 안 타는 웹 UI 병합도 이 정책으로 막을 수
+  // 있다(SPEC-008 FR-007 — 로컬 훅 전용 강제의 사각지대 봉합, 도그푸딩 발견).
+  draftBlockPolicy: "advisory",
   // entity(=aggregate-root 카테고리) 레지스트리: { "<정규화 키>": "<도입 사유>" }.
   // 비어 있으면 비활성(현행). 채워지면 Ownership의 entity 키는 등록된 것만 허용되고
   // 사유가 빈 등록은 에러 — PREFIX 거버넌스(specIdPrefixes+prefixRationale)와 동일 패턴.

@@ -69,4 +69,17 @@ steps:
 
 ---
 
+## 4. MR/PR 파이프라인 — 웹 UI 병합은 로컬 훅을 절대 안 탄다
+> **위 1~3의 레시피(`fr`+`ownership`만)로는 spec-sync의 hard 강제(Draft 소유 코드 차단·`specSyncUnownedPolicy: error`)가 CI에 전혀 걸리지 않는다.** 그 hard 판정은 `<GATE> specsync --staged --message-file <p>`(commit-msg 훅) 경로에서만 발동하고, GitHub/GitLab의 **웹 UI(서버측) "Merge" 버튼은 로컬 git 훅을 절대 실행하지 않는다** — 로컬 클론에 훅이 설치돼 있어도 무관하다(도그푸딩 발견: Draft 상태 spec이 소유한 `Jenkinsfile`이 `Merge branch '...' into 'main'` 병합 커밋으로 여러 번 새어나간 사례. 그 리포의 CI엔 애초에 `specsync` 호출조차 없었다).
+
+MR 파이프라인에 아래 스텝을 추가하고, `sdd.config.json`에 `"draftBlockPolicy": "hard"`(+선택 `"specSyncUnownedPolicy": "error"`)를 켜면 로컬 훅이 안 타는 웹 UI 병합 경로도 CI가 막는다(SPEC-008 FR-007):
+```yaml
+steps:
+  - <GATE> specsync $CI_MERGE_REQUEST_DIFF_BASE_SHA   # 또는 그 도구의 merge-base 참조
+```
+- range 모드는 기본적으로 advisory(exit 0)라 이 스텝만 추가해도 조용히 통과한다 — `draftBlockPolicy: "hard"`를 켜야 Draft-block이 실제로 파이프라인을 막는다.
+- 로컬 pre-push/commit-msg 훅과 이 CI 스텝은 **서로를 대체하지 않는다** — 훅은 로컬 커밋 경로, 이 스텝은 훅이 닿지 않는 서버측 병합 경로의 백스톱이다.
+
+---
+
 > **요지:** SSOT를 "주장"이 아닌 "기계적 사실"로 만드는 건 *게이트가 매 변경마다 자동 실행되어 red면 막는다*는 점이지, **특정 CI/CD 제품이 아니다**. 강제 지점(로컬 훅/사내 CI/클라우드 CI/CD)은 팀이 고르고, 명령은 동일하다. (`SSOT.md` §4, `REALITY_CHECK.md`)

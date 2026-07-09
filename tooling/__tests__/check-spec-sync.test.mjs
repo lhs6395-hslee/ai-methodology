@@ -5,6 +5,8 @@
 // @covers SPEC-003/FR-005
 // @covers SPEC-003/FR-006
 // @covers SPEC-003/FR-010
+// @covers SPEC-008/FR-004
+// @covers SPEC-008/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -252,6 +254,74 @@ test("unowned 정책: error도 range 모드에선 advisory(⚠ + exit 0) / 미�
     const bad = runGate(root, ["main"]);
     assert.equal(bad.code, 1, bad.out);
     assert.match(bad.out, /specSyncUnownedPolicy 값 위반/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── P4: draftBlockPolicy (advisory|hard) — MR 웹 UI 병합이 로컬 훅을 우회하는 사각지대 봉합 ──
+
+const DRAFT_SPEC = (files) =>
+  `# SPEC-001\n**Spec**: \`SPEC-001\`  **Status**: Draft\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL x.\n\n## Ownership\n- **Entities**: thing\n- **Files**: ${files}\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n`;
+
+test("Draft 소유 코드: range 모드 기본값(advisory) → ⚠ Draft 표시 + exit 0(하위호환)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), DRAFT_SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A"); g("commit", "-qm", "code only");
+    const r = runGate(root, ["main"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /⚠ src\/lib\/pdf\/parse\.ts → 소유 스펙 SPEC-001이 Draft 상태/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Draft 소유 코드: draftBlockPolicy=hard → range 모드에서도 ✗ exit 1(웹 UI 병합 우회 방지)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), DRAFT_SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A"); g("commit", "-qm", "code only");
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", draftBlockPolicy: "hard" }));
+    const r = runGate(root, ["main"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /✗ src\/lib\/pdf\/parse\.ts → 소유 스펙 SPEC-001이 Draft 상태/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("draftBlockPolicy=hard여도 non-draft 위반(스펙 무변경)은 range에서 advisory 유지", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A"); g("commit", "-qm", "code only");
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", draftBlockPolicy: "hard" }));
+    const r = runGate(root, ["main"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /⚠/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("draftBlockPolicy 미정의 값 → exit 1(문법화, 정의되지 않은 값 금지)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", draftBlockPolicy: "nope" }));
+    writeFileSync(join(root, "src/other.ts"), "x\n");
+    g("add", "src/other.ts");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /draftBlockPolicy 값 위반/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

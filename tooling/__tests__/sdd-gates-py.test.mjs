@@ -5,6 +5,7 @@
 // @covers SPEC-006/FR-001
 // @covers SPEC-006/FR-002
 // @covers SPEC-006/FR-003
+// @covers SPEC-008/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -434,6 +435,31 @@ test("py specsync staged: Draft 스펙 소유 코드 → 스펙 동반해도 exi
     const r = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /Draft 상태/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("py specsync range: draftBlockPolicy=hard → Draft 소유 코드 변경도 ✗ exit 1 (SPEC-008 FR-007 패리티)", skip, () => {
+  const { root, g } = gitFixture();
+  try {
+    const specPath = join(root, "sdd/specs/SPEC-001.md");
+    const spec = execFileSync("cat", [specPath], { encoding: "utf8" });
+    writeFileSync(specPath, spec.replace("**Spec**: `SPEC-001`", "**Spec**: `SPEC-001`  **Status**: Draft"));
+    g("add", "-A"); g("commit", "-qm", "draft status");
+    g("branch", "-m", "main"); g("checkout", "-qb", "feat");
+    writeFileSync(join(root, "src/lib/a.ts"), "export const v = 2;\n");
+    g("add", "-A"); g("commit", "-qm", "code only");
+
+    const advisory = runPy(root, ["specsync", "main"]);
+    assert.equal(advisory.code, 0, advisory.out);
+    assert.match(advisory.out, /⚠ src\/lib\/a\.ts → 소유 스펙 SPEC-001이 Draft 상태/);
+
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", draftBlockPolicy: "hard" }));
+    const hard = runPy(root, ["specsync", "main"]);
+    assert.equal(hard.code, 1, hard.out);
+    assert.match(hard.out, /✗ src\/lib\/a\.ts → 소유 스펙 SPEC-001이 Draft 상태/);
+
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", draftBlockPolicy: "nope" }));
+    assert.equal(runPy(root, ["specsync", "main"]).code, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

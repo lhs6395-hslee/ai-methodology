@@ -89,6 +89,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-06 | Python DEFAULTS의 `derivationClassGlobs` 기본값 보정 동기(iac 동반 파일·ci 구성요소 편입) — 값·순서 동일(runtime-contract ①이 강제) | SPEC-001 기본값 보정 동반 — 기본값 자체도 패리티 대상 |
 | 2026-07-06 | Python에 `numbering_issues` 미러(fr 0c 배선) + 바이트 패리티 테스트 1종(INFRA-011 Node↔Python) | SPEC-014 신설 동반 — 번호 게이트도 런타임 중립 필수(셸/Go fr에는 없음 — 핵심 3커맨드 계약 밖, 정직한 델타) |
 | 2026-07-06 | Python에 `object_storage_findings` 미러(completeness 배선) + DEFAULTS `objectStorageMarkers` 정렬 + 바이트 패리티 테스트 1종 | SPEC-016 신설 동반 — 오브젝트 스토리지 결정 게이트도 런타임 중립 필수(Node↔Python 동일 출력) |
+| 2026-07-09 | Python specsync에 `draftBlockPolicy`(advisory\|hard) 미러 + DEFAULTS 정렬 + 패리티 테스트 1종 | SPEC-008 FR-007 신설 동반 — range 모드 Draft-block 승격도 런타임 중립 필수 |
 | 2026-07-06 | Python `object_storage_findings`에 감사 트레일 제외(`_before_audit_trail`) 동기 | SPEC-016 자기 서술 오탐 수정의 Node·Python 패리티 유지 |
 | 2026-07-06 | Python STANDARD_PREFIXES·DEFAULTS.specIdPrefixes에 `CICD` + `prefix_class_finding`를 `CLASS_PREFIX{iac:INFRA,ci:CICD}`로 일반화(에러/warn 메시지 바이트 동일) + 패리티 테스트 1종(ci 전용 INFRA→CICD) | CICD 표준 접두어 신설 동반 — 접두어 거버넌스·prefix-class도 런타임 중립 필수 |
 | 2026-07-06 | Python에 `parse_lifecycle`·`LIFECYCLE_ENUM` + completeness Lifecycle enum 검증 미러 + 패리티 테스트 1종 | SPEC-008 FR-006 동반 — Lifecycle 필드도 런타임 중립(Node↔Python 동일 출력) |

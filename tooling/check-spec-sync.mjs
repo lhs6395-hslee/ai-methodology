@@ -79,6 +79,13 @@ if (!["silent", "warn", "error"].includes(POLICY)) {
   console.error(`✗ specSyncUnownedPolicy 값 위반 "${POLICY}" — silent|warn|error 중 하나(문법화, 정의되지 않은 값 금지)`);
   process.exit(1);
 }
+// Draft 소유 코드 차단(SPEC-008 FR-004)을 range 모드에서도 hard로 승격할지 — CI가 range 모드로
+// MR diff를 검사하면 로컬 commit-msg 훅을 타지 않는 웹 UI 병합도 이 정책으로 막을 수 있다(SPEC-008 FR-007).
+const DRAFT_POLICY = cfg.draftBlockPolicy || "advisory";
+if (!["advisory", "hard"].includes(DRAFT_POLICY)) {
+  console.error(`✗ draftBlockPolicy 값 위반 "${DRAFT_POLICY}" — advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
 const exempt = (cfg.specSyncExemptGlobs || []).map(compileGlob);
 const specSet = new Set(specs.map((s) => s.path));
 const violations = []; // {file, spec}
@@ -134,8 +141,11 @@ if (globHard && !violations.length) {
   process.exit(1);
 }
 if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
+// draftBlockPolicy=hard: range 모드에서도 Draft 위반을 hard로 승격(SPEC-008 FR-007) — 웹 UI 병합이
+// 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
+const draftHard = !STAGED && DRAFT_POLICY === "hard" && violations.some((v) => v.draft);
 for (const v of violations) console.log(v.draft
-  ? `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
+  ? `  ${STAGED || draftHard ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
   : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
 if (STAGED) {
   console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.`);
@@ -143,6 +153,10 @@ if (STAGED) {
   if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
+  process.exit(1);
+}
+if (draftHard) {
+  console.error(`\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).`);
   process.exit(1);
 }
 console.log("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.");
