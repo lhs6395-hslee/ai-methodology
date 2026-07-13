@@ -62,7 +62,7 @@ Expected: FAIL — 스크립트 없음.
 ```sh
 # tooling/harness/sdd-session-context.sh
 # SessionStart hook — 세션 진입 시 방법론 궤도·진입규칙을 컨텍스트에 주입.
-# 설계: docs/superpowers/specs/2026-07-01-methodology-enforcement-hooks-design.md §5
+# 설계: docs/design/2026-07-01-methodology-enforcement-hooks-design.md §5
 # (JSON 주입이 필요하면 이 텍스트를 additionalContext로 감싼다.)
 cat <<'EOF'
 [SDD 방법론 — 이 프로젝트는 채택된 강제 궤도 위에서 돈다]

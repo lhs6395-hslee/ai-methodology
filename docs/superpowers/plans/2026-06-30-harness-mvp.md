@@ -44,7 +44,7 @@ Create `HARNESS.md`:
 ```markdown
 # HARNESS — SDD 인터랙티브 sync 계약 (포터블)
 
-> spec↔code 생애주기를 **사람-개입**으로 오케스트레이션하는 플로우 계약. 이 규칙표가 SSOT — 실행기(에이전트별)는 이 표를 해석한다. 탐지는 기존 게이트 재사용(판정 로직 신규 0). 결정은 항상 사람(작성=LLM, 승인=사람). 설계 근거: `docs/superpowers/specs/2026-06-30-harness-design.md`.
+> spec↔code 생애주기를 **사람-개입**으로 오케스트레이션하는 플로우 계약. 이 규칙표가 SSOT — 실행기(에이전트별)는 이 표를 해석한다. 탐지는 기존 게이트 재사용(판정 로직 신규 0). 결정은 항상 사람(작성=LLM, 승인=사람). 설계 근거: `docs/design/2026-06-30-harness-design.md`.
 
 ## 규칙표 {trigger, detect, ask, act}
 

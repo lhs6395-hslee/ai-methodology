@@ -1,6 +1,6 @@
 // tooling/spec-sync-lib.mjs
 // check-spec-sync 순수 코어 — glob 컴파일 + diff 섹션 귀속. git 비의존(테스트 용이).
-// 설계: docs/superpowers/specs/2026-07-02-spec-first-enforcement-design.md §4.1·§5.4
+// 설계: docs/design/2026-07-02-spec-first-enforcement-design.md §4.1·§5.4
 
 // §4.1 지원 부분집합: **(0+ 경로 세그먼트)·*(세그먼트 내). anchored, POSIX, 대소문자 구분.
 export function compileGlob(glob) {

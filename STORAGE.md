@@ -16,6 +16,10 @@
 <project>/
 ├─ sdd.config.json              # ★ 두 구역을 잇는 단일 SSOT (§3): 어디 저장·어디 스캔
 │
+├─ docs/                        # (선택) 스펙 이전 설계·브레인스토밍 산출물 = "무엇을/왜"의 초안
+│  └─ design/
+│     └─ YYYY-MM-DD-<topic>-design.md  # 비정본. 승인되면 sdd/specs/<PREFIX>-NNN 으로 착지(§2.7)
+│
 ├─ sdd/                         # ┌─ SDD 구역 (문서·메타 = "무엇을/왜"). 실행 코드 아님.
 │  ├─ MODULE_MAP.md             # │  이 레포 단일 모듈 매니페스트(정체성+spec 인덱스)
 │  ├─ smoke-manifest.json       # │  (선택) FR 검증 회계 매니페스트 — requireAccounting/smoke-scan이 소비(SPEC-007/010)
@@ -58,6 +62,9 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 4. **추적 닻 = 언어중립 ID** `FR-NNN`. 테스트는 `@covers <PREFIX>-NNN/FR-NNN`(주석 스타일 자유 `//`·`#`·`--`)로 연결.
 5. **정본 언어 = 영어**, 현지어본은 생성만(병행 편집 금지).
 6. 폐기 = 통제 제거(spec+코드+테스트 같은 PR 원자 삭제, `MODULE_MAP`에 기록) — `STRUCTURE.md` 수명주기.
+7. **설계 문서(pre-spec)는 스펙이 아니다.** 브레인스토밍·설계 산출물은 `docs/design/YYYY-MM-DD-<topic>-design.md`(비정본, git 추적)에 두고, 승인되면 그 내용을 `sdd/specs/<PREFIX>-NNN.md`(정본 EARS FR + `## Ownership`)로 착지시킨다. 게이트는 `docs/design/`을 스캔하지 않는다 — FR·Ownership 추적은 `specDir`(§1)만 대상이고, `docs/**`는 `specSyncExemptGlobs` 기본값에 이미 포함돼 spec-first 동반 요구에서도 제외된다. 추적 사슬: `docs/design/…-design.md` ─(승인·착지)→ `sdd/specs/<PREFIX>-NNN.md` ─(`@covers`)→ `tests/` → `src/`.
+
+> **(선택) Superpowers 연동:** `brainstorming` 스킬의 기본 설계 문서 경로(`docs/superpowers/specs/`)는, 이 방법론을 채택한 프로젝트에서는 `docs/design/`으로 오버라이드한다(스킬의 "spec location override" 설정 — 사용자 프로젝트 규약이 스킬 기본값보다 우선).
 
 ## 3. `sdd.config.json` = "이 프로젝트의 저장 방식" SSOT
 한 파일이 저장·식별·게이트 배선 전부를 규정 → 언어·접두어가 달라도 코드 fork 불필요.
@@ -88,6 +95,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 ## 4. 저장 vs 참조 (한눈에)
 | | 항목 |
 |---|---|
+| **레포에 저장 — 설계 문서(선택, 비정본)** | `docs/design/*.md`(브레인스토밍·설계 산출물 — 승인 후 `sdd/specs/`로 착지, 게이트 스캔 대상 아님, §2.7) |
 | **레포에 저장 — SDD 구역** | `sdd/specs/*` · `sdd/MODULE_MAP.md` · `.specify/…/constitution.md` · (회계 켜면) `sdd/smoke-manifest.json` · (readopt 시) `sdd/derivation.json` |
 | **레포에 저장 — TDD 구역** | `src/*`(코드) · `tests/*`(테스트, `@covers`로 FR 연결) — 언어 관례 위치 |
 | **레포에 저장 — 배선** | `sdd.config.json` · 게이트 1판(`scripts/`) · CI/CD 설정 |

@@ -1,6 +1,6 @@
 #!/bin/sh
 # SessionStart hook — 세션 진입 시 방법론 궤도·진입규칙을 컨텍스트에 주입.
-# 설계: docs/superpowers/specs/2026-07-01-methodology-enforcement-hooks-design.md §5
+# 설계: docs/design/2026-07-01-methodology-enforcement-hooks-design.md §5
 # (JSON 주입이 필요하면 이 텍스트를 additionalContext로 감싼다.)
 cat <<'EOF'
 [SDD 방법론 — 이 프로젝트는 채택된 강제 궤도 위에서 돈다]
@@ -8,6 +8,7 @@ cat <<'EOF'
 진입 규칙(새 기능/수정 시 반드시):
   1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
   2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
+  2b) 설계 문서(pre-spec, 승인 전) 위치 = docs/design/ (docs/superpowers/specs/ 아님, STORAGE §2.7)
   3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약

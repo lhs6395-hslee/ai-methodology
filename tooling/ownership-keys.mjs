@@ -1,6 +1,6 @@
 // tooling/ownership-keys.mjs
 // 공통 키 라이브러리 — 파싱·정규화·형식검증. check-ownership/cohesion/consistency 공유.
-// 설계: docs/superpowers/specs/2026-06-30-ownership-key-derivation-design.md §4
+// 설계: docs/design/2026-06-30-ownership-key-derivation-design.md §4
 
 // `## <heading>` 섹션을 잘라 카테고리별 키 배열로. 헤더 다음~다음 ## 전까지.
 export function parseSection(text, heading, categories) {

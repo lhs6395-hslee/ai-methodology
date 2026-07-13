@@ -92,3 +92,4 @@
 | 2026-07-05 | git 호출에 `core.quotepath=off` — 비ASCII 경로가 8진수 인용 문자열로 나와 glob 매칭·디렉토리 귀속이 조용히 깨지던 것 수정(spec-sync·converge, + 한글 파일명 회귀 테스트) | 도그푸딩(이 레포 방법론.html): P2 warn이 인용된 경로를 unowned로 오판해 발견 — 조용한 미매치 금지 |
 | 2026-07-06 | Files 글롭 미지원 문법(`{`·`?`·선두 `[`)을 staged(hard)에서 exit 1로 승격 — range는 advisory 유지, 판정 정책은 SPEC-013 소유 | 고도화 4차: 템플릿의 "금지" 문법이 warn뿐이라 매치 실패 = 소유가 조용히 풀리는 미강제 규범이었음 — staged 차단으로 문법화 |
 | 2026-07-09 | check-spec-sync.mjs에 `draftBlockPolicy` 분기(range 모드에서도 Draft 위반 hard 승격) 배선 — 판정 요구(FR-007)는 SPEC-008 소유, 이 spec은 그 분기가 사는 파일(check-spec-sync.mjs)만 소유 | SPEC-008 FR-007 신설 동반 — 도그푸딩(FinOps): 웹 UI 병합이 로컬 commit-msg 훅을 우회하는 사각지대 봉합 |
+| 2026-07-09 | `spec-sync-lib.mjs` 설계 근거 주석 경로 정정(`docs/superpowers/specs/` → `docs/design/`) | STORAGE §2.7 신설 동반 — 킷 자신의 설계 문서가 새 규약 위치로 이동, 참조 경로 동기(동작 변경 없음) |

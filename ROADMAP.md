@@ -26,7 +26,7 @@
   - **추적 태그 마이그레이션(SPEC-011)**: 재도출은 FR 키 보존이 기본, 재번호는 맵+`retag` 기계 이행 — @covers 재연결 비용 제거.
   - 절차 정본화: `prompts/readopt.md` 6~7단계에 소스 클래스→산출물 매핑표·자동 결선 규칙. 키트 자신 `derivationManifest` 상시 on(9클래스 정직 회계).
 
-설계·계획 근거: `docs/superpowers/specs/` · `docs/superpowers/plans/`.
+설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
 
 > **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 5 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.
 

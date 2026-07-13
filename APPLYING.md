@@ -105,16 +105,17 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 진입 규칙(새 기능/수정 시 반드시):
   1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
   2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
+  2b) 설계 문서(pre-spec, 승인 전) 위치 = docs/design/ (docs/superpowers/specs/ 아님, STORAGE §2.7)
   3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
-게이트(품질): check-fr-coverage(+검증회계)·check-ownership(+entity 레지스트리)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거)·check-spec-consistency
-게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책)
+게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency
+게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책·글롭 문법)
 게이트(재도출·증거): check-derivation(소스 9클래스 회계)·sdd-smoke-scan(검증 태그↔smokeManifest 드리프트)
 동기화: /sdd-sync (drift 점검), pre-push 훅
 ```
 
-**왜:** superpowers 스킬이 기본 경로(`docs/superpowers/specs/`)로 이끌고, FEAT 같은 임의 PREFIX를 만드는 이탈이 실제로 반복됐다. hook이 컨텍스트에 명시해야 모델이 프로젝트 규약을 따른다.
+**왜:** superpowers 스킬이 기본 경로(`docs/superpowers/specs/`)로 이끌고, FEAT 같은 임의 PREFIX를 만드는 이탈이 실제로 반복됐다. hook이 컨텍스트에 명시해야 모델이 프로젝트 규약을 따른다. 같은 기본 경로가 **브레인스토밍 설계 문서**(정본 스펙 이전 단계)에도 적용되는데, 그 산출물은 스펙이 아니라 `docs/design/`에 둔다(STORAGE §2.7) — 착지 전 초안과 정본 스펙을 같은 폴더에 두면 스펙 게이트가 잘못 스캔하거나 사람이 헷갈린다.
 
 ### ② 새 기능 — MODULE_MAP 대조 → spec → TDD
 
