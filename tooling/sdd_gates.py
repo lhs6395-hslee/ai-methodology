@@ -363,7 +363,7 @@ def cmd_fr(cfg, strict):
         pfx = m.group(1)
         if pfx not in allowed:
             prefix_errors.append(
-                f'미등록 접두어 "{pfx}" ({f}) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, '
+                f'미등록 접두어 "{pfx}" ({f}) — 표준 SPEC/INFRA/TEST/CICD. 임의 생성 금지, '
                 f"필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가")
         elif pfx not in STANDARD_PREFIXES and not str(rationale.get(pfx, "")).strip():
             prefix_errors.append(f'표준 밖 접두어 "{pfx}" — prefixRationale["{pfx}"]에 도입 사유 필요(빈 값 불가)')
