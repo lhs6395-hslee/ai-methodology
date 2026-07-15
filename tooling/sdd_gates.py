@@ -637,7 +637,7 @@ def cmd_cohesion(cfg, strict):
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
-        frs = len(set(cfg["__frToken"].findall(text)))
+        frs = len(set(cfg["__frDecl"].findall(text)))  # 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용 제외
         if frs > max_frs:
             violations.append((spec_id, "FR", frs, max_frs))
         if re.search(r"^##\s+Ownership", text, re.MULTILINE):

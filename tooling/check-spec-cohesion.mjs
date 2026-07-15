@@ -38,7 +38,7 @@ const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
 // 고유 FR-ID 수 — 문법은 config의 requirementIdPrefixes에서 파생(coverage와 동일 사이트 통일).
 function countFRs(text) {
   const ids = new Set();
-  for (const m of text.matchAll(cfg.__frTokenRe)) ids.add(m[0]);
+  for (const m of text.matchAll(cfg.__frDeclRe)) ids.add(m[1]); // 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용은 제외
   return ids.size;
 }
 

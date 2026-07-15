@@ -96,3 +96,16 @@ test("maxAggregateRootsPerSpec 상향 → aggregate 다수 신호 억제(루트+
   assert.doesNotMatch(r.out, /aggregate/i); // 임계 상향 시 aggregate 경고 없음
   assert.match(r.out, /분할 권고 없음/);
 });
+
+test("Change Log의 FR 인용은 FR 수 카운트에서 제외 — 정의(**FR-NNN**)만 집계(오탐 회귀)", () => {
+  // 본문 정의 3개 + Change Log가 FR-004~FR-012 인용(9개). 평문 토큰 카운트면 12>8 오탐,
+  // 정의(**FR**)만 세면 3 → 분할 권고 없음. (SPEC-013 "15>11" 오탐과 동종)
+  const cl = Array.from({ length: 9 }, (_, i) => `| 2026-07-15 | FR-${String(i + 4).padStart(3, "0")} 관련 수정 | c |`).join("\n");
+  const dir = fixture(CFG, {
+    "sdd/specs/SPEC-001.md":
+      "**Spec**: `SPEC-001`\n**FR-001** a\n**FR-002** b\n**FR-003** c\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n" + cl + "\n",
+  });
+  const warn = run(dir);
+  assert.match(warn.out, /분할 권고 없음/, warn.out);        // 정의 3개뿐 → 오탐 없어야
+  assert.equal(run(dir, ["--strict"]).code, 0, "인용 카운트로 FR 과다 오탐(strict exit 1)");
+});

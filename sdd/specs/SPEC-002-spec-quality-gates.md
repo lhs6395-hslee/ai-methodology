@@ -98,3 +98,4 @@
 | 2026-07-06 | fr 게이트에 테스트 인프라 격리(testInfraGlobs) 배선 — 판정 코어는 SPEC-015(test-domain-lib) 소유, 본체는 호출·prefixErrors만 | SPEC-015 신설 동반 — testInfra 파일의 비-TEST 소유 차단 |
 | 2026-07-09 | ownership 게이트에 Entity 관계 검사(`Dependencies.Entities`의 `Name (relation-type)` 구조화 표기 — 실재·소유 spec 해석 hard, 순환 advisory) 배선 — 판정 코어는 SPEC-017(relation-lib) 소유, 본체는 호출만 | SPEC-017 신설 동반 — 도그푸딩(FinOps): 과대 spec을 aggregate별로 쪼갤 때 쪼개진 Entity 간 관계를 적을 문법 부재 |
 | 2026-07-15 | `check-fr-coverage` PREFIX 위반 에러 문자열을 `표준 SPEC/INFRA/TEST/CICD`로 | CICD 절반 롤아웃 봉합 — STANDARD 집합·DEFAULTS는 이미 4종인데 에러 메시지만 3종 잔재(4판 바이트 패리티 위해 Node·Python·셸·Go 동시) |
+| 2026-07-15 | cohesion FR 카운터를 `__frTokenRe`(평문 토큰) → `__frDeclRe`(`**FR-NNN**` 정의)로 + 회귀 테스트 | 도그푸딩(FinOps): Change Log·근거 문단의 FR 인용이 정의로 오집계돼 "FR 15>11" 오탐(실 본문 13) — coverage와 동일 사이트(정의만) 통일 |

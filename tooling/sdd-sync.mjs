@@ -11,10 +11,12 @@
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const STRICT = process.argv.includes("--strict");
 const JSON_OUT = process.argv.includes("--json");
-const HERE = dirname(new URL(import.meta.url).pathname);
+// fileURLToPath: 한글 등 비-ASCII 경로에서 URL.pathname은 %-인코딩돼 게이트가 조용히 스킵된다(도그푸딩 발견).
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // 규칙 → detector 게이트(HARNESS.md 규칙표). 같은 디렉토리에서 게이트를 찾는다.
 const RULES = [
