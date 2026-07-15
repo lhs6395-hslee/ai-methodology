@@ -64,7 +64,7 @@ steps:
   - <GATE> ownership
 ```
 - **파이프라인이 한 줄 스크립트면:** `<GATE> run lint && <GATE> run test && <GATE> fr && <GATE> ownership`
-- **로컬 vs CI 테스트 tier:** 로컬·pre-push는 `run test`(로컬 안전 = 유닛)만. CI·개발서버는 AWS 자격증명이 있으니 `run test` 뒤에 **`run smoke`(인프라 테스트)**도 붙인다 — 로컬은 인프라(AWS) 테스트를 강제하지 않는다(METHODOLOGY "검증은 환경으로 계층화된다"·`sdd.config.presets.md` 테스트 tier). 인프라 FR은 smoke 증거(`@verifies`→`smokeManifest`) 또는 deferred로 회계.
+- **로컬 vs CI 테스트 tier:** 로컬·pre-push는 `run test`(로컬 안전 = 유닛)만. CI·개발서버는 인프라 자격증명·도달성이 있으니 `run test` 뒤에 **`run smoke`(인프라 테스트)**도 붙인다 — 로컬은 인프라(어느 CSP든) 테스트를 강제하지 않는다(METHODOLOGY "검증은 환경으로 계층화된다"·`sdd.config.presets.md` 테스트 tier). 인프라 FR은 smoke 증거(`@verifies`→`smokeManifest`) 또는 deferred로 회계.
 - **셸판을 쓰면** 러너 이미지에 `grep`/`awk`/`jq`만 있으면 됨(대개 기본). **Go 바이너리**면 이미지·도구 무관.
 - 워크플로우 YAML 형식을 쓰는 도구용 **복붙 샘플**: `tooling/sdd-gates.yml`(게이트), `tooling/sdd-gate-release.yml`(Go 바이너리 빌드). 다른 도구는 위 스텝을 그 문법으로 옮기면 동일.
 

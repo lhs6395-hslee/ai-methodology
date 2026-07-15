@@ -84,30 +84,39 @@
 }
 ```
 
-## 테스트 환경 tier — `commands.test`(로컬 안전) vs `commands.smoke`(인프라)
-> 로컬엔 AWS 자격증명이 없을 수 있다. **로컬 강제(git 훅·TDD)가 인프라 테스트를 실행하지 않도록** 테스트 명령을 두 tier로 나눈다(METHODOLOGY "검증은 환경으로 계층화된다"). `sdd-run`은 임의 stage를 실행하므로 코드 변경 없이 `smoke` stage가 돈다.
+## 테스트 환경 tier — `commands.test`(로컬 안전) vs `commands.smoke`(인프라) — CSP 무관
+> 로컬엔 인프라 자격증명·네트워크 접근이 없을 수 있다. **로컬 강제(git 훅·TDD)가 인프라 테스트를 실행하지 않도록** 테스트 명령을 두 tier로 나눈다(METHODOLOGY "검증은 환경으로 계층화된다" — 능동적 가능성 판정). `sdd-run`은 임의 stage를 실행하므로 코드 변경 없이 `smoke` stage가 돈다.
 > - `commands.test` = **로컬 안전**(유닛+목)만. 로컬·pre-commit·TDD가 이것만 본다.
-> - `commands.smoke` = **인프라**(AWS 등). 자격증명·도달성 있는 곳(개발서버·CI)에서만 `sdd-run smoke`.
-> - **로컬 실행 가능성:** 공개 API(S3·DynamoDB·STS·CloudWatch·Cost Explorer)는 자격증명만 있으면 로컬 가능(가드가 자격증명 유무로 분기). VPC 전용(Aurora·프라이빗 RDS·ElastiCache)은 로컬 도달 불가 → 개발서버·CI 전용.
+> - `commands.smoke` = **인프라**(관리형 DB·오브젝트 스토리지·큐·클라우드 API·사설 네트워크 자원 — 어느 CSP든). 자격증명·도달성 있는 곳(개발서버·CI)에서만 `sdd-run smoke`.
+> - **로컬 가능성은 가정 말고 판정(사용자 확인 + 실제 probe):** 공개 엔드포인트+자격증명(오브젝트 스토리지·서버리스·모니터링 API 등)은 로컬에 권한 있으면 가능 → 가드가 probe(인증/연결 시도)로 분기. 사설·네트워크 격리(VPC·사설 서브넷 내 DB·캐시, 온프렘 내부)는 로컬 도달 불가 → 개발서버·CI 전용. **probe 실패 시 자원·사유를 skip 메시지·회계에 명시**(조용한 통과 금지).
 
-test/smoke 분리 예(Python):
+test/smoke 분리 예(Python — 도구·CSP만 갈아끼우면 동일):
 ```json
 { "commands": {
   "test":  "python3 -m unittest discover -s tests -p 'test_*_unit.py'",
   "smoke": "SDD_SMOKE=1 python3 -m unittest discover -s tests/smoke"
 } }
 ```
-skip 가드(인프라 테스트가 로컬에서 **실패가 아니라 skip** 되게):
+probe 기반 skip 가드(로컬에서 **실패가 아니라 사유 포함 skip**):
 ```python
 import os, unittest
-# VPC 전용(Aurora 등) — 환경 플래그로, 로컬은 항상 skip:
-@unittest.skipUnless(os.getenv("SDD_SMOKE"), "infra test — 개발서버/CI에서만")
-class TestAuroraMigration(unittest.TestCase): ...
-# 공개 API(S3 등) — 자격증명 유무로, 로컬에 creds 있으면 실행:
-# @unittest.skipUnless(boto3.Session().get_credentials(), "no AWS creds")
+# 사설·격리 자원(예: VPC 내 관리형 DB) — 환경 플래그로, 로컬은 항상 skip:
+@unittest.skipUnless(os.getenv("SDD_SMOKE"), "infra test — 개발서버/CI에서만(로컬 도달 불가)")
+class TestPrivateDbMigration(unittest.TestCase): ...
+
+# 공개 엔드포인트 자원 — 실제 접근 probe로 분기(권한/도달 실패 시 사유 포함 skip):
+def _reachable():
+    try:
+        client.ping()   # CSP/SDK 무관 최소 시도: 스토리지 head / DB SELECT 1 / API describe
+        return True, ""
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"   # 권한 없음·도달 불가 등 실제 사유
+_ok, _why = _reachable()
+@unittest.skipUnless(_ok, f"인프라 접근 불가 → 개발서버/CI 검증. 사유: {_why}")
+class TestObjectStore(unittest.TestCase): ...
 ```
-JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트는 `describe.skipIf(!process.env.SDD_SMOKE)(…)`.
-> CI·개발서버는 `sdd-run test` + `sdd-run smoke` 둘 다, 로컬·pre-commit은 `test`만. 인프라 FR은 smoke 증거(`@verifies`→`smokeManifest`) 또는 deferred로 회계된다(로컬 unit 강제 없음).
+JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트는 probe 결과로 `describe.skipIf(!reachable)(…)`.
+> CI·개발서버는 `sdd-run test` + `sdd-run smoke` 둘 다, 로컬·pre-commit은 `test`만. 인프라 FR은 smoke 증거(`@verifies`→`smokeManifest`) 또는 deferred(사유 명시)로 회계된다(로컬 unit 강제 없음).
 
 ## 인프라 전용 레포 (IaC — CSP 무관: AWS / GCP / Azure / 온프렘)
 > 앱 코드가 없고 IaC만 있는 경우. `@covers`를 정책 테스트(OPA/conftest·terratest 등)에 달고, **로컬 안전**(fmt·validate·conftest — 자격증명 불요)은 `commands.test`, **그 환경의 live drift 검증**(자격증명 필요)은 `commands.smoke`에 넣는다(`SSOT.md` §5b). 아래는 Terraform 예시 — IaC 도구·클라우드만 갈아끼우면 동일하게 동작한다.

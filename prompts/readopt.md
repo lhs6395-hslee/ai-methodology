@@ -24,7 +24,7 @@
    fi
    sh "$KIT/tooling/sdd-init.sh" --gate=node --force      # ← 대상 프로젝트 루트에서
    ```
-4. **config 맞춤 + 새 knob 인스턴스화.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`). 프리셋 필드표의 knob을 전부 검토해 **값이 프로젝트별인 것**(예: `trackerCloseout` 트래커·채널, `testInfraGlobs`, `objectStorageMarkers`)은 CLAUDE.md 관례/사용자 확인으로 인스턴스화한다(자동 추정 금지, 해당 없으면 기본 비활성값). 인프라·AWS 의존이 있으면 **`commands.test`(로컬 안전)/`commands.smoke`(인프라 AWS) tier 분리 + 인프라 테스트 skip 가드**를 인스턴스화한다 — 절차·가드 코드 원본은 `tooling/sdd.config.presets.md`의 "테스트 환경 tier" 섹션이 SSOT(여기 복붙 금지). **주의:** 3단계 `sdd-init --force`는 `sdd.config.json`을 덮어쓰므로, 이전에 tier 분리가 있었으면 이 단계에서 재적용한다.
+4. **config 맞춤 + 새 knob 인스턴스화.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`). 프리셋 필드표의 knob을 전부 검토해 **값이 프로젝트별인 것**(예: `trackerCloseout` 트래커·채널, `testInfraGlobs`, `objectStorageMarkers`)은 CLAUDE.md 관례/사용자 확인으로 인스턴스화한다(자동 추정 금지, 해당 없으면 기본 비활성값). 인프라(관리형 DB·스토리지·큐·클라우드 API 등 — 어느 CSP든) 의존이 있으면 **`commands.test`(로컬 안전)/`commands.smoke`(인프라) tier 분리 + probe 기반 skip 가드**를 인스턴스화한다. 능동적 판정(분류 → 사용자 확인 + 실제 접근 probe → 실패 시 자원·사유 명시)의 절차·가드 코드 원본은 `tooling/sdd.config.presets.md`의 "테스트 환경 tier" 섹션이 SSOT(여기 복붙 금지). **주의:** 3단계 `sdd-init --force`는 `sdd.config.json`을 덮어쓰므로, 이전에 tier 분리가 있었으면 이 단계에서 재적용한다.
 5. **구 산출물 정리 — 인간 절은 먼저 이월 목록으로.** 기존 `sdd/specs/*`를 걷어내기 **전에** 각 스펙의 인간 의도 절(User Story·Assumptions/Clarifications·Review Log·Dedup-Review·Change Log 근거)을 이월 목록으로 뽑아둔다(prior-intent 소스 — 사후 재생성 불가). 그다음 걷어낸다 — 코드는 그대로, 1단계 스냅샷 태그에 남아 있음.
 6. **스펙 재도출 — 소스 클래스 9종 전부 읽는다(SPEC-009).** src만 읽는 재도출은 미완성이다. 정의된 소스 클래스와 산출물 매핑:
    | 클래스 | 읽을 것 | 착지 |
@@ -38,7 +38,7 @@
    | `prior-traceability` | 기존 `@covers`/검증 태그 인벤토리 | **FR 키 보존이 기본** — 태그가 참조하는 키를 새 스펙이 그대로 쓴다 |
    | `prior-intent` | 5단계 이월 목록 | 새 스펙의 Story·Clarifications로 이월(버리면 사유 회계) |
    | `human-intent` | 기록 안 된 순수 의도 — **사후 재도출 불가** | 사용자 인터뷰로 Clarifications에 선제 캡처, 불가면 deferred 회계 |
-   iac/ci 클래스가 매핑되거나 AWS 등 클라우드 의존이 확인되면 **4단계의 `commands.test`/`commands.smoke` tier 분리를 소급 적용한다**(로컬 강제가 인프라 테스트를 돌리지 않도록 — 프리셋 "테스트 환경 tier").
+   iac/ci 클래스가 매핑되거나 클라우드/인프라 의존(어느 CSP든)이 확인되면 **4단계의 `commands.test`/`commands.smoke` tier 분리를 소급 적용한다**(로컬 강제가 인프라 테스트를 돌리지 않도록 — 프리셋 "테스트 환경 tier").
    읽은 결과를 `sdd/derivation.json`에 클래스별 mapped/none/deferred로 회계하고 `sdd.config.json`에 `derivationManifest`를 선언한다 — `derivation` 게이트가 미회계·"실재하는데 none"을 차단한다. spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **iac/ci→INFRA 착지는 fr 게이트가 강제한다(SPEC-012)** — 소유 실파일이 전적으로 iac/ci 클래스인 스펙이 SPEC- 접두어면 exit 1이므로, 재도출 시점에 접두어를 바로 착지시킨다(부수 소유 정당 케이스는 자동 통과, 예외는 `prefixClassExemptions` 사유 등록). **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
 7. **결선 — 태깅은 보존·자동으로.** ① FR 키를 보존했으면 기존 `@covers`는 그대로 유효(R1이 검증). 재번호가 불가피했으면 마이그레이션 맵(old→new|null)을 만들어 `sdd-retag <map.json> --write`(또는 `sdd_gates.py retag`)로 기계 이행(SPEC-011) — 손 재태깅 금지. ② smoke 증거는 증거가 사는 파일(CI 정의·스크립트·runbook)에 검증 태그(`@verifies <SPEC-ID>/FR-NNN <method>: <evidence>`)로 남기고 `sdd-smoke-scan --write`로 매니페스트를 재생성(SPEC-010) — 손 연결 금지. ③ 게이트 green(derivation·smoke-scan check 포함) → 커밋(자기 훅 통과).
 
