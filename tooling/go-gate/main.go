@@ -55,7 +55,7 @@ func defaults() Config {
 		TestFileRegex:       []string{`\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$`},
 		OwnershipCategories: []string{"Entities", "Surfaces", "Capabilities"},
 		// Node판 sdd-config.mjs DEFAULTS의 미러 — 값이 다르면 config 없는 프로젝트에서 판정이 갈라진다.
-		SpecIdPrefixes:        []string{"SPEC", "INFRA", "TEST"},
+		SpecIdPrefixes:        []string{"SPEC", "INFRA", "TEST", "CICD"},
 		PrefixRationale:       map[string]string{},
 		RequirementIdPrefixes: []string{"FR"},
 		Commands:              map[string]string{},
@@ -209,7 +209,7 @@ var (
 	// (requirementIdPrefixes·specIdPrefixes에서 파생 — 하드코딩 사이트 금지).
 )
 
-var standardPrefixes = map[string]bool{"SPEC": true, "INFRA": true, "TEST": true}
+var standardPrefixes = map[string]bool{"SPEC": true, "INFRA": true, "TEST": true, "CICD": true}
 
 func gateFR(c Config, strict bool) {
 	specDir := c.resolve(c.SpecDir)
@@ -229,7 +229,7 @@ func gateFR(c Config, strict bool) {
 			}
 			pfx := m[1]
 			if !allowed[pfx] {
-				prefixErrors = append(prefixErrors, fmt.Sprintf(`미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가`, pfx, n))
+				prefixErrors = append(prefixErrors, fmt.Sprintf(`미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST/CICD. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가`, pfx, n))
 			} else if !standardPrefixes[pfx] && strings.TrimSpace(c.PrefixRationale[pfx]) == "" {
 				prefixErrors = append(prefixErrors, fmt.Sprintf(`표준 밖 접두어 "%s" — prefixRationale["%s"]에 도입 사유 필요(빈 값 불가)`, pfx, pfx))
 			}

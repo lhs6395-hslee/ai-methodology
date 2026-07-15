@@ -10,7 +10,7 @@ case "$FP" in
 [SDD 편집 체크 — 코드 건드리기 전 확인]
   □ MODULE_MAP 대조했나 (기존 spec 개정 vs 새 spec)
   □ 이 변경에 대응하는 FR 있나 — 없으면 sdd/specs/에 spec부터
-  □ PREFIX 표준(SPEC/INFRA/TEST)인가
+  □ PREFIX 표준(SPEC/INFRA/TEST/CICD)인가
   □ 테스트에 @covers <PREFIX>-NNN/FR-NNN 계획했나
 EOF
     ;;

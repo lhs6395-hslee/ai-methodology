@@ -9,7 +9,7 @@ cat <<'EOF'
   1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
   2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
   2b) 설계 문서(pre-spec, 승인 전) 위치 = docs/design/ (docs/superpowers/specs/ 아님, STORAGE §2.7)
-  3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
+  3) PREFIX 표준 = SPEC / INFRA / TEST / CICD 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
 게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency

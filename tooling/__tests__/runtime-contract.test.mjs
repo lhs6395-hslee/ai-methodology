@@ -47,7 +47,7 @@ test("② 하드코딩 요구 ID 정규식 금지 — 전 런타임 소스", () 
 test("③ Go 소스 계약: requirementIdPrefixes 파생·서픽스 경계·PREFIX 거버넌스", () => {
   const go = src("go-gate/main.go");
   assert.match(go, /requirementIdPrefixes/, "config 키 부재");
-  assert.match(go, /\{"SPEC", "INFRA", "TEST"\}/, "specIdPrefixes 기본값이 Node DEFAULTS와 다름");
+  assert.match(go, /\{"SPEC", "INFRA", "TEST", "CICD"\}/, "specIdPrefixes 기본값이 Node DEFAULTS와 다름");
   assert.match(go, /\{"FR"\}/, "requirementIdPrefixes 기본값 부재");
   assert.match(go, /reqAlt \+ `\)-\\d\{3\}\[a-z\]\?\)\\\*\\\*`/, "frDecl 파생·서픽스 문법 부재");
   assert.match(go, /reqAlt \+ `\)-\\d\{3\}\[a-z\]\?\)\\b`/, "covers 파생·경계(\\b) 강제 부재");
@@ -57,7 +57,7 @@ test("③ Go 소스 계약: requirementIdPrefixes 파생·서픽스 경계·PREF
 test("③ 셸 소스 계약: REQALT 파생·과포집 후 정확형 필터·거버넌스", () => {
   const sh = src("sdd_gates.sh");
   assert.match(sh, /requirementIdPrefixes \| arr_or_default FR/, "requirementIdPrefixes 기본값 부재");
-  assert.match(sh, /specIdPrefixes \| arr_or_default SPEC INFRA TEST/, "specIdPrefixes 기본값이 Node DEFAULTS와 다름");
+  assert.match(sh, /specIdPrefixes \| arr_or_default SPEC INFRA TEST CICD/, "specIdPrefixes 기본값이 Node DEFAULTS와 다름");
   assert.match(sh, /\$\{REQALT\}\)-\[0-9\]\{3\}\[a-z\]\?\$/, "정확형 필터(경계 재현) 부재");
   assert.match(sh, /PREFIX 위반/, "PREFIX 거버넌스 부재");
 });

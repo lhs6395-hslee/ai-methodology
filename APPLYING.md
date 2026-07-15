@@ -62,7 +62,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 ```
 > **어떤 언어 런타임도 강요하지 않는다.** Go·C·Rust 등은 (a) 바이너리면 인터프리터 0으로 돈다(크로스컴파일·정적 검증됨). 배포 파이프라인 없이 즉시 돌릴 땐 (b) 셸판(실증: `go` 미설치로 Go 프로젝트 게이트 통과). 이미 Python/Node가 있으면 (c)/(d). **커버 범위 차이:** (a)/(b)는 핵심 3커맨드(fr·ownership·run), (c) Python은 보강게이트·spec-first까지 Node 전 게이트 패리티(`ci-examples.md` 표) — 비-Node 스택에서 전 게이트가 필요하면 (c).
 **언어 맞춤(핵심):** 루트의 `sdd.config.json`을 프로젝트 언어로 바꾼다 — `tooling/sdd.config.presets.md`에서 해당 언어 블록 복사(`testFileRegex`·`scanDirs`·`ignoreDirs`·`ownershipCategories`·`specIdPrefixes`·`commands`). JS/TS면 기본값 그대로.
-- ⚠ **`specIdPrefixes`(기본 `["SPEC","INFRA","TEST","CICD"]` — CICD 기본값은 현재 Node·Python판; 셸/Go판 동기화 진행 중):** 표준 밖 접두어(`FEAT` 등)를 쓰면 **반드시 여기 등록 + `prefixRationale`에 사유**(예: `["SPEC","INFRA","TEST","FEAT"]`). 미등록 접두어는 FR 게이트가 **exit 1로 차단**한다(조용한 누락 금지 — 4판 공통).
+- ⚠ **`specIdPrefixes`(기본 `["SPEC","INFRA","TEST","CICD"]` — 4판 런타임 동일: Node·Python·셸·Go):** 표준 밖 접두어(`FEAT` 등)를 쓰면 **반드시 여기 등록 + `prefixRationale`에 사유**(예: `["SPEC","INFRA","TEST","FEAT"]`). 미등록 접두어는 FR 게이트가 **exit 1로 차단**한다(조용한 누락 금지 — 4판 공통).
 - **`requirementIdPrefixes`(기본 `["FR"]`):** 요구 ID 접두어를 확장할 때 등록(예: `["FR","NFR"]`). FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 이 한 값에서 파생된다 — 코드 fork 없이 config로 확장.
 - `commands`에 그 언어의 `setup/lint/typecheck/test`를 넣는다(예: Python `pytest -q`, Go `go test ./...`). CI/CD는 `<게이트> run <stage>`로 그 명령을 실행하므로 **워크플로우 본체는 손대지 않는다**(도구별 예시: `ci-examples.md`). 미설정 stage는 건너뜀.
 - JS/TS 프로젝트만 해당: `npm i -D vitest vite-tsconfig-paths @vitest/coverage-v8` + `cp <KIT>/tooling/vitest.config.ts ./`.
@@ -106,7 +106,7 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
   1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
   2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
   2b) 설계 문서(pre-spec, 승인 전) 위치 = docs/design/ (docs/superpowers/specs/ 아님, STORAGE §2.7)
-  3) PREFIX 표준 = SPEC / INFRA / TEST 만 (FEAT 등 임의 생성 금지)
+  3) PREFIX 표준 = SPEC / INFRA / TEST / CICD 만 (FEAT 등 임의 생성 금지)
   4) FR은 EARS, 테스트는 @covers <PREFIX>-NNN/FR-NNN
   5) 코드 전에 spec부터 — superpowers 기본 흐름 대신 이 프로젝트 규약
 게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency
@@ -137,7 +137,7 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 [SDD 편집 체크 — 코드 건드리기 전 확인]
   □ MODULE_MAP 대조했나 (기존 spec 개정 vs 새 spec)
   □ 이 변경에 대응하는 FR 있나 — 없으면 sdd/specs/에 spec부터
-  □ PREFIX 표준(SPEC/INFRA/TEST)인가
+  □ PREFIX 표준(SPEC/INFRA/TEST/CICD)인가
   □ 테스트에 @covers <PREFIX>-NNN/FR-NNN 계획했나
 ```
 
@@ -156,7 +156,7 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 **PREFIX 위반(미등록 접두어) — pre-commit exit 1 차단 실측:**
 ```
 ✗ PREFIX 위반:
-  ✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가
+  ✗ 미등록 접두어 "FEAT" (FEAT-001.md) — 표준 SPEC/INFRA/TEST/CICD. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가
 ```
 
 **ownership 중복 — pre-commit exit 1 차단 실측:**

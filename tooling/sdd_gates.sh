@@ -52,7 +52,7 @@ SCAN_DIRS=$(cfg_arr scanDirs | arr_or_default src tests)
 IGNORE=$(cfg_arr ignoreDirs | arr_or_default node_modules .next coverage dist build out target vendor __pycache__ .venv venv .git .idea .gradle bin obj Pods .dart_tool)
 TESTRX=$(cfg_arr testFileRegex | arr_or_default '\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$')
 CATS=$(cfg_arr ownershipCategories | arr_or_default Entities Surfaces Capabilities)
-PREFIXES=$(cfg_arr specIdPrefixes | arr_or_default SPEC INFRA TEST)
+PREFIXES=$(cfg_arr specIdPrefixes | arr_or_default SPEC INFRA TEST CICD)
 # spec ID 접두어 → ERE alt. 예: SPEC\nTEST → "SPEC|TEST"
 PREFALT=$(printf '%s' "$PREFIXES" | awk 'NR>1{printf "|"}{printf "%s",$0}')
 # 요구 ID 접두어(requirementIdPrefixes, 기본 FR) → ERE alt. FR 문법은 전 런타임 공통:
@@ -93,10 +93,10 @@ gate_fr() {
       pfx=$(printf '%s' "$b" | grep -oE '^[A-Z]+-[0-9]{3}' | grep -oE '^[A-Z]+' || true)
       [ -n "$pfx" ] || continue
       if ! printf '%s\n' "$PREFIXES" | grep -qx "$pfx"; then
-        printf '미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가\n' "$pfx" "$b" >> "$TMP/pfxerr"
+        printf '미등록 접두어 "%s" (%s) — 표준 SPEC/INFRA/TEST/CICD. 임의 생성 금지, 필요하면 specIdPrefixes+prefixRationale에 사유와 함께 추가\n' "$pfx" "$b" >> "$TMP/pfxerr"
       else
         case "$pfx" in
-          SPEC|INFRA|TEST) ;;
+          SPEC|INFRA|TEST|CICD) ;;
           *)
             rat=""
             [ -n "$CFG" ] && rat=$(jq -r ".prefixRationale.\"$pfx\" // empty" "$CFG")

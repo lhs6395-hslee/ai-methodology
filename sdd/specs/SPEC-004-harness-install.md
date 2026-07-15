@@ -100,3 +100,4 @@
 | 2026-07-06 | `speckit-fix.SKILL.md`에 6단계 "원점 트래커 close-out"(dev-done→보고→confirm) 추가 | 완료 루프 close-out 규범 — 트래커 유래 작업의 완료형 스킬 실행기(trackerCloseout knob 소비) |
 | 2026-07-09 | sdd-init node 복사 목록에 `relation-lib.mjs` 추가 | SPEC-017 신설 동반 — 채택 프로젝트가 Entity 관계 게이트를 결손 없이 배선(누락 시 check-ownership.mjs가 ERR_MODULE_NOT_FOUND) |
 | 2026-07-09 | `sdd-session-context.sh` 진입 규칙에 "2b) 설계 문서(pre-spec) 위치 = docs/design/" 추가(APPLYING.md·방법론.html 예시 블록 동기, 게이트 목록 드리프트도 같이 정정) | STORAGE §2.7 신설 동반 — 브레인스토밍 산출물이 스펙과 같은 "specs" 이름의 폴더로 새는 걸 세션 진입 시점에 차단 |
+| 2026-07-15 | 세션·편집 훅 표시 문자열(`sdd-session-context.sh`·`sdd-edit-check.sh`)의 PREFIX 표준을 `SPEC/INFRA/TEST/CICD` 4종으로 | CICD 절반 롤아웃 봉합 — 훅이 방출하던 3종 표시가 config 정본(4종)·SPEC-012와 어긋나 있던 것 정정(APPLYING "실측 출력" 블록도 4종으로 동기) |
