@@ -32,7 +32,7 @@
 - **Surfaces**: GET /api/staff/{id}
 ```
 
-**소유 키는 하나(aggregate root), 종속 키는 관계로.** 한 spec은 이상적으로 **하나의 aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유하고, 그 root가 참조·종속하는 다른 aggregate의 키는 **소유로 세지 말고 `## Dependencies`에 `EntityName (relation-type)` 구조화 표기**로 넣는다(SPEC-017). 그러면 (a) 소유 키 카운트가 부풀지 않아 cohesion의 "여러 aggregate 삼킴"(`Ownership.Entities` ≥2) 오탐이 사라지고, (b) 게이트가 그 관계를 검증한다 — 대상 Entity를 소유한 spec을 전체 spec에서 **자동 해석**해 없으면 **exit 1**(오타·삭제·미작성 차단, hard), aggregate 간 **순환 참조는 advisory**(SPEC-017 배선: `check-ownership`이 소비, Node·Python 패리티). 즉 **"원래 한 aggregate인데 종속 엔티티가 많아 키가 과다하던"** 경우는 *root 1개만 소유 + 나머지는 종속관계로* 표현해 해소한다. relation-type은 소문자 kebab 1토큰(`has-many`·`belongs-to`·`references` 등), 괄호 없는 항목은 레거시 자유참조로 그대로 통과(구조화는 opt-in), `relationTypes` config로 어휘를 제한할 수 있다(`capabilityVerbs` 거버넌스 동형).
+**소유 키는 하나(aggregate root), 종속 키는 관계로.** 한 spec은 이상적으로 **하나의 aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유하고, 그 root가 참조·종속하는 다른 aggregate의 키는 **소유로 세지 말고 `## Dependencies`에 `EntityName (relation-type)` 구조화 표기**로 넣는다(SPEC-017). 그러면 (a) 소유 키 카운트가 부풀지 않아 cohesion의 "여러 aggregate 삼킴"(`Ownership.Entities`가 `maxAggregateRootsPerSpec`(config, 기본 1) 초과) 오탐이 사라지고, (b) 게이트가 그 관계를 검증한다 — 대상 Entity를 소유한 spec을 전체 spec에서 **자동 해석**해 없으면 **exit 1**(오타·삭제·미작성 차단, hard), aggregate 간 **순환 참조는 advisory**(SPEC-017 배선: `check-ownership`이 소비, Node·Python 패리티). 즉 **"원래 한 aggregate인데 종속 엔티티가 많아 키가 과다하던"** 경우는 *root 1개만 소유 + 나머지는 종속관계로* 표현해 해소한다. relation-type은 소문자 kebab 1토큰(`has-many`·`belongs-to`·`references` 등), 괄호 없는 항목은 레거시 자유참조로 그대로 통과(구조화는 opt-in), `relationTypes` config로 어휘를 제한할 수 있다(`capabilityVerbs` 거버넌스 동형).
 
 **정규화 절대규칙 (결정성의 심장):**
 - **Entity**: 스키마·모델·마이그레이션의 테이블/타입명 식별자 그대로 + `trim().toLowerCase()`. 단복수 임의변환 금지(스키마가 진실). **entity 레지스트리(`entityRegistry`, 선택):** config에 `{ "<entity>": "<도입 사유>" }`로 채우면 Ownership의 aggregate-root 카테고리 키는 **등록된 것만** 허용된다(미등록 exit 1, 빈 사유 exit 1) — capabilityVerbs·PREFIX 거버넌스와 동형 패턴: **신규 entity 신설 = config 변경 = 리뷰 관문.** 말만 바꾼 유사 entity의 무단 증식을 어휘 수준에서 차단한다(비어 있으면 비활성 = 현행).
@@ -85,7 +85,9 @@
 ## 7. 키트 반영 위치
 | 파일 | 내용 |
 |---|---|
-| `tooling/check-ownership.mjs` | 게이트 본체(+ `entityRegistry` 등록제 검사) |
+| `tooling/check-ownership.mjs` | 게이트 본체(+ `entityRegistry` 등록제 · Entity 관계 실재·순환 검사 — SPEC-017) |
+| `tooling/relation-lib.mjs` · `sdd.config.json` `relationTypes` | Entity 관계 판정 코어(`Entity (relation-type)` 대상 실재 hard·aggregate 순환 advisory) · 관계 어휘 화이트리스트(SPEC-017) |
+| `tooling/check-spec-cohesion.mjs` | 입도 거울상(Ownership.Entities > `maxAggregateRootsPerSpec` = 여러 aggregate 삼킴 advisory) |
 | `tooling/check-spec-completeness.mjs` | `## Dedup-Review` 기록 존재 검사(Reviewed 이상, SPEC-008) |
 | `sdd.config.json` `entityRegistry` | entity 어휘 화이트리스트(entity→도입 사유) — 신설은 config 리뷰 관문 |
 | `STRUCTURE.md` | 소유권 유일성 규칙 + 라우팅 결정트리 |

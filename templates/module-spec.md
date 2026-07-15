@@ -6,6 +6,10 @@
 # Feature Specification: [FEATURE NAME]
 
 **Module**: `[MODULE-ID]`  **Spec**: `SPEC-NNN`  **Created**: [YYYY-MM-DD]  **Status**: Draft | Reviewed | Approved | Active | Deprecated | Removed (택1 — 수명주기 enum, completeness 게이트가 검증)
+<!-- (선택) **Lifecycle**: removable | permanent — Status와 직교. TEST/삭제예정 비제품 도구는 `removable`, 영속 제품 스펙은 생략(또는 `permanent`). SPEC-008 FR-006, SPEC-015가 TEST 도메인에서 소비. -->
+<!-- FR 번호: 기본 `**FR-NNN**`. 버그픽스가 기존 FR을 쪼개 착지하면 레터 서픽스 `**FR-NNNa**`(예 FR-003a) 허용 — 전 게이트·@covers·retag가 지원. -->
+<!-- Dependencies 관계: `Entity (relation-type)`에서 config `relationTypes`가 비어있지 않으면 등록된 어휘만 허용(capabilityVerbs 동형 관문, SPEC-017). -->
+
 <!-- 수명주기(상태 순서 강제 — SPEC-008): Draft(작성 중 — 소유 코드 변경을 spec-sync가 차단) →
   Reviewed(/analyze·/checklist 검토 후 아래 Review Log·Dedup-Review에 기록) → Approved(승인) →
   Active(구현 진행/완료) → Deprecated → Removed(폐기 — STRUCTURE.md 절차). -->

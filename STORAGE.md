@@ -71,7 +71,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 ```json
 {
   "specDir": "sdd/specs",                       // 스펙이 어디 저장되나
-  "specIdPrefixes": ["SPEC"],                    // 어떤 접두어가 1급 스펙인가  ← §2.2 함정의 키
+  "specIdPrefixes": ["SPEC","INFRA","TEST","CICD"],  // 어떤 접두어가 1급 스펙인가 (표준 4종 — §2.2·DEFAULTS)
   "ownershipCategories": ["Entities","Surfaces","Capabilities"],
   "scanDirs": ["src","tests"],                   // @covers를 어디서 찾나
   "ignoreDirs": ["…"],                           // 순회 제외

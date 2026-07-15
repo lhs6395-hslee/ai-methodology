@@ -96,3 +96,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-06 | Python에 `parse_lifecycle`·`LIFECYCLE_ENUM` + completeness Lifecycle enum 검증 미러 + 패리티 테스트 1종 | SPEC-008 FR-006 동반 — Lifecycle 필드도 런타임 중립(Node↔Python 동일 출력) |
 | 2026-07-06 | Python에 `test_infra_finding` + prefix_class TEST 면제 + fr 배선 미러 + 패리티 테스트 1종 | SPEC-015 신설 동반 — 테스트 인프라 격리·TEST 소유 허용도 런타임 중립 |
 | 2026-07-06 | Python DEFAULTS에 `trackerCloseout {}` 동기 | 완료 루프 close-out knob의 DEFAULTS 런타임 패리티(runtime-contract 강제) — 게이트 소비는 없으나 기본값 자체가 패리티 대상 |
+| 2026-07-15 | ears-preset 템플릿을 정식 `module-spec.md`와 바이트 재동기화(Lifecycle·FR 서픽스·relationTypes 안내 주석 3종) | doc-coverage 반영으로 정식 템플릿에 주석 추가 → FR-005 template-parity 유지 위해 preset 사본도 동일 갱신(게이트 동작 무변경) |

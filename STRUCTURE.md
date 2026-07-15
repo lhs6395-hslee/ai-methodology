@@ -4,7 +4,7 @@
 - **1 레포 = 1 모듈** (무조건). 레포 하나 = 안정적 bounded context 하나 = 그 능력 영역의 SSOT 홈. 모듈이 늘면 **레포가 는다**(한 레포에 여러 모듈을 넣지 않는다). 기계 신호: 전 스펙의 `Module` 헤더 값이 하나여야 하며, 갈라지면 `check-spec-completeness`가 advisory로 표면화한다(`--strict` 하드 — SPEC-013). "무엇이 한 모듈인가"의 판정 자체는 리뷰 경계(`METHODOLOGY.md`).
 - **spec** = 그 모듈 안의 응집된 기능 단위. 각 spec = 그 기능의 **살아있는 기능명세서**. 한 모듈(레포)은 spec 다수를 가진다.
 - **큰 프로그램 = 여러 모듈-레포의 MSA 합성** — 모듈 간은 공개 계약(API/이벤트)으로만 결합한다. 그 계약을 1급 SSOT로 강제하는 **MSA 계약 프로파일은 다중 모듈일 때 켜는 선택 계층**(Phase 2).
-- **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 aggregate(핵심 Entity) — dedup이 경계 강제(§3.1)**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조(읽기/호출만) — `EntityName (relation-type)`로 적으면 대상 실재·소유 spec을 게이트가 자동 해석하고 순환 참조를 advisory로 경고한다(구조화는 opt-in, SPEC-017). "응집 묶음"보다 훨씬 결정적인 경계 닻으로, dedup 게이트가 "1 Entity=1 spec" 판정을 사후 강제하고, cohesion 게이트가 Ownership.Entities ≥2이면 "여러 aggregate 삼킴 의심"을 advisory로 신호한다. — 서로 다른 aggregate root를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **aggregate별로 분할**한다. 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
+- **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 aggregate(핵심 Entity) — dedup이 경계 강제(`DEDUP.md` §3)**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조(읽기/호출만) — `EntityName (relation-type)`로 적으면 대상 실재·소유 spec을 게이트가 자동 해석하고 순환 참조를 advisory로 경고한다(구조화는 opt-in, SPEC-017). "응집 묶음"보다 훨씬 결정적인 경계 닻으로, dedup 게이트가 "1 Entity=1 spec" 판정을 사후 강제하고, cohesion 게이트가 Ownership.Entities가 `maxAggregateRootsPerSpec`(config, 기본 1)를 초과하면 "여러 aggregate 삼킴 의심"을 advisory로 신호한다(aggregate root + 그 자식 표를 한 spec이 함께 소유하는 모델이면 이 값을 상향). — 서로 다른 aggregate root를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **aggregate별로 분할**한다. 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
 
 ## 핵심 구분: 모듈 명세서(누적) vs feature 델타(병합)
 | | 정체 | 성격 |
@@ -37,7 +37,7 @@
 ## 기능이 줄 때 — 폐기·삭제 수명주기 (REMOVED)
 명세는 "현재 진실"이라야 하므로 **안 쓰는 spec은 삭제가 권장**(남기면 거짓 SSOT). 단 `rm`이 아니라 통제된 제거 — 추가의 반대, 동일 파이프라인.
 
-상태: `Draft → Reviewed → Approved → Active → Deprecated(예고) → Removed` — 전체 enum과 게이트 강제(Draft 코드 차단·Reviewed 이상 리뷰 기록)는 SPEC-008·`METHODOLOGY.md` 수명주기 절.
+상태: `Draft → Reviewed → Approved → Active → Deprecated(예고) → Removed` — 전체 enum과 게이트 강제(Draft 코드 차단·Reviewed 이상 리뷰 기록)는 SPEC-008·`METHODOLOGY.md` 수명주기 절. 이와 **직교하는 선택 필드 `Lifecycle: removable | permanent`(SPEC-008 FR-006)** 는 "삭제 예정 비제품 도구(`removable` — TEST 도메인 등)"와 "영속 제품(`permanent`)"을 기계가 구분한다 — 애초에 삭제 가능으로 표시된 스펙을 이 폐기 수명주기가 인지한다.
 
 1. 사람이 제거 결정(spec-first) → 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
 2. tasks 생성: "FR-NNN 코드·테스트 삭제".

@@ -16,9 +16,17 @@
 | **원칙 위반** | constitution 위배 | `/speckit.constitution` | 반자동 |
 | **재도출 스코프 누락** | 재생성이 src 밖 소스(IaC/CI/운영문서/이력/의도)를 조용히 안 읽음 | **`check-derivation.mjs`(SPEC-009)**: 소스 9클래스 회계 + 실재↔선언 교차검사 | ★자동(CI) |
 | **의도 기록 누락** | 변경의 "왜"가 어디에도 안 남음(사후 재도출 불가) | **completeness의 Change Log 근거 검사(SPEC-009)** + Review Log·Dedup-Review(SPEC-008) — 존재만 | ★자동(CI) |
+| **미검증 FR(회계 누락)** | 모든 FR이 unit/smoke/deferred 중 하나로 회계됐나 — "조용히 미검증" | **검증 회계(SPEC-007)**: `requireAccounting` R3 exit 1 · `smokeManifest` dangling/빈 값 exit 1 · `strictSpecs` | ★자동(CI) |
+| **증거 드리프트** | `@verifies` 태그와 `smokeManifest`가 어긋남 | **`sdd-smoke-scan.mjs`(SPEC-010)**: 태그 수집→매니페스트 재생성·check 드리프트 exit 1 | ★자동(CI) |
+| **접두어↔클래스 오분류** | 소유 실파일이 전적 iac→INFRA·ci→CICD인데 접두어 불일치 | **prefix-class(SPEC-012)**: `check-fr-coverage` exit 1 · `prefixClassExemptions` 사유 관문 | ★자동(CI) |
+| **스펙 문법 위반** | Module 헤더 부재/다값 · FR 라인 SHALL 없음 · Dedup 참조 미실재 · Files 카테고리 | **grammar(SPEC-013)**: completeness·ownership·spec-sync 배선(warn·`--strict`/staged hard) | ★자동(CI) |
+| **번호 체계 분기** | 접두어별 001 시작·중복·중간 gap | **numbering(SPEC-014)**: `check-fr-coverage`(중복·비-001 hard · gap advisory) | ★자동(CI) |
+| **테스트 인프라 누수** | `testInfraGlobs` 매치 파일을 제품(비-TEST) 스펙이 소유 | **test-domain(SPEC-015)**: `check-fr-coverage` exit 1 · `Lifecycle: removable` 관례 | ★자동(CI) |
+| **스토리지 결정 미기록** | `objectStorageMarkers` 매치인데 버킷 선택·이전(consolidation) 기준 없음 | **object-storage(SPEC-016)**: completeness advisory(`--strict` hard) | ★자동(CI) |
+| **관계 대상 미실재·순환** | `Entity (relation-type)` 대상을 어느 스펙도 안 소유 / aggregate 간 순환 | **relation(SPEC-017)**: `check-ownership` 실재 hard · 순환 advisory | ★자동(CI) |
 
 **요약:** 빈공란=`/clarify`, 한 기능 내 중복·모순·누락=`/analyze`, 체크리스트=`/checklist`, FR↔test=CI 게이트. **spec 간 중복**은 — **구조적**(같은 소유 키)=소유권 게이트로 **강제**, **의미적**(reworded)=좁힌 LLM 리뷰로 보조하되 *검토 기록의 존재*(`Dedup-Review`)와 *entity 어휘*(`entityRegistry`)는 게이트가 강제. (LLM은 누락을 내므로 결정적 게이트가 1차. 상세: `DEDUP.md` / `STRUCTURE.md` 소유권 유일성 규칙.)
 
 **이 체크리스트의 실행이 곧 Reviewed 전이다(SPEC-008):** `/analyze`+`/checklist`를 수행한 결과를 스펙의 `## Review Log`(일시·수행자·판정)에, 이웃 중복 검토를 `## Dedup-Review`에 기록하고 `Status: Reviewed`(이상)로 승격한다 — Draft인 채로는 소유 코드 변경이 commit-msg에서 막힌다. 기록의 존재는 completeness 게이트가 검사한다(내용의 질은 사람 몫 — 과장 금지).
 
-> 표기 규약: 위 `check-*.mjs`는 Node 파일명일 뿐 — 게이트는 Go 바이너리·셸·Python·Node 4판 동작 동일(`principles.md` §10), 소유 키 종류는 `sdd.config.json`의 `ownershipCategories`(웹 기본=Entity/Surface/Capability, 비-웹은 교체).
+> 표기 규약: 위 `check-*.mjs`는 Node 파일명일 뿐 — 핵심 3커맨드(fr·ownership·run)·ID 문법은 Go 바이너리·셸·Python·Node 4판 동작 동일(`principles.md` §10). 단 **보강·회계 계층(SPEC-007·012~017 등)은 Node·Python 두 판만**(셸/Go는 핵심 판정까지 — 정직한 델타, SPEC-006·`ci-examples.md` 매트릭스). 소유 키 종류는 `sdd.config.json`의 `ownershipCategories`(웹 기본=Entity/Surface/Capability, 비-웹은 교체).

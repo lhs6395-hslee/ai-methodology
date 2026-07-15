@@ -149,6 +149,14 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `ignoreDirs` | 순회 제외 폴더명 | 언어별 빌드/의존 폴더 다수 |
 | `testFileRegex` | 테스트 **파일명** 매칭 정규식(소스 문자열) 배열 | JS/TS |
 | `ownershipCategories` | 구조적 중복 키 종류 | `Entities/Surfaces/Capabilities` |
+| `capabilityVerbs` | Capability 키 `<verb> <noun>`의 verb 어휘를 CRUD(create/read/update/delete)에 더할 도메인 동사(SPEC-001). 채우면 미등록 verb 소유는 ownership 키 검증이 거부 | `[]` |
+| `surfaceFormat` | Surface 키 형식(SPEC-001) — `"http"`(`<METHOD> <path>`·`event:`·`job:`)·`"path"`(Next.js 등 파일 라우팅·IaC의 파일경로 표면)·`"any"`(형식검증 생략). normalizeKey/validateKey가 이 값으로 분기 | `"http"` |
+| `surfacePathParam` | Surface path param 표준 표기(SPEC-001) — 키 정규화 시 경로 파라미터를 이 토큰으로 환원해 비교(`/users/{name}` 형태) | `"{name}"` |
+| `maxKeysPerCategoryPerSpec` | spec 입도(cohesion) 임계 — 한 spec이 한 카테고리에서 이 수를 초과 소유하면 under-fragmentation 신호로 분할 권고(advisory, check-ownership dedup의 거울상) | `4` |
+| `maxFRsPerSpec` | spec 입도(cohesion) 임계 — 한 spec의 FR 수가 이를 초과하면 여러 기능 욱여넣기 신호로 분할 권고(advisory) | `8` |
+| `maxAggregateRootsPerSpec` | cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수(SPEC-002). 기본 1(1 spec=1 aggregate) — 루트+자식 표를 함께 소유하는 모델이면 상향 | `1` |
+| `assertionPatterns` | 테스트 "단언" 토큰 정규식 배열(test-adequacy 게이트, SPEC-002) — 매치 0인 테스트 파일은 no-assert advisory(--strict hard). 언어 무관 폭넓은 기본 | 단언 토큰 3종(expect·assert·should·require·t.Error…) |
+| `surfaceGlobs` | orphan-surface 게이트가 "표면 파일"로 볼 경로 정규식 배열(SPEC-003) — 채우면 어떤 스펙 `## Ownership Surfaces`에도 안 걸린 표면 파일을 orphan으로 검출(advisory·--strict hard). `[]`면 게이트 비활성 | `[]` |
 | `specIdPrefixes` | spec 파일·ID·`@covers`에서 인정할 ID 접두어(표준 4종 = SPEC 제품·INFRA 자원·CICD 전달·TEST 테스트). 표준 밖 접두어는 `prefixRationale` 사유 필수(미등록은 fr 게이트가 exit 1) | `["SPEC","INFRA","TEST","CICD"]` |
 | `prefixClassExemptions` | 접두어↔클래스 정합(SPEC-012) 면제 — `{"<SPEC-ID>":"<사유>"}`. 소유 실파일이 전적으로 한 인프라 클래스(iac→INFRA·ci→CICD)인데 그 접두어가 아니면 fr 게이트가 exit 1인데, 정당한 예외를 사유와 함께 선언(빈 사유·미존재 ID는 에러, 미사용 면제는 warn) | `{}` |
 | `requirementIdPrefixes` | 요구 ID 접두어 — FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 여기서 파생(레터 서픽스 1자 포함). 확장 예: `["FR","NFR"]` | `["FR"]` |
@@ -159,13 +167,15 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `derivationManifest` | 재도출 소스 회계 매니페스트 JSON 경로 — 소스 9클래스가 전부 `{status: mapped\|none\|deferred, evidence\|reason}`으로 회계돼야 함. 실재하는데 none 선언은 derivation 게이트가 exit 1(SPEC-009). brownfield readopt에 켜기 | `null` |
 | `derivationClassGlobs` | 검출 가능 클래스(iac·ci·ops-docs)의 탐지 글롭(클래스 단위 교체). terraform/k8s/CI 정의가 표준 경로 밖이면 조정 | 내장 기본 — 정의 파일 + **동반·보조 파일**까지: iac = tf/tfvars/hcl·k8s/helm/manifests/kustomization·Dockerfile/.dockerignore/compose, ci = workflows/actions·gitlab-ci·Jenkinsfile·circleci·azure·bitbucket·buildkite·cloudbuild·travis·drone |
 | `specSyncUnownedPolicy` | 어느 스펙 `Files`에도 미매치인 변경 파일 정책 — `silent`(현행)·`warn`·`error`(staged 차단=closed-world). 예외는 `specSyncExemptGlobs`로 선언. **소비 프로젝트 권장 시작값: `warn`**(안정 후 `error`) | `"silent"` |
+| `specSyncExemptGlobs` | `specSyncUnownedPolicy` 예외 glob(SPEC-003) — `Files` glob이 과포함한 생성물·락파일 등. 통과하되 영속 흔적 없음(목록 자체가 config 리뷰 대상) | `[]` |
+| `prefixRationale` | 표준 밖 접두어(FEAT 등)의 도입 사유 레지스트리(SPEC-002) — `{"<PREFIX>":"<사유>"}`. `specIdPrefixes`에 표준 4종(SPEC/INFRA/TEST/CICD) 밖을 넣으면 여기 사유 필수(빈 값이면 fr 게이트 exit 1) | `{}` |
 | `draftBlockPolicy` | Draft 소유 코드 변경(FR-004) 위반을 range 모드에서도 hard로 승격 — `advisory`(현행, range는 exit 0)·`hard`(range도 exit 1, SPEC-008 FR-007). **로컬 `commit-msg` 훅은 GitHub/GitLab의 웹 UI(서버측) 병합엔 절대 실행되지 않는다** — CI가 `<GATE> specsync [base]`를 MR 파이프라인에 걸고 이 값을 `hard`로 두면, 로컬 훅이 안 타는 병합 경로도 막을 수 있다(도그푸딩 발견: CICD-001이 Draft인데 Jenkinsfile이 웹 UI 병합으로 새어나간 사례) | `"advisory"` |
 | `entityRegistry` | entity(aggregate-root 카테고리) 등록제 — `{"<entity>":"<도입 사유>"}`. 채우면 미등록 entity 소유·빈 사유는 ownership 게이트가 exit 1(PREFIX 거버넌스 동형). 비면 비활성 | `{}` |
 | `relationTypes` | `Dependencies.Entities`의 `EntityName (relation-type)` 구조화 관계 어휘(`capabilityVerbs` 동형) — 채우면 미등록 relation-type은 ownership 게이트가 exit 1. 비면(기본) 어휘 무제한(형식 kebab 토큰만 강제). 관계의 대상 실재·소유 spec 해석은 항상 hard, 순환 참조는 항상 advisory(SPEC-017) | `[]` |
 | `objectStorageMarkers` | 오브젝트 스토리지 감지 마커(SPEC-016) — 스펙 본문이 매치하면 completeness가 `## Object Storage Decision`(Bucket·Consolidation) 존재를 advisory로 요구. `[]`면 비활성 | 멀티클라우드 기본 목록 |
 | `testInfraGlobs` | 테스트/QA 인프라 네임스페이스 마커(SPEC-015) — 매치 파일은 TEST 스펙만 소유(제품 스펙 소유 시 fr 게이트 exit 1). `[]`면 비활성 | `[]` |
 | `trackerCloseout` | 완료 루프 꼬리(원점 트래커 close-out) 인스턴스화 — `{tracker,devDoneState,confirmState,reportChannel}`. 트래커 유래 작업의 verify/merge 후 dev-done→보고→confirm(2인 책임분리). 스킬·사람이 소비(게이트 아님), 트래커·채널은 하드코딩 금지. `{}`면 비활성 | `{}` |
-| `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀 | npm |
+| `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀(예: JS=`npm test`, Python=`pytest -q`) | `{}`(미설정) |
 | `commands.smoke` | 인프라 테스트(자격증명 필요) 명령 — 개발서버·CI 전용, `sdd-run smoke`로 실행(로컬·pre-commit은 안 봄) | `null` |
 
 > **모델 무관:** 이 config에는 어떤 LLM/에이전트 가정도 없다. 게이트는 모델과 독립적으로 CI에서 강제된다.
