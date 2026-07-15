@@ -7,10 +7,10 @@
 - **Gap 2 — spec 입도(cohesion)**: `check-spec-cohesion` advisory 게이트 = `check-ownership`(dedup)의 거울상. (`649e12a`)
 - **Gap 3 — 하네스 MVP**: 포터블 계약 `HARNESS.md` + detect 집계기 `tooling/sdd-sync.mjs` + `/sdd-sync` 스킬 + pre-push 훅. (`0de8820`, `14f6303`)
 - 강화 게이트 3종(test-adequacy / converge-drift / orphan-surfaces) + `sdd-init` 배선(node 게이트 전체 설치).
-- **Ownership 키 결정성** — 소유/참조(`## Dependencies`) 분리 · 정규화 절대규칙 · verb 고정집합 · PREFIX 표준(SPEC/INFRA/TEST)+사유 관문 · 1 spec=1 aggregate · `check-spec-consistency` 신규. (`cc3dc22..acf5b6f`, 설계 `specs/2026-06-30-…`, 계획 `plans/2026-07-01-ownership-…`)
+- **Ownership 키 결정성** — 소유/참조(`## Dependencies`) 분리 · 정규화 절대규칙 · verb 고정집합 · PREFIX 표준(SPEC/INFRA/TEST/CICD)+사유 관문 · 1 spec=1 aggregate · `check-spec-consistency` 신규. (`cc3dc22..acf5b6f`, 설계 `specs/2026-06-30-…`, 계획 `plans/2026-07-01-ownership-…`)
 - **방법론 강제 hook 세트** — SessionStart(방법론 주입)·PreToolUse(편집 체크리스트)·git pre-commit(hard)·`sdd-init` 자동배선 · "채택=상시 강제 궤도" 원칙 · 사용법(`APPLYING`·`방법론.html`). (`cc3dc22..acf5b6f`, 설계 `specs/2026-07-01-…`, 계획 `plans/2026-07-01-methodology-…`)
 - **spec-first 강제** — `Files:` 소유매핑 · `check-spec-sync`(changeset=브랜치, commit-msg hard + range advisory) · `/speckit.fix` · Edge Cases/Change Log 필수화 · 사용법·데모 실측(`APPLYING`·`방법론.html`·`README`). (`74a747b..acf5b6f`, 설계 `specs/2026-07-02-spec-first-enforcement-design.md`, 계획 `plans/2026-07-02-spec-first-enforcement.md`)
-- **키트 자기 정렬(self-hosting)** — 키트 `tooling/`(게이트 스위트, 73 tests) 자신을 자기 궤도에 편입: 루트 `sdd.config.json`(비-웹 카테고리 Modules/Symbols/Artifacts) · `sdd/specs/` 4-spec(1 aggregate씩, 14개 tooling 파일 전부 소유) · `@covers` 28/33 태깅(미커버 5는 실제 테스트 갭 — incremental 점진) · `self-hooks-install.sh`로 자기 훅 배선(tooling 직접 호출). **실증**: 스펙 미동반 tooling 커밋 → commit-msg FAIL(exit 1), `Spec-Impact: none <사유>` → 통과. (설계·계획 `2026-07-02-kit-self-alignment.md`)
+- **키트 자기 정렬(self-hosting)** — 키트 `tooling/`(게이트 스위트, 267 테스트(파일 38)) 자신을 자기 궤도에 편입: 루트 `sdd.config.json`(비-웹 카테고리 Modules/Symbols/Artifacts) · `sdd/specs/` 17-spec(1 aggregate씩, 게이트·lib 25 .mjs 전부 소유) · `@covers` 134태그 / FR 98(unit 93·deferred 5·미검증 0) — deferred 5·unaccounted 0으로 requireAccounting green(정직 회계) · `self-hooks-install.sh`로 자기 훅 배선(tooling 직접 호출). **실증**: 스펙 미동반 tooling 커밋 → commit-msg FAIL(exit 1), `Spec-Impact: none <사유>` → 통과. (설계·계획 `2026-07-02-kit-self-alignment.md`)
 
 - **런타임 패리티(2026-07-05)** — Python판 전 게이트 패리티(같은 픽스처→같은 exit code·바이트 동일 출력, 테스트 강제) · `requirementIdPrefixes` 전 사이트 파생 · preset 템플릿 바이트 동일화 · 셸/Go 문법 정렬. (SPEC-006)
 - **강제 강도 고도화 2차(2026-07-05)** — 진단(spec-first=동반변경 확인, 의미중복 반례, 스펙 리뷰 계층 부재)의 승인 보강 전부 반영:
@@ -25,6 +25,14 @@
   - **smoke 증거 자동 수집(SPEC-010)**: `@verifies` 태그(CI 정의·스크립트·runbook 어디든) → `smoke-scan --write` 매니페스트 결정적 재생성 + check 드리프트 차단 — FinOps가 수동으로 잇던 실증거 연결 제거.
   - **추적 태그 마이그레이션(SPEC-011)**: 재도출은 FR 키 보존이 기본, 재번호는 맵+`retag` 기계 이행 — @covers 재연결 비용 제거.
   - 절차 정본화: `prompts/readopt.md` 6~7단계에 소스 클래스→산출물 매핑표·자동 결선 규칙. 키트 자신 `derivationManifest` 상시 on(9클래스 정직 회계).
+
+- **규범 문법화·도메인 확장 4차(2026-07-06~09)** — 전 문서 감사·도그푸딩 실측에서 "규범은 문서에 있는데 게이트가 없던" 항목을 결정 신호만으로 문법화:
+  - **접두어↔도출클래스 정합(SPEC-012)**: 소유 실파일을 derivation 소스 클래스(iac·ci)로 분류 — 비-테스트 소유가 전적 인프라인데 접두어가 INFRA-가 아니면 exit 1(`prefixClassExemptions` 사유 관문, 의미판정 아닌 선언 신호).
+  - **스펙 문법 경화(SPEC-013)**: Module 헤더 존재·값 단일성 · FR 선언 라인 SHALL · Dedup-Review 이웃 스펙 실재 · `ownershipCategories` Files 금지(hard) · Files 미지원 글롭 staged 차단.
+  - **Spec-ID 번호 무결성(SPEC-014)**: 접두어별 001부터·중복 금지(hard), 001..max 중간 gap은 advisory — 프로젝트 간 번호 체계 분기 차단(해소는 `sdd-retag`).
+  - **TEST 삭제가능 도메인(SPEC-015)**: TEST를 런타임·인프라 자기완결 비제품 도메인으로 확장(prefix-class 면제) · `testInfraGlobs`로 제품 스펙 누수 격리 · `Lifecycle: removable`.
+  - **오브젝트 스토리지 결정(SPEC-016)**: `objectStorageMarkers` 매치 스펙에 `## Object Storage Decision`(버킷 선택·이전 기준) 기록 강제 — completeness advisory(`--strict` hard).
+  - **Entity 관계 정합(SPEC-017)**: 쪼갠 aggregate 사이 참조를 `Entity (relation-type)`로 구조화 — 대상 Entity 실재·소유 spec 해석 hard, aggregate 간 순환 참조 advisory.
 
 설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
 

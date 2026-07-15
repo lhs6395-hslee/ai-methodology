@@ -29,13 +29,17 @@
 | SPEC-011 | 추적 태그 마이그레이션 — 재번호 맵(old→new\|null)의 기계 이행·경계 강제 | `tooling/sdd-retag.mjs` | active |
 | SPEC-012 | 접두어↔derivation 클래스 정합 — 전체성 판정·prefixClassExemptions 거버넌스 | `tooling/prefix-class-lib.mjs` | active |
 | SPEC-013 | 스펙 문법 규범 강제 — Module 존재·단일성, FR 라인 SHALL, Dedup 참조 실재, Files 카테고리 금지, 글롭 문법 staged 차단 | `tooling/grammar-lib.mjs` | active |
+| SPEC-014 | 스펙 번호 매김 정합 — 접두어별 001부터·중복 금지 hard, 001..max 중간 gap advisory(`--strict` 승격) | `tooling/numbering-lib.mjs` | active |
+| SPEC-015 | TEST 삭제가능 도메인(런타임+인프라) — TEST 인프라 소유 허용(prefix-class 면제)+`testInfraGlobs`로 제품 스펙 격리 | `tooling/test-domain-lib.mjs` | active |
+| SPEC-016 | 오브젝트 스토리지 도입 결정 — `objectStorageMarkers` 감지·`## Object Storage Decision` 섹션(버킷·이전 라벨) completeness | `tooling/object-storage-lib.mjs` | active |
+| SPEC-017 | Entity 관계 정합 — `Name (relation-type)` 구조화·대상 실재·소유 spec 해석 hard, aggregate 간 순환 참조 advisory | `tooling/relation-lib.mjs` | active |
 
-> "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 6으로 조정했다(사유는 SPEC-002 Change Log).
+> "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 7로 조정했다(사유는 SPEC-002 Change Log).
 
 ## 추가 규칙
 - 한 모듈(레포) 안 spec 과편화 금지 + **under-fragmentation 금지**(1 spec=1 응집 capability). 새 FR이 같은 모듈 기존 FR과 의미 중복이면 **새 spec 금지, 기존 spec 개정.**
 - 상태 컬럼: `draft/active/deprecated/removed`. 제거는 코드·테스트 동시 삭제 후(`STRUCTURE.md` 수명주기).
-- PREFIX 표준 = `SPEC/INFRA/TEST`만. 새 접두어는 `sdd.config.json`의 `specIdPrefixes`+`prefixRationale`에 사유와 함께 등록.
+- PREFIX 표준 = `SPEC/INFRA/TEST/CICD`만. 새 접두어는 `sdd.config.json`의 `specIdPrefixes`+`prefixRationale`에 사유와 함께 등록.
 
 ## 제거 로그 (Removed)
 | 날짜 | Spec | 사유 | 코드·테스트 삭제 PR |

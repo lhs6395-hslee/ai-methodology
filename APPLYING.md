@@ -62,7 +62,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 ```
 > **어떤 언어 런타임도 강요하지 않는다.** Go·C·Rust 등은 (a) 바이너리면 인터프리터 0으로 돈다(크로스컴파일·정적 검증됨). 배포 파이프라인 없이 즉시 돌릴 땐 (b) 셸판(실증: `go` 미설치로 Go 프로젝트 게이트 통과). 이미 Python/Node가 있으면 (c)/(d). **커버 범위 차이:** (a)/(b)는 핵심 3커맨드(fr·ownership·run), (c) Python은 보강게이트·spec-first까지 Node 전 게이트 패리티(`ci-examples.md` 표) — 비-Node 스택에서 전 게이트가 필요하면 (c).
 **언어 맞춤(핵심):** 루트의 `sdd.config.json`을 프로젝트 언어로 바꾼다 — `tooling/sdd.config.presets.md`에서 해당 언어 블록 복사(`testFileRegex`·`scanDirs`·`ignoreDirs`·`ownershipCategories`·`specIdPrefixes`·`commands`). JS/TS면 기본값 그대로.
-- ⚠ **`specIdPrefixes`(기본 `["SPEC","INFRA","TEST"]` — 전 런타임 동일):** 표준 밖 접두어(`FEAT` 등)를 쓰면 **반드시 여기 등록 + `prefixRationale`에 사유**(예: `["SPEC","INFRA","TEST","FEAT"]`). 미등록 접두어는 FR 게이트가 **exit 1로 차단**한다(조용한 누락 금지 — 4판 공통).
+- ⚠ **`specIdPrefixes`(기본 `["SPEC","INFRA","TEST","CICD"]` — CICD 기본값은 현재 Node·Python판; 셸/Go판 동기화 진행 중):** 표준 밖 접두어(`FEAT` 등)를 쓰면 **반드시 여기 등록 + `prefixRationale`에 사유**(예: `["SPEC","INFRA","TEST","FEAT"]`). 미등록 접두어는 FR 게이트가 **exit 1로 차단**한다(조용한 누락 금지 — 4판 공통).
 - **`requirementIdPrefixes`(기본 `["FR"]`):** 요구 ID 접두어를 확장할 때 등록(예: `["FR","NFR"]`). FR 선언·`@covers`·집계·spec-sync 판정의 문법이 전부 이 한 값에서 파생된다 — 코드 fork 없이 config로 확장.
 - `commands`에 그 언어의 `setup/lint/typecheck/test`를 넣는다(예: Python `pytest -q`, Go `go test ./...`). CI/CD는 `<게이트> run <stage>`로 그 명령을 실행하므로 **워크플로우 본체는 손대지 않는다**(도구별 예시: `ci-examples.md`). 미설정 stage는 건너뜀.
 - JS/TS 프로젝트만 해당: `npm i -D vitest vite-tsconfig-paths @vitest/coverage-v8` + `cp <KIT>/tooling/vitest.config.ts ./`.
@@ -120,7 +120,7 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 ### ② 새 기능 — MODULE_MAP 대조 → spec → TDD
 
 1. `sdd/MODULE_MAP.md`를 열고 기존 spec과 겹치는지 확인 — 겹치면 **그 spec 개정**(새 spec 금지), 안 겹치면 신규.
-2. spec 위치: **`sdd/specs/PREFIX-NNN.md`** (PREFIX는 `SPEC`/`INFRA`/`TEST` 중 하나).
+2. spec 위치: **`sdd/specs/PREFIX-NNN.md`** (PREFIX는 `SPEC`/`INFRA`/`TEST`/`CICD` 중 하나).
 3. FR은 EARS 패턴으로(`WHEN … THE SYSTEM SHALL …`), 키 형식 규칙:
    - **Entity** → 스키마 식별자 그대로 + `trim().toLowerCase()` (`pjt_projects` — 단복수 임의변환 금지).
    - **Surface** → `<METHOD uppercase> <path lowercase>`, path param `{name}` 표준형(`POST /api/recommend/{id}`).
@@ -260,4 +260,4 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 4. **원본 정리**: 이관한 FR·`Files`·`@covers` 태그·검증 회계 엔트리(smoke-manifest)를 원 제품 스펙에서 제거(재번호 필요 시 `sdd-retag`). `MODULE_MAP.md` 갱신.
 5. **삭제 시**: 도구를 지울 때 TEST 스펙 하나 + 그 격리된 인프라만 제거하면 된다 — 제품 스펙을 수술할 필요가 없다(도메인 격리의 값어치).
 
-**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 11-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.
+**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 17-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.

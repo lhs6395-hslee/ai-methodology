@@ -110,7 +110,7 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 > CI·개발서버는 `sdd-run test` + `sdd-run smoke` 둘 다, 로컬·pre-commit은 `test`만. 인프라 FR은 smoke 증거(`@verifies`→`smokeManifest`) 또는 deferred로 회계된다(로컬 unit 강제 없음).
 
 ## 인프라 전용 레포 (IaC — CSP 무관: AWS / GCP / Azure / 온프렘)
-> 앱 코드가 없고 IaC만 있는 경우. `@covers`를 정책 테스트(OPA/conftest·terratest 등)에 달고, `commands.test`에 **그 환경의 live drift 검증**을 넣는다(`SSOT.md` §5b). 아래는 Terraform 예시 — IaC 도구·클라우드만 갈아끼우면 동일하게 동작한다.
+> 앱 코드가 없고 IaC만 있는 경우. `@covers`를 정책 테스트(OPA/conftest·terratest 등)에 달고, **로컬 안전**(fmt·validate·conftest — 자격증명 불요)은 `commands.test`, **그 환경의 live drift 검증**(자격증명 필요)은 `commands.smoke`에 넣는다(`SSOT.md` §5b). 아래는 Terraform 예시 — IaC 도구·클라우드만 갈아끼우면 동일하게 동작한다.
 ```json
 {
   "scanDirs": ["modules", "tests", "policy"],
@@ -118,10 +118,10 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
   "ignoreDirs": [".terraform", ".git"],
   "ownershipCategories": ["Resources", "Surfaces", "Capabilities"],
   "specSyncUnownedPolicy": "warn",
-  "commands": { "lint": "terraform fmt -check && tflint", "typecheck": "terraform validate", "test": "conftest test . && terraform plan -detailed-exitcode" }
+  "commands": { "lint": "terraform fmt -check && tflint", "typecheck": "terraform validate", "test": "conftest test .", "smoke": "terraform plan -detailed-exitcode" }
 }
 ```
-> **commands.test(드리프트 검증) CSP/도구별 대안** — 환경에 맞게 바꾼다:
+> **commands.smoke(드리프트 검증) CSP/도구별 대안** — 환경에 맞게 바꾼다:
 > - **IaC 도구:** Terraform `plan -detailed-exitcode` · Pulumi `pulumi preview --expect-no-changes` · AWS CDK `cdk diff` · Crossplane/Config Connector 상태.
 > - **AWS:** `aws cloudformation detect-stack-drift` / `aws <svc> describe-*`.
 > - **GCP:** `gcloud <svc> describe` / `gcloud asset`.
@@ -157,6 +157,7 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `testInfraGlobs` | 테스트/QA 인프라 네임스페이스 마커(SPEC-015) — 매치 파일은 TEST 스펙만 소유(제품 스펙 소유 시 fr 게이트 exit 1). `[]`면 비활성 | `[]` |
 | `trackerCloseout` | 완료 루프 꼬리(원점 트래커 close-out) 인스턴스화 — `{tracker,devDoneState,confirmState,reportChannel}`. 트래커 유래 작업의 verify/merge 후 dev-done→보고→confirm(2인 책임분리). 스킬·사람이 소비(게이트 아님), 트래커·채널은 하드코딩 금지. `{}`면 비활성 | `{}` |
 | `commands.{setup,lint,typecheck,test}` | CI가 `sdd-run.mjs`로 실행할 언어별 명령. 미설정 stage는 건너뜀 | npm |
+| `commands.smoke` | 인프라 테스트(자격증명 필요) 명령 — 개발서버·CI 전용, `sdd-run smoke`로 실행(로컬·pre-commit은 안 봄) | `null` |
 
 > **모델 무관:** 이 config에는 어떤 LLM/에이전트 가정도 없다. 게이트는 모델과 독립적으로 CI에서 강제된다.
 > **컴포넌트 무관:** DB(RDB·NoSQL)·캐시(Redis…)·브로커/스트림(Kafka…)·검색·스토리지 등 **어떤 미들웨어 제품도 config·게이트·spec에 박지 않는다.** spec은 *역량/요구*만 적고(예: "이벤트 로그 필요") 제품 선택은 프로젝트 몫이다(`principles.md` §10, `SSOT.md` §5b).

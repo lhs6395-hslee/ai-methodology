@@ -76,7 +76,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
   "scanDirs": ["src","tests"],                   // @covers를 어디서 찾나
   "ignoreDirs": ["…"],                           // 순회 제외
   "testFileRegex": ["…"],                        // 무엇이 테스트 파일인가
-  "commands": { "lint":"…","typecheck":"…","test":"…" },  // 게이트가 부를 언어별 명령
+  "commands": { "lint":"…","typecheck":"…","test":"…","smoke":"…" },  // 게이트가 부를 언어별 명령 (smoke=인프라 테스트 stage, 개발서버·CI 전용 — 로컬 강제 아님)
   // ── 강제 강도·회계(선택 — 기본값이면 현행 동작, 켜는 만큼 강해진다. 필드 상세: presets §필드 의미):
   "specSyncUnownedPolicy": "warn",               // 미소유 파일 정책 silent|warn|error
   "draftBlockPolicy": "advisory",                // Draft 소유 코드 range 모드 승격 advisory|hard(CI가 range로 MR diff 검사 시 웹 UI 병합도 차단 — SPEC-008 FR-007)
