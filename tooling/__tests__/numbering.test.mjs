@@ -40,6 +40,23 @@ test("접두어별 독립 판정 — 각자 001부터면 clean", () => {
   assert.deepEqual(r.advisory, []);
 });
 
+// @covers SPEC-018/FR-006
+test("retiredIds에 기록된 gap은 정상 retirement gap — advisory에서 제외", () => {
+  // SPEC-003이 폐기돼 gap이 생겼으나 retiredIds에 기록됨 → 잡음 아님
+  const r = numberingIssues(["SPEC-001", "SPEC-002", "SPEC-004"], ["SPEC-003"]);
+  assert.deepEqual(r.hard, []);
+  assert.deepEqual(r.advisory, []);
+});
+
+test("retiredIds에 없는 gap은 여전히 advisory — 사고성 결번과 구분", () => {
+  // SPEC-003만 폐기 기록, SPEC-005는 미기록 → 005 gap만 보고
+  const r = numberingIssues(["SPEC-001", "SPEC-002", "SPEC-004", "SPEC-006"], ["SPEC-003"]);
+  assert.deepEqual(r.hard, []);
+  assert.equal(r.advisory.length, 1);
+  assert.match(r.advisory[0], /SPEC-005/);
+  assert.doesNotMatch(r.advisory[0], /SPEC-003\b/);
+});
+
 test("결정성 — 출력이 접두어·번호 순 정렬", () => {
   const a = numberingIssues(["TEST-005", "SPEC-003", "INFRA-002"]);
   const b = numberingIssues(["INFRA-002", "TEST-005", "SPEC-003"]);

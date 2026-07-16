@@ -81,3 +81,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-06 | 초안 — 접두어별 001시작·중복 hard·중간 gap advisory(`--strict` 승격), Node·Python 동시 | PM(접두어별)·FinOps(전역 INFRA-011/013) 번호 체계 불일치[검증] — 번호 모델이 미규정·미강제라 프로젝트마다 제각각 |
+| 2026-07-16 | `numberingIssues`에 `retiredIds` 인자 추가 — 폐기 기록된 번호의 gap은 advisory에서 제외(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건 | SPEC-018 FR-006 동반(소비): 폐기 워크플로가 남기는 번호 gap을 정상 retirement gap으로 인지 — 판정 코어는 이 spec 소유 |

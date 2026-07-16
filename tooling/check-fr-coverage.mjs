@@ -134,7 +134,7 @@ for (const f of specMdNames) {
 }
 // 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
 {
-  const { hard, advisory } = numberingIssues([...knownIds]);
+  const { hard, advisory } = numberingIssues([...knownIds], cfg.retiredIds);
   prefixErrors.push(...hard);
   for (const a of advisory) (STRICT ? prefixErrors : prefixClassWarnings).push(a);
 }

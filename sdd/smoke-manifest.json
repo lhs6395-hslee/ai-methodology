@@ -18,9 +18,5 @@
   "SPEC-004/FR-008": {
     "method": "deferred",
     "reason": "sdd-run 스테이지 러너의 exit code 전파 e2e 테스트 미작성 — 백로그"
-  },
-  "SPEC-018/FR-006": {
-    "method": "deferred",
-    "reason": "numbering retirement-gap 인지(retiredIds/MODULE_MAP Removed) — numbering-lib 증분 다음(SPEC-014 소유)"
   }
 }

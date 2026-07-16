@@ -138,6 +138,9 @@ export const DEFAULTS = {
   // 언어별 셸 명령(sdd-run.mjs가 실행). 미설정 stage는 건너뜀.
   //   { "setup": "...", "lint": "...", "typecheck": "...", "test": "..." }
   commands: {},
+  // 폐기된 spec-ID 목록(예: ["CICD-005"]) — 그 번호의 내부 gap을 numbering 게이트가
+  // 사고성 결번이 아닌 정상 retirement gap으로 취급(SPEC-018 FR-006). sdd-retire가 남기는 gap 근거.
+  retiredIds: [],
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

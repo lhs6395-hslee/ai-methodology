@@ -83,6 +83,7 @@ DEFAULTS = {
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
     "commands": {},
+    "retiredIds": [],
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -317,9 +318,11 @@ def classify_accounting(specs, covered, entries, planned_specs=None):
 
 # ── fr — FR↔test 추적 + PREFIX 거버넌스 (check-fr-coverage.mjs) ──
 
-def numbering_issues(spec_ids):
+def numbering_issues(spec_ids, retired_ids=None):
     """접두어별 spec-ID 번호 무결성 (SPEC-014, numbering-lib.mjs 미러 — 바이트 동일).
-    hard: 중복 / 001 미시작. advisory: 실제 최소~최대 내부 gap. (hard, advisory) 반환."""
+    hard: 중복 / 001 미시작. advisory: 실제 최소~최대 내부 gap. (hard, advisory) 반환.
+    retired_ids: 폐기 기록된 spec-ID — 그 번호의 gap은 정상 retirement gap이라 제외(SPEC-018 FR-006)."""
+    retired = {str(s).strip() for s in (retired_ids or [])}
     by_prefix = {}
     for sid in spec_ids or []:
         m = re.match(r"^([A-Z]+)-(\d{3})$", sid)
@@ -340,7 +343,8 @@ def numbering_issues(spec_ids):
             hard.append(f"{pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{uniq[0]:03d} "
                         f"(접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag")
         present, mx = set(uniq), uniq[-1]
-        missing = [n for n in range(uniq[0], mx + 1) if n not in present]
+        # retired에 기록된 번호는 정상 retirement gap이라 재보고하지 않음(SPEC-018 FR-006)
+        missing = [n for n in range(uniq[0], mx + 1) if n not in present and f"{pfx}-{n:03d}" not in retired]
         if missing:
             joined = ", ".join(f"{pfx}-{n:03d}" for n in missing)
             advisory.append(f"{pfx} 번호 중간 gap: {joined} — 제거·retag 잔분(정상일 수 있음)")
@@ -416,7 +420,7 @@ def cmd_fr(cfg, strict):
         if ti:
             prefix_errors.append(f'테스트 인프라 격리 위반 "{sid}" — testInfraGlobs 매치 파일(예: {ti["files"][0]})은 TEST 스펙이 소유해야 함(제품 스펙 소유 금지, SPEC-015)')
     # 0c. 접두어별 spec-ID 번호 무결성(SPEC-014): 중복·001미시작 hard, 내부 gap advisory(--strict 승격).
-    n_hard, n_advisory = numbering_issues(known_ids)
+    n_hard, n_advisory = numbering_issues(known_ids, cfg.get("retiredIds"))
     prefix_errors.extend(n_hard)
     for a in n_advisory:
         (prefix_errors if strict else prefix_class_warnings).append(a)

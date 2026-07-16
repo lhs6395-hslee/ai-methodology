@@ -11,7 +11,10 @@
 const pad3 = (n) => String(n).padStart(3, "0");
 
 // 반환 {hard:[msg], advisory:[msg]}. 입력 순서 무관, 동일 입력 집합 → 동일 출력.
-export function numberingIssues(specIds) {
+// retiredIds: 폐기 기록된 spec-ID 집합(config `retiredIds`) — 그 ID의 내부 gap은
+//   사고성 결번이 아니라 정상 retirement gap이므로 advisory에서 제외(SPEC-018 FR-006).
+export function numberingIssues(specIds, retiredIds = []) {
+  const retired = new Set((retiredIds || []).map((s) => String(s).trim()));
   const byPrefix = new Map(); // prefix -> [num,...]
   for (const id of specIds || []) {
     const m = /^([A-Z]+)-(\d{3})$/.exec(id);
@@ -36,7 +39,8 @@ export function numberingIssues(specIds) {
     }
     // 내부 gap (실제 최소~최대) — 001 미시작분은 gap으로 재보고하지 않음
     const present = new Set(uniq), max = uniq[uniq.length - 1], missing = [];
-    for (let n = uniq[0]; n <= max; n++) if (!present.has(n)) missing.push(n);
+    // retiredIds에 기록된 번호는 정상 retirement gap이라 재보고하지 않음(SPEC-018 FR-006)
+    for (let n = uniq[0]; n <= max; n++) if (!present.has(n) && !retired.has(`${pfx}-${pad3(n)}`)) missing.push(n);
     if (missing.length) {
       advisory.push(`${pfx} 번호 중간 gap: ${missing.map(pad3).map((s) => `${pfx}-${s}`).join(", ")} — 제거·retag 잔분(정상일 수 있음)`);
     }
