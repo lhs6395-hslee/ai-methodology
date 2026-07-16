@@ -147,6 +147,10 @@ export const DEFAULTS = {
   // 테스트 스위트 실제 실행 게이트(SPEC-021): check-test-run이 commands.test를 돌려 green을 확인.
   // 커버리지 회계 ≠ 실행 결과. off(기본, 실행 안 함)|advisory(실패 경고)|hard(실패 exit 1).
   runTestsPolicy: "off",
+  // 런타임 스키마 드리프트(SPEC-022, R2' code↔deployed-DB): 코드 기대 스키마 ↔ 배포 DB 실측 diff.
+  // {expected, deployed} 두 조회 명령(DB/ORM 중립 주입) 또는 null(비활성, 기본). 배포 preflight용.
+  schemaDriftManifest: null,
+  migrationStatePolicy: "advisory", // 드리프트 발견 시 강도: advisory(경고)|hard(exit 1).
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

@@ -106,3 +106,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-16 | Python에 `escalations`·`semanticDriftPolicy` DEFAULTS·리네임 수집·drift 배선 미러(SPEC-019 동반) — spec-sync drift 출력 Node↔Python 바이트 동일(패리티 테스트 green) | semantic drift 런타임 패리티 — 리네임 승격 판정·리포트가 두 런타임에서 동일 |
 | 2026-07-16 | Python에 `parse_drivers`·`cross_spec_relaxed`·`__idAlt` cfg·cross-spec 배선 미러(SPEC-020 동반) — spec-sync cross-spec 출력 Node↔Python 바이트 동일 | cross-spec 런타임 패리티 — Change-Driver 파싱·참조 완화가 두 런타임에서 동일 |
 | 2026-07-16 | Python에 `test_run_verdict`·`cmd_testrun`·`testrun` 서브커맨드·`runTestsPolicy` DEFAULTS 미러(SPEC-021 동반) + 패리티 테스트 1종 — testrun 출력 Node↔Python 바이트 동일 | 테스트 실행 게이트 런타임 패리티 — FinOps가 Python 게이트로 도니 실행-결과 확인도 두 런타임 동일 |
+| 2026-07-16 | Python에 `schema_drift_verdict`·`cmd_schemadrift`·`schemadrift` 서브커맨드·DEFAULTS 미러(SPEC-022 동반) + 패리티 테스트 1종 — schemadrift 출력 Node↔Python 바이트 동일 | R2′ 스키마 드리프트 게이트 런타임 패리티 — 배포 preflight가 두 런타임에서 동일 |

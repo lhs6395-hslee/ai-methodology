@@ -109,3 +109,4 @@
 | 2026-07-16 | FR-010 신설 — `sdd-init`이 `agent-context.md`를 `.kiro/steering/sdd.md`로 설치 + `AGENTS.md`에 마커 블록 idempotent 병합(게이트 무관). `tooling/harness/agent-context.md` 신규 아티팩트 | 비-Claude 에이전트(Kiro·Codex) 방법론 상시 주입 — Claude SessionStart 훅의 실행기-무관 대체. 슬래시 없이도 궤도·진입 규칙이 항상 로드됨(에이전트 중립 방향) |
 | 2026-07-16 | `sdd-init` Node 클로저에 `check-test-run.mjs` 추가 + `speckit-fix` 스킬에 "테스트 스위트 실행 확인" 단계(4b) 추가 | SPEC-021 동반: 완료 주장 전 실제 실행 규범을 실행기 마지막 단계에 배선(커버리지 회계 ≠ 실행 결과) |
 | 2026-07-16 | `self-hooks-install.sh` 킷 pre-commit에 `gen-changelog.mjs` 재생성 + `git add change_log.html` 추가(킷 전용, 소비 훅 불변) | 방법론이 커밋(=push)될 때마다 change_log.html이 사람 개입 없이 자동 갱신 — 자동 changelog의 1-커밋 지연 수용 |
+| 2026-07-16 | `sdd-init` Node 클로저에 `check-schema-drift.mjs`·`schema-drift-lib.mjs` 추가 + `speckit-fix` 스킬에 Change-Driver 사용 규칙(공유 파일은 타 스펙 동인이면 억지 Change Log 대신 `Change-Driver`) 명문화 | SPEC-022 동반(게이트 배선) + SPEC-020 후속(가이드 부재로 억지 Change Log로 흐르던 것 봉합) |

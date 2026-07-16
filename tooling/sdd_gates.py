@@ -86,6 +86,8 @@ DEFAULTS = {
     "retiredIds": [],
     "semanticDriftPolicy": "advisory",
     "runTestsPolicy": "off",
+    "schemaDriftManifest": None,
+    "migrationStatePolicy": "advisory",
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -1958,7 +1960,49 @@ def cmd_testrun(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun> [...]"
+MIGRATION_ENUM = ("advisory", "hard")
+
+
+def schema_drift_verdict(expected, deployed, ran, policy):
+    """런타임 스키마 드리프트 판정 (SPEC-022, schema-drift-lib.mjs 미러 — 바이트 동일).
+    (코드 기대 vs 배포 실측) 식별자 집합 diff. (valid, exit, drift, line) 반환."""
+    if policy not in MIGRATION_ENUM:
+        return False, 1, [], f'✗ migrationStatePolicy 값 위반 "{policy}" — advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)'
+    hard = policy == "hard"
+    if not ran:
+        return True, (1 if hard else 0), [], f"{'✗' if hard else '⚠'} 런타임 스키마 드리프트 게이트 — expected/deployed 스키마 조회 실패, 드리프트 판정 불가(조용한 통과 금지 — migrationStatePolicy:{policy})"
+    dep = set(deployed or [])
+    drift = sorted(set(expected or []) - dep)
+    if not drift:
+        return True, 0, [], f"런타임 스키마 드리프트 게이트 — 배포 스키마가 코드 기대와 일치(드리프트 없음, migrationStatePolicy:{policy})"
+    return True, (1 if hard else 0), drift, f"{'✗' if hard else '⚠'} 런타임 스키마 드리프트 — 코드 기대엔 있으나 배포에 없음: {', '.join(drift)} (migrationStatePolicy:{policy})"
+
+
+def cmd_schemadrift(cfg):
+    """프로젝트가 선언한 expected/deployed 조회 명령을 실행해 스키마 드리프트를 판정 (SPEC-022). DB/ORM 중립."""
+    m = cfg.get("schemaDriftManifest")
+    if not m or not m.get("expected") or not m.get("deployed"):
+        print("런타임 스키마 드리프트 게이트 — schemaDriftManifest 미설정(비활성; DB 스키마 SSOT 프로젝트는 배포 preflight에 expected/deployed 조회 명령 설정 권장)")
+        sys.exit(0)
+    policy = cfg.get("migrationStatePolicy") or "advisory"
+    expected, deployed, ran = [], [], True
+    if policy in MIGRATION_ENUM:
+        def run_lines(cmd):
+            out = subprocess.run(cmd, shell=True, cwd=cfg["__root"], capture_output=True, text=True)
+            if out.returncode != 0:
+                raise RuntimeError("query failed")
+            return [x.strip() for x in out.stdout.split("\n") if x.strip()]
+        try:
+            expected = run_lines(m["expected"])
+            deployed = run_lines(m["deployed"])
+        except Exception:  # noqa: BLE001
+            ran = False
+    valid, code, _drift, line = schema_drift_verdict(expected, deployed, ran, policy)
+    print(line, file=(sys.stdout if valid else sys.stderr))
+    sys.exit(code)
+
+
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift> [...]"
 
 
 def main():
@@ -2017,6 +2061,8 @@ def main():
         cmd_run(cfg, args[1])
     elif sub == "testrun":
         cmd_testrun(cfg)
+    elif sub == "schemadrift":
+        cmd_schemadrift(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

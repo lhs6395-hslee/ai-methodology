@@ -98,3 +98,4 @@
 | 2026-07-16 | config DEFAULTS에 `retiredIds: []` knob 추가(Node·Python) — 폐기 spec-ID 목록 | SPEC-018 FR-006 동반: numbering 게이트가 이 knob으로 retirement gap을 정상 취급(소비 게이트는 SPEC-014/002) |
 | 2026-07-16 | config DEFAULTS에 `semanticDriftPolicy: "advisory"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-019 FR-005 동반: 리네임 기반 drift 승격 정책(소비 게이트는 SPEC-003, 판정 코어는 SPEC-019) |
 | 2026-07-16 | config DEFAULTS에 `runTestsPolicy: "off"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-021 동반: 테스트 스위트 실제 실행 게이트 정책(판정·게이트는 SPEC-021) |
+| 2026-07-16 | config DEFAULTS에 `schemaDriftManifest: null`·`migrationStatePolicy: "advisory"` knob 추가(Node·Python) | SPEC-022 동반: 런타임 스키마 드리프트(R2′) 게이트 정책(판정·게이트는 SPEC-022) |

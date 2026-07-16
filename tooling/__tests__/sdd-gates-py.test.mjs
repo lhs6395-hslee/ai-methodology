@@ -814,3 +814,23 @@ test("py testrun: off·advisory·hard × green/실패/미선언 — Node·Python
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── schemadrift 게이트 패리티(SPEC-022) ──
+test("py schemadrift: 미설정·드리프트·일치·조회실패·미정의정책 — Node·Python 바이트 동일", skip, () => {
+  const scen = [
+    {},
+    { migrationStatePolicy: "hard", schemaDriftManifest: { expected: "printf 't.a\\nt.b\\n'", deployed: "printf 't.a\\n'" } },
+    { migrationStatePolicy: "advisory", schemaDriftManifest: { expected: "printf 't.a\\n'", deployed: "printf 't.a\\nt.b\\n'" } },
+    { migrationStatePolicy: "hard", schemaDriftManifest: { expected: "exit 3", deployed: "printf x" } },
+    { migrationStatePolicy: "x", schemaDriftManifest: { expected: "printf a", deployed: "printf a" } },
+  ];
+  for (const cfg of scen) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-schema-drift.mjs");
+      const p = runPy(root, ["schemadrift"]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg)})`);
+      assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(cfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

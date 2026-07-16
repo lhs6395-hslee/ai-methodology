@@ -173,6 +173,8 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `semanticDriftPolicy` | 소유 파일 리네임 감지 시 spec-sync 요구를 "FR 선언 라인 변경 ∨ `Spec-Impact`"로 승격 — `off`·`advisory`(기본, 경고)·`hard`(exit 1). 옛 의미 방치(리네임인데 본문 불변)를 리뷰로 라우팅(SPEC-019) | `"advisory"` |
 | `retiredIds` | 폐기된 spec-ID 목록(예: `["CICD-005"]`) — 그 번호의 내부 gap을 numbering 게이트가 사고성 결번이 아닌 정상 retirement gap으로 취급. `sdd-retire`가 남기는 gap 근거(SPEC-018 FR-006) | `[]` |
 | `runTestsPolicy` | `commands.test`(로컬 안전 tier)를 **실제 실행**해 green을 확인하는 게이트(`check-test-run`, SPEC-021) — `off`(기본, 실행 안 함)·`advisory`(실패 경고)·`hard`(실패 exit 1). **커버리지 태그 회계 ≠ 실행 결과**를 닫는다. 실행이 느려 pre-commit 아닌 완료 시점·CI·pre-push에서. env-gated 테스트가 부재 시 사유 포함 skip이면 결과가 error 0으로 명확 | `"off"` |
+| `schemaDriftManifest` | 런타임 스키마 드리프트(R2′ code↔deployed-DB, `check-schema-drift`, SPEC-022) — `{expected, deployed}` 두 조회 명령(코드 기대 스키마 / 배포 DB 실측; DB·ORM 중립 주입, 각 줄당 `table.column`)·`null`이면 비활성. **배포 파이프라인 preflight(migrate 직전)에 건다** — spec↔code green이 배포 안전을 보장 못 하는 사각지대(예: 42703 column does not exist)를 봉합 | `null` |
+| `migrationStatePolicy` | 위 드리프트 발견 시 강도 — `advisory`(경고)·`hard`(배포 차단 exit 1). 조회 실패도 조용히 통과 안 함(판정 불가 표면화) | `"advisory"` |
 | `entityRegistry` | entity(aggregate-root 카테고리) 등록제 — `{"<entity>":"<도입 사유>"}`. 채우면 미등록 entity 소유·빈 사유는 ownership 게이트가 exit 1(PREFIX 거버넌스 동형). 비면 비활성 | `{}` |
 | `relationTypes` | `Dependencies.Entities`의 `EntityName (relation-type)` 구조화 관계 어휘(`capabilityVerbs` 동형) — 채우면 미등록 relation-type은 ownership 게이트가 exit 1. 비면(기본) 어휘 무제한(형식 kebab 토큰만 강제). 관계의 대상 실재·소유 spec 해석은 항상 hard, 순환 참조는 항상 advisory(SPEC-017) | `[]` |
 | `objectStorageMarkers` | 오브젝트 스토리지 감지 마커(SPEC-016) — 스펙 본문이 매치하면 completeness가 `## Object Storage Decision`(Bucket·Consolidation) 존재를 advisory로 요구. `[]`면 비활성 | 멀티클라우드 기본 목록 |
