@@ -1440,7 +1440,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
         else:
             print(f"  {tag} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
     if staged:
-        print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.", file=sys.stderr)
+        print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.", file=sys.stderr)
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
         if any(d for _, _, d in violations):
             print("  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
@@ -1452,7 +1452,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print("\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).",
               file=sys.stderr)
         sys.exit(1)
-    print("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.")
+    print("spec-sync: advisory — node scripts/sdd-sync.mjs로 정렬 검토(Claude Code: /sdd-sync·/speckit.fix).")
 
 
 # ── derivation — 재도출 소스 회계 (check-derivation.mjs 패리티, SPEC-009) ──

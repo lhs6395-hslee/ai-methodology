@@ -148,7 +148,7 @@ for (const v of violations) console.log(v.draft
   ? `  ${STAGED || draftHard ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
   : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
 if (STAGED) {
-  console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라 — /speckit.fix 사용.`);
+  console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.`);
   console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
   if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
@@ -159,4 +159,4 @@ if (draftHard) {
   console.error(`\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).`);
   process.exit(1);
 }
-console.log("spec-sync: advisory — '/sdd-sync' 또는 /speckit.fix로 정렬 검토.");
+console.log("spec-sync: advisory — node scripts/sdd-sync.mjs로 정렬 검토(Claude Code: /sdd-sync·/speckit.fix).");

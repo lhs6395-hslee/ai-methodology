@@ -63,7 +63,7 @@ if (JSON_OUT) {
   console.log(
     clean
       ? `\n요약: 전부 sync ✓`
-      : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → '/sdd-sync'로 의사결정`
+      : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → node scripts/sdd-sync.mjs 리포트로 의사결정(Claude Code: /sdd-sync)`
   );
 }
 if (STRICT && !clean) process.exit(1);

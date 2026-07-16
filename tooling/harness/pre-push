@@ -4,6 +4,6 @@
 # 설치: ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push
 node scripts/sdd-sync.mjs --strict && exit 0
 echo ""
-echo "↑ spec↔code drift 가능 — '/sdd-sync'로 정렬 검토. (push는 계속됨)"
+echo "↑ spec↔code drift 가능 — node scripts/sdd-sync.mjs로 검토(Claude Code: /sdd-sync). (push는 계속됨)"
 [ "${SDD_SYNC_BLOCK:-0}" = "1" ] && exit 1
 exit 0

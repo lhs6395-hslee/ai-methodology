@@ -102,3 +102,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-15 | Python `cmd_cohesion` FR 카운터를 `__frToken` → `__frDecl`로 미러(Node cohesion 오탐 수정 동반) | cohesion FR 인용 오집계 수정의 런타임 패리티 — Node·Python 동일 판정 유지 |
 | 2026-07-15 | Python STATUS_ENUM에 Planned·`classify_accounting`에 planned_specs·`cmd_fr` planned 수집·리포트 planned 세그먼트 미러(SPEC-018 FR-005 동반) | Planned 회계 런타임 패리티 — Node↔Python 회계 리포트 바이트 동일(`planned:N`) 확인 |
 | 2026-07-16 | `numbering_issues`에 `retired_ids` 인자·DEFAULTS `retiredIds`·호출부 미러(SPEC-018 FR-006 동반) | numbering retirement-gap 런타임 패리티 — Node↔Python fr 리포트 바이트 동일 확인 |
+| 2026-07-16 | Python spec-sync 메시지를 중립-우선 문구로 미러(SPEC-003 동반) — `node scripts/sdd-sync.mjs`/Change Log 안내, Claude 슬래시는 괄호 | 강제 메시지의 Node↔Python 바이트 동일 유지 — 중립화도 두 판이 함께 움직여야 패리티 불변 |
