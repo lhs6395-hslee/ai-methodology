@@ -81,7 +81,8 @@
     "entity-relations": "Entity 관계 판정 코어 — Dependencies.Entities의 구조화 관계(실재·소유 spec hard, 순환 advisory, SPEC-017)",
     "spec-retirement": "명세/FR 폐기 워크플로 aggregate(sdd-retire·retire-lib) — 누적 아닌 정리·삭제·재sync (SPEC-018)",
     "semantic-drift": "리네임/소유 이동 → spec-sync 요구 승격(drift-lib) — 옛 의미 방치를 리뷰로 라우팅 (SPEC-019)",
-    "cross-spec-change": "Change-Driver 트레일러 → 공유 표면 변경 동인 추적·참조 완화(cross-spec-lib) — 억지 Change Log 제거 (SPEC-020)"
+    "cross-spec-change": "Change-Driver 트레일러 → 공유 표면 변경 동인 추적·참조 완화(cross-spec-lib) — 억지 Change Log 제거 (SPEC-020)",
+    "test-execution": "runTestsPolicy로 commands.test를 실제 실행해 green 확인(check-test-run) — 커버리지 회계 ≠ 실행 결과 (SPEC-021)"
   },
   "specSyncExemptGlobs": [
     "*.md",
@@ -100,5 +101,6 @@
   ],
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"
-  }
+  },
+  "runTestsPolicy": "hard"
 }

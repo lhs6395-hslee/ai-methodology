@@ -85,6 +85,7 @@ DEFAULTS = {
     "commands": {},
     "retiredIds": [],
     "semanticDriftPolicy": "advisory",
+    "runTestsPolicy": "off",
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -1927,7 +1928,37 @@ def cmd_run(cfg, stage):
         sys.exit(r.returncode)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run> [...]"
+RUN_TESTS_ENUM = ("off", "advisory", "hard")
+
+
+def test_run_verdict(policy, has_command, exit_code):
+    """테스트 실행 판정 순수 코어 (SPEC-021, check-test-run.mjs 미러 — 바이트 동일).
+    정책 × 명령유무 × exit code → (valid, exit, line)."""
+    if policy not in RUN_TESTS_ENUM:
+        return False, 1, f'✗ runTestsPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)'
+    if policy == "off":
+        return True, 0, "테스트 실행 게이트 — runTestsPolicy:off (실행 안 함; 완료 주장 전 commands.test 수동 실행 권장 — 커버리지 회계 ≠ 실행 결과)"
+    hard = policy == "hard"
+    if not has_command:
+        return True, (1 if hard else 0), f"{'✗' if hard else '⚠'} 테스트 실행 게이트 — runTestsPolicy:{policy}인데 commands.test 미선언 — 실행으로 검증 불가(커버리지 회계 ≠ 실행 결과)"
+    if exit_code == 0:
+        return True, 0, f"테스트 실행 게이트 — commands.test green (runTestsPolicy:{policy})"
+    return True, (1 if hard else 0), f"{'✗' if hard else '⚠'} 테스트 실행 게이트 — commands.test 실패 (exit {exit_code}, runTestsPolicy:{policy})"
+
+
+def cmd_testrun(cfg):
+    """`commands.test`(로컬 안전 tier)를 실제 실행해 결과를 판정 (SPEC-021). 러너/언어 중립."""
+    policy = cfg.get("runTestsPolicy") or "off"
+    cmd = (cfg.get("commands") or {}).get("test")
+    exit_code = None
+    if policy in ("advisory", "hard") and cmd:
+        exit_code = subprocess.run(cmd, shell=True, cwd=cfg["__root"]).returncode
+    valid, code, line = test_run_verdict(policy, bool(cmd), exit_code)
+    print(line, file=(sys.stdout if valid else sys.stderr))
+    sys.exit(code)
+
+
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun> [...]"
 
 
 def main():
@@ -1984,6 +2015,8 @@ def main():
             print("usage: python sdd_gates.py run <stage>", file=sys.stderr)
             sys.exit(2)
         cmd_run(cfg, args[1])
+    elif sub == "testrun":
+        cmd_testrun(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

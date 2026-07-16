@@ -107,3 +107,4 @@
 | 2026-07-16 | `sdd-init` Node 게이트 임포트 클로저에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 소비 프로젝트에도 복사해 설치만으로 실행되게(누락 시 ERR_MODULE_NOT_FOUND) |
 | 2026-07-16 | `sdd-init` Node 클로저에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib)를 소비 프로젝트에도 복사(설치만으로 실행) |
 | 2026-07-16 | FR-010 신설 — `sdd-init`이 `agent-context.md`를 `.kiro/steering/sdd.md`로 설치 + `AGENTS.md`에 마커 블록 idempotent 병합(게이트 무관). `tooling/harness/agent-context.md` 신규 아티팩트 | 비-Claude 에이전트(Kiro·Codex) 방법론 상시 주입 — Claude SessionStart 훅의 실행기-무관 대체. 슬래시 없이도 궤도·진입 규칙이 항상 로드됨(에이전트 중립 방향) |
+| 2026-07-16 | `sdd-init` Node 클로저에 `check-test-run.mjs` 추가 + `speckit-fix` 스킬에 "테스트 스위트 실행 확인" 단계(4b) 추가 | SPEC-021 동반: 완료 주장 전 실제 실행 규범을 실행기 마지막 단계에 배선(커버리지 회계 ≠ 실행 결과) |

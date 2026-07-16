@@ -144,6 +144,9 @@ export const DEFAULTS = {
   // semantic drift 승격(SPEC-019): 소유 파일 리네임 감지 시 spec-sync 요구를
   // "Change Log 한 줄" → "FR 선언 라인 변경 ∨ Spec-Impact"로 승격. off|advisory(기본)|hard.
   semanticDriftPolicy: "advisory",
+  // 테스트 스위트 실제 실행 게이트(SPEC-021): check-test-run이 commands.test를 돌려 green을 확인.
+  // 커버리지 회계 ≠ 실행 결과. off(기본, 실행 안 함)|advisory(실패 경고)|hard(실패 exit 1).
+  runTestsPolicy: "off",
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

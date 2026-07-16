@@ -793,3 +793,24 @@ test("py specsync staged: 미지원 glob 문법 → exit 1 (Node 패리티)", sk
     assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── testrun 게이트 패리티(SPEC-021) ──
+test("py testrun: off·advisory·hard × green/실패/미선언 — Node·Python 바이트 동일", skip, () => {
+  const scen = [
+    { runTestsPolicy: "off", commands: { test: "false" } },
+    { runTestsPolicy: "advisory", commands: { test: "false" } },
+    { runTestsPolicy: "hard", commands: { test: "false" } },
+    { runTestsPolicy: "hard", commands: { test: "true" } },
+    { runTestsPolicy: "hard" },
+    { runTestsPolicy: "bogus" },
+  ];
+  for (const cfg of scen) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-test-run.mjs");
+      const p = runPy(root, ["testrun"]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg)})`);
+      assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(cfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
