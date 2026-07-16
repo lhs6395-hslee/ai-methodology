@@ -1,17 +1,7 @@
 # 붙여넣기 프롬프트 (어느 IDE/에이전트든)
 
-## 한 줄 실행 (시작 · 재채택 · 업데이트) → raw URL (clone 불필요)
-이 3종은 절차를 [`prompts/`](prompts/) 파일에 두고 **raw URL 한 줄로 실행**한다(방법론 읽기·`sdd-init`·고정 규칙까지 파일이 자체 포함 — 절차 원본은 여기 한 곳, SSOT). 키트가 로컬에 없어도 됨:
-
-| 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
-|---|---|
-| **시작** (새/SDD 없던 프로젝트) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/adopt.md 읽고 그대로 수행해줘` → [adopt.md](prompts/adopt.md) |
-| **재채택** (이미 sdd/ 있음 — 소비 프로젝트 A/B) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` → [readopt.md](prompts/readopt.md) |
-| **업데이트** (방법론 고도화 후) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘` → [update.md](prompts/update.md) |
-
-> **ref:** 위 URL의 정본 ref는 `main`. 각 파일은 자신을 받은 ref를 이어 써서 main/브랜치 어느 raw든 동일 동작(자기참조). 두 계층: **작성·검토**는 GitHub 문서 직접 읽기로 다운로드 없이, **강제**(훅·게이트)만 partial+sparse로 tooling 확보 후 `sdd-init` 1회(~25파일, 전체 clone 아님). 키트가 로컬에 있으면 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
-
-> **설치형 슬래시 명령:** `sdd-init` 배선 후에는 같은 3종이 `/sdd-start`·`/sdd-readopt`·`/sdd-update`로 설치되어(`.claude/skills/`) 프로젝트 안에서 바로 부를 수 있다(인자 `[<project-path>] [<methodology-url>]`, 없으면 현재 디렉토리·정본). 절차 원본은 위 `prompts/`이고 스킬이 이를 실행한다 — 계약: `SPEC-005`.
+## 한 줄 실행 (시작 · 재채택 · 업데이트)
+시작/재채택/업데이트 3종은 `prompts/{adopt,readopt,update}.md`를 **raw URL 한 줄로 실행**한다(방법론 읽기·`sdd-init`·고정 규칙까지 파일 자체 포함 — 절차 원본은 여기 한 곳, SSOT). **raw URL 표·설치형 슬래시 명령(`/sdd-start`·`/sdd-readopt`·`/sdd-update`)·ref 자기참조·경량 부트스트랩은 정본 [`README.md`](README.md) §"한 줄로 쓰기"** 참조(중복 저장 안 함). 계약: `SPEC-005`.
 
 아래 A/B/C는 위 3종에 안 들어가는 **다른 시나리오**의 붙여넣기 프롬프트다.
 

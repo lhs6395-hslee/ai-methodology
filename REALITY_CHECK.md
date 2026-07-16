@@ -1,6 +1,7 @@
 # REALITY CHECK — 검증된 동작 결과 (추측 아님)
 
-> 이 문서의 모든 판정은 참조 프로젝트(operations-dashboard, Spec Kit 0.11.9 + claude 연동)에서 **실제 명령을 실행해** 확인한 결과다. 검증일: 2026-06-26. **언어 무관 어댑터는 Python 픽스처로 추가 검증(2026-06-29).** 태그: `[검증]`=실행함 · `[조건부]`=프로젝트마다 설치/배선 필요 · `[미동작]`=현재 안 됨.
+> 이 문서의 모든 판정은 참조 프로젝트(operations-dashboard, Spec Kit 0.11.9 + claude 연동)에서 **실제 명령을 실행해** 확인한 결과다. 검증일: 2026-06-26. **언어 무관 어댑터는 Python 픽스처로 추가 검증(2026-06-29).** 이후 SPEC-006~022 게이트는 **키트 자체 테스트 스위트**(`tooling/__tests__/`, Node↔Python 패리티)로 검증(하단 표). 태그: `[검증]`=실행함 · `[조건부]`=프로젝트마다 설치/배선 필요 · `[미동작]`=현재 안 됨.
+> **역사적 스냅샷 주의:** 위 참조 프로젝트의 "11모듈 config"는 **1 레포=1 모듈 피벗 이전**의 세계관(한 레포에 다중 모듈)이다. 현행 방법론은 **1 레포=1 모듈, 큰 시스템=MSA 합성**(STRUCTURE.md) — 판정 자체(게이트 동작)는 유효하나 "11모듈" 수치는 옛 구조 가정임.
 >
 > **범용성 정직 노트:** 게이트는 텍스트 파서라 언어에 묶이지 않으며 Python 픽스처에서 통과·차단 모두 실증했다(아래 매트릭스). 다만 **실제 Python/Go/Rust 프로덕션 레포 전체 파이프라인**(그 언어의 lint/typecheck/test가 CI green) 검증은 적용 프로젝트의 몫이다 — 어댑터(`sdd.config.json`)와 게이트 동작 자체는 검증됨, 각 언어의 `commands.*`가 그 레포에서 green인지는 JS 때와 동일하게 "그 프로젝트가 먼저 통과해야" 한다.
 
@@ -27,6 +28,7 @@
 | module>spec·cross-spec 중복검사 | `[검증]`/`[조건부]` | **구조적 중복**=`check-ownership.mjs` 게이트로 결정적 차단(검증됨, → `DEDUP.md`). **의미적 중복**(reworded)=`/analyze`(한 기능 내)+좁힌 리뷰로 보조(조건부) |
 | **언어 무관 어댑터**(`sdd.config.json`) — Python 픽스처로 게이트 실행 | `[검증]` **동작**(2026-06-29) | Python 테스트(`#` 주석 @covers) FR↔test 통과(specs:1 FRs:2 covered:2), 커스텀 Ownership 키(Modules/Symbols/Artifacts) 유일성 OK |
 | `sdd-init.sh` — 대상에 `.git` 부재 시 훅 배선 | `[검증]` **경고 명시**(2026-07-16, 소비 프로젝트 gsneotek-mis-mcp 마찰) | 조용한 스킵 제거 — 블록별 `⚠ .git 없음…` stderr + 완료 안내 재요약(`init-hooks.test.mjs` 회귀). 해결: `git init` 후 `--force` 재실행 |
+| **정리·삭제·배포경계 게이트(SPEC-018~022)** — 키트 자체 테스트로 검증 | `[검증]` **동작**(2026-07-16, 키트 self-test·Node↔Python 패리티) | `sdd-retire`(폐기 계획·재sync) · `drift-lib`(리네임→요구 승격) · `cross-spec-lib`(Change-Driver 완화) · `check-test-run`(commands.test 실행·green) · `check-schema-drift`(코드↔배포 스키마 diff, R2′). 순수 코어 TDD + 게이트 e2e + 패리티 테스트 전 케이스 green |
 | 언어 무관 — **위반 탐지도 비-JS에서 강제** | `[검증]` **차단(설계대로)** | 같은 Module 키 2 spec=exit 1, dangling `@covers`(없는 FR)=R1 exit 1. Python 픽스처 |
 | config 없을 때 **JS/TS 하위호환** | `[검증]` 동작 | `config:defaults(JS/TS)`로 `.test.ts` 인식·Entities 기본키 — 기존 동작 그대로 |
 | CI 언어 무관(`sdd-run.mjs`) — `commands.*` 실행/미설정 stage skip | `[검증]` 동작 | 설정 stage 실행·exit 전파, 미설정 stage는 건너뜀(exit 0) |

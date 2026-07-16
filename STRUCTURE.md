@@ -19,12 +19,7 @@
 
 **규칙(판정):** 각 spec은 `## Ownership` 블록에 소유 키를 선언한다. 키 종류는 `sdd.config.json`의 `ownershipCategories`가 정한다 — 웹/CRUD 기본은 **Entity**(도메인 객체/테이블)·**Surface**(route·화면·job)·**Capability**(Entity×Action). **비-웹 프로젝트는 바꿔 쓴다** — 라이브러리/CLI=`Modules·Symbols·Artifacts`, 데이터파이프라인=`Datasets·Jobs·Sinks`, IaC=`Resources·Surfaces·Capabilities`. 종류가 무엇이든 규칙은 동일: **하나의 키는 정확히 한 spec만 소유.** 2개 이상이 같은 키를 선언 = **구조적 중복**. (애매한 판단이 아니라 집합 조회로 결정.)
 
-**라우팅 결정트리(새 요구 → 새 spec? 개정?):**
-1. 새 요구의 키 산출: 어떤 Entity를 건드리나 / 어떤 Surface인가 / 어떤 Capability인가.
-2. 그 키를 이미 소유한 spec이 있나? (`MODULE_MAP` 소유 레지스트리 / `check-ownership` 조회)
-   - **있음 → 그 spec을 개정(새 spec 금지).**
-   - 없지만 같은 Entity·Surface 범위 안 → 그 owner spec 개정.
-   - 완전히 새 범위 → **새 spec 생성 + Owns 등록.**
+**라우팅 결정트리(새 요구 → 새 spec? 개정?):** 키 산출 → 이미 그 키를 소유한 spec이 있으면 **개정**(새 spec 금지), 없지만 같은 범위면 owner 개정, 완전히 새 범위면 **새 spec + 소유 등록**. 정본 결정트리·정규화 절대규칙(Entity/Surface/Capability 표준형)·소유 vs 종속(`## Dependencies`) 구분: [`DEDUP.md`](DEDUP.md) §3.
 
 **강제(게이트):** 소유권 게이트가 전 spec의 `## Ownership`을 파싱해 **키별 소유 spec이 1개인지** CI에서 검증(중복 = exit 1). FR↔test 게이트의 형제. Ownership 미선언 spec은 warn(점진 도입), `--strict`로 완전 강제. (게이트는 Go 바이너리·셸·Python·Node 4판 동작 동일 — `principles.md` §10; CI는 provider 무관 — `ci-examples.md`.) **유일성 범위 = 이 레포(=한 모듈)의 전 spec.** 모듈 간(레포 간) 키는 MSA 계약 경계로 분리되므로 dedup 대상이 아니다(1 레포=1 모듈). **거울상:** 한 spec이 키/FR을 과다 소유하면(under-fragmentation) `check-spec-cohesion` advisory 게이트가 분할을 권고한다.
 

@@ -24,6 +24,11 @@
 | **테스트 인프라 누수** | `testInfraGlobs` 매치 파일을 제품(비-TEST) 스펙이 소유 | **test-domain(SPEC-015)**: `check-fr-coverage` exit 1 · `Lifecycle: removable` 관례 | ★자동(CI) |
 | **스토리지 결정 미기록** | `objectStorageMarkers` 매치인데 버킷 선택·이전(consolidation) 기준 없음 | **object-storage(SPEC-016)**: completeness advisory(`--strict` hard) | ★자동(CI) |
 | **관계 대상 미실재·순환** | `Entity (relation-type)` 대상을 어느 스펙도 안 소유 / aggregate 간 순환 | **relation(SPEC-017)**: `check-ownership` 실재 hard · 순환 advisory | ★자동(CI) |
+| **유령 명세·번호 gap 누적** | 필요 없어진 SPEC/FR을 안 지우고 누적 / 폐기가 남긴 gap을 사고성 결번과 혼동 | **retirement(SPEC-018)**: `sdd-retire`(폐기 계획·재sync) · `Status: Planned` 회계 · `retiredIds` numbering gap | 반자동(커맨드+게이트) |
+| **의미 방치(semantic drift)** | 소유 파일 리네임·목적변경인데 FR 본문이 옛 의미 유지 | **semantic-drift(SPEC-019)**: 리네임 감지→"FR 라인 변경 ∨ Spec-Impact" 승격(`semanticDriftPolicy`) | ★자동(트리거) + 리뷰(의미) |
+| **공유 표면 억지 Change Log** | 타 스펙 기능 때문에 고친 공유 파일에 비-동인 스펙이 잡음 Change Log | **cross-spec(SPEC-020)**: `Change-Driver` 트레일러로 진짜 동인 기록·참조 완화 | ★자동(배선) |
+| **커버리지 green ≠ 실행 green** | 태그 회계는 green인데 스위트가 실제로 안 돌거나 실패 | **test-execution(SPEC-021)**: `runTestsPolicy`로 `commands.test` 실행·exit 0 요구(opt-in) | ★자동(opt-in) + 완료 규범 |
+| **배포 스키마 드리프트(R2′)** | spec↔code green인데 배포 DB에 컬럼 미적용(42703) | **schema-drift(SPEC-022)**: 배포 preflight에서 코드 기대↔배포 실측 diff(`schemaDriftManifest`) | ★자동(opt-in, 배포 preflight) |
 
 **요약:** 빈공란=`/clarify`, 한 기능 내 중복·모순·누락=`/analyze`, 체크리스트=`/checklist`, FR↔test=CI 게이트. **spec 간 중복**은 — **구조적**(같은 소유 키)=소유권 게이트로 **강제**, **의미적**(reworded)=좁힌 LLM 리뷰로 보조하되 *검토 기록의 존재*(`Dedup-Review`)와 *entity 어휘*(`entityRegistry`)는 게이트가 강제. (LLM은 누락을 내므로 결정적 게이트가 1차. 상세: `DEDUP.md` / `STRUCTURE.md` 소유권 유일성 규칙.)
 
