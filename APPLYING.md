@@ -10,7 +10,7 @@ sh <KIT>/tooling/sdd-init.sh --gate=sh        # gate: go|sh|py|node
 ```
 → `sdd/specs/`·`sdd/MODULE_MAP.md`·`sdd/templates/`·`sdd.config.json`·`scripts/<게이트>`가 **모든 프로젝트에서 동일하게** 생성된다(`STORAGE.md` §5). 그다음 **§3의 "언어 맞춤"** 으로 `sdd.config.json` 값만 조정하고, **§1**로 Spec Kit init(+constitution)만 추가하면 끝. 아래 0~5는 그 빠른 경로가 하는 일의 상세·수동 폴백이다.
 
-> **URL로 시작(경량 부트스트랩).** 키트가 이 머신에 없으면 전체 clone 대신 실행 폐포만 받는다: `git clone --filter=blob:none --sparse https://github.com/lhs6395-hslee/ai-methodology <KIT> && cd <KIT> && git sparse-checkout set tooling templates prompts` (cone 모드 — 루트 파일 + 이 3폴더; 큰 하위폴더 `.superpowers/`·`docs/`·`sdd/`는 제외). 이후 위 `sdd-init` 또는 채택 스킬 `/sdd-start`. 상세: `README.md` §"경량 부트스트랩".
+> **URL로 시작(경량 부트스트랩).** 키트가 이 머신에 없으면 전체 clone 대신 실행 폐포만(partial+sparse) 받는다 — clone 명령·cone 모드 상세는 정본 `README.md` §"경량 부트스트랩". 받은 뒤 위 `sdd-init` 또는 채택 스킬 `/sdd-start`.
 
 ## 0. 전제 도구
 - `uv`/`uvx`(Spec Kit 실행) · 대상 IDE에 **Superpowers 스킬**(또는 동급 TDD/검증 규율, `[조건부]`).
@@ -268,4 +268,4 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 4. **원본 정리**: 이관한 FR·`Files`·`@covers` 태그·검증 회계 엔트리(smoke-manifest)를 원 제품 스펙에서 제거(재번호 필요 시 `sdd-retag`). `MODULE_MAP.md` 갱신.
 5. **삭제 시**: 도구를 지울 때 TEST 스펙 하나 + 그 격리된 인프라만 제거하면 된다 — 제품 스펙을 수술할 필요가 없다(도메인 격리의 값어치).
 
-**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 17-spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.
+**실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 각 spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.

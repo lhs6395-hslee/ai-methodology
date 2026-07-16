@@ -111,3 +111,4 @@
 | 2026-07-16 | `self-hooks-install.sh` 킷 pre-commit에 `gen-changelog.mjs` 재생성 + `git add change_log.html` 추가(킷 전용, 소비 훅 불변) | 방법론이 커밋(=push)될 때마다 change_log.html이 사람 개입 없이 자동 갱신 — 자동 changelog의 1-커밋 지연 수용 |
 | 2026-07-16 | `sdd-init` Node 클로저에 `check-schema-drift.mjs`·`schema-drift-lib.mjs` 추가 + `speckit-fix` 스킬에 Change-Driver 사용 규칙(공유 파일은 타 스펙 동인이면 억지 Change Log 대신 `Change-Driver`) 명문화 | SPEC-022 동반(게이트 배선) + SPEC-020 후속(가이드 부재로 억지 Change Log로 흐르던 것 봉합) |
 | 2026-07-16 | `sdd-init.sh`의 `.git` 부재 시 훅 배선 조용한 스킵 → 블록별 `⚠` 경고(stderr) + 완료 안내 재요약(`warn()`·`GITWARN`), `init-hooks.test.mjs` 회귀 1건 | 도그푸딩(gsneotek-mis-mcp): `.git` 없으면 훅이 말없이 안 깔려 "강제 궤도 켜진 줄" 오인 — 조용한 스킵 제거(정직) |
+| 2026-07-16 | `sdd-init` Node 클로저에 `sdd-retire.mjs`·`retire-lib.mjs` 추가 | 정리 감사(죽은 코드): SPEC-018 폐기 워크플로 완결(6/6)됐는데 배포 클로저에 빠져 소비 프로젝트가 `sdd-retire`를 못 받던 배포 누락 봉합 |

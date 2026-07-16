@@ -10,11 +10,11 @@
 - **Ownership 키 결정성** — 소유/참조(`## Dependencies`) 분리 · 정규화 절대규칙 · verb 고정집합 · PREFIX 표준(SPEC/INFRA/TEST/CICD)+사유 관문 · 1 spec=1 aggregate · `check-spec-consistency` 신규. (`cc3dc22..acf5b6f`, 설계 `specs/2026-06-30-…`, 계획 `plans/2026-07-01-ownership-…`)
 - **방법론 강제 hook 세트** — SessionStart(방법론 주입)·PreToolUse(편집 체크리스트)·git pre-commit(hard)·`sdd-init` 자동배선 · "채택=상시 강제 궤도" 원칙 · 사용법(`APPLYING`·`방법론.html`). (`cc3dc22..acf5b6f`, 설계 `specs/2026-07-01-…`, 계획 `plans/2026-07-01-methodology-…`)
 - **spec-first 강제** — `Files:` 소유매핑 · `check-spec-sync`(changeset=브랜치, commit-msg hard + range advisory) · `/speckit.fix` · Edge Cases/Change Log 필수화 · 사용법·데모 실측(`APPLYING`·`방법론.html`·`README`). (`74a747b..acf5b6f`, 설계 `specs/2026-07-02-spec-first-enforcement-design.md`, 계획 `plans/2026-07-02-spec-first-enforcement.md`)
-- **키트 자기 정렬(self-hosting)** — 키트 `tooling/`(게이트 스위트, 267 테스트(파일 38)) 자신을 자기 궤도에 편입: 루트 `sdd.config.json`(비-웹 카테고리 Modules/Symbols/Artifacts) · `sdd/specs/` 17-spec(1 aggregate씩, 게이트·lib 25 .mjs 전부 소유) · `@covers` 134태그 / FR 98(unit 93·deferred 5·미검증 0) — deferred 5·unaccounted 0으로 requireAccounting green(정직 회계) · `self-hooks-install.sh`로 자기 훅 배선(tooling 직접 호출). **실증**: 스펙 미동반 tooling 커밋 → commit-msg FAIL(exit 1), `Spec-Impact: none <사유>` → 통과. (설계·계획 `2026-07-02-kit-self-alignment.md`)
+- **키트 자기 정렬(self-hosting)** — 키트 `tooling/`(게이트 스위트) 자신을 자기 궤도에 편입: 루트 `sdd.config.json`(비-웹 카테고리 Modules/Symbols/Artifacts) · `sdd/specs/`의 각 spec(1 aggregate씩, 게이트·lib 전부 소유) · 테스트 `@covers`로 FR 결선 — requireAccounting 상시 on(unaccounted 0, 미커버는 deferred로 정직 회계) · `self-hooks-install.sh`로 자기 훅 배선(tooling 직접 호출). **실증**: 스펙 미동반 tooling 커밋 → commit-msg FAIL(exit 1), `Spec-Impact: none <사유>` → 통과.
 
 - **런타임 패리티(2026-07-05)** — Python판 전 게이트 패리티(같은 픽스처→같은 exit code·바이트 동일 출력, 테스트 강제) · `requirementIdPrefixes` 전 사이트 파생 · preset 템플릿 바이트 동일화 · 셸/Go 문법 정렬. (SPEC-006)
 - **강제 강도 고도화 2차(2026-07-05)** — 진단(spec-first=동반변경 확인, 의미중복 반례, 스펙 리뷰 계층 부재)의 승인 보강 전부 반영:
-  - **B-3 검증 회계(SPEC-007)**: `strictSpecs`(전역 --strict 점진 브리지) · `requireAccounting`(R3: 전 FR이 unit∨smoke∨deferred) · `smokeManifest`(사유 존재만 강제) — 키트 자신 requireAccounting 상시 on(미커버 5 FR은 deferred로 정직 회계).
+  - **B-3 검증 회계(SPEC-007)**: `strictSpecs`(전역 --strict 점진 브리지) · `requireAccounting`(R3: 전 FR이 unit∨smoke∨deferred) · `smokeManifest`(사유 존재만 강제) — 키트 자신 requireAccounting 상시 on(미커버 FR은 deferred로 정직 회계).
   - **P1 스펙 수명주기(SPEC-008)**: Status enum 문법화 · Draft 소유 코드 commit-msg 차단 · Reviewed 이상 `Review Log` 기록 존재 검사 — 상태 순서 강제(시간 순서 아님), 레거시(Status 없음)는 warn(advisory→strict 승격 경로).
   - **P2 미소유 파일 정책**: `specSyncUnownedPolicy`(silent|warn|error) — 침묵 통과를 선언된 정책으로 승격(exempt 조합 탈출).
   - **P3 의미중복 절차 문법화**: `entityRegistry`(entity 등록제 — PREFIX 거버넌스 동형) + `## Dedup-Review` 기록 의무화(존재·형식만 — DEDUP.md 경계 유지).
@@ -34,9 +34,17 @@
   - **오브젝트 스토리지 결정(SPEC-016)**: `objectStorageMarkers` 매치 스펙에 `## Object Storage Decision`(버킷 선택·이전 기준) 기록 강제 — completeness advisory(`--strict` hard).
   - **Entity 관계 정합(SPEC-017)**: 쪼갠 aggregate 사이 참조를 `Entity (relation-type)`로 구조화 — 대상 Entity 실재·소유 spec 해석 hard, aggregate 간 순환 참조 advisory.
 
+- **정리·삭제·배포경계 확장 5차(2026-07-15~16)** — 도그푸딩(소비 프로젝트 B) 실측에서 "누적만 하고 정리·삭제·배포검증이 없던" 축을 문법화. 설계 `docs/design/2026-07-15-spec-retirement-and-drift.md`:
+  - **명세 폐기 워크플로(SPEC-018)**: `sdd-retire`(dry-run/--write, all-or-nothing 재sync) + `Status: Planned` 회계(유령 명세 노이즈 제거) + `retiredIds` numbering retirement-gap — "누적 아니라 정리·삭제".
+  - **semantic drift 승격(SPEC-019)**: 소유 파일 리네임 감지 → spec-sync 요구를 "FR 라인 변경 ∨ Spec-Impact"로 승격(`semanticDriftPolicy`) — 옛 의미 방치를 리뷰로 라우팅.
+  - **cross-spec 변경 동인(SPEC-020)**: `Change-Driver` 트레일러로 공유 표면 변경 동인 추적·참조 완화 — 억지 Change Log 제거.
+  - **테스트 실행 게이트(SPEC-021)**: `runTestsPolicy`로 `commands.test` 실제 실행·green 확인 — 커버리지 회계 ≠ 실행 결과. env-gated skip 관례 1급화.
+  - **런타임 스키마 드리프트(SPEC-022, R2′)**: 코드 기대 스키마 ↔ 배포 DB 실측 diff(`check-schema-drift`, 배포 preflight) — spec↔code green ≠ 배포 안전.
+  - 에이전트 중립화(강제 메시지·비-Claude 에이전트 컨텍스트 자동 배선) + change_log.html 자동 생성 + 소비 프로젝트 마찰 3종(조용한 훅 스킵·retrofit Reviewed·병렬 저술 프로토콜).
+
 설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
 
-> **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 5 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.
+> **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.
 
 ## 🔜 보류 (트리거가 오면 착수)
 | 항목 | 착수 트리거 |

@@ -24,7 +24,7 @@
 - 어느 방향도 **자동 덮어쓰기 금지** — 사람 의사 확인 게이트 필수.
 - 탐지는 advisory 1차; `--strict` 승격은 팀 선택.
 - 게이트는 런타임 중립(4판), 실행기만 에이전트별.
-- 로컬 훅(pre-commit·pre-push)·TDD는 run test(로컬 안전 유닛)만 실행하고, 인프라(관리형 DB·스토리지·큐·클라우드 API — 어느 CSP든) 테스트는 자격증명·도달성이 있는 개발서버·CI에서 run smoke로 — 로컬은 인프라 의존 테스트를 강제하지 않는다(METHODOLOGY '검증은 환경으로 계층화된다'·sdd.config.presets 테스트 tier 참조).
+- 로컬 훅·TDD는 `commands.test`(로컬 안전 유닛)만, 인프라 테스트는 개발서버·CI에서 `commands.smoke` — 로컬은 인프라 의존 테스트를 강제하지 않는다. 정본: METHODOLOGY §"검증은 환경으로 계층화된다"(+ `sdd.config.presets` 테스트 tier).
 
 ## 완료 루프의 꼬리 — 원점 트래커 close-out
 작업이 tracked issue(QA/이슈 트래커)에서 유래했다면 verify/merge가 끝이 아니다 — **①트래커 dev-done(개발자) → ②이해관계자 완료 보고(무엇·왜·어떻게+검증 경로) → ③리포터 confirm(리포터/QA)**까지가 완료다. **2인 책임분리**: 개발자는 리포터의 confirm을 건드리지 않는다. 외부 시스템·사람 sign-off라 게이트가 아니라 규범이며(SC 충족과 동일 — 리뷰 경계), 실행기는 `speckit-fix` 스킬 마지막 단계(§완료형 스킬)다. 트래커 정체·보고 채널(수신자·형식)은 킷에 하드코딩하지 않고 `trackerCloseout` config(또는 CLAUDE.md 관례)로 인스턴스화한다(`{}`=비활성).
