@@ -50,7 +50,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > completeness 게이트 본체는 SPEC-002 소유(이 spec은 결정 검사 코어만), config 어댑터·DEFAULTS는 SPEC-001, Python 복제는 SPEC-006 소유.
-- **Modules**: key-pipeline, spec-quality-gates, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), runtime-parity (references)
 
 ---
 

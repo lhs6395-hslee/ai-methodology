@@ -49,7 +49,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > fr 게이트 본체·PREFIX 화이트리스트는 SPEC-002 소유(이 spec은 번호 판정 코어만), 재번호 해소 수단은 SPEC-011(retag), Python 복제는 SPEC-006 소유.
-- **Modules**: spec-quality-gates, traceability-retag, runtime-parity
+- **Modules**: spec-quality-gates (references), retag (references), runtime-parity (references)
 
 ---
 

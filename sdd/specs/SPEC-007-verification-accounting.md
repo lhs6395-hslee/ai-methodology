@@ -50,7 +50,7 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 
 ## Dependencies (참조 — dedup 제외)
 > fr 게이트 본체(check-fr-coverage)와 ID 문법 파생은 SPEC-002·SPEC-001 소유 — 이 spec은 회계 계층만 소유. Python판 동작 복제는 SPEC-006이 소유.
-- **Modules**: key-pipeline, spec-quality-gates, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), runtime-parity (references)
 
 ---
 

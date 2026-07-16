@@ -56,7 +56,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > glob 매칭 대상 키의 파싱은 SPEC-001 파이프라인에 위임.
-- **Modules**: key-pipeline
+- **Modules**: key-pipeline (references)
 
 ---
 

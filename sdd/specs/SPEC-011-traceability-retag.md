@@ -49,7 +49,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 태그·키 문법 파생은 SPEC-001, 커버리지 판정(R1)은 SPEC-002, 검증 태그 문법은 SPEC-010, Python 복제는 SPEC-006.
-- **Modules**: key-pipeline, spec-quality-gates, smoke-scan, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), smoke-scan (references), runtime-parity (references)
 - **Artifacts**: sdd/smoke-manifest.json
 
 ---

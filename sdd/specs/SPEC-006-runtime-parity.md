@@ -50,7 +50,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 
 ## Dependencies (참조 — dedup 제외)
 > 판정 알고리즘의 정본은 Node판이 소유한다 — 이 spec은 그 동작의 "복제 충실도"만 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references)
 
 ---
 

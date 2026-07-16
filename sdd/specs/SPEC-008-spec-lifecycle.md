@@ -52,7 +52,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 소비 게이트 본체는 SPEC-002(completeness)·SPEC-003(spec-sync) 소유 — 이 spec은 수명주기 문법·판정 코어만 소유. Python 복제는 SPEC-006.
-- **Modules**: spec-quality-gates, spec-sync, runtime-parity
+- **Modules**: spec-quality-gates (references), spec-sync (references), runtime-parity (references)
 
 ---
 

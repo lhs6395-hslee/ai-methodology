@@ -54,7 +54,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 이 게이트군은 키의 파싱·정규화·검증을 SPEC-001에 위임한다.
-- **Modules**: key-pipeline
+- **Modules**: key-pipeline (references)
 
 ---
 

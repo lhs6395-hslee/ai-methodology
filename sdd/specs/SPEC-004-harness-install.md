@@ -57,7 +57,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references)
 
 ---
 

@@ -85,6 +85,7 @@
     "test-execution": "runTestsPolicy로 commands.test를 실제 실행해 green 확인(check-test-run) — 커버리지 회계 ≠ 실행 결과 (SPEC-021)",
     "runtime-schema-drift": "코드 기대 스키마 ↔ 배포 DB 실측 diff(check-schema-drift·schema-drift-lib) — R2′ 배포 경계 드리프트, 배포 preflight (SPEC-022)"
   },
+  "relationTypes": ["references"],
   "specSyncExemptGlobs": [
     "*.md",
     "*.html",

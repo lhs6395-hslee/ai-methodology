@@ -51,7 +51,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > `commands.test` tier·config 문법은 SPEC-001/015 소유, 러너(sdd-run)는 SPEC-004, Python 복제는 SPEC-006. 이 spec은 실행-결과 게이트 계층만 소유.
-- **Modules**: key-pipeline, test-domain, harness-install, runtime-parity
+- **Modules**: key-pipeline (references), test-domain (references), harness-install (references), runtime-parity (references)
 
 ---
 

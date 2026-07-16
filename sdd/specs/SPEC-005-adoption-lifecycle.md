@@ -54,7 +54,7 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 
 ## Dependencies (참조 — dedup 제외)
 > 설치·배선과 하네스 detector는 아래 모듈들이 소유. 라이프사이클 스킬은 이를 호출·안내만 한다.
-- **Modules**: harness-install
+- **Modules**: harness-install (references)
 - **Symbols**: sdd-init.sh, sdd-sync.mjs
 
 ---

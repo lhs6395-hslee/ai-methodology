@@ -52,7 +52,7 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 
 ## Dependencies (참조 — dedup 제외)
 > completeness·ownership 게이트 본체는 SPEC-002 소유, spec-sync 본체·글롭 스캐너는 SPEC-003 소유, 섹션 파서는 SPEC-008 소유(lifecycle-lib), Python 복제는 SPEC-006 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync, spec-lifecycle, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references), spec-lifecycle (references), runtime-parity (references)
 
 ---
 

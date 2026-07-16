@@ -52,7 +52,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 폐기 계획은 아래 소유 개념을 소비한다: FR 문법·config는 SPEC-001, 커버리지·매니페스트·회계는 SPEC-002/007, Status enum(Planned)은 SPEC-008, 번호는 SPEC-014, Python 복제는 SPEC-006.
-- **Modules**: key-pipeline, spec-quality-gates, verification-accounting, spec-lifecycle, spec-id-numbering, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), verification-accounting (references), spec-lifecycle (references), spec-id-numbering (references), runtime-parity (references)
 
 ---
 
