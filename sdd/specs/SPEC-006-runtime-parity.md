@@ -100,3 +100,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-15 | 셸(`sdd_gates.sh`)·Go(`go-gate/main.go`) `specIdPrefixes` 기본값·표준 접두어 집합·에러 문자열을 `SPEC/INFRA/TEST/CICD` 4종으로 통일 + `runtime-contract.test.mjs` 소스 계약 기대치를 4종으로 갱신 | CICD 절반 롤아웃 봉합 — Node·Python은 4종인데 셸/Go 기본값이 3종이라 config 없는 CICD 스펙이 런타임에 따라 통과/차단 갈리던 패리티 결함(감사 P1) 실증 후 정정(셸 CICD-001 통과 확인) |
 | 2026-07-15 | Python(`sdd_gates.py`) PREFIX 위반 에러 문자열도 `표준 SPEC/INFRA/TEST/CICD`로 — 4판 에러 문자열 바이트 동일 완결 | 위 통일의 잔재 1곳(Python 에러 메시지만 3종) 정정 — Node·셸·Go와 바이트 동일 |
 | 2026-07-15 | Python `cmd_cohesion` FR 카운터를 `__frToken` → `__frDecl`로 미러(Node cohesion 오탐 수정 동반) | cohesion FR 인용 오집계 수정의 런타임 패리티 — Node·Python 동일 판정 유지 |
+| 2026-07-15 | Python STATUS_ENUM에 Planned·`classify_accounting`에 planned_specs·`cmd_fr` planned 수집·리포트 planned 세그먼트 미러(SPEC-018 FR-005 동반) | Planned 회계 런타임 패리티 — Node↔Python 회계 리포트 바이트 동일(`planned:N`) 확인 |

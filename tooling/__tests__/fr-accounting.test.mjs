@@ -154,7 +154,7 @@ test("회계 리포트: accounted(unit/smoke/deferred/unaccounted) 집계 + unit
   try {
     const r = run(root);
     assert.equal(r.code, 0, r.out); // requireAccounting 아님 — unaccounted는 warn 영역
-    assert.match(r.out, /accounted\(unit:1 smoke:1 deferred:0 unaccounted:1\)/);
+    assert.match(r.out, /accounted\(unit:1 smoke:1 deferred:0 planned:0 unaccounted:1\)/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -165,4 +165,20 @@ test("하위호환: 회계 config 전부 미설정이면 리포트에 accounted 
     assert.equal(r.code, 0, r.out);
     assert.doesNotMatch(r.out, /accounted\(/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-018/FR-005
+test("Planned 스펙: 0-coverage FR이 requireAccounting에서 planned 회계(R3 미검증 아님)", () => {
+  const dir = fixture({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Planned\n- **FR-001** (event): x.\n- **FR-002** (event): y.\n",
+  }, { requireAccounting: true });
+  const r = run(dir);
+  assert.equal(r.code, 0, r.out);                 // Planned → R3 통과(미검증 아님)
+  assert.match(r.out, /planned:2/, r.out);        // 리포트에 planned 2
+  assert.doesNotMatch(r.out, /R3 unaccounted/);
+  // 대조: Active면 같은 0-cov가 R3로 exit 1
+  const dir2 = fixture({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Active\n- **FR-001** (event): x.\n",
+  }, { requireAccounting: true });
+  assert.equal(run(dir2).code, 1, "Active 0-cov는 여전히 R3 미검증");
 });

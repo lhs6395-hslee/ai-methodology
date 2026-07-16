@@ -295,10 +295,11 @@ def load_manifest(cfg, specs):
     return entries, errors
 
 
-def classify_accounting(specs, covered, entries):
-    """FR별 분류(unit > smoke > deferred > unaccounted) + 카운트."""
+def classify_accounting(specs, covered, entries, planned_specs=None):
+    """FR별 분류(unit > smoke > deferred > planned > unaccounted) + 카운트."""
+    planned_specs = planned_specs or set()
     classes = {}
-    counts = {"unit": 0, "smoke": 0, "deferred": 0, "unaccounted": 0}
+    counts = {"unit": 0, "smoke": 0, "deferred": 0, "planned": 0, "unaccounted": 0}
     for spec, frs in specs.items():
         for fr in frs:
             key = f"{spec}/{fr}"
@@ -307,6 +308,8 @@ def classify_accounting(specs, covered, entries):
                 cls = "unit"  # unit이 manifest보다 우선
             elif entries is not None and key in entries:
                 cls = "deferred" if entries[key]["method"] == "deferred" else "smoke"
+            elif spec in planned_specs:
+                cls = "planned"  # SPEC-018: Planned 스펙의 미커버 FR = 의도적 미구현
             classes[key] = cls
             counts[cls] += 1
     return classes, counts
@@ -458,7 +461,12 @@ def cmd_fr(cfg, strict):
         if sid not in specs:
             errors.append(f'strictSpecs에 존재하지 않는 spec "{sid}" — 오타/삭제 확인(조용한 스킵 금지)')
     accounting_active = manifest is not None or bool(cfg.get("requireAccounting"))
-    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest)
+    planned_specs = set()
+    for f in spec_names:
+        m = cfg["__specId"].search(f)
+        if m and f.endswith(".md") and parse_status(read_text(os.path.join(spec_dir, f))) == "Planned":
+            planned_specs.add(m.group(0))
+    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest, planned_specs)
                                  if accounting_active else (None, None))
 
     for spec, frs in specs.items():
@@ -466,8 +474,9 @@ def cmd_fr(cfg, strict):
         hard = strict or spec in strict_specs
         label = "R2(strict)" if strict else "R2(strictSpecs)"
         if not cov:
-            msg = f"{spec}: 0/{len(frs)} FRs covered (not yet implemented)"
-            if hard and frs:
+            planned = spec in planned_specs
+            msg = f"{spec}: 0/{len(frs)} FRs covered ({'planned — 의도적 미구현' if planned else 'not yet implemented'})"
+            if hard and frs and not planned:
                 errors.append(f"{label} {msg}")
             else:
                 warnings.append(msg)
@@ -490,7 +499,7 @@ def cmd_fr(cfg, strict):
     total_cov = sum(len(s) for s in covered.values())
     mode = "strict" if strict else "incremental"
     acct_tag = (f" accounted(unit:{acct_counts['unit']} smoke:{acct_counts['smoke']}"
-                f" deferred:{acct_counts['deferred']} unaccounted:{acct_counts['unaccounted']})"
+                f" deferred:{acct_counts['deferred']} planned:{acct_counts['planned']} unaccounted:{acct_counts['unaccounted']})"
                 if accounting_active else "")
     print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov}{acct_tag} mode:{mode} config:{cfg_tag(cfg)}")
     for w in warnings:
@@ -666,7 +675,7 @@ def cmd_cohesion(cfg, strict):
 
 # ── 수명주기 (lifecycle-lib.mjs 패리티, SPEC-008) ──
 
-STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"]
+STATUS_ENUM = ["Planned", "Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"]
 _REVIEWED_PLUS = {"Reviewed", "Approved", "Active"}
 LIFECYCLE_ENUM = ["removable", "permanent"]  # lifecycle-lib.mjs 미러(SPEC-008)
 

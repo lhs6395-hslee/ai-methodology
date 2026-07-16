@@ -52,15 +52,16 @@ export function loadManifest(cfg, specs) {
 
 // FR별 분류. entries가 null이면 unit/unaccounted 2분류만(=manifest 미설정에서 requireAccounting).
 // 반환: { classes: Map("SPEC/FR" -> class), counts: {unit, smoke, deferred, unaccounted} }
-export function classify(specs, covered, entries) {
+export function classify(specs, covered, entries, plannedSpecs = new Set()) {
   const classes = new Map();
-  const counts = { unit: 0, smoke: 0, deferred: 0, unaccounted: 0 };
+  const counts = { unit: 0, smoke: 0, deferred: 0, planned: 0, unaccounted: 0 };
   for (const [spec, frs] of specs) {
     for (const fr of frs) {
       const key = `${spec}/${fr}`;
       let cls = "unaccounted";
       if (covered.has(spec) && covered.get(spec).has(fr)) cls = "unit"; // unit이 manifest보다 우선
       else if (entries && entries.has(key)) cls = entries.get(key).method === "deferred" ? "deferred" : "smoke";
+      else if (plannedSpecs.has(spec)) cls = "planned"; // SPEC-018: Planned 스펙의 미커버 FR = 의도적 미구현(R3 미검증 아님)
       classes.set(key, cls);
       counts[cls]++;
     }

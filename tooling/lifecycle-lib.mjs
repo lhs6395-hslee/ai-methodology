@@ -5,8 +5,9 @@
 // 존재해야 한다"는 상태의 요구지, 명령 실행의 순서 감시가 아니다. 설계: SPEC-008.
 // Python판 sdd_gates.py가 동일 동작을 미러(SPEC-006 패리티).
 
-// 수명주기 enum. Draft→Reviewed→Approved→Active→Deprecated(→Removed=폐기 종단, STRUCTURE.md).
-export const STATUS_ENUM = ["Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"];
+// 수명주기 enum. Planned(선언·미구현 백로그)→Draft→Reviewed→Approved→Active→Deprecated(→Removed=폐기 종단, STRUCTURE.md).
+// Planned: 아직 안 지은 스펙 — 0-coverage가 의도적(회계에서 planned 분류, R3 미검증 아님; SPEC-018 FR-005).
+export const STATUS_ENUM = ["Planned", "Draft", "Reviewed", "Approved", "Active", "Deprecated", "Removed"];
 
 // Reviewed 이상(리뷰를 통과한 상태) — Review Log·Dedup-Review 기록이 존재해야 하는 상태들.
 const REVIEWED_PLUS = new Set(["Reviewed", "Approved", "Active"]);

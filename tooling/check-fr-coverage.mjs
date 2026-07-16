@@ -26,6 +26,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
+import { parseStatus } from "./lifecycle-lib.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
@@ -191,7 +192,13 @@ for (const id of [...strictSpecs].sort()) {
   if (!specs.has(id)) errors.push(`strictSpecs에 존재하지 않는 spec "${id}" — 오타/삭제 확인(조용한 스킵 금지)`);
 }
 const accountingActive = manifest !== null || !!cfg.requireAccounting;
-const acct = accountingActive ? classify(specs, covered, manifest) : null;
+// SPEC-018 FR-005: Status: Planned 스펙 — 미커버 FR을 planned로 회계(R3 미검증 아님).
+const plannedSpecs = new Set();
+for (const f of specMdNames) {
+  const id = f.match(SPEC_ID)?.[0]; if (!id) continue;
+  if (parseStatus(readFileSync(join(SPEC_DIR, f), "utf8")) === "Planned") plannedSpecs.add(id);
+}
+const acct = accountingActive ? classify(specs, covered, manifest, plannedSpecs) : null;
 
 // R2: coverage completeness.
 //   - incremental (default): partial coverage WARNS (adopt FR by FR).
@@ -201,8 +208,9 @@ for (const [spec, frs] of specs) {
   const hard = STRICT || strictSpecs.has(spec);
   const label = STRICT ? "R2(strict)" : "R2(strictSpecs)";
   if (cov.size === 0) {
-    const msg = `${spec}: 0/${frs.size} FRs covered (not yet implemented)`;
-    if (hard && frs.size > 0) errors.push(`${label} ${msg}`);
+    const planned = plannedSpecs.has(spec);
+    const msg = `${spec}: 0/${frs.size} FRs covered (${planned ? "planned — 의도적 미구현" : "not yet implemented"})`;
+    if (hard && frs.size > 0 && !planned) errors.push(`${label} ${msg}`);
     else warnings.push(msg);
     continue;
   }
@@ -231,7 +239,7 @@ if (cfg.requireAccounting) {
 const totalFR = [...specs.values()].reduce((n, s) => n + s.size, 0);
 const totalCov = [...covered.values()].reduce((n, s) => n + s.size, 0);
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
-const acctTag = acct ? ` accounted(unit:${acct.counts.unit} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} unaccounted:${acct.counts.unaccounted})` : "";
+const acctTag = acct ? ` accounted(unit:${acct.counts.unit} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} planned:${acct.counts.planned} unaccounted:${acct.counts.unaccounted})` : "";
 console.log(`FR coverage gate — specs:${specs.size} FRs:${totalFR} covered:${totalCov}${acctTag} mode:${STRICT ? "strict" : "incremental"} config:${cfgTag}`);
 for (const w of warnings) console.log(`  · ${w}`);
 if (errors.length) {
