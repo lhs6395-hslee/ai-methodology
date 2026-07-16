@@ -1,7 +1,7 @@
 # Feature Specification: Runtime Schema Drift Accounting (R2′)
 
 **Module**: `sdd-tooling`  **Spec**: `SPEC-022`  **Created**: 2026-07-16  **Status**: Active
-**Input**: SDD 드리프트 게이트는 **spec↔code** 두 축(R1 spec→code, R2 code→spec)만 본다 — **code가 기대하는 런타임 스키마 ↔ 실제 배포된 DB** 축(R2′)은 어떤 게이트도 커버하지 않는다. 실축(도그푸딩): 코드(schema SSOT)엔 컬럼이 있고 spec↔code 게이트는 전부 green인데 배포 DB엔 미적용 → 배포 후 `column does not exist`(42703) 500이 동일 클래스로 3회 반복. 근본은 마이그레이션이 CI 자동 적용이 아니라 수동 out-of-band라 "코드 기대 스키마"와 "배포 스키마"가 조용히 벌어짐. 프로젝트가 DB 스키마 SSOT+마이그레이션을 쓸 때만 활성(opt-in)인 `check-schema-drift` 게이트로 이 축을 회계한다 — DB/ORM 중립(조회 방법을 명령으로 주입).
+**Input**: SDD 드리프트 게이트는 **spec↔code** 두 축(R1 spec→code, R2 code→spec)만 본다 — **code가 기대하는 런타임 스키마 ↔ 실제 배포된 DB** 축(R2′)은 어떤 게이트도 커버하지 않는다. 실측(도그푸딩): 코드(schema SSOT)엔 컬럼이 있고 spec↔code 게이트는 전부 green인데 배포 DB엔 미적용 → 배포 후 `column does not exist`(42703) 500이 동일 클래스로 3회 반복. 근본은 마이그레이션이 CI 자동 적용이 아니라 수동 out-of-band라 "코드 기대 스키마"와 "배포 스키마"가 조용히 벌어짐. 프로젝트가 DB 스키마 SSOT+마이그레이션을 쓸 때만 활성(opt-in)인 `check-schema-drift` 게이트로 이 축을 회계한다 — DB/ORM 중립(조회 방법을 명령으로 주입).
 
 ---
 

@@ -95,7 +95,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 
 ## 5. 채택 순서 (점진)
-incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 비-unit 증거는 손으로 잇지 말고 검증 태그(`@verifies`) + `smoke-scan --write`로 자동 채움(SPEC-010). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격. brownfield 재도출(readopt)에는 `derivationManifest`를 켜서 소스 9클래스 회계를 강제(SPEC-009 — src만 읽는 재생성 차단, 절차는 `prompts/readopt.md`).
+incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred/planned 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 비-unit 증거는 손으로 잇지 말고 검증 태그(`@verifies`) + `smoke-scan --write`로 자동 채움(SPEC-010). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격. brownfield 재도출(readopt)에는 `derivationManifest`를 켜서 소스 9클래스 회계를 강제(SPEC-009 — src만 읽는 재생성 차단, 절차는 `prompts/readopt.md`).
 
 ---
 
@@ -251,7 +251,7 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 기존 스펙에 `Files` glob이 없으면 `check-spec-sync`가 해당 파일 변경을 추적하지 않는다. 적용 순서:
 
 1. 각 스펙의 `## Ownership` 절에 `- **Files**: <소유 경로 glob>` 한 줄 추가 (예: `src/lib/pdf/**`).
-2. glob은 `**`와 `*` 만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
+2. glob은 `**`와 `*`만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
 3. `sdd-init` 이후 신규 스펙은 템플릿(`sdd/templates/spec-template.md`)에 Files 절이 포함되어 자동 안내된다.
 
 **마이그레이션 — CI/CD를 INFRA 스펙에서 CICD로 이관.** CI/CD·릴리스 자동화가 관행적으로 INFRA 계열 스펙에 얹혀 있던 프로젝트는 이제 `CICD` 표준 접두어로 분리한다(iac 자원=INFRA, ci 파이프라인=CICD — fr 게이트가 강제). 절차:
