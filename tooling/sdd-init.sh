@@ -57,7 +57,7 @@ case "$GATE" in
                  ownership-keys.mjs check-spec-consistency.mjs check-spec-sync.mjs spec-sync-lib.mjs \
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
-                 prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs; do
+                 prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac

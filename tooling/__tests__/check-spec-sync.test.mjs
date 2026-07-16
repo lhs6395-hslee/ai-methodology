@@ -22,7 +22,7 @@ function repo() {
   mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "drift-lib.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
@@ -372,5 +372,41 @@ test("semantic drift: 소유 파일 리네임 + FR라인 무변경(hard) → ✗
     writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact: 파일명만 정리, 동작 불변\n");
     const r3 = runGate(root, ["--staged", "--message-file", "msg"]);
     assert.equal(r3.code, 0, r3.out);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-020/FR-002
+test("cross-spec: 공유 파일을 타 스펙 기능 때문에 변경 + Change-Driver → 참조 완화(PASS) / 없으면 위반 / 가짜 동인 비완화", () => {
+  const { root, g } = repo();
+  const S2 = (files, cl = "| 2026-07-01 | 초안 | |\n") =>
+    `# SPEC-002\n**Spec**: \`SPEC-002\`\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL z.\n\n## Ownership\n- **Files**: ${files}\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n${cl}`;
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "sdd/specs/SPEC-002.md"), S2("src/shared/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    mkdirSync(join(root, "src/shared"), { recursive: true });
+    writeFileSync(join(root, "src/shared/util.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // SPEC-002 소유 공유 파일을 SPEC-001 기능 때문에 변경. SPEC-001만 의미변경(Change Log), SPEC-002 무변경.
+    writeFileSync(join(root, "src/shared/util.ts"), "2\n");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 공유 util 확장 | |\n"));
+    g("add", "-A");
+
+    // 동인 없음 → SPEC-002 위반
+    writeFileSync(join(root, "msg"), "feat: use shared util\n");
+    const noDriver = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(noDriver.code, 1, noDriver.out);
+    assert.match(noDriver.out, /SPEC-002/);
+
+    // Change-Driver: SPEC-001(의미변경 동인) → SPEC-002 참조 완화 PASS
+    writeFileSync(join(root, "msg"), "feat: use shared util\n\nChange-Driver: SPEC-001 공유 util을 pdf 기능이 확장\n");
+    const withDriver = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(withDriver.code, 0, withDriver.out);
+    assert.match(withDriver.out, /cross-spec/);
+
+    // 가짜 동인(미실재 SPEC-999) → 완화 안 됨, 위반 유지
+    writeFileSync(join(root, "msg"), "feat: x\n\nChange-Driver: SPEC-999 없는 스펙\n");
+    const bogus = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(bogus.code, 1, bogus.out);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

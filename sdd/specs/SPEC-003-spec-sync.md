@@ -95,3 +95,4 @@
 | 2026-07-09 | `spec-sync-lib.mjs` 설계 근거 주석 경로 정정(`docs/superpowers/specs/` → `docs/design/`) | STORAGE §2.7 신설 동반 — 킷 자신의 설계 문서가 새 규약 위치로 이동, 참조 경로 동기(동작 변경 없음) |
 | 2026-07-16 | spec-sync 위반·advisory 메시지를 중립-우선으로: remediation을 `node scripts/sdd-sync.mjs`/스펙 Change Log로 안내하고 Claude 슬래시(/sdd-sync·/speckit.fix)는 괄호 편의로 강등, Node·Python 바이트 동일 | 에이전트 중립 방향(사용자 결정): 강제 계층은 에이전트를 가정하지 않는다 — Codex/무-에이전트 사용자가 없는 슬래시 커맨드에 막히지 않게 |
 | 2026-07-16 | spec-sync가 리네임 감지(`--find-renames`)·FR라인 diff·Spec-Impact 트레일러를 수집해 `drift-lib.escalations`로 승격 판정을 배선 + 리포트/exit 통합, Node·Python 바이트 동일 | SPEC-019 FR-001 동반: 소유 파일 리네임 시 요구를 "FR 라인 변경 ∨ Spec-Impact"로 승격(판정 코어는 SPEC-019, 이 게이트는 소비·배선) |
+| 2026-07-16 | spec-sync가 `Change-Driver` 트레일러를 파싱(`cross-spec-lib`)해 의미변경 동인이면 소유 스펙 요구를 참조 완화 — 위반 대신 cross-spec 노트, Node·Python 바이트 동일 | SPEC-020 FR-002 동반: 공유 표면을 타 스펙 기능 때문에 고칠 때 억지 Change Log 제거(판정 코어는 SPEC-020, 이 게이트는 소비·배선) |

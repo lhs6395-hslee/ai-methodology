@@ -86,3 +86,4 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 |---|---|---|
 | 2026-07-06 | 초안 — Module 존재·단일성, FR 라인 SHALL, Dedup-Review 참조 실재(advisory·strict) + Files 카테고리 금지·글롭 문법 staged 차단(hard) (Node·Python 동시) | 고도화 4차 전 문서 감사[검증]: 문서 규범 6건이 게이트 없이 존재 — 결정적 신호가 있는 것은 게이트로, 의미 판정은 리뷰 경계 선언으로(미강제 규범 제거) |
 | 2026-07-16 | `grammar-hardening.test.mjs`의 check-spec-sync 임포트 클로저 복사 목록에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 테스트 하네스도 복사해야 ERR_MODULE_NOT_FOUND 없이 게이트 실행(픽스처 배선만, 판정 불변) |
+| 2026-07-16 | 같은 복사 목록에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib) 픽스처 배선(판정 불변) |

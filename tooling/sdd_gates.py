@@ -126,6 +126,7 @@ def load_config():
     # spec ID 접두어 파생값(게이트 공통). ["SPEC","TEST"] → "SPEC|TEST"
     alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
     cfg["__prefixes"] = cfg.get("specIdPrefixes") or DEFAULTS["specIdPrefixes"]
+    cfg["__idAlt"] = alt
     cfg["__specId"] = re.compile(rf"(?:{alt})-\d{{3}}")
     # 요구 ID 접두어 파생값 — 전 파싱 사이트(선언·집계·면제·@covers·spec-sync FR 라인)가
     # 이 한 곳의 문법을 공유한다(Node sdd-config.mjs와 동일 파생).
@@ -1308,6 +1309,18 @@ def escalations(triggered, satisfied, has_spec_impact, policy):
     return violations, policy == "hard", None
 
 
+def parse_drivers(msg, id_alt):
+    """`Change-Driver: <SPEC-ID> <사유>` 트레일러 파싱 (SPEC-020, cross-spec-lib.mjs 미러).
+    사유 빈 항목은 버림. [(id, reason)] 반환."""
+    rx = re.compile(rf"^Change-Driver:[ \t]*((?:{id_alt})-\d{{3}})[ \t]+(.+)$", re.MULTILINE)
+    return [(m.group(1), m.group(2).strip()) for m in rx.finditer(msg or "") if m.group(2).strip()]
+
+
+def cross_spec_relaxed(owner, meaningful_drivers):
+    """소유 스펙 owner의 요구가 참조 완화되는가 — 자기 자신 아닌 의미변경 동인이 하나라도 있으면 True."""
+    return any(d != owner for d in set(meaningful_drivers or []))
+
+
 def cmd_specsync(cfg, staged, msg_file, base):
     def lines(s):
         return [x.strip() for x in (s or "").split("\n") if x.strip()]
@@ -1421,6 +1434,14 @@ def cmd_specsync(cfg, staged, msg_file, base):
         memo[path] = ok
         return ok
 
+    # cross-spec 변경 동인(SPEC-020): Change-Driver 트레일러가 지목한 "의미변경 동인"이면 소유 요구를 참조 완화.
+    drivers = parse_drivers(read_text(msg_file), cfg["__idAlt"]) if (staged and msg_file) else []
+    _spec_by_id = {s[0]: s for s in specs}
+    meaningful_drivers = set()
+    for did in {d[0] for d in drivers}:
+        s = _spec_by_id.get(did)
+        if s and meaningful(s[0], s[1], s[3]):
+            meaningful_drivers.add(did)
     for f in sorted(changed):
         if f in spec_set or f.startswith(cfg["specDir"] + "/"):
             continue  # 스펙 자신은 코드 아님
@@ -1438,7 +1459,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
                 violations.append((f, spec_id, True))
                 continue
             if not meaningful(spec_id, path, deleted):
-                violations.append((f, spec_id, False))
+                if cross_spec_relaxed(spec_id, meaningful_drivers):
+                    print(f"· cross-spec: {f} → 소유 {spec_id} 변경 동인 {', '.join(sorted(meaningful_drivers))}(Change-Driver 선언, 참조 완화)")
+                else:
+                    violations.append((f, spec_id, False))
         if not owned and policy != "silent":
             unowned.append(f)
 

@@ -104,3 +104,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-16 | `numbering_issues`에 `retired_ids` 인자·DEFAULTS `retiredIds`·호출부 미러(SPEC-018 FR-006 동반) | numbering retirement-gap 런타임 패리티 — Node↔Python fr 리포트 바이트 동일 확인 |
 | 2026-07-16 | Python spec-sync 메시지를 중립-우선 문구로 미러(SPEC-003 동반) — `node scripts/sdd-sync.mjs`/Change Log 안내, Claude 슬래시는 괄호 | 강제 메시지의 Node↔Python 바이트 동일 유지 — 중립화도 두 판이 함께 움직여야 패리티 불변 |
 | 2026-07-16 | Python에 `escalations`·`semanticDriftPolicy` DEFAULTS·리네임 수집·drift 배선 미러(SPEC-019 동반) — spec-sync drift 출력 Node↔Python 바이트 동일(패리티 테스트 green) | semantic drift 런타임 패리티 — 리네임 승격 판정·리포트가 두 런타임에서 동일 |
+| 2026-07-16 | Python에 `parse_drivers`·`cross_spec_relaxed`·`__idAlt` cfg·cross-spec 배선 미러(SPEC-020 동반) — spec-sync cross-spec 출력 Node↔Python 바이트 동일 | cross-spec 런타임 패리티 — Change-Driver 파싱·참조 완화가 두 런타임에서 동일 |

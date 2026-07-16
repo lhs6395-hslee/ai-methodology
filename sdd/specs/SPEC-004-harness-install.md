@@ -104,3 +104,4 @@
 | 2026-07-15 | `sdd-sync.mjs`의 `new URL(import.meta.url).pathname` → `fileURLToPath(import.meta.url)` | 도그푸딩(소비 프로젝트 B): 한글 등 비-ASCII 경로에서 `URL.pathname`이 %-인코딩돼 게이트가 조용히 스킵되던 버그 — 소비자가 매번 패치할 게 아니라 킷 자체를 고침(델타 보존 부담 소멸) |
 | 2026-07-16 | `sdd-sync.mjs` 요약·`pre-push` 훅 안내를 중립-우선으로: `node scripts/sdd-sync.mjs`를 1차 remediation으로, Claude `/sdd-sync`는 괄호 편의 | 에이전트 중립 방향(사용자 결정): drift 안내가 특정 에이전트 커맨드를 가정하지 않게 — 강제/탐지 계층은 실행기 무관 |
 | 2026-07-16 | `sdd-init` Node 게이트 임포트 클로저에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 소비 프로젝트에도 복사해 설치만으로 실행되게(누락 시 ERR_MODULE_NOT_FOUND) |
+| 2026-07-16 | `sdd-init` Node 클로저에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib)를 소비 프로젝트에도 복사(설치만으로 실행) |

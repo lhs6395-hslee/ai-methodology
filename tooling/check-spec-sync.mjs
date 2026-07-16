@@ -10,6 +10,7 @@ import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
 import { escalations } from "./drift-lib.mjs";
+import { parseDrivers, crossSpecRelaxed } from "./cross-spec-lib.mjs";
 
 const cfg = loadConfig();
 const args = process.argv.slice(2);
@@ -118,6 +119,12 @@ function meaningful(spec) {
   memo.set(spec.path, ok);
   return ok;
 }
+// cross-spec 변경 동인(SPEC-020): Change-Driver 트레일러가 지목한 "의미변경 동인"이면 소유 요구를 참조 완화.
+const drivers = (STAGED && MSG) ? parseDrivers(readFileSync(MSG, "utf8"), cfg.__idAlt) : [];
+const meaningfulDrivers = new Set([...new Set(drivers.map((d) => d.id))].filter((id) => {
+  const s = specs.find((x) => x.id === id);
+  return s && meaningful(s);
+}));
 for (const f of changed) {
   if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;      // 스펙 자신은 코드 아님
   if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
@@ -128,7 +135,10 @@ for (const f of changed) {
     // Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
     // 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
     if (s.status === "Draft" && !s.deletedInIndex) { violations.push({ file: f, spec: s.id, draft: true }); continue; }
-    if (!meaningful(s)) violations.push({ file: f, spec: s.id });
+    if (!meaningful(s)) {
+      if (crossSpecRelaxed(s.id, meaningfulDrivers)) console.log(`· cross-spec: ${f} → 소유 ${s.id} 변경 동인 ${[...meaningfulDrivers].sort().join(", ")}(Change-Driver 선언, 참조 완화)`);
+      else violations.push({ file: f, spec: s.id });
+    }
   }
   if (!owned && POLICY !== "silent") unowned.push(f);
 }
