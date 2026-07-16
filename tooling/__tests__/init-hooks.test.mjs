@@ -134,3 +134,16 @@ test("sdd-init가 에이전트 컨텍스트 배선(.kiro/steering + AGENTS.md) +
     assert.equal((ag2.match(/SDD:BEGIN/g) || []).length, 1, "재실행에도 SDD 블록 중복 없음");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("sdd-init: .git 없는 대상 → 조용한 스킵 대신 경고 명시(SPEC-004 FR-005 회귀)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-nogit-"));
+  try {
+    // git init 안 함 → .git 없음. stderr까지 잡으려 sh -c로 2>&1 결합.
+    const combined = execFileSync(
+      "sh", ["-c", `sh "${join(process.cwd(), "tooling/sdd-init.sh")}" --gate=node 2>&1`],
+      { cwd: root, encoding: "utf8" });
+    assert.match(combined, /\.git 없음/, "조용한 스킵 아니라 경고 출력");
+    assert.match(combined, /강제 궤도.*꺼진/, "완료 안내에 재요약");
+    assert.match(combined, /git init/, "해결 방법 안내");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

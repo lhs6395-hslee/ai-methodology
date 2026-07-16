@@ -26,6 +26,7 @@
 | converge 양방향 "자동" sync | `[미동작 오해]` | converge는 갭을 **task로 표면화만**. spec 작성은 별도(LLM)+승인(사람) |
 | module>spec·cross-spec 중복검사 | `[검증]`/`[조건부]` | **구조적 중복**=`check-ownership.mjs` 게이트로 결정적 차단(검증됨, → `DEDUP.md`). **의미적 중복**(reworded)=`/analyze`(한 기능 내)+좁힌 리뷰로 보조(조건부) |
 | **언어 무관 어댑터**(`sdd.config.json`) — Python 픽스처로 게이트 실행 | `[검증]` **동작**(2026-06-29) | Python 테스트(`#` 주석 @covers) FR↔test 통과(specs:1 FRs:2 covered:2), 커스텀 Ownership 키(Modules/Symbols/Artifacts) 유일성 OK |
+| `sdd-init.sh` — 대상에 `.git` 부재 시 훅 배선 | `[검증]` **경고 명시**(2026-07-16, 소비 프로젝트 gsneotek-mis-mcp 마찰) | 조용한 스킵 제거 — 블록별 `⚠ .git 없음…` stderr + 완료 안내 재요약(`init-hooks.test.mjs` 회귀). 해결: `git init` 후 `--force` 재실행 |
 | 언어 무관 — **위반 탐지도 비-JS에서 강제** | `[검증]` **차단(설계대로)** | 같은 Module 키 2 spec=exit 1, dangling `@covers`(없는 FR)=R1 exit 1. Python 픽스처 |
 | config 없을 때 **JS/TS 하위호환** | `[검증]` 동작 | `config:defaults(JS/TS)`로 `.test.ts` 인식·Entities 기본키 — 기존 동작 그대로 |
 | CI 언어 무관(`sdd-run.mjs`) — `commands.*` 실행/미설정 stage skip | `[검증]` 동작 | 설정 stage 실행·exit 전파, 미설정 stage는 건너뜀(exit 0) |

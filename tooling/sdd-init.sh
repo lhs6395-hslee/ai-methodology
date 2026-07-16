@@ -24,6 +24,8 @@ T="$PWD"
 [ "$T" = "$KIT" ] && { echo "✗ 키트 안에서 실행 금지 — 대상 프로젝트 루트에서 실행." >&2; exit 1; }
 
 say(){ printf '%s\n' "$1"; }
+warn(){ printf '%s\n' "$1" >&2; }   # 경고는 stderr — 조용한 스킵 금지
+GITWARN=0                            # .git 부재로 훅 배선을 건너뛰면 1 (완료 안내에서 재요약)
 copy(){ # $1=src $2=dst : 없을 때만(또는 --force)
   if [ -e "$2" ] && [ "$FORCE" -eq 0 ]; then say "· 유지(이미 있음): ${2#"$T"/}"
   else mkdir -p "$(dirname "$2")"; cp "$1" "$2"; say "+ ${2#"$T"/}"; fi
@@ -51,6 +53,8 @@ case "$GATE" in
           printf '#!/bin/sh\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
           chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/commit-msg"
           say "  → git pre-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
+        else
+          warn "  ⚠ .git 없음 — pre-commit/commit-msg 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=py --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
         fi ;;
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
                  check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs \
@@ -95,6 +99,8 @@ if [ "$GATE" = "node" ]; then
     printf '#!/bin/sh\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
     chmod +x "$T/.git/hooks/pre-commit"
     say "  → git pre-commit 훅 연결됨"
+  else
+    warn "  ⚠ .git 없음 — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
   fi
 
   # commit-msg 훅 + speckit-fix 스킬
@@ -105,6 +111,8 @@ if [ "$GATE" = "node" ]; then
     printf '#!/bin/sh\nsh scripts/sdd-commit-msg.sh "$1"\n' > "$T/.git/hooks/commit-msg"
     chmod +x "$T/.git/hooks/commit-msg"
     say "  → git commit-msg 훅 연결됨"
+  else
+    warn "  ⚠ .git 없음 — commit-msg(spec-first) 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
   fi
 
   # 채택 수명주기 스킬 (start·readopt·update) — 최초 채택/재채택/평상시 동기화 진입점.
@@ -174,3 +182,8 @@ say "  1) sdd.config.json 언어 맞춤 → $KIT/tooling/sdd.config.presets.md"
 say "     (scanDirs·testFileRegex·commands·specIdPrefixes·ownershipCategories — 값만)"
 say "  2) Spec Kit init + constitution → $KIT/APPLYING.md §1"
 say "  3) 첫 스펙: sdd/specs/SPEC-001-<slug>.md (템플릿: sdd/templates/spec-template.md)"
+if [ "$GITWARN" -eq 1 ]; then
+  warn ""
+  warn "⚠ 중요 — git 훅이 배선되지 않았다(대상에 .git 없음). 강제 궤도(pre-commit·commit-msg)가 꺼진 상태다."
+  warn "   해결: \`git init\` → \`sh $KIT/tooling/sdd-init.sh --gate=$GATE --force\` 재실행."
+fi

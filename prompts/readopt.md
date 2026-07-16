@@ -40,6 +40,7 @@
    | `human-intent` | 기록 안 된 순수 의도 — **사후 재도출 불가** | 사용자 인터뷰로 Clarifications에 선제 캡처, 불가면 deferred 회계 |
    iac/ci 클래스가 매핑되거나 클라우드/인프라 의존(어느 CSP든)이 확인되면 **4단계의 `commands.test`/`commands.smoke` tier 분리를 소급 적용한다**(로컬 강제가 인프라 테스트를 돌리지 않도록 — 프리셋 "테스트 환경 tier").
    읽은 결과를 `sdd/derivation.json`에 클래스별 mapped/none/deferred로 회계하고 `sdd.config.json`에 `derivationManifest`를 선언한다 — `derivation` 게이트가 미회계·"실재하는데 none"을 차단한다. spec은 `sdd/specs/`에만, PREFIX는 SPEC/INFRA/TEST, 1 spec=1 aggregate. **iac/ci→INFRA 착지는 fr 게이트가 강제한다(SPEC-012)** — 소유 실파일이 전적으로 iac/ci 클래스인 스펙이 SPEC- 접두어면 exit 1이므로, 재도출 시점에 접두어를 바로 착지시킨다(부수 소유 정당 케이스는 자동 통과, 예외는 `prefixClassExemptions` 사유 등록). **초안을 만들되 대량 생성·확정은 사용자 승인 후.**
+   > **retrofit 스펙은 `Status: Reviewed`로 바로 작성한다(Draft 아님).** 기존 코드에서 재도출하는 스펙은 작성 시점에 이미 코드 대조 검토가 끝났으므로, Draft로 두면 spec-sync가 "그 스펙이 소유한 (이미 존재하던) 코드를 같은 changeset에서 건드리는 것"을 Draft 차단으로 막아 **매 스펙마다 Draft→커밋실패→Reviewed→재커밋**을 반복하게 된다(실측: SPEC-001~004 4회). Review Log에 한 줄(일시·수행자=코드 대조 검토·판정)을 채우고 `Status: Reviewed`로 작성하라 — Draft는 코드가 아직 없는 spec-first 신규 기능에만.
 7. **결선 — 태깅은 보존·자동으로.** ① FR 키를 보존했으면 기존 `@covers`는 그대로 유효(R1이 검증). 재번호가 불가피했으면 마이그레이션 맵(old→new|null)을 만들어 `sdd-retag <map.json> --write`(또는 `sdd_gates.py retag`)로 기계 이행(SPEC-011) — 손 재태깅 금지. ② smoke 증거는 증거가 사는 파일(CI 정의·스크립트·runbook)에 검증 태그(`@verifies <SPEC-ID>/FR-NNN <method>: <evidence>`)로 남기고 `sdd-smoke-scan --write`로 매니페스트를 재생성(SPEC-010) — 손 연결 금지. ③ 게이트 green(derivation·smoke-scan check 포함) → 커밋(자기 훅 통과).
 
 ## 고정 규칙

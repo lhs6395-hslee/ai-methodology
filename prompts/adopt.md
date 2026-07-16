@@ -41,6 +41,8 @@
 3. **셀프리뷰**(EARS 모호어·단일동작·측정형 — `SPEC_REVIEW.md`) 후 게이트 green 확인(`check-fr-coverage`·`check-ownership`·`check-spec-completeness`).
 4. **사용자 승인** 후 확정. 코드 착지는 그 다음(작성=LLM, 승인=사람).
 
+> **retrofit(기존 코드에 사후 스펙)은 `Status: Reviewed`로 바로 작성한다 — Draft 아님.** 템플릿 기본값 `Draft`는 **코드가 아직 없는 신규 기능**(spec-first)용이다. 이미 있는 코드를 스펙화하는 retrofit은 **작성 시점에 이미 코드 대조 검토가 끝난 상태**이므로, Draft로 두면 spec-sync 게이트가 "그 스펙이 소유한 (이미 존재하던) 코드를 같은 changeset에서 건드리는 것"을 Draft 차단으로 막아 **매 스펙마다 Draft→커밋실패→Reviewed 승격→재커밋**을 반복하게 된다(실측: 한 세션에서 SPEC-001~004 4회). 그러니 같은 저술 세션에서 **Review Log에 한 줄(일시·수행자=코드 대조 검토·판정)을 채우고 `Status: Reviewed`로 바로 작성**하라(신규 기능처럼 코드가 아직 없는 경우만 Draft가 맞다).
+
 ## 고정 규칙 (발명 금지)
 - spec은 `sdd/specs/`에만 둔다.
 - PREFIX는 **SPEC/INFRA/TEST**. 새 PREFIX가 필요하면 사유와 함께 사용자 승인 후 `sdd.config.json`의 `specIdPrefixes`에 등록.

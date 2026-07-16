@@ -36,6 +36,12 @@ cp <KIT>/templates/constitution.md .specify/memory/constitution.md
 ```
 - `STRUCTURE.md`대로 **이 레포의 단일 모듈**(bounded context 하나)을 정의하고 `MODULE_MAP.md`(단일 모듈 매니페스트)에 등록. 도메인 placeholder를 실제 도메인으로 치환. 모듈이 더 필요하면 **레포를 나눈다**(MSA — 다중 모듈이면 Phase 2 계약 프로파일).
 
+### 병렬 스펙 저술 프로토콜 (멀티에이전트·다중 저자) — Ownership 키 사전 배정
+여러 스펙을 여러 sub-agent(또는 여러 사람)에게 **동시에** 위임해 작성할 때, `check-ownership.mjs`의 키 유일성 강제는 **저술 후 커밋 시점에서야** 충돌(같은 Entity/Surface/Capability를 두 스펙이 소유)을 잡는다. 병렬 저술은 이를 사전에 막지 않으면 뒤늦게 재작업이 터진다(실측: 위임마다 키를 손으로 미리 배정해 예방). 규약:
+1. **위임 전 스캔.** `MODULE_MAP.md`와 기존 스펙들의 `## Ownership` 절을 먼저 읽어 이미 쓰인 Entities/Surfaces/Capabilities 키를 파악한다.
+2. **키를 프롬프트에 명시 지정.** 각 위임 대상에게 그 스펙이 소유할 **정확한 키 값**(Entities/Surfaces/Capabilities/Modules/Symbols/Artifacts)을 프롬프트에 박아 지정한다 — **임의로 짓게 두지 않는다**(임의 생성 = 충돌·중복의 근원).
+3. **사후 게이트는 여전히 필수.** 위임이 끝나면 `check-ownership.mjs`(+`check-spec-cohesion`)로 검증한다 — 사전 배정은 실수를 줄일 뿐 게이트를 **대체하지 않는다**(사람이 배정한 키에도 오타·누락이 있으니 결정적 그물은 유지).
+
 ## 3. 검증 게이트 배선 (SSOT를 "실재"로) — 언어·런타임 무관
 ```bash
 cp <KIT>/tooling/sdd.config.json       ./        # ← 어댑터 한 장(아래에서 언어 맞춤)
