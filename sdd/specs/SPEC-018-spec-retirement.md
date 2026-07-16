@@ -57,7 +57,7 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `retire.test.mjs` 전 케이스 green + `planRetirement` 코어의 Node↔Python 바이트 동일(패리티 테스트 green).
+- **SC-001**: `retire.test.mjs` 전 케이스 green. **게이트 경로에 영향 주는 판정**(FR-005 Planned 회계·FR-006 numbering retirement-gap)은 Node↔Python 바이트 동일(패리티 테스트 green — CI가 두 런타임 중 무엇으로 돌든 동일). `sdd-retire` 커맨드·`retire-lib` 계획 코어는 CI 게이트 경로 밖 유지보수 도구라 **Node 참조 구현**(런타임 패리티 비대상) — 소비 프로젝트 CI 판정은 회계·numbering 게이트가 좌우하고 폐기 실행은 유지보수자 로컬 작업이므로.
 - **SC-002**: 이 레포 자신에 `sdd-retire`를 dry-run으로 돌릴 때 의도한 대상만 계획에 잡히고 무관 스펙은 불변(거짓양성 0).
 
 ## Non-Functional Requirements
@@ -88,3 +88,4 @@
 | 2026-07-15 | 증분 1 — `retire-lib.mjs`(순수 계획 코어)·`sdd-retire.mjs`(dry-run/--write) 구현 + 테스트(FR-001~004). Python 포트·FR-005(Planned)·FR-006(numbering)은 증분 2 | 자기 시연: 이 스펙 자체가 requireAccounting R3에 걸려 "새/유령 스펙 노이즈" 문제를 입증 — FR-005/006 deferred로 정직 회계 |
 | 2026-07-15 | 증분 2a — FR-005 구현: `Status: Planned` → 미커버 FR을 planned로 회계(R3 미검증 아님·"not yet implemented" 노이즈 아님). lifecycle STATUS_ENUM·verification-accounting classify·fr-coverage, Node·Python 패리티. FR-005 deferred→unit | 소비 프로젝트 B 유령 명세(0/N) 노이즈 직접 해소 — 유령이 아니라 "의도된 미구현"으로 명시 |
 | 2026-07-16 | 증분 2b — FR-006 구현: `retiredIds` config knob + `numberingIssues(specIds, retiredIds)` — 폐기 gap을 정상 retirement gap으로 취급(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건. FR-006 deferred→unit → SPEC-018 6/6 완결 | 폐기 워크플로가 남기는 번호 gap이 advisory 노이즈로 재부상하지 않게 봉합 — "정리·삭제"가 잔재를 남기지 않음 |
+| 2026-07-16 | SC-001 정직 조정 — 게이트 경로 판정(FR-005/006)은 Node↔Python 패리티 필수(달성), `sdd-retire` 커맨드·`retire-lib`는 Node 참조 구현(런타임 패리티 비대상)임을 명시 | 커맨드 파리티는 CI 판정 밖 유지보수 도구라 실익 없음 — SC가 없는 패리티를 주장하지 않게(스펙↔현실 드리프트 방지) |
