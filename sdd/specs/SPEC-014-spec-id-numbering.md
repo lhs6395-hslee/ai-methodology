@@ -22,7 +22,8 @@
 - 접두어별로 독립 판정한다 — SPEC와 INFRA는 각자 001부터 순차이며 서로의 번호에 간섭하지 않는다(전역 공유 번호는 비-001 시작으로 드러난다).
 - 미등록 접두어 파일은 이 판정 이전에 PREFIX 화이트리스트가 이미 에러 처리한다(이중 보고 없음).
 - gap 계산은 그 접두어의 실제 최소 번호부터 max까지의 내부 결번만 센다 — 001 미시작은 gap이 아니라 별도 hard 신호다(소비 프로젝트 B INFRA `[011,013]` → hard "001 미시작" + advisory "INFRA-012 gap", 001~010은 gap으로 재보고하지 않음).
-- 맨 앞 spec을 제거해 001 자체가 사라진 정당 케이스는 지금 exemption을 두지 않는다 — 실제 사례가 나오면 prefixClassExemptions 동형으로 추가(YAGNI).
+- 맨 앞 spec을 제거해 001 자체가 사라진 정당 케이스는 선행 번호 전부가 `retiredIds`에 기록돼 있을 때만 통과한다(FR-001 개정 — 감사 M4에서 YAGNI 해제: `sdd-retire`가 구성적으로 이 케이스를 만들 수 있음이 확인됨). 일부만 기록이면 여전히 hard(사고성 결번과 구분).
+- 실재 ID가 `retiredIds`에도 있으면 폐기 ID 재사용으로 hard(FR-004) — 과거 참조(@verifies·Change Log·vcs-history)가 의미 다른 새 스펙으로 앨리어싱되는 것을 차단. 의도적 재사용은 retiredIds에서 제거로 선언.
 - 판정 severity는 fr 게이트 한 곳에서 결정한다(hard=중복·001미시작, advisory=gap·`--strict` 승격) — 번호는 단일 관심사라 게이트를 쪼개지 않는다.
 - 셸/Go판 fr에는 이 계층이 없다(핵심 3커맨드 계약 밖, 정직한 델타 — SPEC-006).
 
@@ -31,9 +32,10 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates the spec-file id set, THE SYSTEM SHALL group ids by prefix and SHALL exit non-zero when any prefix contains a duplicate number or its lowest number is not one, naming the offending id.
+- **FR-001** (event): WHEN the coverage gate evaluates the spec-file id set, THE SYSTEM SHALL group ids by prefix and SHALL exit non-zero when any prefix contains a duplicate number or its lowest number is not one, naming the offending id — except that a lowest number above one is accepted when every preceding number of that prefix is recorded in `retiredIds` (retiring the lowest-numbered spec is a legitimate gap, not a renumbering trigger).
 - **FR-002** (state): WHILE a prefix's numbers span from its lowest to its highest with interior holes, THE SYSTEM SHALL report each missing number as an advisory warning and SHALL promote it to a hard failure only under `--strict`, so removals and retags may legitimately leave gaps.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL derive the numbering judgment purely from the id set (prefix plus zero-padded number), performing no filesystem walk or spec-body inspection.
+- **FR-004** (unwanted): IF a present spec id is also recorded in `retiredIds`, THEN THE SYSTEM SHALL exit non-zero naming the reused id — a retired id resurrected by a new spec silently aliases every historical reference (Change Log rows, `@verifies` evidence, vcs history) to a semantically different spec.
 
 ### Key Entities
 - **prefix number sequence** — the per-prefix ordered set of spec numbers the gate checks for start-at-001, uniqueness, and interior contiguity.
@@ -82,3 +84,4 @@
 |---|---|---|
 | 2026-07-06 | 초안 — 접두어별 001시작·중복 hard·중간 gap advisory(`--strict` 승격), Node·Python 동시 | 소비 프로젝트 A(접두어별)·소비 프로젝트 B(전역 INFRA-011/013) 번호 체계 불일치[검증] — 번호 모델이 미규정·미강제라 프로젝트마다 제각각 |
 | 2026-07-16 | `numberingIssues`에 `retiredIds` 인자 추가 — 폐기 기록된 번호의 gap은 advisory에서 제외(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건 | SPEC-018 FR-006 동반(소비): 폐기 워크플로가 남기는 번호 gap을 정상 retirement gap으로 인지 — 판정 코어는 이 spec 소유 |
+| 2026-07-16 | FR-001 개정 + FR-004 신설 — ① 001-미시작 hard에 retiredIds 면제(선행 번호 전부 폐기 기록이면 정상 gap — 최소번호 스펙 폐기가 접두어 전체 재번호·retag 연쇄를 강요하던 모순 해소, SPEC-018 FR-006과 정합) ② 폐기 ID 재사용 hard(실재 ID ∈ retiredIds = exit 1). Node·Python 패리티 | 감사 M3·M4: retiredIds가 내부 gap만 면제해 SPEC-001 폐기 시 fr 게이트 영구 red + 폐기 ID를 새 스펙이 재사용해도 무신호(과거 참조 앨리어싱)이던 두 결함 — SPEC-018/STRUCTURE의 "retiredIds가 처리한다" 약속과 SPEC-014 실구현의 문서 모순도 해소 |

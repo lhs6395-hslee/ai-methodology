@@ -182,3 +182,19 @@ test("Planned 스펙: 0-coverage FR이 requireAccounting에서 planned 회계(R3
   }, { requireAccounting: true });
   assert.equal(run(dir2).code, 1, "Active 0-cov는 여전히 R3 미검증");
 });
+
+// @covers SPEC-018/FR-007
+test("Planned 모순: Status Planned인데 unit 커버 FR 실재 → hard exit 1(회계 침묵기 차단, 감사 T2)", () => {
+  const dir = fixture({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Planned\n- **FR-001** (event): x.\n",
+    "src/a.test.mjs": "// @covers SPEC-001/FR-001\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /Planned 모순 SPEC-001/);
+  // 대조: 커버 0이면 Planned는 정상(FR-005 회계)
+  const dir2 = fixture({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Planned\n- **FR-001** (event): x.\n",
+  });
+  assert.equal(run(dir2).code, 0);
+});

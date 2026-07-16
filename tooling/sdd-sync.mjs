@@ -23,6 +23,9 @@ const RULES = [
   { rule: "R1 spec→code", gates: ["check-fr-coverage.mjs"] },
   { rule: "R2 code→spec", gates: ["check-converge-drift.mjs", "check-orphan-surfaces.mjs", "check-spec-sync.mjs"] },
   { rule: "R3 dedup+입도+완전성+일관성", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs", "check-spec-completeness.mjs", "check-spec-consistency.mjs"] },
+  // R5(감사 M1): 테스트 실행 결과 — runTestsPolicy가 off(기본)면 게이트가 스스로 no-op라 비용 0.
+  // SPEC-021이 선언한 "CI·pre-push" 발동 지점의 실제 배선(선언만 있고 호출처 0곳이던 결함 봉합).
+  { rule: "R5 test 실행(commands.test)", gates: ["check-test-run.mjs"] },
 ];
 
 function runGate(file) {

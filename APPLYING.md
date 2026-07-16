@@ -39,7 +39,7 @@ cp <KIT>/templates/constitution.md .specify/memory/constitution.md
 ### 병렬 스펙 저술 프로토콜 (멀티에이전트·다중 저자) — Ownership 키 사전 배정
 여러 스펙을 여러 sub-agent(또는 여러 사람)에게 **동시에** 위임해 작성할 때, `check-ownership.mjs`의 키 유일성 강제는 **저술 후 커밋 시점에서야** 충돌(같은 Entity/Surface/Capability를 두 스펙이 소유)을 잡는다. 병렬 저술은 이를 사전에 막지 않으면 뒤늦게 재작업이 터진다(실측: 위임마다 키를 손으로 미리 배정해 예방). 규약:
 1. **위임 전 스캔.** `MODULE_MAP.md`와 기존 스펙들의 `## Ownership` 절을 먼저 읽어 이미 쓰인 Entities/Surfaces/Capabilities 키를 파악한다.
-2. **키를 프롬프트에 명시 지정.** 각 위임 대상에게 그 스펙이 소유할 **정확한 키 값**(Entities/Surfaces/Capabilities/Modules/Symbols/Artifacts)을 프롬프트에 박아 지정한다 — **임의로 짓게 두지 않는다**(임의 생성 = 충돌·중복의 근원).
+2. **키와 스펙 번호를 프롬프트에 명시 지정.** 각 위임 대상에게 그 스펙이 소유할 **정확한 키 값**(Entities/Surfaces/Capabilities/Modules/Symbols/Artifacts)과 **스펙 번호**(`SPEC-0NN`)를 프롬프트에 박아 지정한다 — **임의로 짓게 두지 않는다**(임의 생성 = 충돌·중복의 근원). 번호 사전 배정은 브랜치 간 경쟁에도 적용된다: 병행 브랜치 둘이 각자 "다음 번호"를 집으면 파일명이 달라 **무충돌 병합**되고 각 PR은 개별 green이라 중복이 main에 착지한다 — `pre-merge-commit` 훅(sdd-init 배선)이 병합 시점에 번호 중복·ownership 충돌을 잡지만, 스펙 추가 브랜치는 병합 전 rebase(merge-base 최신화)를 관례로 한다.
 3. **사후 게이트는 여전히 필수.** 위임이 끝나면 `check-ownership.mjs`(+`check-spec-cohesion`)로 검증한다 — 사전 배정은 실수를 줄일 뿐 게이트를 **대체하지 않는다**(사람이 배정한 키에도 오타·누락이 있으니 결정적 그물은 유지).
 
 ## 3. 검증 게이트 배선 (SSOT를 "실재"로) — 언어·런타임 무관
@@ -155,11 +155,13 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 
 | 훅 | 시점 | 담당 | 강제 수준 |
 |---|---|---|---|
-| `pre-commit` | 커밋 직전 | FR coverage·ownership 중복·PREFIX | exit 1 차단 |
-| `commit-msg` | 커밋 메시지 작성 후 | **spec-sync hard** — 소유 스펙 동반 여부 | exit 1 차단 |
+| `pre-commit` | 커밋 직전 | FR coverage·ownership 중복·PREFIX·번호 무결성 | exit 1 차단 |
+| `pre-merge-commit` | 무충돌 병합 직전 | pre-commit과 동일 게이트(병행 브랜치의 번호·키 경쟁 차단 — 감사 M5) | exit 1 차단 |
+| `commit-msg` | 커밋 메시지 작성 후 | **spec-sync hard** — 소유 스펙 동반·상태 화이트리스트·HEAD-config 판정 | exit 1 차단 |
 
-> **merge commit**: commit-msg 훅은 merge commit에서 spec-sync를 skip한다(range 백스톱이 커버).
-> **`--no-verify`**: 두 훅을 전면 우회한다(기계로 못 막음 — 팀 규율로 방지).
+> **merge commit**: commit-msg 훅은 merge commit에서 spec-sync를 skip하고(pre-merge-commit + range 백스톱이 커버), 서버측(웹 UI) 병합은 CI의 range 모드 + `draftBlockPolicy: hard`가 담당한다.
+> **`--no-verify`**: 로컬 훅을 전면 우회한다(기계로 못 막음 — 로컬은 팀 규율, 서버측은 CI 백스톱).
+> **pre-commit 트리거**: 경로 필터 없음 — 게이트는 레포 상태 전역 스캔이라 매 커밋 실행된다(과거 src/lib/app/tests 하드코딩이 Go·Python 레이아웃에서 게이트를 미발동시키던 결함 봉합 — 감사 P3).
 
 **PREFIX 위반(미등록 접두어) — pre-commit exit 1 차단 실측:**
 ```

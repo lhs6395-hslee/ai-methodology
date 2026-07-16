@@ -42,17 +42,33 @@ copy "$KIT/templates/module-spec.md" "$T/sdd/templates/spec-template.md"
 # ── 2. 게이트 런타임 (택1, 출력 동일) ────────────────────────
 case "$GATE" in
   go)   say "  → Go 바이너리는 빌드/다운로드: cd $KIT/tooling/go-gate && CGO_ENABLED=0 go build -o \"$T/scripts/sdd-gate\" ."
-        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
+        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)"
+        # 감사 P3: go는 바이너리를 이 시점에 확보 못 해 훅을 못 건다 — "채택=상시 강제"가 꺼진
+        # 상태임을 조용히 넘기지 않고 명시(경고는 stderr). 바이너리 배치 후 아래 한 줄로 수동 배선.
+        warn "  ⚠ 강제 훅 미배선(go) — 바이너리 배치 후: printf '#!/bin/sh\\nscripts/sdd-gate fr && scripts/sdd-gate ownership\\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit (pre-merge-commit도 동일)"; GITWARN=1 ;;
   sh)   copy "$KIT/tooling/sdd_gates.sh" "$T/scripts/sdd_gates.sh"
-        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)" ;;
+        say "  ⚠ spec-sync는 Node 필요 — --gate=node 또는 node 설치 후 재실행(ROADMAP 포팅 참조)"
+        # 감사 P3: 셸판도 fr·ownership 훅은 배선 가능 — 기본 경로(--gate=sh)가 "채택=상시 강제"
+        # 주장과 어긋나게 훅 0개로 끝나던 결함 봉합. pre-merge-commit(M5): merge commit에도 동일
+        # 게이트(번호 중복·ownership — 두 브랜치가 같은 번호를 집는 경쟁을 병합 시점에 차단).
+        if [ -d "$T/.git" ]; then
+          printf '#!/bin/sh\nsh scripts/sdd_gates.sh fr && sh scripts/sdd_gates.sh ownership\n' > "$T/.git/hooks/pre-commit"
+          cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+          say "  → git pre-commit·pre-merge-commit 훅 연결됨(셸 게이트 — fr·ownership)"
+        else
+          warn "  ⚠ .git 없음 — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=sh --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
+        fi ;;
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py"
         # Python판은 spec-first(specsync) 포함 Node 전 게이트 패리티(SPEC-006) — 훅도 배선.
         if [ -d "$T/.git" ]; then
           printf '#!/bin/sh\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$T/.git/hooks/pre-commit"
+          # pre-merge-commit(M5): merge commit에도 fr·ownership — 병합 시점 번호 경쟁 차단.
+          cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
           # merge commit은 skip(§5.6) — harness/commit-msg와 동일 의미론.
           printf '#!/bin/sh\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
-          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/commit-msg"
-          say "  → git pre-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
+          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit" "$T/.git/hooks/commit-msg"
+          say "  → git pre-commit·pre-merge-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
         else
           warn "  ⚠ .git 없음 — pre-commit/commit-msg 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=py --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
         fi ;;
@@ -94,11 +110,15 @@ if [ "$GATE" = "node" ]; then
   copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
   chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-pre-commit.sh"
 
-  # git pre-commit 훅 연결 (.git 있을 때만)
+  # git pre-commit + pre-merge-commit 훅 연결 (.git 있을 때만).
+  # pre-merge-commit(M5): 무충돌 git merge는 pre-commit을 타지 않는다 — 두 브랜치가 각자 같은
+  # 스펙 번호(SPEC-014 중복)나 같은 ownership 키를 들고 깨끗이 병합돼 main이 사후 red가 되던
+  # 경쟁을 병합 시점에 차단(같은 게이트 재사용).
   if [ -d "$T/.git" ]; then
     printf '#!/bin/sh\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
-    chmod +x "$T/.git/hooks/pre-commit"
-    say "  → git pre-commit 훅 연결됨"
+    cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+    chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+    say "  → git pre-commit·pre-merge-commit 훅 연결됨"
   else
     warn "  ⚠ .git 없음 — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
   fi

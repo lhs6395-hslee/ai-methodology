@@ -30,7 +30,7 @@
 >
 > 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
 >
-> 🔁 **키트는 자기 자신의 첫 소비자다(self-hosting):** 이 레포의 게이트 스위트(`tooling/`)도 자기 방법론 궤도 위에 있다 — [`sdd/specs/`](sdd/specs/)의 스펙 전부(SPEC-001~)가 tooling 전체(게이트·lib)를 소유하고, 테스트는 `@covers`로 FR에 묶이며(전 FR이 unit 또는 smoke-manifest로 회계됨 — `requireAccounting` 상시 on), 자기 git 훅(`tooling/harness/self-hooks-install.sh`)이 tooling 변경을 상시 강제한다. 스펙 없는 tooling 커밋은 commit-msg에서 막힌다.
+> 🔁 **키트는 자기 자신의 첫 소비자다(self-hosting):** 이 레포의 게이트 스위트(`tooling/`)도 자기 방법론 궤도 위에 있다 — [`sdd/specs/`](sdd/specs/)의 스펙 전부(SPEC-001~·CICD-001)가 tooling 전체(게이트·lib)와 `sdd.config.json`·CI 워크플로를 소유하고, 테스트는 `@covers`로 FR에 묶이며(전 FR이 unit 또는 smoke-manifest로 회계됨 — `requireAccounting` 상시 on), 자기 git 훅(`tooling/harness/self-hooks-install.sh`)이 tooling 변경을 상시 강제한다. 스펙 없는 소유 파일 커밋은 commit-msg에서, **어느 스펙도 소유하지 않는 신규 파일도 closed-world(`specSyncUnownedPolicy: error`)로** 막히고, 로컬 훅을 우회한 커밋은 **자체 CI**(`.github/workflows/sdd-gates.yml`, CICD-001 — 스위트+게이트, PR엔 range spec-sync·`draftBlockPolicy: hard`)가 서버측에서 잡는다.
 
 > **어떤 언어·어떤 모델·어떤 인프라든** 같은 규율로 동작한다. 언어/스택 차이는 `sdd.config.json` 어댑터 한 장으로만 표현(프리셋: `tooling/sdd.config.presets.md`), 방법론·게이트엔 특정 LLM·벤더 가정이 없다. **특정 CI/CD 도구도 불필요** — 게이트는 CLI라 로컬·git훅·어떤 CI/CD 도구에서든 돈다(`ci-examples.md`). *Spec Kit(spec 작성)과 CI/CD 도구(게이트 실행)는 별개*다. (→ `principles.md` §10)
 

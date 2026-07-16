@@ -5,34 +5,54 @@
 // 모드: --staged --message-file <p> = hard(exit 1, commit-msg 훅) / [base] = range advisory(exit 0).
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { loadConfig } from "./sdd-config.mjs";
+import { loadConfig, configFromString } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
-import { parseStatus } from "./lifecycle-lib.mjs";
+import { parseStatus, canLeadCode } from "./lifecycle-lib.mjs";
 import { escalations } from "./drift-lib.mjs";
-import { parseDrivers, crossSpecRelaxed } from "./cross-spec-lib.mjs";
+import { parseDrivers, relaxingDrivers } from "./cross-spec-lib.mjs";
 
-const cfg = loadConfig();
+let cfg = loadConfig();
 const args = process.argv.slice(2);
 const STAGED = args.includes("--staged");
 const mi = args.indexOf("--message-file");
 const MSG = mi >= 0 ? args[mi + 1] : null;
 const positional = args.filter((a, i) => !a.startsWith("--") && (mi < 0 || i !== mi + 1)); // mi=-1일 때 args[0](base)이 mi+1=0으로 오배제되던 버그 수정
-const BASE = positional[0] || process.env.SDD_DIFF_BASE || "origin/main";
 
 // core.quotepath=off: 비ASCII 경로가 8진수 인용 문자열("\353…")로 나오면 glob 매칭이 조용히 깨진다(도그푸딩 발견).
 const sh = (c) => execSync(c.replace(/^git /, "git -c core.quotepath=off "), { cwd: cfg.__root, encoding: "utf8" });
 const shOk = (c) => { try { return sh(c); } catch { return null; } };
 const lines = (s) => (s || "").split("\n").map((x) => x.trim()).filter(Boolean);
 
-// ① 트레일러(§5.5): staged 모드에서만.
+// ⓪ staged 판정은 HEAD 시점 config로(SPEC-003 FR-011) — 이 커밋이 config를 바꾸는 중이면,
+// 약화된(변경 후) config가 아니라 약화 "전"(HEAD) config가 이 커밋을 심판한다(자기약화 커밋 방지 —
+// 게이트를 통제하는 config가 게이트 판정 밖에 있던 반사성 결함의 봉합, 감사 T1). config가 이
+// 커밋에서 불변이면 두 판은 같으므로 동작·출력 무변(하위호환). HEAD에 config가 없으면(최초 채택) 현행.
+if (STAGED) {
+  const prefix = (shOk("git rev-parse --show-prefix") || "").trim();
+  const cfgRel = `${prefix}sdd.config.json`;
+  const headRaw = shOk(`git show HEAD:${cfgRel}`);
+  const curRaw = shOk(`git show :${cfgRel}`) ?? (cfg.__path ? readFileSync(cfg.__path, "utf8") : null);
+  if (headRaw !== null && curRaw !== null && headRaw !== curRaw) {
+    const headCfg = configFromString(headRaw, cfg.__root);
+    if (headCfg) {
+      cfg = headCfg;
+      console.log("· spec-sync: sdd.config.json 변경 감지 — HEAD 시점 config로 판정(자기약화 커밋 방지, SPEC-003)");
+    }
+  }
+}
+// base 우선순위: CLI positional > SDD_DIFF_BASE(env) > specSyncBase(config) > origin/main.
+const BASE = positional[0] || process.env.SDD_DIFF_BASE || cfg.specSyncBase || "origin/main";
+
+// ① 트레일러(§5.5): staged 모드에서만 — 여기선 사유 필수 검증·파싱만 하고, 면제는 판정 루프에서
+// 적용한다(감사 T3: 전면 단락 금지). 트레일러가 면제하는 것 = 동반 요구 + 상태 차단(문서화된 탈출구).
+// 면제하지 않는 것 = Files 글롭 문법 hard(SPEC-013)·unowned closed-world(SPEC-003 FR-010).
+let SPEC_IMPACT = null;
 if (STAGED && MSG) {
-  const msg = readFileSync(MSG, "utf8");
-  const m = msg.match(/^Spec-Impact:\s*none\s*(.*)$/m);
+  const m = readFileSync(MSG, "utf8").match(/^Spec-Impact:\s*none\s*(.*)$/m);
   if (m) {
     if (!m[1].trim()) { console.error("✗ spec-sync: `Spec-Impact: none`은 사유 필수 (`Spec-Impact: none <사유>`)"); process.exit(1); }
-    console.log(`spec-sync: Spec-Impact: none — 통과 (사유: ${m[1].trim()}) [트레일러가 커밋에 영속]`);
-    process.exit(0);
+    SPEC_IMPACT = m[1].trim();
   }
 }
 
@@ -40,7 +60,7 @@ if (STAGED && MSG) {
 const branchDiffOk = shOk(`git rev-parse -q --verify ${BASE}`) !== null && shOk(`git diff --name-only ${BASE}...HEAD`) !== null;
 const changed = new Set();
 if (branchDiffOk) lines(shOk(`git diff --name-only ${BASE}...HEAD`)).forEach((f) => changed.add(f));
-else console.log(`· spec-sync: base(${BASE}) 해석 불가 — ${STAGED ? "staged만 판정(경고)" : "판정 불가, 건너뜀"}`);
+else console.log(`· spec-sync: base(${BASE}) 해석 불가 — ${STAGED ? "staged만 판정(경고). 멀티커밋 브랜치(스펙 선커밋→코드 후커밋)는 오차단될 수 있음 — sdd.config.json specSyncBase 또는 SDD_DIFF_BASE로 base 지정" : "판정 불가, 건너뜀"}`);
 if (STAGED) lines(sh("git diff --cached --name-only")).forEach((f) => changed.add(f));
 if (!STAGED && !branchDiffOk) process.exit(0);
 
@@ -120,11 +140,18 @@ function meaningful(spec) {
   return ok;
 }
 // cross-spec 변경 동인(SPEC-020): Change-Driver 트레일러가 지목한 "의미변경 동인"이면 소유 요구를 참조 완화.
+// 경로 스코프(@glob, FR-005): 스코프 선언 동인은 매치 파일만 완화 — 무스코프 동인의 전역 팬아웃을 귀속으로 좁힌다.
 const drivers = (STAGED && MSG) ? parseDrivers(readFileSync(MSG, "utf8"), cfg.__idAlt) : [];
-const meaningfulDrivers = new Set([...new Set(drivers.map((d) => d.id))].filter((id) => {
+const meaningfulDriverIds = new Set([...new Set(drivers.map((d) => d.id))].filter((id) => {
   const s = specs.find((x) => x.id === id);
   return s && meaningful(s);
 }));
+const meaningfulEntries = drivers.filter((d) => meaningfulDriverIds.has(d.id));
+const globReCache = new Map();
+const matchGlob = (g, file) => {
+  if (!globReCache.has(g)) globReCache.set(g, compileGlob(g));
+  return globReCache.get(g).test(file);
+};
 for (const f of changed) {
   if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;      // 스펙 자신은 코드 아님
   if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
@@ -132,11 +159,16 @@ for (const f of changed) {
   for (const s of specs) {
     if (!s.globs.some(({ re }) => re.test(f))) continue;
     owned = true;
-    // Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
-    // 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
-    if (s.status === "Draft" && !s.deletedInIndex) { violations.push({ file: f, spec: s.id, draft: true }); continue; }
+    // 트레일러 면제(§5.5): 동반 요구·상태 차단만 — unowned·글롭 문법은 아래에서 그대로 강제.
+    if (SPEC_IMPACT) continue;
+    // 상태 차단(SPEC-008 FR-008): Reviewed 미만(Draft·Planned·enum 밖) 스펙의 소유 코드는
+    // 스펙 동반 여부와 무관하게 위반 — 상태 "화이트리스트"로 강제(Draft 문자열 등가 검사가
+    // Planned·비enum 상태를 흘려보내던 결함 봉합, 감사 T2). Status 미선언(레거시)은 통과(점진 도입).
+    // 삭제 중 스펙은 제외(수명 종료 경로).
+    if (s.status && !canLeadCode(s.status) && !s.deletedInIndex) { violations.push({ file: f, spec: s.id, draft: true, status: s.status }); continue; }
     if (!meaningful(s)) {
-      if (crossSpecRelaxed(s.id, meaningfulDrivers)) console.log(`· cross-spec: ${f} → 소유 ${s.id} 변경 동인 ${[...meaningfulDrivers].sort().join(", ")}(Change-Driver 선언, 참조 완화)`);
+      const ids = relaxingDrivers(s.id, f, meaningfulEntries, matchGlob);
+      if (ids.length) console.log(`· cross-spec: ${f} → 소유 ${s.id} 변경 동인 ${ids.join(", ")}(Change-Driver 선언, 참조 완화)`);
       else violations.push({ file: f, spec: s.id });
     }
   }
@@ -188,7 +220,8 @@ if (globHard && !violations.length) {
 // semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
 for (const id of drift.violations) console.log(`  ${driftHard ? "✗" : "⚠"} [${id}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy=${DRIFT_POLICY})`);
 if (!violations.length && !driftHard) {
-  console.log(drift.violations.length
+  if (SPEC_IMPACT) console.log(`spec-sync: Spec-Impact: none — 통과 (사유: ${SPEC_IMPACT}) [트레일러가 커밋에 영속 — 글롭 문법·unowned 정책은 면제 대상 아님]`);
+  else console.log(drift.violations.length
     ? "spec-sync: OK (semantic drift advisory — 위 리네임 스펙 본문 재검토 권장)."
     : "spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).");
   process.exit(0);
@@ -197,12 +230,12 @@ if (!violations.length && !driftHard) {
 // 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
 const draftHard = !STAGED && DRAFT_POLICY === "hard" && violations.some((v) => v.draft);
 for (const v of violations) console.log(v.draft
-  ? `  ${STAGED || draftHard ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
+  ? `  ${STAGED || draftHard ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 ${v.status} 상태 — Reviewed 이상 승격 전 코드 변경 금지`
   : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
 if (violations.length && STAGED) {
   console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.`);
   console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
-  if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
+  if (violations.some((v) => v.draft)) console.error(`  · Reviewed 미만 상태(Draft·Planned·enum 밖)의 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
   process.exit(1);

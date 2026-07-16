@@ -1,0 +1,35 @@
+# 킷 자신의 CI 백스톱 (CICD-001) — "채택=상시 강제"가 로컬 훅 전용이던 사각지대 봉합(감사 M1).
+# 로컬 훅은 --no-verify·웹 UI 병합으로 우회 가능하다 — 이 워크플로가 push/PR마다 스위트·게이트를
+# 강제하고, PR엔 range 모드 spec-sync(draftBlockPolicy=hard 소비)로 서버측 병합 경로까지 막는다.
+# @verifies CICD-001/FR-001 smoke: 이 워크플로의 GitHub Actions 실행 로그(push/PR마다 스위트+게이트)
+# @verifies CICD-001/FR-002 smoke: PR run의 spec-sync(range) 스텝 로그 — merge-base 대비 판정
+name: sdd-gates
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # range 모드 spec-sync가 merge-base를 해석하려면 전체 이력 필요
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: unit suite (runTestsPolicy=hard와 동일 스위트 — 커버리지 회계 ≠ 실행 결과)
+        run: node --test tooling/__tests__/*.mjs
+      - name: quality gates (fr·ownership·cohesion·completeness·consistency)
+        run: |
+          node tooling/check-fr-coverage.mjs
+          node tooling/check-ownership.mjs
+          node tooling/check-spec-cohesion.mjs
+          node tooling/check-spec-completeness.mjs
+          node tooling/check-spec-consistency.mjs
+      - name: smoke evidence drift (태그↔매니페스트)
+        run: node tooling/sdd-smoke-scan.mjs
+      - name: spec-sync range (웹 UI 병합 백스톱 — draftBlockPolicy=hard 승격 소비)
+        if: github.event_name == 'pull_request'
+        run: node tooling/check-spec-sync.mjs "origin/${{ github.base_ref }}"

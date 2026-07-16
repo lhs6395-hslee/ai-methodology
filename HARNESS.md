@@ -11,13 +11,15 @@
 | **R3 dedup+입도+완전성+일관성** | spec 생성/변경 직후 | `check-ownership`(+`entityRegistry`·Files 카테고리 금지·Entity 관계(SPEC-017 — 실재 hard·순환 advisory))·`check-spec-cohesion`·`check-spec-completeness`(SC·인수조건 + 수명주기 기록 + Change Log 근거 + 문법 규범: Module 존재·단일성·SHALL·Dedup 참조 실재 + 오브젝트 스토리지 결정(SPEC-016 advisory))·`check-spec-consistency` | "중복 통합 / 과대 spec 분할 / SC·인수조건·리뷰 기록·근거·문법 보강 / 근거 없는 키 정렬?" | 통합·분할·보강 → 재검증 |
 | **R2′ code→deployed-runtime** | 배포 전(preflight) | `check-schema-drift`(코드 기대 스키마 ↔ 배포 DB 실측 diff — opt-in `schemaDriftManifest`, SPEC-022) | "배포 전 마이그레이션 적용 / baseline?" | migrate-on-deploy 또는 배포전 스키마 preflight |
 | **R4 상시 sync** | push·주기·요청 | 위 일괄(`sdd-sync.mjs`) | drift → 해당 규칙 라우팅 | (R1/R2/R3의 act) |
+| **R5 test 실행** | push(pre-push)·CI·완료 주장 시 | `check-test-run`(`runTestsPolicy` off=no-op·advisory·hard — `commands.test` 실행·exit 0 요구, SPEC-021) | "스위트 red — 완료 주장 전 green으로?" | 실패 테스트 수정 → 재실행 |
 
 > **범위 밖(의도적):** `check-derivation`(재도출 소스 회계)·`sdd-smoke-scan`(증거 드리프트)은 이 하네스의 규칙표에 넣지 않는다 — 트리거가 "spec/코드 변경"이 아니라 **재채택(readopt)·증거 갱신** 이벤트라서다. 실행 지점은 readopt 절차(`prompts/readopt.md` 6~7단계)와 CI 스텝(`ci-examples.md`·`sdd-gates.yml` 주석)이 담당한다. `retag`는 게이트가 아니라 마이그레이션 도구(dry-run 기본)라 detect 대상이 아니다.
 
 ## 실행기 (Claude Code 1차 — 다른 에이전트는 같은 표로 자체 구현)
 - **detect 집계:** `node scripts/sdd-sync.mjs [--strict]` → 규칙별 sync 리포트.
 - **인터랙티브:** 스킬 `/sdd-sync` — 리포트 → 규칙별 사람 의사 확인 → act.
-- **상시(R4):** git pre-push 훅이 `sdd-sync.mjs`를 advisory 실행 → drift면 `/sdd-sync` 안내(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
+- **상시(R4·R5):** git pre-push 훅이 `sdd-sync.mjs`를 advisory 실행 → drift면 `/sdd-sync` 안내(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단). R5(test 실행)는 같은 집계에 포함되고, 서버측 백스톱은 CI(킷 자신은 `.github/workflows/sdd-gates.yml`, CICD-001)가 담당.
+- **병합 시점:** `pre-merge-commit` 훅이 pre-commit과 같은 품질 게이트를 무충돌 병합에도 실행 — 두 브랜치가 같은 스펙 번호·같은 ownership 키를 각자 들고 깨끗이 병합돼 main이 사후 red가 되는 경쟁 차단(감사 M5, `sdd-init`·self-hooks 배선).
 - **비-Claude 에이전트(Kiro·Codex 등):** 슬래시 명령·SessionStart 주입은 Claude Code 편의 계층이다 — 강제(게이트+git 훅)와 절차(`prompts/`)는 실행기 무관이므로 슬래시를 못 써도 **같은 절차를 수동으로** 밟고 되묻지 않는다. 방법론 상시 주입은 그 에이전트의 상시-로드 문서(Kiro `.kiro/steering/sdd.md`·기타 `AGENTS.md`)에 이 규칙표/`sdd-session-context.sh` 출력을 옮겨 대체한다. 수동 첫-스펙 절차는 `prompts/adopt.md` §"에이전트 무관 실행".
 
 ## 불변

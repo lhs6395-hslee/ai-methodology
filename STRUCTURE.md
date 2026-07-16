@@ -43,11 +43,12 @@
 
 원칙(owner): 불필요한 FR은 **delete**(미룸 아님) — `deferred`는 "할 건데 아직"에만 쓴다. 유령 명세(0/N Active)가 리포트 노이즈로 쌓이면 그건 `Planned`(안 지음)거나 `Removed`(폐기) 둘 중 하나여야지, Active인 채 방치가 아니다.
 
-1. 사람이 제거 결정(spec-first) → `sdd-retire <SPEC-ID | SPEC-ID/FR-NNN>`(dry-run)로 **폐기 계획**(삭제 대상 + dangling `@covers` + 제거될 smoke 매니페스트 키 + 결과 번호 gap) 산출·검토(SPEC-018). 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
-2. `sdd-retire … --write`가 매니페스트·deferred 엔트리를 원자적 재sync + tasks 생성: "FR-NNN 코드·테스트 삭제". 폐기가 남긴 번호 gap은 `retiredIds`(config)에 기록하면 numbering 게이트가 "정상 retirement gap"으로 취급(사고성 결번과 구분, FR-006).
-3. 구현이 **코드 + 테스트를 같은 PR로 원자적 삭제** → 검증(빌드 green, dangling 없음).
-4. spec 파일 삭제 + `MODULE_MAP`/Change Log에 제거 기록. **git이 히스토리 보존**(graveyard 폴더 불필요).
-5. 사람 승인.
+1. 사람이 제거 결정(spec-first) → `sdd-retire <SPEC-ID | SPEC-ID/FR-NNN>`(dry-run)로 **폐기 계획**(삭제 대상 + dangling `@covers` + 제거될 smoke 매니페스트 키 + 결과 번호 gap + **inbound 참조** — 타 스펙의 구조화 관계·Dedup-Review 언급, SPEC-018 FR-008) 산출·검토(SPEC-018). 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
+2. **참조 스펙 선갱신(같은 PR):** 계획이 지목한 inbound 참조를 정리한다 — 참조 스펙의 `Dependencies` 관계 항목 제거/이전, Dedup-Review는 "이웃 없음(삭제됨)" 등으로 갱신. 남기면 삭제 커밋이 관계 실재 hard(SPEC-017)·dangling advisory(SPEC-013)에 막힌다.
+3. `sdd-retire … --write`가 매니페스트·deferred 엔트리를 원자적 재sync + tasks 생성: "FR-NNN 코드·테스트 삭제". 폐기가 남긴 번호 gap은 `retiredIds`(config)에 기록하면 numbering 게이트가 "정상 retirement gap"으로 취급(사고성 결번과 구분, FR-006) — **최소번호(001 등) 스펙 폐기도 선행 번호 전부가 retiredIds에 있으면 001-시작 hard가 면제**되고(SPEC-014 FR-001), 기록된 폐기 ID를 새 스펙이 재사용하면 hard로 막힌다(FR-004 — 과거 참조 앨리어싱 방지).
+4. 구현이 **코드 + 테스트를 같은 PR로 원자적 삭제** → 검증(빌드 green, dangling 없음).
+5. spec 파일 삭제 + `MODULE_MAP`/Change Log에 제거 기록. **git이 히스토리 보존**(graveyard 폴더 불필요).
+6. 사람 승인.
 
 **"spec 삭제 ⟹ 코드 삭제" — 방향은 맞지만 자동 아님(정직):**
 - 코드는 spec의 파생물이라 spec에서 기능을 없애면 코드도 없어져야 한다. 그러나 `rm spec`이 코드를 자동 삭제하진 않는다 — 위 2~3(task→구현)으로 흐르고 **한 PR로 묶어 원자적**으로 한다.
@@ -60,7 +61,7 @@
 
 **과광역 glob 경고:** 여러 spec의 Files glob이 같은 파일을 덮으면(겹침) `check-spec-sync`가 **AND**로 동작 — 해당 파일 변경 시 *모든* 소유 스펙에 의미 있는 변경을 요구한다. 공유 유틸이 N개 스펙 편집을 강요하는 부담이 되므로 겹침은 최소화를 권장한다. 공유 코드는 별도 스펙(또는 미소유→converge-drift 소관)으로 두는 것이 좋다.
 
-**INFRA 스펙 config 파일 소유 관행(권장):** 프로젝트 루트 config 파일(`next.config.ts`·`tsconfig.json`·`vite.config.ts` 등)은 특정 기능 스펙의 소유가 아니어서 check-spec-sync가 침묵한다(converge-drift advisory만). 이 사각지대를 닫으려면 **INFRA 스펙**(`INFRA-001` 등)에 `Files: next.config.ts, tsconfig.json, …`으로 등록하는 관행을 권장한다. 채택하지 않으면 config 파일 변경은 advisory 그물만 적용된다(과장 금지).
+**INFRA 스펙 config 파일 소유 관행(권장):** 프로젝트 루트 config 파일(`next.config.ts`·`tsconfig.json`·`vite.config.ts` 등)은 특정 기능 스펙의 소유가 아니어서 check-spec-sync가 침묵한다(converge-drift advisory만). 이 사각지대를 닫으려면 **INFRA 스펙**(`INFRA-001` 등)에 `Files: next.config.ts, tsconfig.json, …`으로 등록하는 관행을 권장한다. 채택하지 않으면 config 파일 변경은 advisory 그물만 적용된다(과장 금지). **`sdd.config.json` 자신은 예외 없이 소유하라(감사 T1)** — 이 파일은 전 게이트의 강도를 통제하는 통제면이라, exempt에 넣으면 강제 무력화 커밋이 흔적 없이 통과한다. 스펙 소유(킷은 config 어댑터 스펙 SPEC-001의 Files)로 변경 흔적을 강제하고, spec-sync는 staged 판정을 HEAD 시점 config로 내려 "약화 커밋을 약화된 규칙이 심판"하는 순환을 막는다.
 
 **만성 unowned 경고 — exempt인가 소유인가(사용 규범):** `specSyncUnownedPolicy=warn`이 같은 파일을 매번 unowned로 표면화하면, 그건 둘 중 하나다 — **(a) 정당한 미소유**(서버 부트스트랩·테스트 하네스·생성물처럼 어느 기능 스펙에도 안 속하는 인프라): `specSyncExemptGlobs`에 선언해 "의도적 미소유"를 **한 번** 명문화한다(만성 노이즈 제거). **(b) 진짜 drift**(소유돼야 할 기능 코드가 어느 Files에도 안 잡힘): 그 스펙 `Files:`에 등록해 소유시킨다. 판정 기준은 "이 파일이 어떤 FR의 파생물인가" — 그렇다면 (b) 소유, 아니면 (a) exempt. **하지 말 것:** 진짜 기능 코드를 노이즈를 지우려고 exempt에 넣는 것(소유 사각지대를 영구화). exempt는 "이건 원래 아무 spec 것도 아님"의 선언이지 "지금 매핑하기 귀찮음"의 도피처가 아니다.
 

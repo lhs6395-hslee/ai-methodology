@@ -11,7 +11,7 @@
 **REF(자기참조):** 이 파일을 raw URL로 받았다면 그 URL의 `<ref>` 세그먼트를 REF로, 로컬 키트로 실행 중이면 REF=`main`으로 간주한다(아래 raw base·`--branch`에 사용).
 
 ## 실행 순서
-1. **안전망(필수).** `git add -A && git commit` 후 `git tag sdd-pre-readopt-<오늘날짜>`로 현재 상태를 스냅샷한다 — 진짜 손실 0, 언제든 태그로 복구.
+1. **안전망(필수).** `git add -A && git commit` 후 `git tag sdd-pre-readopt-<오늘날짜>`로 현재 상태를 스냅샷한다 — 진짜 손실 0, 언제든 태그로 복구. **구버전 훅이 이 스냅샷 커밋을 막으면 `--no-verify`로 통과시켜라** — readopt 대상은 정의상 "낡거나 어긋난" 레포라 자기 훅이 red일 수 있고, 이 커밋의 목적은 게이트 통과가 아니라 복구 지점 확보다(정당한 유일한 `--no-verify` 사용처).
 2. **방법론 읽기(다운로드 불필요).** `REALITY_CHECK.md` → `STORAGE.md` → `APPLYING.md`를 정독한다 — 로컬 키트가 있으면 그 파일을, 없으면 이 파일과 **같은 raw base**(`https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/<ref>/`)에서 직접 읽는다. `[검증]/[추론]/[미확인]` 구분.
 3. **강제 재배선 — tooling 확보 후 `sdd-init --force`.** 전체 clone 없이 tooling만 확보(partial + sparse) 후 최신 도구로 덮어쓴다:
    ```sh
@@ -22,9 +22,10 @@
        https://github.com/lhs6395-hslee/ai-methodology "$KIT"
      git -C "$KIT" sparse-checkout set tooling templates prompts
    fi
+   cp sdd.config.json sdd.config.json.pre-readopt 2>/dev/null || true  # ← --force가 config 전체를 덮으므로 diff용 백업(필수)
    sh "$KIT/tooling/sdd-init.sh" --gate=node --force      # ← 대상 프로젝트 루트에서
    ```
-4. **config 맞춤 + 새 knob 인스턴스화.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`). 프리셋 필드표의 knob을 전부 검토해 **값이 프로젝트별인 것**(예: `trackerCloseout` 트래커·채널, `testInfraGlobs`, `objectStorageMarkers`)은 CLAUDE.md 관례/사용자 확인으로 인스턴스화한다(자동 추정 금지, 해당 없으면 기본 비활성값). 인프라(관리형 DB·스토리지·큐·클라우드 API 등 — 어느 CSP든) 의존이 있으면 **`commands.test`(로컬 안전)/`commands.smoke`(인프라) tier 분리 + probe 기반 skip 가드**를 인스턴스화한다. 능동적 판정(분류 → 사용자 확인 + 실제 접근 probe → 실패 시 자원·사유 명시)의 절차·가드 코드 원본은 `tooling/sdd.config.presets.md`의 "테스트 환경 tier" 섹션이 SSOT(여기 복붙 금지). **주의:** 3단계 `sdd-init --force`는 `sdd.config.json`을 덮어쓰므로, 이전에 tier 분리가 있었으면 이 단계에서 재적용한다.
+4. **config 맞춤 + 새 knob 인스턴스화.** `sdd.config.json`을 이 프로젝트 언어로(프리셋: `tooling/sdd.config.presets.md`). 프리셋 필드표의 knob을 전부 검토해 **값이 프로젝트별인 것**(예: `trackerCloseout` 트래커·채널, `testInfraGlobs`, `objectStorageMarkers`)은 CLAUDE.md 관례/사용자 확인으로 인스턴스화한다(자동 추정 금지, 해당 없으면 기본 비활성값). 인프라(관리형 DB·스토리지·큐·클라우드 API 등 — 어느 CSP든) 의존이 있으면 **`commands.test`(로컬 안전)/`commands.smoke`(인프라) tier 분리 + probe 기반 skip 가드**를 인스턴스화한다. 능동적 판정(분류 → 사용자 확인 + 실제 접근 probe → 실패 시 자원·사유 명시)의 절차·가드 코드 원본은 `tooling/sdd.config.presets.md`의 "테스트 환경 tier" 섹션이 SSOT(여기 복붙 금지). **주의:** 3단계 `sdd-init --force`는 `sdd.config.json` **전체**를 덮어쓴다 — 잃는 건 tier 분리만이 아니라 프로젝트가 인스턴스화한 모든 knob(`prefixRationale`·`entityRegistry`·`capabilityVerbs`·`retiredIds`·`specSyncExemptGlobs`·`strictSpecs` 등)이다. 3단계에서 백업한 `sdd.config.json.pre-readopt`와 diff해 프로젝트 고유 값을 전부 재적용하라(특히 `retiredIds` 유실은 numbering 게이트를 즉시 red로 만든다 — SPEC-014 FR-001/004).
 5. **구 산출물 정리 — 인간 절은 먼저 이월 목록으로.** 기존 `sdd/specs/*`를 걷어내기 **전에** 각 스펙의 인간 의도 절(User Story·Assumptions/Clarifications·Review Log·Dedup-Review·Change Log 근거)을 이월 목록으로 뽑아둔다(prior-intent 소스 — 사후 재생성 불가). 그다음 걷어낸다 — 코드는 그대로, 1단계 스냅샷 태그에 남아 있음.
 6. **스펙 재도출 — 소스 클래스 9종 전부 읽는다(SPEC-009).** src만 읽는 재도출은 미완성이다. 정의된 소스 클래스와 산출물 매핑:
    | 클래스 | 읽을 것 | 착지 |

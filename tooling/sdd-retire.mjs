@@ -6,7 +6,10 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
-import { parseTarget, planRetirement, removeFrFromSpecText, pruneManifest } from "./retire-lib.mjs";
+import { parseTarget, planRetirement, removeFrFromSpecText, pruneManifest, inboundReferences } from "./retire-lib.mjs";
+import { parseSection } from "./ownership-keys.mjs";
+import { parseRelationEntry } from "./relation-lib.mjs";
+import { sectionBlock } from "./lifecycle-lib.mjs";
 
 const cfg = loadConfig();
 const WRITE = process.argv.includes("--write");
@@ -41,8 +44,21 @@ if (manPath) { try { manifest = JSON.parse(readFileSync(manPath, "utf8")); } cat
 const manifestKeys = Object.keys(manifest);
 const deferredKeys = manifestKeys.filter((k) => manifest[k]?.method === "deferred");
 
+// 3b. inbound 참조(FR-008): 타 스펙의 구조화 관계(Dependencies)·Dedup-Review 언급 — 스펙 전체 폐기 시
+// 남으면 관계 실재 hard(SPEC-017)·dangling advisory(SPEC-013)로 삭제 커밋이 막힌다. 계획이 미리 지목.
+const t = parseTarget(target);
+const CATS = cfg.ownershipCategories;
+const ENT_CAT = CATS.find((c) => /entit/i.test(c)) || CATS[0];
+const ownedKeys = t && specText.has(t.specId)
+  ? new Set(parseSection(specText.get(t.specId), "Ownership", [ENT_CAT])[ENT_CAT] || [])
+  : new Set();
+const parseDeps = (text) => (parseSection(text, "Dependencies", [ENT_CAT])[ENT_CAT] || []).map(parseRelationEntry);
+const inboundRefs = t && !t.frId
+  ? inboundReferences(t.specId, ownedKeys, specText, parseDeps, (text) => sectionBlock(text, "Dedup-Review"))
+  : [];
+
 // 4. 계획
-const plan = planRetirement(target, { frsBySpec, coversIndex, manifestKeys, deferredKeys });
+const plan = planRetirement(target, { frsBySpec, coversIndex, manifestKeys, deferredKeys, inboundRefs });
 if (!plan.ok) { console.error(`✗ sdd-retire: ${plan.reason}`); process.exit(1); }
 
 console.log(`폐기 계획 — ${target}  (${WRITE ? "WRITE" : "dry-run"})`);
@@ -53,6 +69,12 @@ if (plan.danglingCovers.length) {
   for (const c of plan.danglingCovers) console.log(`      ${c.file}: @covers ${c.spec}/${c.fr}`);
 }
 if (plan.numberingGap) console.log(`  · 번호 gap: ${plan.numberingGap} (retiredIds에 등록 시 numbering이 정상 처리 — FR-006)`);
+if (plan.inboundRefs.length) {
+  console.log(`  · 참조 스펙 갱신 필요(같은 PR — 남으면 관계 실재 hard/SPEC-017·dangling advisory/SPEC-013에 막힘):`);
+  for (const r of plan.inboundRefs) {
+    console.log(`      ${r.spec} — ${r.kind === "relation" ? `Dependencies 관계 ${r.detail}` : `Dedup-Review에 ${r.detail} 언급("이웃 없음(삭제됨)" 등으로 갱신)`}`);
+  }
+}
 
 if (!WRITE) { console.log("\ndry-run — 적용하려면 --write. 테스트 삭제는 사람이 원자적 PR로."); process.exit(0); }
 

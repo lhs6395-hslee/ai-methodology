@@ -33,6 +33,12 @@
 | SPEC-015 | TEST 삭제가능 도메인(런타임+인프라) — TEST 인프라 소유 허용(prefix-class 면제)+`testInfraGlobs`로 제품 스펙 격리 | `tooling/test-domain-lib.mjs` | active |
 | SPEC-016 | 오브젝트 스토리지 도입 결정 — `objectStorageMarkers` 감지·`## Object Storage Decision` 섹션(버킷·이전 라벨) completeness | `tooling/object-storage-lib.mjs` | active |
 | SPEC-017 | Entity 관계 정합 — `Name (relation-type)` 구조화·대상 실재·소유 spec 해석 hard, aggregate 간 순환 참조 advisory | `tooling/relation-lib.mjs` | active |
+| SPEC-018 | 명세 폐기 워크플로 — `sdd-retire`(dry-run/--write)·Planned 회계·retiredIds gap·inbound 참조 지목 | `tooling/sdd-retire.mjs`, `tooling/retire-lib.mjs` | active |
+| SPEC-019 | semantic drift 승격 — 소유 파일 리네임 감지 시 FR 라인 변경 ∨ Spec-Impact 요구(`semanticDriftPolicy`) | `tooling/drift-lib.mjs` | active |
+| SPEC-020 | cross-spec 변경 동인 — `Change-Driver` 트레일러(경로 스코프 `@glob` 포함) 참조 완화 | `tooling/cross-spec-lib.mjs` | active |
+| SPEC-021 | 테스트 실행 게이트 — `runTestsPolicy`로 `commands.test` 실행·green 확인(sdd-sync R5·CI 배선) | `tooling/check-test-run.mjs` | active |
+| SPEC-022 | 런타임 스키마 드리프트(R2′) — 코드 기대 ↔ 배포 DB 실측 diff, 배포 preflight | `tooling/check-schema-drift.mjs`, `tooling/schema-drift-lib.mjs` | active |
+| CICD-001 | 킷 자신 CI 백스톱 — push/PR 스위트·게이트 + PR range spec-sync(서버측 병합 강제 지점) | `.github/workflows/sdd-gates.yml` | active |
 
 > "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 7로 조정했다(사유는 SPEC-002 Change Log).
 

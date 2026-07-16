@@ -50,6 +50,8 @@ jobs:
         run: node scripts/sdd-run.mjs typecheck
       - name: Tests — test ↔ code (commands.test)
         run: node scripts/sdd-run.mjs test
+      # 테스트 실행 게이트(SPEC-021) — runTestsPolicy(off|advisory|hard)를 선언한 프로젝트만(미설정=no-op):
+      # - run: node scripts/check-test-run.mjs
       - name: FR ↔ test traceability (incremental)
         run: node scripts/check-fr-coverage.mjs
       - name: Cross-spec ownership uniqueness (구조적 중복 차단)

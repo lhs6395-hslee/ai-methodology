@@ -36,6 +36,8 @@
 - **FR-004** (unwanted): IF the retirement target does not exist in the spec corpus, THEN THE SYSTEM SHALL make no change and exit non-zero.
 - **FR-005** (state): WHILE a spec declares `Status: Planned`, THE SYSTEM SHALL account its zero-coverage requirements as intentionally-planned rather than R3-unaccounted, without requiring manifest entries.
 - **FR-006** (event): WHEN the numbering integrity check encounters a gap whose ID is recorded as retired (config `retiredIds` or MODULE_MAP Removed), THE SYSTEM SHALL treat it as an expected retirement gap rather than an advisory anomaly.
+- **FR-007** (unwanted): IF a spec declares `Status: Planned` while one or more of its requirements carry unit coverage, THEN the coverage gate SHALL exit non-zero naming the contradiction — Planned declares intentional non-implementation, so covered requirements mean either the status must be promoted or the spec retired (blocks the flip-to-Planned accounting silencer).
+- **FR-008** (event): WHEN a whole-spec retirement plan is computed, THE SYSTEM SHALL also list inbound references from other specs — structured Dependencies relations targeting keys the retired spec owns, and Dedup-Review records naming the retired spec id — so the same PR can update them before the deletion commit trips the relation-existence and dangling-reference gates.
 
 ### Key Entities
 - **retirement plan** — the computed `{removals, danglingCovers, manifestKeys, deferredKeys, numberingGap}` for a target, derived from the spec/test/manifest corpus.
@@ -89,3 +91,4 @@
 | 2026-07-15 | 증분 2a — FR-005 구현: `Status: Planned` → 미커버 FR을 planned로 회계(R3 미검증 아님·"not yet implemented" 노이즈 아님). lifecycle STATUS_ENUM·verification-accounting classify·fr-coverage, Node·Python 패리티. FR-005 deferred→unit | 소비 프로젝트 B 유령 명세(0/N) 노이즈 직접 해소 — 유령이 아니라 "의도된 미구현"으로 명시 |
 | 2026-07-16 | 증분 2b — FR-006 구현: `retiredIds` config knob + `numberingIssues(specIds, retiredIds)` — 폐기 gap을 정상 retirement gap으로 취급(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건. FR-006 deferred→unit → SPEC-018 6/6 완결 | 폐기 워크플로가 남기는 번호 gap이 advisory 노이즈로 재부상하지 않게 봉합 — "정리·삭제"가 잔재를 남기지 않음 |
 | 2026-07-16 | SC-001 정직 조정 — 게이트 경로 판정(FR-005/006)은 Node↔Python 패리티 필수(달성), `sdd-retire` 커맨드·`retire-lib`는 Node 참조 구현(런타임 패리티 비대상)임을 명시 | 커맨드 파리티는 CI 판정 밖 유지보수 도구라 실익 없음 — SC가 없는 패리티를 주장하지 않게(스펙↔현실 드리프트 방지) |
+| 2026-07-16 | FR-007 신설(Planned 모순 — Status Planned인데 unit 커버 FR 실재 = fr 게이트 hard) + FR-008 신설(폐기 계획에 inbound 참조 — 타 스펙 구조화 관계·Dedup-Review 언급을 dry-run이 지목, retire-lib `inboundReferences`) | 감사 T2·P1: Active→Planned 한 줄 뒤집기로 strictSpecs·R3를 침묵시키는 회계 침묵기 + 참조된 스펙 폐기 시 dry-run은 침묵하고 --write 후 삭제 커밋이 관계 실재 hard(SPEC-017)에 막히는 dead-end(킷 자신 SPEC-011 dry-run으로 실증 — SPEC-014 관계·Dedup 언급 3건 지목) |
