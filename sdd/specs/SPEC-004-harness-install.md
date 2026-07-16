@@ -39,6 +39,7 @@
 - **FR-007** (unwanted): IF `sdd-init.sh` is executed from inside the kit directory itself, THEN THE SYSTEM SHALL refuse and exit non-zero.
 - **FR-008** (event): WHEN `sdd-run.mjs` is invoked with a stage name, THE SYSTEM SHALL execute the command declared in `commands.<stage>` from `sdd.config.json` and exit with that command's exit code; WHERE the stage is not declared in `commands`, THE SYSTEM SHALL skip and exit zero without error.
 - **FR-009** (event): WHEN `sdd-sync.mjs` is invoked with `--json`, THE SYSTEM SHALL emit to stdout only a machine-readable report — an object with `schemaVersion`, `clean`, `flaggedRules` (stable rule ids), and `rules` (each with a stable `id`, a `title`, a `flagged` flag, and `gates` each carrying `gate`, `flagged`, and `summary`) — suppressing the human-readable report, and SHALL keep the `--strict` contract of exiting non-zero when any rule is flagged.
+- **FR-010** (event): WHEN `sdd-init.sh` runs (any gate), THE SYSTEM SHALL install the agent-context methodology doc to `.kiro/steering/sdd.md` and ensure a marker-delimited SDD block exists in `AGENTS.md` — creating the file if absent, appending the block while preserving existing content if present without the marker, and leaving it unchanged if the marker is already present (idempotent) — so non-Claude executors (Kiro, Codex, etc.) load the same orbit and entry rules the Claude SessionStart hook injects.
 
 ### Key Entities
 - **install layout** — the deterministic `sdd/` tree, `sdd.config.json`, and wired hooks/settings/skills produced by init.
@@ -51,8 +52,8 @@
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts). Symbols = 소스 진입점, Artifacts = 설치 산출물.
 - **Modules**: harness-install
 - **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh, sdd-run.mjs
-- **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md
-- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
+- **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md, .kiro/steering/sdd.md, AGENTS.md
+- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
@@ -105,3 +106,4 @@
 | 2026-07-16 | `sdd-sync.mjs` 요약·`pre-push` 훅 안내를 중립-우선으로: `node scripts/sdd-sync.mjs`를 1차 remediation으로, Claude `/sdd-sync`는 괄호 편의 | 에이전트 중립 방향(사용자 결정): drift 안내가 특정 에이전트 커맨드를 가정하지 않게 — 강제/탐지 계층은 실행기 무관 |
 | 2026-07-16 | `sdd-init` Node 게이트 임포트 클로저에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 소비 프로젝트에도 복사해 설치만으로 실행되게(누락 시 ERR_MODULE_NOT_FOUND) |
 | 2026-07-16 | `sdd-init` Node 클로저에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib)를 소비 프로젝트에도 복사(설치만으로 실행) |
+| 2026-07-16 | FR-010 신설 — `sdd-init`이 `agent-context.md`를 `.kiro/steering/sdd.md`로 설치 + `AGENTS.md`에 마커 블록 idempotent 병합(게이트 무관). `tooling/harness/agent-context.md` 신규 아티팩트 | 비-Claude 에이전트(Kiro·Codex) 방법론 상시 주입 — Claude SessionStart 훅의 실행기-무관 대체. 슬래시 없이도 궤도·진입 규칙이 항상 로드됨(에이전트 중립 방향) |

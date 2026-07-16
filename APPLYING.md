@@ -83,6 +83,8 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 
 > **수명주기 스킬도 함께 설치된다**(`--gate=node`): `/sdd-start`(최초 채택)·`/sdd-readopt`(완전 재채택)·`/sdd-update`(평상시 sync). 각각 `prompts/{adopt,readopt,update}.md` 정본 절차를 실행하며 승인 게이트·재채택 안전망 태그를 불변식으로 강제한다(계약: `sdd/specs/SPEC-005-adoption-lifecycle.md`).
 
+> **비-Claude 에이전트 컨텍스트도 배선된다**(게이트 무관, SPEC-004 FR-010): `sdd-init`이 `.kiro/steering/sdd.md`(Kiro 상시 로드) 설치 + `AGENTS.md`에 SDD 블록을 idempotent 병합(기존 내용 보존)한다. 그래서 Kiro·Codex 등 슬래시·SessionStart를 못 쓰는 에이전트도 방법론 궤도·진입 규칙·"슬래시 없이 수동 진행" 규범이 항상 로드된다(Claude SessionStart 훅의 실행기-무관 대체). 정본 요약은 `tooling/harness/agent-context.md`.
+
 ## 4. 루프 가동
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 

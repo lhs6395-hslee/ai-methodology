@@ -1,6 +1,7 @@
 // @covers SPEC-004/FR-002
 // @covers SPEC-004/FR-003
 // @covers SPEC-004/FR-004
+// @covers SPEC-004/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -108,5 +109,28 @@ test("sdd-init --gate=py: Python 게이트 + spec-first 훅(pre-commit·commit-m
     const cm = readFileSync(join(root, ".git/hooks/commit-msg"), "utf8");
     assert.match(cm, /specsync --staged --message-file/);
     assert.match(cm, /MERGE_HEAD/); // merge commit skip(§5.6) 의미론 유지
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("sdd-init가 에이전트 컨텍스트 배선(.kiro/steering + AGENTS.md) + idempotent (SPEC-004 FR-010)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-agent-"));
+  try {
+    // 기존 AGENTS.md에 사용자 내용이 있는 경우 — 보존되어야
+    writeFileSync(join(root, "AGENTS.md"), "# 우리 프로젝트 규칙\n- 커밋은 한국어\n");
+    execFileSync("sh", [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"], { cwd: root, stdio: "ignore" });
+
+    const steer = join(root, ".kiro/steering/sdd.md");
+    assert.ok(existsSync(steer), ".kiro/steering/sdd.md 설치");
+    assert.match(readFileSync(steer, "utf8"), /SDD:BEGIN/, "steering에 SDD 마커 블록");
+    assert.match(readFileSync(steer, "utf8"), /슬래시를 못 쓰는/, "에이전트 무관 실행 규범 포함");
+
+    const ag = readFileSync(join(root, "AGENTS.md"), "utf8");
+    assert.match(ag, /우리 프로젝트 규칙/, "기존 AGENTS.md 내용 보존");
+    assert.match(ag, /SDD:BEGIN/, "AGENTS.md에 SDD 블록 추가");
+
+    // idempotency — 재실행해도 블록 1개만
+    execFileSync("sh", [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"], { cwd: root, stdio: "ignore" });
+    const ag2 = readFileSync(join(root, "AGENTS.md"), "utf8");
+    assert.equal((ag2.match(/SDD:BEGIN/g) || []).length, 1, "재실행에도 SDD 블록 중복 없음");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

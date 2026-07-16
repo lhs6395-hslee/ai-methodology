@@ -62,6 +62,19 @@ case "$GATE" in
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
 
+# ── 2c. 에이전트 컨텍스트 주입 (Claude 외 — Kiro·Codex 등) ─────
+# 방법론 상시 로드 문서를 비-Claude 에이전트용으로 배선한다(Claude는 SessionStart hook이 담당 — SPEC-004).
+# 게이트 무관(순수 마크다운) — 어느 에이전트/무-에이전트에서도 같은 궤도를 보장.
+copy "$KIT/tooling/harness/agent-context.md" "$T/.kiro/steering/sdd.md"   # Kiro steering(기본 always-include)
+AG="$T/AGENTS.md"                                                          # Codex 등 상시 로드 규칙 파일
+if [ ! -e "$AG" ]; then
+  cp "$KIT/tooling/harness/agent-context.md" "$AG"; say "+ AGENTS.md (SDD 컨텍스트)"
+elif grep -q 'SDD:BEGIN' "$AG" 2>/dev/null; then
+  say "· 유지(이미 SDD 블록): AGENTS.md"                                   # idempotent — 재실행 중복 방지
+else
+  { printf '\n'; cat "$KIT/tooling/harness/agent-context.md"; } >> "$AG"; say "+ AGENTS.md에 SDD 컨텍스트 블록 추가(기존 내용 보존)"
+fi
+
 # ── 2b. 하네스 (선택) — 인터랙티브 spec↔code sync (Claude Code 1차) ──
 # 하네스 detector는 Node 게이트를 쓰므로 --gate=node 일 때만 설치.
 if [ "$GATE" = "node" ]; then
