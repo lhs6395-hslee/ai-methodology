@@ -141,6 +141,9 @@ export const DEFAULTS = {
   // 폐기된 spec-ID 목록(예: ["CICD-005"]) — 그 번호의 내부 gap을 numbering 게이트가
   // 사고성 결번이 아닌 정상 retirement gap으로 취급(SPEC-018 FR-006). sdd-retire가 남기는 gap 근거.
   retiredIds: [],
+  // semantic drift 승격(SPEC-019): 소유 파일 리네임 감지 시 spec-sync 요구를
+  // "Change Log 한 줄" → "FR 선언 라인 변경 ∨ Spec-Impact"로 승격. off|advisory(기본)|hard.
+  semanticDriftPolicy: "advisory",
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

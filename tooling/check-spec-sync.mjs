@@ -9,6 +9,7 @@ import { loadConfig } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
+import { escalations } from "./drift-lib.mjs";
 
 const cfg = loadConfig();
 const args = process.argv.slice(2);
@@ -41,6 +42,15 @@ if (branchDiffOk) lines(shOk(`git diff --name-only ${BASE}...HEAD`)).forEach((f)
 else console.log(`· spec-sync: base(${BASE}) 해석 불가 — ${STAGED ? "staged만 판정(경고)" : "판정 불가, 건너뜀"}`);
 if (STAGED) lines(sh("git diff --cached --name-only")).forEach((f) => changed.add(f));
 if (!STAGED && !branchDiffOk) process.exit(0);
+
+// ②b 리네임 수집(SPEC-019): 소유 파일 리네임은 semantic drift 승격 트리거.
+const renamed = new Set(); // 리네임된 새 경로
+const collectRenames = (raw) => lines(raw).forEach((ln) => {
+  const m = /^R\d*\t(.+)\t(.+)$/.exec(ln);
+  if (m) renamed.add(m[2].trim());
+});
+if (branchDiffOk) collectRenames(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
+if (STAGED) collectRenames(shOk("git diff --cached --name-status --find-renames"));
 
 // ③ 스펙 로드(§5.1): HEAD ∪ index 합집합(삭제 가시화).
 const specPaths = new Set([
@@ -123,6 +133,31 @@ for (const f of changed) {
   if (!owned && POLICY !== "silent") unowned.push(f);
 }
 
+// ④b semantic drift 승격(SPEC-019): 리네임된 소유 파일의 스펙은 FR 라인 변경 ∨ Spec-Impact 필요.
+const DRIFT_POLICY = cfg.semanticDriftPolicy || "advisory";
+const frLineChanged = (specPath) => {
+  const re = new RegExp(`^[+-].*\\*\\*(?:${cfg.__reqAlt})-\\d{3}[a-z]?\\*\\*`, "m");
+  const ds = [];
+  if (STAGED) ds.push(shOk(`git diff --cached -- ${specPath}`));
+  if (branchDiffOk) ds.push(shOk(`git diff ${BASE}...HEAD -- ${specPath}`));
+  return ds.some((d) => d && re.test(d));
+};
+const triggered = new Set();
+for (const nf of renamed) {
+  if (specSet.has(nf) || nf.startsWith(cfg.specDir + "/")) continue;
+  if (exempt.some((rx) => rx.test(nf))) continue;
+  for (const s of specs) if (s.globs.some(({ re }) => re.test(nf))) triggered.add(s.id);
+}
+const satisfied = new Set([...triggered].filter((id) => {
+  const s = specs.find((x) => x.id === id);
+  return s && frLineChanged(s.path);
+}));
+let hasSpecImpact = false;
+if (STAGED && MSG) hasSpecImpact = /^Spec-Impact:/m.test(readFileSync(MSG, "utf8"));
+const drift = escalations(triggered, satisfied, hasSpecImpact, DRIFT_POLICY);
+if (drift.policyError) { console.error(`✗ ${drift.policyError}`); process.exit(1); }
+const driftHard = drift.hard && drift.violations.length > 0;
+
 // ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
 const unownedHard = POLICY === "error" && STAGED && unowned.length > 0;
 const mode = STAGED ? "staged(hard)" : `range(advisory, base:${BASE})`;
@@ -140,19 +175,30 @@ if (globHard && !violations.length) {
   console.error(`\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).`);
   process.exit(1);
 }
-if (!violations.length) { console.log("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음)."); process.exit(0); }
+// semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
+for (const id of drift.violations) console.log(`  ${driftHard ? "✗" : "⚠"} [${id}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy=${DRIFT_POLICY})`);
+if (!violations.length && !driftHard) {
+  console.log(drift.violations.length
+    ? "spec-sync: OK (semantic drift advisory — 위 리네임 스펙 본문 재검토 권장)."
+    : "spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).");
+  process.exit(0);
+}
 // draftBlockPolicy=hard: range 모드에서도 Draft 위반을 hard로 승격(SPEC-008 FR-007) — 웹 UI 병합이
 // 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
 const draftHard = !STAGED && DRAFT_POLICY === "hard" && violations.some((v) => v.draft);
 for (const v of violations) console.log(v.draft
   ? `  ${STAGED || draftHard ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지`
   : `  ${STAGED ? "✗" : "⚠"} ${v.file} → 소유 스펙 ${v.spec}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)`);
-if (STAGED) {
+if (violations.length && STAGED) {
   console.error(`\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.`);
   console.error(`  · 스펙을 이미 수정했다면 \`git add\`로 스테이징했는지 확인(§6.2).`);
   if (violations.some((v) => v.draft)) console.error(`  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
+  process.exit(1);
+}
+if (driftHard) {
+  console.error(`\n✗ semantic drift(SPEC-019): 리네임된 소유 파일의 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 \`Spec-Impact: <사유>\` 트레일러를 남겨라 — ${drift.violations.join(", ")}.`);
   process.exit(1);
 }
 if (draftHard) {

@@ -84,6 +84,7 @@ DEFAULTS = {
     "surfaceFormat": "http",
     "commands": {},
     "retiredIds": [],
+    "semanticDriftPolicy": "advisory",
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -1290,6 +1291,23 @@ def has_meaningful_spec_change(post_image, diff_text, req_alt="FR"):
     return False
 
 
+DRIFT_POLICY_ENUM = ("off", "advisory", "hard")
+
+
+def escalations(triggered, satisfied, has_spec_impact, policy):
+    """semantic drift 승격 판정 순수 코어 (SPEC-019, drift-lib.mjs 미러 — 바이트 동일).
+    트리거 집합·충족 집합 → 위반 집합. (violations[정렬], hard, policy_error) 반환."""
+    if policy not in DRIFT_POLICY_ENUM:
+        return [], False, f'semanticDriftPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)'
+    if policy == "off":
+        return [], False, None
+    if has_spec_impact:
+        return [], False, None
+    sat = set(satisfied or [])
+    violations = sorted(set(triggered or []) - sat)
+    return violations, policy == "hard", None
+
+
 def cmd_specsync(cfg, staged, msg_file, base):
     def lines(s):
         return [x.strip() for x in (s or "").split("\n") if x.strip()]
@@ -1317,6 +1335,19 @@ def cmd_specsync(cfg, staged, msg_file, base):
         changed.update(lines(_git(cfg, ["diff", "--cached", "--name-only"])))
     if not staged and not branch_diff_ok:
         sys.exit(0)
+
+    # ②b 리네임 수집(SPEC-019): 소유 파일 리네임은 semantic drift 승격 트리거.
+    renamed = set()
+
+    def collect_renames(raw):
+        for ln in lines(raw):
+            m = re.match(r"^R\d*\t(.+)\t(.+)$", ln)
+            if m:
+                renamed.add(m.group(2).strip())
+    if branch_diff_ok:
+        collect_renames(_git(cfg, ["diff", "--name-status", "--find-renames", f"{base}...HEAD"]))
+    if staged:
+        collect_renames(_git(cfg, ["diff", "--cached", "--name-status", "--find-renames"]))
 
     # ③ 스펙 로드(§5.1): HEAD ∪ index 합집합(삭제 가시화).
     spec_paths = set(
@@ -1411,6 +1442,39 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if not owned and policy != "silent":
             unowned.append(f)
 
+    # ④b semantic drift 승격(SPEC-019): 리네임된 소유 파일의 스펙은 FR 라인 변경 ∨ Spec-Impact 필요.
+    drift_policy = cfg.get("semanticDriftPolicy") or "advisory"
+
+    def fr_line_changed(path):
+        rx = re.compile(rf"^[+-].*\*\*(?:{cfg['__reqAlt']})-\d{{3}}[a-z]?\*\*", re.MULTILINE)
+        ds = []
+        if staged:
+            ds.append(_git(cfg, ["diff", "--cached", "--", path]))
+        if branch_diff_ok:
+            ds.append(_git(cfg, ["diff", f"{base}...HEAD", "--", path]))
+        return any(d and rx.search(d) for d in ds)
+    triggered = set()
+    for nf in renamed:
+        if nf in spec_set or nf.startswith(cfg["specDir"] + "/"):
+            continue
+        if any(rx.match(nf) for rx in exempt):
+            continue
+        for spec_id, path, globs, deleted, status in specs:
+            if any(rx.match(nf) for _, rx in globs):
+                triggered.add(spec_id)
+    spec_by_id = {s[0]: s for s in specs}
+    satisfied = set(sid for sid in triggered
+                    if spec_by_id.get(sid) and fr_line_changed(spec_by_id[sid][1]))
+    has_spec_impact = False
+    if staged and msg_file:
+        has_spec_impact = re.search(r"^Spec-Impact:", read_text(msg_file), re.MULTILINE) is not None
+    drift_violations, drift_hard_flag, drift_policy_error = escalations(
+        triggered, satisfied, has_spec_impact, drift_policy)
+    if drift_policy_error:
+        print(f"✗ {drift_policy_error}", file=sys.stderr)
+        sys.exit(1)
+    drift_hard = drift_hard_flag and len(drift_violations) > 0
+
     # ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
     unowned_hard = policy == "error" and staged and len(unowned) > 0
     mode = "staged(hard)" if staged else f"range(advisory, base:{base})"
@@ -1427,8 +1491,13 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print("\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).",
               file=sys.stderr)
         sys.exit(1)
-    if not violations:
-        print("spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
+    # semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
+    for sid in drift_violations:
+        print(f"  {'✗' if drift_hard else '⚠'} [{sid}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy={drift_policy})")
+    if not violations and not drift_hard:
+        print("spec-sync: OK (semantic drift advisory — 위 리네임 스펙 본문 재검토 권장)."
+              if drift_violations else
+              "spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
     # draftBlockPolicy=hard: range 모드에서도 Draft 위반을 hard로 승격(SPEC-008 FR-007) — 웹 UI 병합이
     # 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
@@ -1439,7 +1508,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
             print(f"  {tag} {f} → 소유 스펙 {spec_id}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지")
         else:
             print(f"  {tag} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
-    if staged:
+    if violations and staged:
         print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.", file=sys.stderr)
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
         if any(d for _, _, d in violations):
@@ -1447,6 +1516,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if unowned_hard:
             print("  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
+        sys.exit(1)
+    if drift_hard:
+        print(f"\n✗ semantic drift(SPEC-019): 리네임된 소유 파일의 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 `Spec-Impact: <사유>` 트레일러를 남겨라 — {', '.join(drift_violations)}.",
+              file=sys.stderr)
         sys.exit(1)
     if draft_hard:
         print("\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).",

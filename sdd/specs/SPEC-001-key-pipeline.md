@@ -96,3 +96,4 @@
 | 2026-07-09 | DEFAULTS에 `relationTypes`(기본 []) 추가 | SPEC-017 신설 동반 — Entity 관계 relation-type 어휘(capabilityVerbs 동형)의 기본값을 config 어댑터가 선언(빈 목록=무제한, 하위호환) |
 | 2026-07-09 | `ownership-keys.mjs` 설계 근거 주석 경로 정정(`docs/superpowers/specs/` → `docs/design/`) | STORAGE §2.7 신설 동반 — 킷 자신의 설계 문서가 새 규약 위치로 이동, 참조 경로 동기(동작 변경 없음) |
 | 2026-07-16 | config DEFAULTS에 `retiredIds: []` knob 추가(Node·Python) — 폐기 spec-ID 목록 | SPEC-018 FR-006 동반: numbering 게이트가 이 knob으로 retirement gap을 정상 취급(소비 게이트는 SPEC-014/002) |
+| 2026-07-16 | config DEFAULTS에 `semanticDriftPolicy: "advisory"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-019 FR-005 동반: 리네임 기반 drift 승격 정책(소비 게이트는 SPEC-003, 판정 코어는 SPEC-019) |

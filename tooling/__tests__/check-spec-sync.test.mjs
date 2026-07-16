@@ -22,7 +22,7 @@ function repo() {
   mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "drift-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
@@ -338,5 +338,39 @@ test("비ASCII 경로(quotepath): 한글 파일명 소유 코드도 인용 없�
     const r = runGate(root, ["--staged", "--message-file", "msg"]);
     assert.equal(r.code, 1, r.out); // 소유 매치가 됐다는 증거(인용된 "\354…" 문자열이면 침묵 통과해버림)
     assert.match(r.out, /한글모듈\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-019/FR-001
+test("semantic drift: 소유 파일 리네임 + FR라인 무변경(hard) → ✗ exit 1 / FR라인 변경 → PASS / Spec-Impact → PASS", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 리네임 + 스펙엔 Change Log 행만 추가(spec-first는 충족, FR 라인은 미변경 → drift 승격 위반)
+    g("mv", "src/lib/pdf/parse.ts", "src/lib/pdf/parser.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename parse\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /semantic drift/);
+    assert.match(r.out, /SPEC-001/);
+
+    // FR 선언 라인을 실제로 바꾸면 충족 → PASS
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n").replace("SHALL x.", "SHALL y."));
+    g("add", "-A");
+    const r2 = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r2.code, 0, r2.out);
+
+    // FR 라인은 그대로 두되 Spec-Impact 트레일러로 충족 → PASS
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact: 파일명만 정리, 동작 불변\n");
+    const r3 = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r3.code, 0, r3.out);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

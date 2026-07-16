@@ -124,7 +124,7 @@ function repo() {
   mkdirSync(join(root, "src"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "drift-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");

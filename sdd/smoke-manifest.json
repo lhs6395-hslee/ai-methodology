@@ -18,5 +18,9 @@
   "SPEC-004/FR-008": {
     "method": "deferred",
     "reason": "sdd-run 스테이지 러너의 exit code 전파 e2e 테스트 미작성 — 백로그"
+  },
+  "SPEC-019/FR-002": {
+    "method": "deferred",
+    "reason": "소유 이동(파일이 다른 스펙 Files로 이동/Ownership 키 변경) 트리거는 두-리비전 ownership diff 필요 — 다음 증분(리네임 트리거 FR-001 우선 착지)"
   }
 }
