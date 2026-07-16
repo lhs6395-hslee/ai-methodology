@@ -95,7 +95,8 @@
     "sdd/derivation.json",
     "tooling/*.md",
     "tooling/*.yml",
-    "tooling/vitest.config.ts"
+    "tooling/vitest.config.ts",
+    "tooling/gen-changelog.mjs"
   ],
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"

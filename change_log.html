@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDD 키트 변경 로그</title>
+<style>
+  :root {
+    --bg:#fbfbfa; --fg:#1b1b19; --muted:#6b6b66; --line:#e7e6e2; --card:#fff;
+    --feat:#1a7f4b; --fix:#b3541e; --docs:#3a63c0; --refactor:#7a48b8; --test:#0f8a8a; --chore:#6b6b66; --misc:#888; --id:#8a2be2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --fg:#e9e9e6; --muted:#9a9a94; --line:#2a2a30; --card:#1d1d22;
+      --feat:#4bd08a; --fix:#e0925a; --docs:#7fa0ec; --refactor:#b98fe0; --test:#5fd0d0; --chore:#9a9a94; --misc:#aaa; --id:#c79bff; }
+  }
+  :root[data-theme="dark"] { --bg:#16161a; --fg:#e9e9e6; --muted:#9a9a94; --line:#2a2a30; --card:#1d1d22;
+    --feat:#4bd08a; --fix:#e0925a; --docs:#7fa0ec; --refactor:#b98fe0; --test:#5fd0d0; --chore:#9a9a94; --misc:#aaa; --id:#c79bff; }
+  :root[data-theme="light"] { --bg:#fbfbfa; --fg:#1b1b19; --muted:#6b6b66; --line:#e7e6e2; --card:#fff;
+    --feat:#1a7f4b; --fix:#b3541e; --docs:#3a63c0; --refactor:#7a48b8; --test:#0f8a8a; --chore:#6b6b66; --misc:#888; --id:#8a2be2; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:40px 20px 80px; }
+  header h1 { font-size:1.7rem; margin:0 0 6px; }
+  header .sub { color:var(--muted); font-size:.92rem; margin:0 0 18px; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 28px; padding-bottom:20px; border-bottom:1px solid var(--line); }
+  .badge { display:inline-block; min-width:64px; text-align:center; padding:1px 8px; border-radius:999px; font-size:.72rem; font-weight:700;
+    letter-spacing:.02em; color:#fff; text-transform:uppercase; }
+  .badge.feat{background:var(--feat)} .badge.fix{background:var(--fix)} .badge.docs{background:var(--docs)}
+  .badge.refactor{background:var(--refactor)} .badge.test{background:var(--test)} .badge.chore{background:var(--chore)} .badge.misc{background:var(--misc)}
+  .day { margin:0 0 26px; }
+  .day h2 { position:sticky; top:0; background:var(--bg); font-size:1.05rem; margin:0 0 10px; padding:6px 0;
+    color:var(--fg); border-bottom:1px solid var(--line); }
+  .day ul { list-style:none; margin:0; padding:0; }
+  .day li { display:flex; align-items:baseline; gap:10px; padding:7px 10px; border-radius:8px; }
+  .day li:hover { background:var(--card); }
+  .day .h { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; color:var(--muted); flex:0 0 auto; }
+  .day .s { flex:1 1 auto; }
+  .id { color:var(--id); font-weight:600; }
+  code.h { background:transparent; }
+  footer { margin-top:40px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SDD 키트 변경 로그</h1>
+    <p class="sub">portable SDD 방법론 킷 · 최종 갱신 <b>2026-07-16</b> · 총 137개 변경 · git 이력에서 생성(<code>tooling/gen-changelog.mjs</code>)</p>
+    <div class="legend">
+      <span class="badge feat">feat</span><span class="badge fix">fix</span><span class="badge docs">docs</span>
+      <span class="badge refactor">refactor</span><span class="badge test">test</span><span class="badge chore">chore</span>
+    </div>
+  </header>
+  <section class="day">
+    <h2>2026-07-16</h2>
+    <ul>
+      <li><span class="badge feat">feat</span><code class="h">26089e5</code><span class="s">feat(cross-spec): <b class="id">SPEC-020</b> — Change-Driver 트레일러로 공유 표면 변경 동인 추적</span></li>
+      <li><span class="badge feat">feat</span><code class="h">ef7cc12</code><span class="s">feat(drift): <b class="id">SPEC-019</b> semantic-drift — 리네임→spec-sync 요구 승격</span></li>
+      <li><span class="badge docs">docs</span><code class="h">dd1fb52</code><span class="s">docs(retire): Python 포트 결정(SC-001 정직화) + deferred/Planned/Removed 규범 명문화</span></li>
+      <li><span class="badge docs">docs</span><code class="h">ab433a0</code><span class="s">docs(scrub): 소비 프로젝트 고유명사 익명화 — 포터블 킷 정합</span></li>
+      <li><span class="badge refactor">refactor</span><code class="h">f56717c</code><span class="s">refactor(harness): 강제 메시지를 에이전트 중립-우선으로</span></li>
+      <li><span class="badge feat">feat</span><code class="h">3f3f595</code><span class="s">feat(retire): <b class="id">SPEC-018</b> <b class="id">FR-006</b> — numbering retirement-gap 인지(retiredIds knob)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">ab5eb1a</code><span class="s">feat(retire): <b class="id">SPEC-018</b> 증분 2a — Status: Planned 회계(유령 명세 노이즈 제거)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">e23c0eb</code><span class="s">feat(retire): <b class="id">SPEC-018</b> 명세 폐기 워크플로 증분 1 — retire-lib 코어 + sdd-retire 커맨드</span></li>
+      <li><span class="badge docs">docs</span><code class="h">323c445</code><span class="s">docs(design): 명세 폐기·재sync + semantic drift 설계 문서 (도그푸딩 A/B/C/D)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">7bfdf20</code><span class="s">fix(gates): cohesion FR 인용 오집계 + sdd-sync 한글경로 — 도그푸딩 quick-win 2종</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-15</h2>
+    <ul>
+      <li><span class="badge fix">fix</span><code class="h">4ed10b2</code><span class="s">fix(cicd): Python 에러 문자열도 4종 — 4판 바이트 패리티 완결</span></li>
+      <li><span class="badge docs">docs</span><code class="h">db68f03</code><span class="s">docs(방법론.html): CICD 표준 접두어 반영 + 누락 메커니즘 시각화 보강</span></li>
+      <li><span class="badge fix">fix</span><code class="h">3eeb0a7</code><span class="s">fix(cicd): CICD 표준 접두어 4판 패리티 봉합 — 셸/Go 기본값·표준집합·에러·훅 표시 3→4종</span></li>
+      <li><span class="badge docs">docs</span><code class="h">18e3b7f</code><span class="s">docs(coverage): 정본 문서를 <b class="id">SPEC-014</b>~017·env-tier·신규 게이트·config knob까지 따라잡음</span></li>
+      <li><span class="badge docs">docs</span><code class="h">3081740</code><span class="s">docs(dedup): Entity 종속관계 표기(<b class="id">SPEC-017</b>)를 소유권 정본에 반영 — 소유 키=1, 나머지는 관계로</span></li>
+      <li><span class="badge docs">docs</span><code class="h">079107e</code><span class="s">docs(env-tier): CSP 중립화 + 능동적 로컬 가능성 판정(사용자 확인 + probe + 실패 시 명시)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b76cf12</code><span class="s">docs(realign): 방법론 문서 안전 재정렬 — MODULE_MAP 등재·stale 수치·env-tier 통합·readopt 포인터</span></li>
+      <li><span class="badge docs">docs</span><code class="h">e5bb107</code><span class="s">docs(env-tier): 검증을 환경으로 계층화 — 로컬은 인프라(AWS) 테스트를 강제하지 않는다</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-13</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">2c2e591</code><span class="s">docs(sdd): 설계 문서(pre-spec) 저장 위치 규약 — STORAGE §2.7 신설 + docs/design/ 도입</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-09</h2>
+    <ul>
+      <li><span class="badge feat">feat</span><code class="h">16f0741</code><span class="s">feat(sdd): Entity 관계(<b class="id">SPEC-017</b>) — 쪼갠 aggregate 사이의 참조를 구조화</span></li>
+      <li><span class="badge feat">feat</span><code class="h">477a960</code><span class="s">feat(sdd): draftBlockPolicy knob — MR 웹 UI 병합의 로컬 훅 우회 사각지대 봉합 (<b class="id">SPEC-008</b> <b class="id">FR-007</b>)</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-07</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">f9e6ff8</code><span class="s">docs(방법론.html): #determinism에 실전 예시 — 세 키 역할·라우팅·중복 방지 3단</span></li>
+      <li><span class="badge docs">docs</span><code class="h">24590ab</code><span class="s">docs(방법론.html): #run에 새 기능 전체 루프(위→아래) 하네스 실전 예시 추가</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-06</h2>
+    <ul>
+      <li><span class="badge feat">feat</span><code class="h">3dae520</code><span class="s">feat(update-prompt): update.md가 새 config knob·규범을 자동 인스턴스화 — 한 줄로 고도화 전파</span></li>
+      <li><span class="badge feat">feat</span><code class="h">d249bd1</code><span class="s">feat(closeout): 완료 루프의 꼬리 — 원점 트래커 close-out 규범 (trackerCloseout knob)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">16a21c0</code><span class="s">docs(applying): 제품 스펙→TEST 도메인 재분류 마이그레이션 가이드 (<b class="id">SPEC-015</b> deliverable)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">31e4f05</code><span class="s">feat(test-domain): TEST 삭제가능 도메인 — 인프라 소유 허용 + testInfraGlobs 격리 (<b class="id">SPEC-015</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">7016a69</code><span class="s">feat(lifecycle): Lifecycle removable|permanent 필드 (<b class="id">SPEC-008</b> <b class="id">FR-006</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">3e895d6</code><span class="s">feat(cicd-prefix): CICD 표준 접두어 신설 — CI/CD·릴리스 자동화 도메인 (Node·Py 패리티)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">01e2dd8</code><span class="s">fix(object-storage): 마커 스캔에서 감사 트레일 제외 — 게이트 자기 서술 오탐 수정 (<b class="id">SPEC-016</b>)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">9bd55ff</code><span class="s">feat(object-storage): 오브젝트 스토리지 프로비저닝 결정 게이트 (<b class="id">SPEC-016</b>, Node·Python 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">5085d1f</code><span class="s">feat(numbering): 접두어별 spec-ID 번호 무결성 게이트 (<b class="id">SPEC-014</b>, Node·Python 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">202b1ac</code><span class="s">feat(harness): sdd-sync --json 결정적 리포트로 ask 층 입력 잠금 (<b class="id">SPEC-004</b> <b class="id">FR-009</b>)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">9f42cfc</code><span class="s">docs(sync): 바이브 코딩→명세 기반 전환 서사를 글 문서에 동기 (방법론.html 정합)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">40ebeda</code><span class="s">docs(방법론.html): 바이브 코딩→명세 기반 전환 서사 추가 (도입 #compare·요약 #summary)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">d6cc6c7</code><span class="s">fix(derivation-class-globs): 분류 기본값 보정 — 인프라/CI 동반·보조 파일이 other로 새지 않게 (Node·Py 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">27e2901</code><span class="s">feat(norm-gate-sync): 고도화 4차 — 접두어↔클래스 정합(<b class="id">SPEC-012</b>)·스펙 문법 규범 강제(<b class="id">SPEC-013</b>)·리뷰 경계 선언 (Node·Py 패리티)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">4ed7d61</code><span class="s">docs(drift-fix): 문서↔게이트 동기 감사 6건 정정 — 게이트 광고 전종화·저장 계약 매니페스트 등재·CI 샘플 정렬</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-05</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">51daa48</code><span class="s">docs(sync): 고도화 3차(재도출 회계·증거 자동 수집·retag·선제 캡처)를 전 문서·방법론.html에 동기</span></li>
+      <li><span class="badge feat">feat</span><code class="h">76a404a</code><span class="s">feat(full-automation): 고도화 3차 — 재도출 소스 회계(<b class="id">SPEC-009</b>)·smoke 증거 자동 수집(<b class="id">SPEC-010</b>)·추적 태그 마이그레이션(<b class="id">SPEC-011</b>), Node·Py 패리티</span></li>
+      <li><span class="badge docs">docs</span><code class="h">cbbe273</code><span class="s">docs(sync): 고도화 2차(회계·수명주기·미소유 정책·entity 등록제)를 전 문서·방법론.html에 동기</span></li>
+      <li><span class="badge feat">feat</span><code class="h">e7394ab</code><span class="s">feat(entity-registry): P3a — entityRegistry로 Ownership entity 등록제 문법화 (<b class="id">SPEC-002</b> <b class="id">FR-009</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">9c1ac31</code><span class="s">fix(spec-sync): git 경로 인용(core.quotepath) 끔 — 비ASCII 파일명 glob 매칭·귀속 오판 수정 (Node·Py)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">483f550</code><span class="s">feat(unowned): P2 — specSyncUnownedPolicy(silent|warn|error) 문법화 (<b class="id">SPEC-003</b> <b class="id">FR-010</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">171e844</code><span class="s">feat(lifecycle): P1+P3b — Status enum 문법화 + Draft 차단 + Reviewed 이상 리뷰 기록 검사 (<b class="id">SPEC-008</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">da071a3</code><span class="s">feat(accounting): B-3 — strictSpecs·requireAccounting·smokeManifest 문법화 (<b class="id">SPEC-007</b>, Node·Py 패리티)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">13902d8</code><span class="s">docs(sync): 런타임 커버 매트릭스·requirementIdPrefixes를 전 문서에 동기 — 과장 제거</span></li>
+      <li><span class="badge misc">misc</span><code class="h">2d97a30</code><span class="s">fix+feat(gates): 런타임·경로 간 문법 통일 — Python 전 게이트 패리티 + requirementIdPrefixes 일반화 + preset 템플릿 동일화</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-04</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">9d03e26</code><span class="s">docs(entry): ref 승격 feat/lifecycle-commands→main (머지 후 정본화)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">0f551cf</code><span class="s">fix(entry): 부트스트랩 가드를 -x→-f로 (sdd-init.sh는 mode 0644, sh로 실행)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">20eb65f</code><span class="s">docs(entry): 진입점을 로컬경로→GitHub raw URL로 교정 (clean-machine clone-free)</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-03</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">998af02</code><span class="s">docs(entry): 설치형 슬래시 명령 안내 + 경량 부트스트랩(sparse) — README·APPLYING·PROMPTS</span></li>
+      <li><span class="badge feat">feat</span><code class="h">1d5956d</code><span class="s">feat(lifecycle): 채택 수명주기 3 명령(/sdd-start·/sdd-readopt·/sdd-update) + <b class="id">SPEC-005</b></span></li>
+      <li><span class="badge docs">docs</span><code class="h">f8861f1</code><span class="s">docs(entry): 한 줄 실행 프롬프트 파일화 — prompts/{adopt,readopt,update}.md (SSOT)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">4d188c6</code><span class="s">docs(entry): README 쓰는 법에 재채택(A0-R) 프롬프트 추가 — 시작·재채택·업데이트 3종 완비</span></li>
+      <li><span class="badge docs">docs</span><code class="h">3bc02be</code><span class="s">docs(entry): 방법론 쓰는 법 2계층으로 정정 — 작성=다운로드 불필요, 강제=sdd-init 1회(~25파일)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">480f32a</code><span class="s">docs(visual): ownership 키 도출 시각 설명서 추가</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-02</h2>
+    <ul>
+      <li><span class="badge fix">fix</span><code class="h">39e80d3</code><span class="s">fix(gates): Files glob `[` 경고를 토큰-시작 위치로 한정 — 파일 라우팅 [id] 지원</span></li>
+      <li><span class="badge feat">feat</span><code class="h">8817d7c</code><span class="s">feat(gates): Surface 형식·aggregate 임계 config화 — 프레임워크/도메인 중립 확장</span></li>
+      <li><span class="badge fix">fix</span><code class="h">82246fd</code><span class="s">fix(gates): FR ID 레터 서픽스(<b class="id">FR-003a</b>) 전 사이트 지원 — 도그푸딩 회귀 역류</span></li>
+      <li><span class="badge docs">docs</span><code class="h">dbc44e0</code><span class="s">docs(entry): URL 진입 프롬프트 A0 — 레포 주소만으로 sdd-init까지 강제 도달</span></li>
+      <li><span class="badge docs">docs</span><code class="h">dc124e7</code><span class="s">docs(self): 자기 정렬 완료 기록 — ROADMAP ✅ 이동 + README/APPLYING self-hosting</span></li>
+      <li><span class="badge feat">feat</span><code class="h">09a48af</code><span class="s">feat(self): 키트 자기 훅 배선(self-hooks-install.sh, tooling 직접 호출)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">78dd40e</code><span class="s">feat(self): 전 테스트 @covers 태깅 — FR↔test 사슬 결선(픽스처 문자열 중화 포함)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">e365d8e</code><span class="s">fix(self): <b class="id">SPEC-004</b> <b class="id">FR-002</b> 정직 정정(pre-push 자동배선 아님) + 미커버 4파일 spec 편입</span></li>
+      <li><span class="badge feat">feat</span><code class="h">778a48e</code><span class="s">feat(self): 키트 자기 spec 4종 + config + MODULE_MAP (자기 게이트 green)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">7c0fad0</code><span class="s">docs(plan): 키트 자기 정렬 계획 (4태스크 — config·4spec·@covers·자기훅·실증)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">62bde95</code><span class="s">fix(gate): 미지원 glob 경고 spec당 1회 dedupe (idx/head 중복 스캔 출력)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">5d98322</code><span class="s">docs(fix): ROADMAP plan 파일명 오기 정정 (spec-first-plan→spec-first-enforcement, T9 리뷰 발견)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">9cec52e</code><span class="s">docs: spec-first 사용법·데모 실측(APPLYING·방법론.html·README·ROADMAP)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">ca89491</code><span class="s">docs: Files 필드·필수화·Files 완전성·spec-first 원칙(템플릿·constitution·STRUCTURE·DEDUP·METHODOLOGY)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">2b34acb</code><span class="s">docs(fix): HARNESS R3 행에 check-spec-consistency 반영 (sdd-sync.mjs와 정합 — T7 리뷰 발견 drift)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">7570926</code><span class="s">feat(harness): sdd-sync R2에 check-spec-sync(range) 배선 + HARNESS.md</span></li>
+      <li><span class="badge feat">feat</span><code class="h">9d6e614</code><span class="s">feat(init): spec-sync 게이트·commit-msg 훅·speckit-fix 스킬·package.json 배선 + init-then-execute</span></li>
+      <li><span class="badge feat">feat</span><code class="h">f0858e3</code><span class="s">feat(skill): /speckit.fix — 버그픽스 SDD 경로(스펙 착지 강제)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">db0f783</code><span class="s">fix(hook): commit-msg 실행비트 100755 (pre-commit과 일관, 설치 시 즉시 동작)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">0348171</code><span class="s">feat(hook): commit-msg — spec-sync staged 강제(merge skip)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">38b9d78</code><span class="s">feat(gate): check-spec-sync — staged(hard)/range(advisory), changeset=브랜치, HEAD∪index</span></li>
+      <li><span class="badge fix">fix</span><code class="h">00f75be</code><span class="s">fix(gate): 불법 중간 ** 경고(값부만 스캔·볼드 오탐 방지) + 0-세그먼트 테스트 + 주석</span></li>
+      <li><span class="badge feat">feat</span><code class="h">4decde6</code><span class="s">feat(gate): spec-sync 순수 코어 — glob 컴파일·레벨무관 섹션 귀속(§4.1·§5.4)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">74a747b</code><span class="s">feat(config): specSyncExemptGlobs (spec-sync 예외 glob)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">55c9e01</code><span class="s">docs(plan): spec-first 강제 구현 계획 (9 태스크 TDD)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">1413990</code><span class="s">docs(spec): spec-first 설계 R3 반영 — 1C/3I/2M 전건 해소</span></li>
+      <li><span class="badge docs">docs</span><code class="h">6cd0f68</code><span class="s">docs(roadmap): 구현완료 2건 정정 + spec-first 진행중 + 키트 자기정렬 확정</span></li>
+      <li><span class="badge docs">docs</span><code class="h">754ce91</code><span class="s">docs(spec): spec-first 설계 R2 반영 — changeset=브랜치(top-down 흐름 보존) 등 1C/3I/2m</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b68e60e</code><span class="s">docs(spec): spec-first 설계 R1 반영 — 4C/7I/5M 전건 해소</span></li>
+      <li><span class="badge docs">docs</span><code class="h">8685672</code><span class="s">docs(spec): spec-first 강제 설계 (Files 소유매핑·check-spec-sync·/speckit.fix)</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-07-01</h2>
+    <ul>
+      <li><span class="badge fix">fix</span><code class="h">acf5b6f</code><span class="s">fix(init): sdd-init가 ownership-keys·consistency 복사 + consistency를 sdd-sync R3 배선 + init-then-execute 통합테스트 (final-review Critical)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">0ea733b</code><span class="s">docs(fix): 사용법 정직성 정정 — pre-commit incremental·R3 완전성·PreToolUse 매편집·pre-push 수동·no-verify</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b69b270</code><span class="s">docs: 궤도 운영법 사용법 — APPLYING·방법론.html(결정성+PREFIX+경계+워크스루)·README</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b7975d3</code><span class="s">docs: '채택=상시 강제 궤도' 원칙 명시(METHODOLOGY·constitution)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">ca66484</code><span class="s">fix(init): jq-없음 clobber 방지(데이터손실) + hook 배선 idempotency + 테스트</span></li>
+      <li><span class="badge feat">feat</span><code class="h">66e25c5</code><span class="s">feat(init): 채택 시 hook 세트·settings.json·pre-commit 자동배선</span></li>
+      <li><span class="badge fix">fix</span><code class="h">0e626dd</code><span class="s">fix(hook): pre-commit docs-only 통과 테스트 + 게이트 미설치/비-git 가드</span></li>
+      <li><span class="badge feat">feat</span><code class="h">73c0def</code><span class="s">feat(hook): git pre-commit — ownership·PREFIX hard 차단</span></li>
+      <li><span class="badge fix">fix</span><code class="h">33df7ec</code><span class="s">fix(hook): file_path 정규식 앵커 + 중첩 lib/app 경로 + 테스트 4항목 분리</span></li>
+      <li><span class="badge feat">feat</span><code class="h">6b063b8</code><span class="s">feat(hook): PreToolUse 편집 체크리스트(src만, 비차단)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">887ad36</code><span class="s">feat(hook): SessionStart 방법론 컨텍스트 주입 스크립트</span></li>
+      <li><span class="badge docs">docs</span><code class="h">7c8188e</code><span class="s">docs(fix): Dependencies 형식검증 과장 정정(정직) + entity 뉘앙스 + 게이트명</span></li>
+      <li><span class="badge docs">docs</span><code class="h">e1b64d9</code><span class="s">docs: 소유/참조 분리·키 생성 절차·PREFIX 표준·1spec=1aggregate 반영</span></li>
+      <li><span class="badge fix">fix</span><code class="h">44e8796</code><span class="s">fix(gate): PREFIX 폴백 → DEFAULTS(INFRA/TEST 하위호환) + 테스트 assert 정밀화</span></li>
+      <li><span class="badge feat">feat</span><code class="h">832af7e</code><span class="s">feat(gate): PREFIX 화이트리스트·조용한누락 제거·사유 관문</span></li>
+      <li><span class="badge feat">feat</span><code class="h">2f341b3</code><span class="s">feat(gate): cohesion에 aggregate 다수(Entities&gt;1) 분할 신호</span></li>
+      <li><span class="badge fix">fix</span><code class="h">328588b</code><span class="s">fix(gate): pin Ownership-exclusion invariant + 제외 의도 주석</span></li>
+      <li><span class="badge feat">feat</span><code class="h">5275e62</code><span class="s">feat(gate): check-spec-consistency — 근거 없는 키 advisory(FR↔Ownership)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">c24da28</code><span class="s">fix(gate): Dependencies 실제 파싱 + test 판별력(naive 구분·Surface 정규화 충돌)</span></li>
+      <li><span class="badge feat">feat</span><code class="h">ce2750e</code><span class="s">feat(gate): check-ownership 강화 — Dependencies 분리·정규화·형식검증</span></li>
+      <li><span class="badge fix">fix</span><code class="h">988af17</code><span class="s">fix(gate): surfacePathParam fallback + 하이픈 param + {id}/&lt;id&gt; 변형 테스트</span></li>
+      <li><span class="badge feat">feat</span><code class="h">e2e9ecd</code><span class="s">feat(gate): 공통 키 lib — 파싱·카테고리별 정규화·형식검증</span></li>
+      <li><span class="badge fix">fix</span><code class="h">37bc305</code><span class="s">fix(config): __idAlt fallback→DEFAULTS + capabilityVerbs merge test</span></li>
+      <li><span class="badge feat">feat</span><code class="h">93f8c43</code><span class="s">feat(config): PREFIX 표준·prefixRationale·capabilityVerbs·surfacePathParam</span></li>
+      <li><span class="badge docs">docs</span><code class="h">cc3dc22</code><span class="s">docs: README·ROADMAP에 "채택=상시 강제 궤도" 설계·계획 반영 (구현 대기)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">48eb650</code><span class="s">docs(plan): 방법론 강제 hook 세트 구현 계획 (SessionStart·PreToolUse·pre-commit·배선, TDD 6태스크)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">e3a348b</code><span class="s">docs(plan): Ownership 키 결정성 구현 계획 (게이트·config·문서, TDD 7태스크)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">2ab6e60</code><span class="s">docs(spec): hook 설계에 사용법(how-to) 산출물 추가</span></li>
+      <li><span class="badge docs">docs</span><code class="h">1849c3d</code><span class="s">docs(spec): 방법론 강제 hook 세트 설계 (채택 시 자동배선·상시 강제 궤도)</span></li>
+    </ul>
+  </section>
+  <section class="day">
+    <h2>2026-06-30</h2>
+    <ul>
+      <li><span class="badge docs">docs</span><code class="h">51b4d45</code><span class="s">docs(spec): spec 경계 규칙 추가 — 1 spec = 1 aggregate(핵심 Entity)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">637bedc</code><span class="s">fix(site): index.html → 방법론.html (웹 배포용 진입점 아닌 로컬 설명 문서)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">9a36ca6</code><span class="s">docs(spec): Ownership 키 도출 결정성 설계 (소유/참조·정규화 절대규칙·PREFIX 거버넌스)</span></li>
+      <li><span class="badge fix">fix</span><code class="h">94d84f2</code><span class="s">fix(site): restore index.html (unicode normalisation from read/write cycle)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">a810974</code><span class="s">docs(site): add standalone index.html explainer at repo root + README pointer</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b08cfb6</code><span class="s">docs: explain why Ownership is mandatory (missing one = hole in dedup guarantee)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b9a86a1</code><span class="s">docs: distinguish Spec Kit base skeleton vs our additions (Ownership, EARS)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">809e270</code><span class="s">docs(fix): reinforcement-gate count 3→5 (cohesion·completeness added)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">3e0cc3f</code><span class="s">docs: explain why 3 pillars form one skeleton + FR↔gates / SC·acceptance↔SpecKit division</span></li>
+      <li><span class="badge feat">feat</span><code class="h">4347d92</code><span class="s">feat(gate): add spec-completeness gate (FR present → SC + acceptance) + wire</span></li>
+      <li><span class="badge docs">docs</span><code class="h">be44664</code><span class="s">docs: clarify EARS applies to FR only (not whole spec)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">b9fa069</code><span class="s">docs(roadmap): consolidate done/deferred items into ROADMAP.md</span></li>
+      <li><span class="badge feat">feat</span><code class="h">14f6303</code><span class="s">feat(init): scaffold harness + reinforcement gates; doc harness in APPLYING/README</span></li>
+      <li><span class="badge feat">feat</span><code class="h">0de8820</code><span class="s">feat(harness): interactive spec&lt;-&gt;code sync (HARNESS.md + sdd-sync.mjs + skill + pre-push)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">5142e10</code><span class="s">docs(plan): add harness MVP implementation plan (Gap 3)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">ff5b8cc</code><span class="s">docs(harness): add Gap 3 harness design (flow-contract rule table + /sdd-sync MVP)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">49dce2b</code><span class="s">docs: rebaseline methodology to 1-repo-1-module + spec-cohesion rule</span></li>
+      <li><span class="badge feat">feat</span><code class="h">649e12a</code><span class="s">feat(gate): add spec-cohesion gate (under-fragmentation, dedup mirror)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">eca1906</code><span class="s">docs(harness): capture Gap 3 harness vision + requirements (incl. R4 continuous spec-code sync)</span></li>
+      <li><span class="badge docs">docs</span><code class="h">687b384</code><span class="s">docs(plan): fold Gap 2 spec-cohesion into design + Phase 1 plan</span></li>
+      <li><span class="badge chore">chore</span><code class="h">84f4b80</code><span class="s">chore: initial publish of SDD portable kit</span></li>
+    </ul>
+  </section>
+  <footer>
+    이 문서는 <code>node tooling/gen-changelog.mjs</code>로 재생성한다(수기 편집 금지). 각 항목 = 한 커밋(merge 제외).
+    방법론 정본은 <code>방법론.html</code>·<code>METHODOLOGY.md</code>, 진입은 <code>prompts/adopt.md</code>.
+  </footer>
+</div>
+</body>
+</html>

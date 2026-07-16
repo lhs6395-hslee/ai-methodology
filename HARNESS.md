@@ -17,6 +17,7 @@
 - **detect 집계:** `node scripts/sdd-sync.mjs [--strict]` → 규칙별 sync 리포트.
 - **인터랙티브:** 스킬 `/sdd-sync` — 리포트 → 규칙별 사람 의사 확인 → act.
 - **상시(R4):** git pre-push 훅이 `sdd-sync.mjs`를 advisory 실행 → drift면 `/sdd-sync` 안내(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
+- **비-Claude 에이전트(Kiro·Codex 등):** 슬래시 명령·SessionStart 주입은 Claude Code 편의 계층이다 — 강제(게이트+git 훅)와 절차(`prompts/`)는 실행기 무관이므로 슬래시를 못 써도 **같은 절차를 수동으로** 밟고 되묻지 않는다. 방법론 상시 주입은 그 에이전트의 상시-로드 문서(Kiro `.kiro/steering/sdd.md`·기타 `AGENTS.md`)에 이 규칙표/`sdd-session-context.sh` 출력을 옮겨 대체한다. 수동 첫-스펙 절차는 `prompts/adopt.md` §"에이전트 무관 실행".
 
 ## 불변
 - 어느 방향도 **자동 덮어쓰기 금지** — 사람 의사 확인 게이트 필수.

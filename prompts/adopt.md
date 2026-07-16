@@ -29,6 +29,18 @@
 
 여기까지는 **설치·배선까지만**. 스펙 대량 생성은 사용자 승인 후.
 
+## 에이전트 무관 실행 (Claude Code 외 — Kiro·Codex·기타)
+> **슬래시 명령(`/sdd-start`·`/speckit.*`·`/sdd-sync`)과 SessionStart 방법론 주입은 Claude Code 편의 계층일 뿐이다.** 강제(게이트 + git 훅)와 절차(이 `prompts/`)는 **실행기 무관** — 어느 에이전트/무-에이전트에서도 동일하게 돈다(git 훅이 누가 커밋하든 발화). 슬래시를 못 쓰는 환경(Kiro 등)에서 **"슬래시 명령을 못 쓰는데 수동으로 할까요?"라고 되묻지 말고, 같은 절차를 그대로 수동으로 밟아 진행한다** — 그게 정공법이다.
+> - **방법론 컨텍스트 상시 주입**이 필요하면(Claude의 SessionStart 대체), 그 에이전트의 상시-로드 문서에 방법론 요약을 넣는다 — Kiro는 `.kiro/steering/sdd.md`, 그 외는 `AGENTS.md`(또는 해당 에이전트의 규칙 파일). 내용은 `tooling/harness/sdd-session-context.sh`의 출력(궤도·진입 규칙) 또는 `HARNESS.md` 규칙표를 옮긴다.
+> - **슬래시 ↔ 수동 대응**: `/sdd-start`·`/sdd-readopt`·`/sdd-update`는 각각 `prompts/{adopt,readopt,update}.md` 절차 그대로(SSOT), `/speckit.fix`는 "소유 스펙을 같은 changeset에 갱신"(§6.2)을 손으로, `/sdd-sync`는 `node scripts/sdd-sync.mjs`를 직접 실행. 슬래시가 하던 일은 전부 CLI/수동 절차로 존재한다.
+
+### 첫 스펙 작성 (수동 — 슬래시 없이)
+`/speckit.specify`가 하던 것을 손으로 한다:
+1. `templates/module-spec.md`(로컬 키트) 또는 raw base의 `templates/module-spec.md`를 복사해 `sdd/specs/SPEC-001-<slug>.md`로 만든다.
+2. **채운다:** `Module`(1 레포=1 모듈)·`Status`·User Story·**FR(EARS 형식, SHALL 필수)**·`## Ownership`(Modules/Symbols/Artifacts/Files — 유일 키)·`## Success Criteria`·`## Review Log`·`## Dedup-Review`·`## Change Log`. FR ID는 본문에 리터럴로 적지 않는다(팬텀 집계 방지, `**FR-001**` 선언 라인만).
+3. **셀프리뷰**(EARS 모호어·단일동작·측정형 — `SPEC_REVIEW.md`) 후 게이트 green 확인(`check-fr-coverage`·`check-ownership`·`check-spec-completeness`).
+4. **사용자 승인** 후 확정. 코드 착지는 그 다음(작성=LLM, 승인=사람).
+
 ## 고정 규칙 (발명 금지)
 - spec은 `sdd/specs/`에만 둔다.
 - PREFIX는 **SPEC/INFRA/TEST**. 새 PREFIX가 필요하면 사유와 함께 사용자 승인 후 `sdd.config.json`의 `specIdPrefixes`에 등록.
