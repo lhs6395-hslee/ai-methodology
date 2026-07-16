@@ -2,7 +2,7 @@
 
 ## 문제
 
-`STRUCTURE.md` §3.1 원칙은 "1 spec = 1 aggregate(핵심 Entity)"이지만, 실사용에서는 spec이 여러 Entity를 안고 있는 경우가 흔하다(FinOps의 SPEC-005가 aggregate root 7개로 cohesion 게이트 상한을 넘긴 실측 사례). 그런 과대 spec을 나중에 aggregate별로 쪼갤 때, 쪼개진 Entity들 사이의 관계(예: `InvestigationRun`이 `InvestigationFinding`을 여러 개 가짐)를 표현할 방법이 필요하다.
+`STRUCTURE.md` §3.1 원칙은 "1 spec = 1 aggregate(핵심 Entity)"이지만, 실사용에서는 spec이 여러 Entity를 안고 있는 경우가 흔하다(소비 프로젝트 B의 SPEC-005가 aggregate root 7개로 cohesion 게이트 상한을 넘긴 실측 사례). 그런 과대 spec을 나중에 aggregate별로 쪼갤 때, 쪼개진 Entity들 사이의 관계(예: `InvestigationRun`이 `InvestigationFinding`을 여러 개 가짐)를 표현할 방법이 필요하다.
 
 지금 `## Dependencies` 절의 `Entities:` 라인은 "다른 spec이 소유한 Entity를 참조한다"는 걸 적을 수 있지만 완전한 자유 텍스트다 — 게이트가 그 값의 존재·소유 spec 일치·순환 여부를 전혀 검사하지 않는다(`tooling/check-ownership.mjs`가 `_deps`라는 이름으로 파싱은 하되 명시적으로 버림).
 

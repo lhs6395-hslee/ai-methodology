@@ -66,7 +66,7 @@ test("config: __coversRe 레터 서픽스(FR-003a) 온전 캡처, 2자 서픽스
   const tag = (fr) => "// @cov" + `ers SPEC-004/${fr}`; // 자기 게이트 스캔 중화
   const one = [...tag("FR-003a").matchAll(cfg.__coversRe)];
   assert.equal(one.length, 1);
-  assert.equal(one[0][2], "FR-003a"); // FR-003 절단 오판 금지(도그푸딩 PM f36494a 회귀)
+  assert.equal(one[0][2], "FR-003a"); // FR-003 절단 오판 금지(도그푸딩 소비 프로젝트 A 회귀)
   const two = [...tag("FR-003ab").matchAll(cfg.__coversRe)];
   assert.equal(two.length, 0);        // 부분 캡처(FR-003a)도 금지 — 경계 강제
 });

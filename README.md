@@ -52,7 +52,7 @@
 | 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
 |---|---|
 | **시작** — SDD 처음인 새 프로젝트 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/adopt.md 읽고 그대로 수행해줘` |
-| **재채택** — 이미 `sdd/` 있음(PM/FinOps 등) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` |
+| **재채택** — 이미 `sdd/` 있음(소비 프로젝트 A/B 등) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` |
 | **업데이트** — 내가 방법론을 고도화한 뒤 | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘` |
 
 > **ref:** 위 URL의 정본 ref는 `main`이다. 각 파일은 방법론 읽기·`sdd-init`·고정 규칙까지 자체 포함하며, 자신을 받은 ref를 이어 사용하므로 특정 브랜치의 raw로 fetch하면 그 브랜치 기준으로 동일하게 동작한다(자기참조).

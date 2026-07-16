@@ -1,7 +1,7 @@
 # Feature Specification: Spec-ID Numbering Integrity
 
 **Module**: `sdd-tooling`  **Spec**: `SPEC-014`  **Created**: 2026-07-06  **Status**: Active
-**Input**: 접두어(SPEC/INFRA/TEST)는 화이트리스트로 강제되지만 **번호 매김 규칙은 미규정·미강제**였다 — 소비 프로젝트 실측에서 PM은 접두어별 순차(INFRA-001..004·TEST-001), FinOps는 재도출을 SPEC-로 만든 뒤 retag해 전역 잔번(INFRA-011·INFRA-013, SPEC 쪽엔 011·013 gap)을 남겨 **두 프로젝트가 서로 다른 번호 체계**로 갈라졌다. 번호는 순전히 spec 파일 id 집합(접두어+영패딩 번호)만으로 판정 가능한 결정 신호다 — 접두어별로 **001부터 시작·중복 금지**를 hard로 강제하고, 001..max 사이 **중간 gap은 advisory**(제거·retag가 정당히 남기는 구멍)로 표면화한다.
+**Input**: 접두어(SPEC/INFRA/TEST)는 화이트리스트로 강제되지만 **번호 매김 규칙은 미규정·미강제**였다 — 소비 프로젝트 실측에서 소비 프로젝트 A는 접두어별 순차(INFRA-001..004·TEST-001), 소비 프로젝트 B는 재도출을 SPEC-로 만든 뒤 retag해 전역 잔번(INFRA-011·INFRA-013, SPEC 쪽엔 011·013 gap)을 남겨 **두 프로젝트가 서로 다른 번호 체계**로 갈라졌다. 번호는 순전히 spec 파일 id 집합(접두어+영패딩 번호)만으로 판정 가능한 결정 신호다 — 접두어별로 **001부터 시작·중복 금지**를 hard로 강제하고, 001..max 사이 **중간 gap은 advisory**(제거·retag가 정당히 남기는 구멍)로 표면화한다.
 
 ---
 
@@ -21,7 +21,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 - 접두어별로 독립 판정한다 — SPEC와 INFRA는 각자 001부터 순차이며 서로의 번호에 간섭하지 않는다(전역 공유 번호는 비-001 시작으로 드러난다).
 - 미등록 접두어 파일은 이 판정 이전에 PREFIX 화이트리스트가 이미 에러 처리한다(이중 보고 없음).
-- gap 계산은 그 접두어의 실제 최소 번호부터 max까지의 내부 결번만 센다 — 001 미시작은 gap이 아니라 별도 hard 신호다(FinOps INFRA `[011,013]` → hard "001 미시작" + advisory "INFRA-012 gap", 001~010은 gap으로 재보고하지 않음).
+- gap 계산은 그 접두어의 실제 최소 번호부터 max까지의 내부 결번만 센다 — 001 미시작은 gap이 아니라 별도 hard 신호다(소비 프로젝트 B INFRA `[011,013]` → hard "001 미시작" + advisory "INFRA-012 gap", 001~010은 gap으로 재보고하지 않음).
 - 맨 앞 spec을 제거해 001 자체가 사라진 정당 케이스는 지금 exemption을 두지 않는다 — 실제 사례가 나오면 prefixClassExemptions 동형으로 추가(YAGNI).
 - 판정 severity는 fr 게이트 한 곳에서 결정한다(hard=중복·001미시작, advisory=gap·`--strict` 승격) — 번호는 단일 관심사라 게이트를 쪼개지 않는다.
 - 셸/Go판 fr에는 이 계층이 없다(핵심 3커맨드 계약 밖, 정직한 델타 — SPEC-006).
@@ -62,7 +62,7 @@
 
 ## Assumptions / Clarifications Retained
 - 번호 모델의 정본은 "접두어별 001 순차"다 — 전역 공유 번호는 채택하지 않는다(가독성·접두어별 독립성). 이 결정은 STORAGE 접두어 의미(§2.2)와 정합.
-- 소비 프로젝트의 기존 위반(예: FinOps INFRA-011/013) 정규화는 각 프로젝트가 `sdd-retag`로 수행하는 다운스트림 작업이며 이 spec 범위 밖이다.
+- 소비 프로젝트의 기존 위반(예: 소비 프로젝트 B INFRA-011/013) 정규화는 각 프로젝트가 `sdd-retag`로 수행하는 다운스트림 작업이며 이 spec 범위 밖이다.
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
@@ -80,5 +80,5 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
-| 2026-07-06 | 초안 — 접두어별 001시작·중복 hard·중간 gap advisory(`--strict` 승격), Node·Python 동시 | PM(접두어별)·FinOps(전역 INFRA-011/013) 번호 체계 불일치[검증] — 번호 모델이 미규정·미강제라 프로젝트마다 제각각 |
+| 2026-07-06 | 초안 — 접두어별 001시작·중복 hard·중간 gap advisory(`--strict` 승격), Node·Python 동시 | 소비 프로젝트 A(접두어별)·소비 프로젝트 B(전역 INFRA-011/013) 번호 체계 불일치[검증] — 번호 모델이 미규정·미강제라 프로젝트마다 제각각 |
 | 2026-07-16 | `numberingIssues`에 `retiredIds` 인자 추가 — 폐기 기록된 번호의 gap은 advisory에서 제외(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건 | SPEC-018 FR-006 동반(소비): 폐기 워크플로가 남기는 번호 gap을 정상 retirement gap으로 인지 — 판정 코어는 이 spec 소유 |

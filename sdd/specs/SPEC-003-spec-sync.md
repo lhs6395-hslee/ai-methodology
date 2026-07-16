@@ -85,12 +85,12 @@
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |
 | 2026-07-02 | FR 라인 패턴 레터 서픽스 지원 | SPEC-001/002와 FR ID 문법 통일(사이트 간 불일치 금지) — /speckit.fix |
-| 2026-07-02 | `[` 경고를 토큰-시작 위치로 한정(FR-005 개정) — 파일 라우팅 `.../[id]/**`는 리터럴 매치라 미경고 + 테스트 | 도그푸딩(PM솔루션): Next.js 동적 세그먼트를 Files glob에 쓰면 정확 매치되는데도 false-positive 경고 — parseSection 드롭 조건(토큰 시작 `[`)에 정렬 |
+| 2026-07-02 | `[` 경고를 토큰-시작 위치로 한정(FR-005 개정) — 파일 라우팅 `.../[id]/**`는 리터럴 매치라 미경고 + 테스트 | 도그푸딩(소비 프로젝트 A): Next.js 동적 세그먼트를 Files glob에 쓰면 정확 매치되는데도 false-positive 경고 — parseSection 드롭 조건(토큰 시작 `[`)에 정렬 |
 | 2026-07-05 | FR 라인 판정 접두어를 `requirementIdPrefixes` 파생 주입으로 전환 + base positional 오배제 버그 수정(+ 회귀 테스트 2건) | 진단 B-2(전 사이트 문법 통일) + 패리티 작업 중 발견: `--message-file` 부재 시 첫 positional(base)이 조용히 무시됨 — 조용한 대체 금지(문법화, SPEC-006 연동) |
 | 2026-07-05 | Draft 스펙 소유 코드 차단 통합(스펙 동반 여부 무관 위반, staged 하드·range advisory) — 상태 판정 코어는 SPEC-008 소유 | 진단 Q1·Q3 승인(P1): 리뷰 없는 Draft 스펙이 코드를 이끄는 구멍 봉합, 탈출구는 기존 트레일러 하나 |
 | 2026-07-05 | FR-010 신설 — `specSyncUnownedPolicy`(silent\|warn\|error)로 미소유 파일 침묵 통과를 선언된 정책으로 승격(FR 10개 — maxFRsPerSpec 10 상향, sdd.config.json) | 진단 Q1 구멍 승인(P2): "Files 미매치 = 침묵"은 테스트로 고정된 의도였으나 미선언 정책 — 문법화(exempt 조합 탈출, error=closed-world) |
 | 2026-07-05 | git 호출에 `core.quotepath=off` — 비ASCII 경로가 8진수 인용 문자열로 나와 glob 매칭·디렉토리 귀속이 조용히 깨지던 것 수정(spec-sync·converge, + 한글 파일명 회귀 테스트) | 도그푸딩(이 레포 방법론.html): P2 warn이 인용된 경로를 unowned로 오판해 발견 — 조용한 미매치 금지 |
 | 2026-07-06 | Files 글롭 미지원 문법(`{`·`?`·선두 `[`)을 staged(hard)에서 exit 1로 승격 — range는 advisory 유지, 판정 정책은 SPEC-013 소유 | 고도화 4차: 템플릿의 "금지" 문법이 warn뿐이라 매치 실패 = 소유가 조용히 풀리는 미강제 규범이었음 — staged 차단으로 문법화 |
-| 2026-07-09 | check-spec-sync.mjs에 `draftBlockPolicy` 분기(range 모드에서도 Draft 위반 hard 승격) 배선 — 판정 요구(FR-007)는 SPEC-008 소유, 이 spec은 그 분기가 사는 파일(check-spec-sync.mjs)만 소유 | SPEC-008 FR-007 신설 동반 — 도그푸딩(FinOps): 웹 UI 병합이 로컬 commit-msg 훅을 우회하는 사각지대 봉합 |
+| 2026-07-09 | check-spec-sync.mjs에 `draftBlockPolicy` 분기(range 모드에서도 Draft 위반 hard 승격) 배선 — 판정 요구(FR-007)는 SPEC-008 소유, 이 spec은 그 분기가 사는 파일(check-spec-sync.mjs)만 소유 | SPEC-008 FR-007 신설 동반 — 도그푸딩(소비 프로젝트 B): 웹 UI 병합이 로컬 commit-msg 훅을 우회하는 사각지대 봉합 |
 | 2026-07-09 | `spec-sync-lib.mjs` 설계 근거 주석 경로 정정(`docs/superpowers/specs/` → `docs/design/`) | STORAGE §2.7 신설 동반 — 킷 자신의 설계 문서가 새 규약 위치로 이동, 참조 경로 동기(동작 변경 없음) |
 | 2026-07-16 | spec-sync 위반·advisory 메시지를 중립-우선으로: remediation을 `node scripts/sdd-sync.mjs`/스펙 Change Log로 안내하고 Claude 슬래시(/sdd-sync·/speckit.fix)는 괄호 편의로 강등, Node·Python 바이트 동일 | 에이전트 중립 방향(사용자 결정): 강제 계층은 에이전트를 가정하지 않는다 — Codex/무-에이전트 사용자가 없는 슬래시 커맨드에 막히지 않게 |

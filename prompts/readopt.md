@@ -5,7 +5,7 @@
 > https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘
 > ```
 > 위 URL의 정본 ref는 `main`(자기참조 — 특정 브랜치에서 받으면 그 ref를 이어 쓴다). 키트가 로컬에 있으면 `<KIT>/prompts/readopt.md 를 그대로 수행해줘`도 동일.
-> **대상:** 이미 `sdd/` 산출물이 있는데(스펙·게이트가 낡거나 어긋남) 현 방법론으로 **처음부터 다시** 세울 때. **코드는 남기고 `sdd/` 산출물만 새로.** (PM/FinOps 등.)
+> **대상:** 이미 `sdd/` 산출물이 있는데(스펙·게이트가 낡거나 어긋남) 현 방법론으로 **처음부터 다시** 세울 때. **코드는 남기고 `sdd/` 산출물만 새로.** (소비 프로젝트 A/B 등.)
 
 **정본 방법론:** https://github.com/lhs6395-hslee/ai-methodology
 **REF(자기참조):** 이 파일을 raw URL로 받았다면 그 URL의 `<ref>` 세그먼트를 REF로, 로컬 키트로 실행 중이면 REF=`main`으로 간주한다(아래 raw base·`--branch`에 사용).

@@ -83,8 +83,8 @@
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `maxKeysPerCategoryPerSpec`를 4→6으로 상향(sdd.config.json) | 이 spec의 Symbols=5개 게이트 파일명은 한 응집 aggregate라 분할이 부적절 — 브리프 허용 config 조정으로 cohesion warn 해소 |
 | 2026-07-02 | check-test-adequacy.mjs(+ 테스트) + FR-008 편입 — Symbols=6 유지(threshold 내) | spec-quality-gates aggregate의 6번째 게이트; @covers 빈 껍데기 검출은 FR coverage 게이트의 직접 보완 |
-| 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(PM솔루션): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |
-| 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(PM솔루션): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |
+| 2026-07-02 | FR ID 레터 서픽스 지원(coverage·cohesion·completeness 공통 문법) + `check-fr-coverage.test.mjs` Files 편입 | 도그푸딩(소비 프로젝트 A): 서픽스 FR이 태그 절단 dangling·조용한 FR 미집계 유발 — /speckit.fix |
+| 2026-07-02 | cohesion aggregate 임계 config화(`maxAggregateRootsPerSpec`, 기본 1) — FR-003 개정 + 테스트 | 도그푸딩(소비 프로젝트 A): aggregate 루트+자식표를 한 spec이 소유하는 모델(SPEC-004=project+9 자식표)은 별도 root 아님 — 하드코딩 `>1`을 config로 흡수 |
 | 2026-07-05 | coverage·cohesion·completeness의 요구 ID 정규식을 `requirementIdPrefixes` 파생값으로 전환 + `check-req-prefix.test.mjs` Files 편입 | 진단 B-2: 사이트별 하드코딩이 접두어 확장 시 조용한 누락을 만듦 — SPEC-001 config 파생값 하나로 통일 |
 | 2026-07-05 | fr 게이트에 검증 회계 계층 통합(strictSpecs 하드 R2·R3 unaccounted·accounted 리포트) — 회계 판정 자체는 SPEC-007 소유 | 진단 B-3 승인: "조용히 미검증" 제거 — 게이트 본체는 회계 코어(verification-accounting)를 소비만 |
 | 2026-07-05 | completeness 게이트에 수명주기 검사 통합(Status enum·Reviewed 이상 Review Log/Dedup-Review 존재) — 판정 코어는 SPEC-008 소유 | 진단 Q3 승인(P1): 스펙 리뷰 계층 부재 — 존재만 검사(advisory, --strict 하드) |
@@ -96,8 +96,8 @@
 | 2026-07-06 | fr 게이트 PREFIX 화이트리스트(STANDARD)에 `CICD` 편입 + 접두어↔클래스 에러/warn 메시지가 기대 접두어(INFRA/CICD)를 지목하도록 갱신 | CICD 표준 접두어 신설 동반 — 사유 없이 1급 수용, 판정 코어는 SPEC-012 |
 | 2026-07-06 | completeness 게이트에 Lifecycle enum 검증 배선(있으면 removable\|permanent) — 판정 코어는 SPEC-008(lifecycle-lib) 소유, 본체는 호출만 | SPEC-008 FR-006 동반 — 선택 필드라 없으면 무관(하위호환) |
 | 2026-07-06 | fr 게이트에 테스트 인프라 격리(testInfraGlobs) 배선 — 판정 코어는 SPEC-015(test-domain-lib) 소유, 본체는 호출·prefixErrors만 | SPEC-015 신설 동반 — testInfra 파일의 비-TEST 소유 차단 |
-| 2026-07-09 | ownership 게이트에 Entity 관계 검사(`Dependencies.Entities`의 `Name (relation-type)` 구조화 표기 — 실재·소유 spec 해석 hard, 순환 advisory) 배선 — 판정 코어는 SPEC-017(relation-lib) 소유, 본체는 호출만 | SPEC-017 신설 동반 — 도그푸딩(FinOps): 과대 spec을 aggregate별로 쪼갤 때 쪼개진 Entity 간 관계를 적을 문법 부재 |
+| 2026-07-09 | ownership 게이트에 Entity 관계 검사(`Dependencies.Entities`의 `Name (relation-type)` 구조화 표기 — 실재·소유 spec 해석 hard, 순환 advisory) 배선 — 판정 코어는 SPEC-017(relation-lib) 소유, 본체는 호출만 | SPEC-017 신설 동반 — 도그푸딩(소비 프로젝트 B): 과대 spec을 aggregate별로 쪼갤 때 쪼개진 Entity 간 관계를 적을 문법 부재 |
 | 2026-07-15 | `check-fr-coverage` PREFIX 위반 에러 문자열을 `표준 SPEC/INFRA/TEST/CICD`로 | CICD 절반 롤아웃 봉합 — STANDARD 집합·DEFAULTS는 이미 4종인데 에러 메시지만 3종 잔재(4판 바이트 패리티 위해 Node·Python·셸·Go 동시) |
-| 2026-07-15 | cohesion FR 카운터를 `__frTokenRe`(평문 토큰) → `__frDeclRe`(`**FR-NNN**` 정의)로 + 회귀 테스트 | 도그푸딩(FinOps): Change Log·근거 문단의 FR 인용이 정의로 오집계돼 "FR 15>11" 오탐(실 본문 13) — coverage와 동일 사이트(정의만) 통일 |
+| 2026-07-15 | cohesion FR 카운터를 `__frTokenRe`(평문 토큰) → `__frDeclRe`(`**FR-NNN**` 정의)로 + 회귀 테스트 | 도그푸딩(소비 프로젝트 B): Change Log·근거 문단의 FR 인용이 정의로 오집계돼 "FR 15>11" 오탐(실 본문 13) — coverage와 동일 사이트(정의만) 통일 |
 | 2026-07-15 | `check-fr-coverage`가 Status: Planned 스펙을 파싱해 `plannedSpecs`를 회계 코어에 전달 + 리포트에 `planned:` 세그먼트·R2 "planned" 메시지 | SPEC-018 FR-005 동반: fr 게이트 본체가 Planned 회계를 배선(판정 코어는 SPEC-007, enum은 SPEC-008) |
 | 2026-07-16 | fr 게이트가 `cfg.retiredIds`를 `numberingIssues`에 전달 — 폐기 gap이 잡음으로 뜨지 않게 배선(판정 코어는 SPEC-014) | SPEC-018 FR-006 동반: 번호 무결성 호출부가 retiredIds를 전달하는 배선점 |

@@ -6,7 +6,7 @@
 | 상황 | 대화창에 붙여넣는 한 줄 (raw URL) |
 |---|---|
 | **시작** (새/SDD 없던 프로젝트) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/adopt.md 읽고 그대로 수행해줘` → [adopt.md](prompts/adopt.md) |
-| **재채택** (이미 sdd/ 있음 — PM/FinOps) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` → [readopt.md](prompts/readopt.md) |
+| **재채택** (이미 sdd/ 있음 — 소비 프로젝트 A/B) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/readopt.md 읽고 그대로 수행해줘` → [readopt.md](prompts/readopt.md) |
 | **업데이트** (방법론 고도화 후) | `https://raw.githubusercontent.com/lhs6395-hslee/ai-methodology/main/prompts/update.md 읽고 그대로 수행해줘` → [update.md](prompts/update.md) |
 
 > **ref:** 위 URL의 정본 ref는 `main`. 각 파일은 자신을 받은 ref를 이어 써서 main/브랜치 어느 raw든 동일 동작(자기참조). 두 계층: **작성·검토**는 GitHub 문서 직접 읽기로 다운로드 없이, **강제**(훅·게이트)만 partial+sparse로 tooling 확보 후 `sdd-init` 1회(~25파일, 전체 clone 아님). 키트가 로컬에 있으면 경로로도 동일: `~/Documents/claude/sdd/prompts/adopt.md 를 그대로 수행해줘`.
