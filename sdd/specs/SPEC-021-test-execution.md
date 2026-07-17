@@ -51,7 +51,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > `commands.test` tier·config 문법은 SPEC-001/015 소유, 러너(sdd-run)는 SPEC-004, Python 복제는 SPEC-006. 이 spec은 실행-결과 게이트 계층만 소유.
-- **Modules**: key-pipeline, test-domain, harness-install, runtime-parity
+- **Modules**: key-pipeline (references), test-domain (references), harness-install (references), runtime-parity (references)
 
 ---
 
@@ -83,3 +83,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — `runTestsPolicy`(off|advisory|hard) + `check-test-run` 게이트(`commands.test` 실제 실행·exit 판정) + 판정 코어 `testRunVerdict`, Node·Python 패리티 | 도그푸딩(소비 프로젝트 B): sync 전부 green인데 단위 스위트 3-error — 커버리지 회계 ≠ 실행 결과라는 구조적 오인, "완료 주장 전 실행+결과 확인"을 문법화 |
+| 2026-07-16 | 발동 지점 배선 — sdd-sync 규칙표에 R5(check-test-run) 추가(pre-push 경유) + 킷 자신 CI(.github/workflows, CICD-001)가 동일 스위트를 push/PR마다 실행 | 감사 M1: 스펙 본문이 "CI·pre-push에서 돈다"고 선언했으나 훅·sdd-sync·CI 샘플 어디에도 호출처 0곳 — knob(runTestsPolicy=hard)만 있고 발동 지점이 없던 스펙↔배선 드리프트 봉합 |

@@ -9,9 +9,33 @@ export function parseTarget(target) {
   return { specId: m[1], frId: m[2] || null };
 }
 
+// FR-008(감사 P1): 폐기 대상 스펙을 가리키는 inbound 참조 수집(스펙 전체 폐기 시).
+// 폐기 후 남으면 — 구조화 관계는 check-ownership hard(exit 1), Dedup-Review 언급은 dangling
+// advisory — 삭제 커밋이 자기 게이트에 막힌다. 계획이 미리 지목해 같은 PR에서 갱신하게 한다.
+//   specTexts: Map<specId, text>(전 코퍼스) · ownedKeys: 폐기 스펙의 aggregate-root 카테고리 소유
+//   키 집합(소문자 정규화) · parseDeps(text): [{name,type}] — 커맨드가 relation 파서를 주입
+//   (이 코어는 문법 비의존) · dedupBlock(text): Dedup-Review 섹션 본문|null.
+export function inboundReferences(targetSpecId, ownedKeys, specTexts, parseDeps, dedupBlock) {
+  const refs = [];
+  const owned = new Set([...ownedKeys].map((k) => String(k).trim().toLowerCase()));
+  for (const [sid, text] of specTexts) {
+    if (sid === targetSpecId) continue;
+    for (const { name, type } of parseDeps(text) || []) {
+      if (type && owned.has(String(name).trim().toLowerCase())) {
+        refs.push({ spec: sid, kind: "relation", detail: `${name} (${type})` });
+      }
+    }
+    const block = dedupBlock(text);
+    if (block && block.includes(targetSpecId)) refs.push({ spec: sid, kind: "dedup-review", detail: targetSpecId });
+  }
+  return refs.sort((a, b) =>
+    a.spec.localeCompare(b.spec) || a.kind.localeCompare(b.kind) || a.detail.localeCompare(b.detail));
+}
+
 // 폐기 계획 산출(FR-001·003·004). ctx는 커맨드가 코퍼스에서 뽑아 넘긴다:
 //   frsBySpec: Map<specId, Set<frId>>  · specText: Map<specId, string>
 //   coversIndex: [{file, spec, fr}]    · manifestKeys: [string "SPEC/FR"]  · deferredKeys: [string]
+//   inboundRefs: inboundReferences() 결과(스펙 전체 폐기 시 — FR 단위 폐기엔 무관)
 export function planRetirement(target, ctx) {
   const t = parseTarget(target);
   if (!t) return { ok: false, reason: `대상 형식 오류: "${target}" (SPEC-NNN 또는 SPEC-NNN/FR-NNN)` };
@@ -32,6 +56,7 @@ export function planRetirement(target, ctx) {
     manifestKeys: (ctx.manifestKeys || []).filter(match),
     deferredKeys: (ctx.deferredKeys || []).filter(match),
     numberingGap: t.frId ? null : t.specId, // SPEC 폐기 시 그 번호가 gap(FR-006이 retiredIds로 정상 처리)
+    inboundRefs: t.frId ? [] : (ctx.inboundRefs || []), // FR-008: 같은 PR에서 갱신할 참조 스펙
   };
 }
 

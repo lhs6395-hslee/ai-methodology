@@ -53,7 +53,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > fr 게이트 본체는 SPEC-002 소유(이 spec은 정합 판정 코어만), 글롭 컴파일·Files 파싱은 SPEC-003·SPEC-001 소유, 소스 클래스 enum·derivationClassGlobs는 SPEC-009 소유, Python 복제는 SPEC-006 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync, derivation-accounting, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references), derivation-accounting (references), runtime-parity (references)
 
 ---
 

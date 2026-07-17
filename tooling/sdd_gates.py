@@ -76,6 +76,7 @@ DEFAULTS = {
                      "docs/ops/**", "docs/operations/**", "ops/**"],
     },
     "specSyncUnownedPolicy": "silent",
+    "specSyncBase": None,
     "draftBlockPolicy": "advisory",
     "entityRegistry": {},
     "relationTypes": [],
@@ -121,10 +122,24 @@ def load_config():
         except Exception as e:  # noqa: BLE001
             print(f"✗ sdd.config.json 파싱 실패: {path}\n  {e}", file=sys.stderr)
             sys.exit(1)
+    return _build_config(user, path, os.path.dirname(path) if path else os.getcwd())
+
+
+def config_from_string(raw, root):
+    """config JSON 문자열에서 동일 파생 규칙으로 구성 — specsync staged 판정을 HEAD 시점
+    config로 내릴 때(자기약화 커밋 방지, SPEC-003 — sdd-config.mjs configFromString 미러).
+    파싱 실패는 None(호출부가 폴백)."""
+    try:
+        return _build_config(json.loads(raw), None, root)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _build_config(user, path, root):
     cfg = {**DEFAULTS, **user}
     cfg["commands"] = {**DEFAULTS["commands"], **user.get("commands", {})}
     cfg["__path"] = path
-    cfg["__root"] = os.path.dirname(path) if path else os.getcwd()
+    cfg["__root"] = root
     cfg["__testRegex"] = [re.compile(s) for s in cfg["testFileRegex"]]
     # spec ID 접두어 파생값(게이트 공통). ["SPEC","TEST"] → "SPEC|TEST"
     alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
@@ -344,9 +359,17 @@ def numbering_issues(spec_ids, retired_ids=None):
         uniq = sorted(seen)
         if not uniq:
             continue
+        # 폐기 ID 재사용(hard, SPEC-014 FR-004): 무신호 재사용 차단 — numbering-lib.mjs 미러(감사 M3).
+        for n in uniq:
+            if f"{pfx}-{n:03d}" in retired:
+                hard.append(f"{pfx}-{n:03d} 폐기 ID 재사용 — retiredIds에 기록된 번호가 실재(과거 참조 앨리어싱). "
+                            f"새 번호를 쓰거나, 의도적 재사용이면 retiredIds에서 제거")
+        # 001 미시작 — 선행 번호가 전부 retiredIds면 정상 retirement gap(SPEC-014 FR-001 개정, 감사 M4).
         if uniq[0] != 1:
-            hard.append(f"{pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{uniq[0]:03d} "
-                        f"(접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag")
+            leading_retired = all(f"{pfx}-{n:03d}" in retired for n in range(1, uniq[0]))
+            if not leading_retired:
+                hard.append(f"{pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{uniq[0]:03d} "
+                            f"(접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag, 선행 번호가 폐기분이면 retiredIds에 기록")
         present, mx = set(uniq), uniq[-1]
         # retired에 기록된 번호는 정상 retirement gap이라 재보고하지 않음(SPEC-018 FR-006)
         missing = [n for n in range(uniq[0], mx + 1) if n not in present and f"{pfx}-{n:03d}" not in retired]
@@ -477,6 +500,13 @@ def cmd_fr(cfg, strict):
             planned_specs.add(m.group(0))
     acct_classes, acct_counts = (classify_accounting(specs, covered, manifest, planned_specs)
                                  if accounting_active else (None, None))
+    # Planned↔커버리지 모순(SPEC-018 FR-007): Planned는 "안 지음" 선언인데 unit 커버 FR이 실재하면 모순 —
+    # Active→Planned 뒤집기로 strictSpecs·R3를 침묵시키는 "회계 침묵기" 경로를 hard 차단(감사 T2).
+    for spec in sorted(planned_specs):
+        cov = covered.get(spec)
+        if cov:
+            errors.append(f"Planned 모순 {spec}: Status Planned인데 unit 커버 FR {len(cov)}개 — "
+                          f"구현이면 Status 승격, 폐기면 sdd-retire(Planned=의도적 미구현 선언, SPEC-018)")
 
     for spec, frs in specs.items():
         cov = covered.get(spec, set())
@@ -701,6 +731,16 @@ def parse_lifecycle(text):
 
 def is_reviewed_plus(status):
     return status in _REVIEWED_PLUS
+
+
+# 소유 코드 변경을 이끌 수 있는 상태(SPEC-008 FR-008) — lifecycle-lib.mjs canLeadCode 미러.
+# 화이트리스트: Draft만이 아니라 Planned(리뷰 전)·enum 밖 값(Wip 등)도 코드를 못 이끈다.
+# None(레거시 — Status 미선언)은 통과(점진 도입 유지).
+_CODE_LEADING = {"Reviewed", "Approved", "Active", "Deprecated", "Removed"}
+
+
+def can_lead_code(status):
+    return status is None or status in _CODE_LEADING
 
 
 def section_block(text, heading):
@@ -1313,14 +1353,33 @@ def escalations(triggered, satisfied, has_spec_impact, policy):
 
 
 def parse_drivers(msg, id_alt):
-    """`Change-Driver: <SPEC-ID> <사유>` 트레일러 파싱 (SPEC-020, cross-spec-lib.mjs 미러).
-    사유 빈 항목은 버림. [(id, reason)] 반환."""
-    rx = re.compile(rf"^Change-Driver:[ \t]*((?:{id_alt})-\d{{3}})[ \t]+(.+)$", re.MULTILINE)
-    return [(m.group(1), m.group(2).strip()) for m in rx.finditer(msg or "") if m.group(2).strip()]
+    """`Change-Driver: <SPEC-ID> [@<glob>[,<glob>]] <사유>` 트레일러 파싱 (SPEC-020, cross-spec-lib.mjs 미러).
+    사유 빈 항목은 버림. [(id, globs|None, reason)] 반환 — globs=None은 무스코프(전 파일, 레거시)."""
+    rx = re.compile(rf"^Change-Driver:[ \t]*((?:{id_alt})-\d{{3}})[ \t]+(?:@(\S+)[ \t]+)?(.+)$", re.MULTILINE)
+    out = []
+    for m in rx.finditer(msg or ""):
+        if not m.group(3).strip():
+            continue
+        globs = [g.strip() for g in m.group(2).split(",") if g.strip()] if m.group(2) else None
+        out.append((m.group(1), globs, m.group(3).strip()))
+    return out
+
+
+def relaxing_drivers(owner, file, entries, match_glob):
+    """파일 file에 대해 소유 스펙 owner를 완화하는 동인 id들(정렬) — 자기 자신 아닌 의미변경 동인 중,
+    무스코프이거나 스코프 글롭이 file에 매치하는 것만(SPEC-020 FR-005, cross-spec-lib.mjs 미러)."""
+    ids = set()
+    for did, globs, _reason in entries or []:
+        if did == owner:
+            continue
+        if globs and not any(match_glob(g, file) for g in globs):
+            continue
+        ids.add(did)
+    return sorted(ids)
 
 
 def cross_spec_relaxed(owner, meaningful_drivers):
-    """소유 스펙 owner의 요구가 참조 완화되는가 — 자기 자신 아닌 의미변경 동인이 하나라도 있으면 True."""
+    """(하위호환) 소유 스펙 owner의 요구가 참조 완화되는가 — 자기 자신 아닌 의미변경 동인이 하나라도 있으면 True."""
     return any(d != owner for d in set(meaningful_drivers or []))
 
 
@@ -1328,16 +1387,38 @@ def cmd_specsync(cfg, staged, msg_file, base):
     def lines(s):
         return [x.strip() for x in (s or "").split("\n") if x.strip()]
 
-    # ① 트레일러(§5.5): staged 모드에서만.
+    # ⓪ staged 판정은 HEAD 시점 config로(SPEC-003 FR-011 — check-spec-sync.mjs 미러):
+    # 이 커밋이 config를 바꾸는 중이면 약화 "전"(HEAD) config가 이 커밋을 심판한다(자기약화 방지).
+    # config 불변 커밋이면 두 판이 같아 동작·출력 무변(하위호환). HEAD에 config 없으면(최초 채택) 현행.
+    if staged:
+        prefix = (_git(cfg, ["rev-parse", "--show-prefix"]) or "").strip()
+        cfg_rel = f"{prefix}sdd.config.json"
+        head_raw = _git(cfg, ["show", f"HEAD:{cfg_rel}"])
+        cur_raw = _git(cfg, ["show", f":{cfg_rel}"])
+        if cur_raw is None and cfg.get("__path"):
+            try:
+                cur_raw = read_text(cfg["__path"])
+            except OSError:
+                cur_raw = None
+        if head_raw is not None and cur_raw is not None and head_raw != cur_raw:
+            head_cfg = config_from_string(head_raw, cfg["__root"])
+            if head_cfg:
+                cfg = head_cfg
+                print("· spec-sync: sdd.config.json 변경 감지 — HEAD 시점 config로 판정(자기약화 커밋 방지, SPEC-003)")
+    # base 우선순위: CLI positional > SDD_DIFF_BASE(env) > specSyncBase(config) > origin/main.
+    if base is None:
+        base = os.environ.get("SDD_DIFF_BASE") or cfg.get("specSyncBase") or "origin/main"
+
+    # ① 트레일러(§5.5): staged에서만 — 사유 필수 검증·파싱만 하고, 면제는 판정 루프에서 적용(감사 T3:
+    # 전면 단락 금지). 면제 = 동반 요구 + 상태 차단(문서화된 탈출구). 글롭 문법·unowned는 면제 대상 아님.
+    spec_impact = None
     if staged and msg_file:
-        msg = read_text(msg_file)
-        m = re.search(r"^Spec-Impact:\s*none\s*(.*)$", msg, re.MULTILINE)
+        m = re.search(r"^Spec-Impact:\s*none\s*(.*)$", read_text(msg_file), re.MULTILINE)
         if m:
             if not m.group(1).strip():
                 print("✗ spec-sync: `Spec-Impact: none`은 사유 필수 (`Spec-Impact: none <사유>`)", file=sys.stderr)
                 sys.exit(1)
-            print(f"spec-sync: Spec-Impact: none — 통과 (사유: {m.group(1).strip()}) [트레일러가 커밋에 영속]")
-            sys.exit(0)
+            spec_impact = m.group(1).strip()
 
     # ② 변경 파일 수집(§5.7): staged = cached ∪ base...HEAD / range = base...HEAD.
     branch_diff_ok = _git(cfg, ["rev-parse", "-q", "--verify", base]) is not None \
@@ -1346,7 +1427,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
     if branch_diff_ok:
         changed.update(lines(_git(cfg, ["diff", "--name-only", f"{base}...HEAD"])))
     else:
-        print(f"· spec-sync: base({base}) 해석 불가 — {'staged만 판정(경고)' if staged else '판정 불가, 건너뜀'}")
+        print(f"· spec-sync: base({base}) 해석 불가 — {'staged만 판정(경고). 멀티커밋 브랜치(스펙 선커밋→코드 후커밋)는 오차단될 수 있음 — sdd.config.json specSyncBase 또는 SDD_DIFF_BASE로 base 지정' if staged else '판정 불가, 건너뜀'}")
     if staged:
         changed.update(lines(_git(cfg, ["diff", "--cached", "--name-only"])))
     if not staged and not branch_diff_ok:
@@ -1438,13 +1519,21 @@ def cmd_specsync(cfg, staged, msg_file, base):
         return ok
 
     # cross-spec 변경 동인(SPEC-020): Change-Driver 트레일러가 지목한 "의미변경 동인"이면 소유 요구를 참조 완화.
+    # 경로 스코프(@glob, FR-005): 스코프 선언 동인은 매치 파일만 완화(무스코프 전역 팬아웃을 귀속으로).
     drivers = parse_drivers(read_text(msg_file), cfg["__idAlt"]) if (staged and msg_file) else []
     _spec_by_id = {s[0]: s for s in specs}
-    meaningful_drivers = set()
+    meaningful_ids = set()
     for did in {d[0] for d in drivers}:
         s = _spec_by_id.get(did)
         if s and meaningful(s[0], s[1], s[3]):
-            meaningful_drivers.add(did)
+            meaningful_ids.add(did)
+    meaningful_entries = [d for d in drivers if d[0] in meaningful_ids]
+    _glob_cache = {}
+
+    def match_glob(g, file):
+        if g not in _glob_cache:
+            _glob_cache[g] = compile_glob(g)
+        return bool(_glob_cache[g].match(file))
     for f in sorted(changed):
         if f in spec_set or f.startswith(cfg["specDir"] + "/"):
             continue  # 스펙 자신은 코드 아님
@@ -1456,16 +1545,21 @@ def cmd_specsync(cfg, staged, msg_file, base):
             if not any(rx.match(f) for _, rx in globs):
                 continue
             owned = True
-            # Draft 차단(SPEC-008): Draft 스펙의 소유 코드는 스펙 동반 여부와 무관하게 위반 —
-            # 상태 순서 강제(리뷰 후 Reviewed 이상으로 승격이 정공법). 삭제 중 스펙은 제외(수명 종료 경로).
-            if status == "Draft" and not deleted:
-                violations.append((f, spec_id, True))
+            # 트레일러 면제(§5.5): 동반 요구·상태 차단만 — unowned·글롭 문법은 아래에서 그대로 강제.
+            if spec_impact:
+                continue
+            # 상태 차단(SPEC-008 FR-008): Reviewed 미만(Draft·Planned·enum 밖) 스펙의 소유 코드는
+            # 스펙 동반 여부와 무관하게 위반 — 상태 화이트리스트(Draft 문자열 등가 검사가 Planned·
+            # 비enum 상태를 흘려보내던 결함 봉합). Status 미선언(레거시)은 통과(점진 도입).
+            if status and not can_lead_code(status) and not deleted:
+                violations.append((f, spec_id, True, status))
                 continue
             if not meaningful(spec_id, path, deleted):
-                if cross_spec_relaxed(spec_id, meaningful_drivers):
-                    print(f"· cross-spec: {f} → 소유 {spec_id} 변경 동인 {', '.join(sorted(meaningful_drivers))}(Change-Driver 선언, 참조 완화)")
+                ids = relaxing_drivers(spec_id, f, meaningful_entries, match_glob)
+                if ids:
+                    print(f"· cross-spec: {f} → 소유 {spec_id} 변경 동인 {', '.join(ids)}(Change-Driver 선언, 참조 완화)")
                 else:
-                    violations.append((f, spec_id, False))
+                    violations.append((f, spec_id, False, None))
         if not owned and policy != "silent":
             unowned.append(f)
 
@@ -1522,24 +1616,27 @@ def cmd_specsync(cfg, staged, msg_file, base):
     for sid in drift_violations:
         print(f"  {'✗' if drift_hard else '⚠'} [{sid}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy={drift_policy})")
     if not violations and not drift_hard:
-        print("spec-sync: OK (semantic drift advisory — 위 리네임 스펙 본문 재검토 권장)."
-              if drift_violations else
-              "spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
+        if spec_impact:
+            print(f"spec-sync: Spec-Impact: none — 통과 (사유: {spec_impact}) [트레일러가 커밋에 영속 — 글롭 문법·unowned 정책은 면제 대상 아님]")
+        else:
+            print("spec-sync: OK (semantic drift advisory — 위 리네임 스펙 본문 재검토 권장)."
+                  if drift_violations else
+                  "spec-sync: OK — 소유 코드 변경에 스펙 동반됨(또는 대상 없음).")
         sys.exit(0)
     # draftBlockPolicy=hard: range 모드에서도 Draft 위반을 hard로 승격(SPEC-008 FR-007) — 웹 UI 병합이
     # 로컬 commit-msg 훅을 안 타도 CI가 range 모드로 이 게이트를 돌리면 막을 수 있다.
-    draft_hard = (not staged) and draft_policy == "hard" and any(d for _, _, d in violations)
-    for f, spec_id, draft in violations:
+    draft_hard = (not staged) and draft_policy == "hard" and any(d for _, _, d, _ in violations)
+    for f, spec_id, draft, status in violations:
         tag = "✗" if (staged or (draft and draft_hard)) else "⚠"
         if draft:
-            print(f"  {tag} {f} → 소유 스펙 {spec_id}이 Draft 상태 — Reviewed 이상 승격 전 코드 변경 금지")
+            print(f"  {tag} {f} → 소유 스펙 {spec_id}이 {status} 상태 — Reviewed 이상 승격 전 코드 변경 금지")
         else:
             print(f"  {tag} {f} → 소유 스펙 {spec_id}에 의미 있는 변경 없음(FR/Edge Cases/Change Log)")
     if violations and staged:
         print("\n✗ spec-first 위반: 소유 스펙을 같은 changeset에 갱신하라(스펙 Change Log에 항목 추가). Claude Code는 /speckit.fix.", file=sys.stderr)
         print("  · 스펙을 이미 수정했다면 `git add`로 스테이징했는지 확인(§6.2).", file=sys.stderr)
-        if any(d for _, _, d in violations):
-            print("  · Draft 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
+        if any(d for _, _, d, _ in violations):
+            print("  · Reviewed 미만 상태(Draft·Planned·enum 밖)의 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).", file=sys.stderr)
         if unowned_hard:
             print("  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).", file=sys.stderr)
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
@@ -2047,7 +2144,8 @@ def main():
         if "--message-file" in args:
             mi = args.index("--message-file")
             msg_file = args[mi + 1] if mi + 1 < len(args) else None
-        cmd_specsync(cfg, staged, msg_file, positional[0] if positional else base_default)
+        # base=None이면 cmd_specsync가 env > config specSyncBase > origin/main 순으로 해석(SPEC-003 FR-006).
+        cmd_specsync(cfg, staged, msg_file, positional[0] if positional else None)
     elif sub == "derivation":
         cmd_derivation(cfg)
     elif sub == "smokescan":

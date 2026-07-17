@@ -5,7 +5,8 @@
 // @covers SPEC-018/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseTarget, planRetirement, removeFrFromSpecText, pruneManifest } from "../retire-lib.mjs";
+import { parseTarget, planRetirement, removeFrFromSpecText, pruneManifest, inboundReferences } from "../retire-lib.mjs";
+const ctxLib = { inboundReferences };
 
 const ctx = () => ({
   frsBySpec: new Map([
@@ -60,4 +61,42 @@ test("FR-002: 적용 변환 — 스펙 본문 FR 라인 제거·매니페스트 
   assert.match(out, /\*\*FR-003\*\*/);
   const m = pruneManifest({ "SPEC-001/FR-002": { method: "deferred" }, "SPEC-002/FR-001": {} }, ["SPEC-001/FR-002"]);
   assert.deepEqual(Object.keys(m), ["SPEC-002/FR-001"]);       // 폐기 키만 제거
+});
+
+// ── 감사 봉합(2026-07-16, P1): inbound 참조 — 폐기 계획이 참조 스펙 갱신을 미리 지목 ──
+// @covers SPEC-018/FR-008
+
+test("FR-008: inboundReferences — 구조화 관계·Dedup-Review 언급 수집(자기 자신 제외, 결정적 정렬)", () => {
+  const { inboundReferences } = ctxLib;
+  const specTexts = new Map([
+    ["SPEC-001", "# t\n## Ownership\n- **Modules**: alpha\n"],
+    ["SPEC-002", "# a\n## Dependencies\n- **Modules**: alpha (references)\n## Dedup-Review\n- 이웃 SPEC-001 비중복\n"],
+    ["SPEC-003", "# b\n## Dependencies\n- **Modules**: beta (references), alpha\n## Dedup-Review\n- 이웃 없음\n"],
+  ]);
+  const parseDeps = (text) => {
+    const m = text.match(/- \*\*Modules\*\*: (.+)/);
+    if (!m) return [];
+    return m[1].split(",").map((e) => {
+      const r = /^(.+?)\s*\(([a-z-]+)\)\s*$/.exec(e.trim());
+      return r ? { name: r[1], type: r[2] } : { name: e.trim(), type: null };
+    });
+  };
+  const dedupBlock = (text) => {
+    const m = text.match(/## Dedup-Review\n([\s\S]*?)(?=\n## |$)/);
+    return m ? m[1] : null;
+  };
+  const refs = inboundReferences("SPEC-001", new Set(["alpha"]), specTexts, parseDeps, dedupBlock);
+  // SPEC-002: 관계 + Dedup-Review 언급 둘 다. SPEC-003: alpha는 괄호 없는 레거시(관계 아님) → 미포함.
+  assert.deepEqual(refs, [
+    { spec: "SPEC-002", kind: "dedup-review", detail: "SPEC-001" },
+    { spec: "SPEC-002", kind: "relation", detail: "alpha (references)" },
+  ]);
+});
+
+test("FR-008: planRetirement — 스펙 전체 폐기는 inboundRefs 포함, FR 단위 폐기는 빈 배열", () => {
+  const inbound = [{ spec: "SPEC-002", kind: "relation", detail: "alpha (references)" }];
+  const whole = planRetirement("SPEC-001", { ...ctx(), inboundRefs: inbound });
+  assert.deepEqual(whole.inboundRefs, inbound);
+  const fr = planRetirement("SPEC-001/FR-003", { ...ctx(), inboundRefs: inbound });
+  assert.deepEqual(fr.inboundRefs, []);
 });

@@ -51,7 +51,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 매니페스트 문법·회계 분류는 SPEC-007 소유(이 spec은 자동 채움·드리프트 검사만), 키 문법 파생은 SPEC-001, Python 복제는 SPEC-006.
-- **Modules**: key-pipeline, verification-accounting, runtime-parity
+- **Modules**: key-pipeline (references), verification-accounting (references), runtime-parity (references)
 - **Artifacts**: sdd/smoke-manifest.json
 
 ---

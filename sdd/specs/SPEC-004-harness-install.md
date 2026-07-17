@@ -57,7 +57,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references)
 
 ---
 
@@ -112,3 +112,4 @@
 | 2026-07-16 | `sdd-init` Node 클로저에 `check-schema-drift.mjs`·`schema-drift-lib.mjs` 추가 + `speckit-fix` 스킬에 Change-Driver 사용 규칙(공유 파일은 타 스펙 동인이면 억지 Change Log 대신 `Change-Driver`) 명문화 | SPEC-022 동반(게이트 배선) + SPEC-020 후속(가이드 부재로 억지 Change Log로 흐르던 것 봉합) |
 | 2026-07-16 | `sdd-init.sh`의 `.git` 부재 시 훅 배선 조용한 스킵 → 블록별 `⚠` 경고(stderr) + 완료 안내 재요약(`warn()`·`GITWARN`), `init-hooks.test.mjs` 회귀 1건 | 도그푸딩(gsneotek-mis-mcp): `.git` 없으면 훅이 말없이 안 깔려 "강제 궤도 켜진 줄" 오인 — 조용한 스킵 제거(정직) |
 | 2026-07-16 | `sdd-init` Node 클로저에 `sdd-retire.mjs`·`retire-lib.mjs` 추가 | 정리 감사(죽은 코드): SPEC-018 폐기 워크플로 완결(6/6)됐는데 배포 클로저에 빠져 소비 프로젝트가 `sdd-retire`를 못 받던 배포 누락 봉합 |
+| 2026-07-16 | 감사 봉합(P3·M5) — ① pre-commit 경로 필터 제거(src/lib/app/tests 하드코딩이 Go cmd/·pkg/ 등 비-JS 레이아웃에서 게이트를 영원히 미발동시키던 이식성 결함; 게이트는 전역 스캔이라 매 커밋 실행) ② --gate=sh에 fr·ownership 훅 배선 + --gate=go 미배선 명시 경고(기본 경로가 훅 0개로 "채택=상시 강제"와 어긋나던 것) ③ pre-merge-commit 훅 신설(node/py/sh·self-hooks — 무충돌 병합이 pre-commit을 타지 않아 두 브랜치의 같은 번호·같은 키가 main에 착지하던 경쟁 차단) | 감사 P3·M5: "언어 무관" 기둥이 강제 지점(훅 트리거)에서 깨져 있었고, merge commit은 로컬 게이트 사각지대였음 — 소비 프로젝트 도그푸딩 전 선제 봉합 |

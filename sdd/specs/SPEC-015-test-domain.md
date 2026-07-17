@@ -49,7 +49,7 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 
 ## Dependencies (참조 — dedup 제외)
 > fr 게이트 본체는 SPEC-002, prefix-class 면제(TEST)는 SPEC-012 lib, 수명 성격 필드는 SPEC-008, config 어댑터는 SPEC-001, Python 복제는 SPEC-006 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-lifecycle, prefix-class-consistency, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-lifecycle (references), prefix-class-consistency (references), runtime-parity (references)
 
 ---
 

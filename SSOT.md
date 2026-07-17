@@ -25,7 +25,7 @@
 - **FR 게이트**가 spec의 FR 선언과 태그를 대조 →
   - R1: 존재하지 않는 FR 참조 시 fail.
   - R2: 커버 테스트가 있는 spec은 **모든 FR 커버 필수**(strict). 0개인 spec은 incremental에선 warn(점진 도입).
-  - R3(선택, `requireAccounting`): 모든 FR이 **unit-covered ∨ smoke-verified ∨ deferred**로 회계(accounting)되어야 함 — "조용히 미검증"이 경고 속에 쌓이는 것을 제거. smoke/deferred는 `smokeManifest`(JSON: FR→`{method,evidence}` 또는 `{method:"deferred",reason}`)로 선언하고, 게이트는 dangling 키·빈 evidence/reason을 에러 처리한다. **evidence의 질은 기계가 못 본다 — 존재만 강제**(질은 리뷰 몫, 과장 금지). 리포트는 `accounted(unit/smoke/deferred/unaccounted)`. **비-unit 엔트리는 자동 채움(SPEC-010)**: 증거가 사는 파일의 검증 태그(`@verifies`)를 `smoke-scan`이 수집해 매니페스트를 재생성(`--write`)하고 check 모드가 드리프트를 차단 — 수동 연결 제거(수동 선언 경로는 보존).
+  - R3(선택, `requireAccounting`): 모든 FR이 **unit-covered ∨ smoke-verified ∨ deferred ∨ planned**(`Status: Planned` 스펙의 미커버 FR — SPEC-018 FR-005)로 회계(accounting)되어야 함 — "조용히 미검증"이 경고 속에 쌓이는 것을 제거. smoke/deferred는 `smokeManifest`(JSON: FR→`{method,evidence}` 또는 `{method:"deferred",reason}`)로 선언하고, 게이트는 dangling 키·빈 evidence/reason을 에러 처리한다. **evidence의 질은 기계가 못 본다 — 존재만 강제**(질은 리뷰 몫, 과장 금지). 리포트는 `accounted(unit/smoke/deferred/unaccounted)`. **비-unit 엔트리는 자동 채움(SPEC-010)**: 증거가 사는 파일의 검증 태그(`@verifies`)를 `smoke-scan`이 수집해 매니페스트를 재생성(`--write`)하고 check 모드가 드리프트를 차단 — 수동 연결 제거(수동 선언 경로는 보존).
   - `strictSpecs`(spec ID 배열): 전역 `--strict`의 **점진 도입 브리지** — 등재 spec만 R2를 하드로(모든 FR unit 커버 필수, smoke/deferred 대체 불가). 완전 커버에 도달한 spec부터 하나씩 잠근다. (SPEC-007)
 - 로컬 훅·TDD는 `commands.test`(로컬 안전 유닛)만, 인프라 테스트는 개발서버·CI에서 `commands.smoke` — 로컬은 인프라 의존 테스트를 강제하지 않는다. 정본: METHODOLOGY §"검증은 환경으로 계층화된다"(+ `sdd.config.presets` 테스트 tier).
 - 게이트는 **언어·런타임 무관 4판 동봉**: Go 바이너리 `sdd-gate fr`·셸 `sdd_gates.sh fr`·Python `sdd_gates.py fr`·Node `check-fr-coverage.mjs` — 핵심 3커맨드(fr·ownership·run)와 ID 문법(`specIdPrefixes`·`requirementIdPrefixes` 파생)은 4판 동일, **보강게이트·spec-first(§5)까지의 전 게이트는 Node·Python 두 판**(패리티 테스트로 강제 — 커버 매트릭스: `tooling/ci-examples.md`). 아래 본문은 Node 파일명으로 표기.
@@ -65,7 +65,7 @@ converge는 양방향 자동 sync가 아님. **작성=LLM, 승인=사람**(`METH
 
 | 항목 | 규칙 |
 |---|---|
-| **정본(operative)** | `spec.md`는 **영어**가 정본. EARS 키워드+서술부 모두 영어 → 도구(`analyze`/`checklist`)·EARS(IEEE 출처)·AI 처리 일관성 |
+| **정본(operative)** | **필수 하한 = FR 절**: FR 선언 라인(EARS 키워드+서술부)은 영어 — 도구(`analyze`/`checklist`)·EARS(IEEE 출처)·AI 처리 일관성 + 추적 닻이 사는 절이라서. **여타 절**(Input·Story·Edge·SC·Review Log·Change Log)의 언어는 팀 선택 — 킷 자신의 스펙이 "FR만 영어 + 나머지 한국어"의 선례다(추적·게이트는 언어중립 ID·SHALL 토큰만 봐서 기계적으로 무영향). 전문 영어를 택하면 위 일관성 이득이 커진다(권장) |
 | **현지어본** | 영문에서 **생성(generated)** — 문서 변환·팀 뷰·인터뷰 공유용 |
 | **금지** | 현지어본을 손으로 **병행 편집(parallel-edit) 금지** — 영문↔현지어 번역 드리프트라는 새 이음매가 생김. 생성은 단방향만 |
 | **추적 닻** | **언어중립 FR-ID**(`FR-006`) — 본문 언어와 무관하게 테스트·문서가 ID로 연결. **언어 결정과 추적성은 독립** |

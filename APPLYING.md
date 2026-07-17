@@ -39,7 +39,7 @@ cp <KIT>/templates/constitution.md .specify/memory/constitution.md
 ### 병렬 스펙 저술 프로토콜 (멀티에이전트·다중 저자) — Ownership 키 사전 배정
 여러 스펙을 여러 sub-agent(또는 여러 사람)에게 **동시에** 위임해 작성할 때, `check-ownership.mjs`의 키 유일성 강제는 **저술 후 커밋 시점에서야** 충돌(같은 Entity/Surface/Capability를 두 스펙이 소유)을 잡는다. 병렬 저술은 이를 사전에 막지 않으면 뒤늦게 재작업이 터진다(실측: 위임마다 키를 손으로 미리 배정해 예방). 규약:
 1. **위임 전 스캔.** `MODULE_MAP.md`와 기존 스펙들의 `## Ownership` 절을 먼저 읽어 이미 쓰인 Entities/Surfaces/Capabilities 키를 파악한다.
-2. **키를 프롬프트에 명시 지정.** 각 위임 대상에게 그 스펙이 소유할 **정확한 키 값**(Entities/Surfaces/Capabilities/Modules/Symbols/Artifacts)을 프롬프트에 박아 지정한다 — **임의로 짓게 두지 않는다**(임의 생성 = 충돌·중복의 근원).
+2. **키와 스펙 번호를 프롬프트에 명시 지정.** 각 위임 대상에게 그 스펙이 소유할 **정확한 키 값**(Entities/Surfaces/Capabilities/Modules/Symbols/Artifacts)과 **스펙 번호**(`SPEC-0NN`)를 프롬프트에 박아 지정한다 — **임의로 짓게 두지 않는다**(임의 생성 = 충돌·중복의 근원). 번호 사전 배정은 브랜치 간 경쟁에도 적용된다: 병행 브랜치 둘이 각자 "다음 번호"를 집으면 파일명이 달라 **무충돌 병합**되고 각 PR은 개별 green이라 중복이 main에 착지한다 — `pre-merge-commit` 훅(sdd-init 배선)이 병합 시점에 번호 중복·ownership 충돌을 잡지만, 스펙 추가 브랜치는 병합 전 rebase(merge-base 최신화)를 관례로 한다.
 3. **사후 게이트는 여전히 필수.** 위임이 끝나면 `check-ownership.mjs`(+`check-spec-cohesion`)로 검증한다 — 사전 배정은 실수를 줄일 뿐 게이트를 **대체하지 않는다**(사람이 배정한 키에도 오타·누락이 있으니 결정적 그물은 유지).
 
 ## 3. 검증 게이트 배선 (SSOT를 "실재"로) — 언어·런타임 무관
@@ -95,7 +95,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 `METHODOLOGY.md` 0~8단계. 신규=`/specify`→`/clarify`→`/plan`→`/tasks`→`/analyze`→Superpowers TDD→머지→`/converge`. 코드 우선 hotfix=`/converge`로 갭 표면화→`/specify`(update)로 LLM이 spec 갱신→사람 승인.
 
 ## 5. 채택 순서 (점진)
-incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 비-unit 증거는 손으로 잇지 말고 검증 태그(`@verifies`) + `smoke-scan --write`로 자동 채움(SPEC-010). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격. brownfield 재도출(readopt)에는 `derivationManifest`를 켜서 소스 9클래스 회계를 강제(SPEC-009 — src만 읽는 재생성 차단, 절차는 `prompts/readopt.md`).
+incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `strictSpecs`에 등재해 하나씩 잠금(점진 브리지) → 모든 spec이 잠기면 전역 `--strict`. 중간 강도로 `requireAccounting`을 켜면 모든 FR이 최소한 unit/smoke/deferred/planned 중 하나로 **회계**되어야 한다(`smokeManifest`에 사유 선언 — "조용히 미검증" 제거). 비-unit 증거는 손으로 잇지 말고 검증 태그(`@verifies`) + `smoke-scan --write`로 자동 채움(SPEC-010). 스펙 수명주기는 신규 스펙부터 `Status:` 선언으로 편입(Status 없는 기존 스펙은 warn만 — 점진), 미소유 파일 정책은 `warn`으로 시작해 안정 후 `error`(closed-world)로 승격. brownfield 재도출(readopt)에는 `derivationManifest`를 켜서 소스 9클래스 회계를 강제(SPEC-009 — src만 읽는 재생성 차단, 절차는 `prompts/readopt.md`).
 
 ---
 
@@ -155,11 +155,13 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 
 | 훅 | 시점 | 담당 | 강제 수준 |
 |---|---|---|---|
-| `pre-commit` | 커밋 직전 | FR coverage·ownership 중복·PREFIX | exit 1 차단 |
-| `commit-msg` | 커밋 메시지 작성 후 | **spec-sync hard** — 소유 스펙 동반 여부 | exit 1 차단 |
+| `pre-commit` | 커밋 직전 | FR coverage·ownership 중복·PREFIX·번호 무결성 | exit 1 차단 |
+| `pre-merge-commit` | 무충돌 병합 직전 | pre-commit과 동일 게이트(병행 브랜치의 번호·키 경쟁 차단 — 감사 M5) | exit 1 차단 |
+| `commit-msg` | 커밋 메시지 작성 후 | **spec-sync hard** — 소유 스펙 동반·상태 화이트리스트·HEAD-config 판정 | exit 1 차단 |
 
-> **merge commit**: commit-msg 훅은 merge commit에서 spec-sync를 skip한다(range 백스톱이 커버).
-> **`--no-verify`**: 두 훅을 전면 우회한다(기계로 못 막음 — 팀 규율로 방지).
+> **merge commit**: commit-msg 훅은 merge commit에서 spec-sync를 skip하고(pre-merge-commit + range 백스톱이 커버), 서버측(웹 UI) 병합은 CI의 range 모드 + `draftBlockPolicy: hard`가 담당한다.
+> **`--no-verify`**: 로컬 훅을 전면 우회한다(기계로 못 막음 — 로컬은 팀 규율, 서버측은 CI 백스톱).
+> **pre-commit 트리거**: 경로 필터 없음 — 게이트는 레포 상태 전역 스캔이라 매 커밋 실행된다(과거 src/lib/app/tests 하드코딩이 Go·Python 레이아웃에서 게이트를 미발동시키던 결함 봉합 — 감사 P3).
 
 **PREFIX 위반(미등록 접두어) — pre-commit exit 1 차단 실측:**
 ```
@@ -251,7 +253,7 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 기존 스펙에 `Files` glob이 없으면 `check-spec-sync`가 해당 파일 변경을 추적하지 않는다. 적용 순서:
 
 1. 각 스펙의 `## Ownership` 절에 `- **Files**: <소유 경로 glob>` 한 줄 추가 (예: `src/lib/pdf/**`).
-2. glob은 `**`와 `*` 만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
+2. glob은 `**`와 `*`만 지원 — 템플릿에서 `[소유하는 코드 경로]` 같은 placeholder를 그대로 두면 `check-spec-sync`가 `⚠ 미지원 glob 문법` 경고를 낸다(채우라는 신호). 실제 경로로 치환 후 재커밋.
 3. `sdd-init` 이후 신규 스펙은 템플릿(`sdd/templates/spec-template.md`)에 Files 절이 포함되어 자동 안내된다.
 
 **마이그레이션 — CI/CD를 INFRA 스펙에서 CICD로 이관.** CI/CD·릴리스 자동화가 관행적으로 INFRA 계열 스펙에 얹혀 있던 프로젝트는 이제 `CICD` 표준 접두어로 분리한다(iac 자원=INFRA, ci 파이프라인=CICD — fr 게이트가 강제). 절차:

@@ -4,7 +4,7 @@
 - **1 레포 = 1 모듈** (무조건). 레포 하나 = 안정적 bounded context 하나 = 그 능력 영역의 SSOT 홈. 모듈이 늘면 **레포가 는다**(한 레포에 여러 모듈을 넣지 않는다). 기계 신호: 전 스펙의 `Module` 헤더 값이 하나여야 하며, 갈라지면 `check-spec-completeness`가 advisory로 표면화한다(`--strict` 하드 — SPEC-013). "무엇이 한 모듈인가"의 판정 자체는 리뷰 경계(`METHODOLOGY.md`).
 - **spec** = 그 모듈 안의 응집된 기능 단위. 각 spec = 그 기능의 **살아있는 기능명세서**. 한 모듈(레포)은 spec 다수를 가진다.
 - **큰 프로그램 = 여러 모듈-레포의 MSA 합성** — 모듈 간은 공개 계약(API/이벤트)으로만 결합한다. 그 계약을 1급 SSOT로 강제하는 **MSA 계약 프로파일은 다중 모듈일 때 켜는 선택 계층**(Phase 2).
-- **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 aggregate(핵심 Entity) — dedup이 경계 강제(`DEDUP.md` §3)**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조(읽기/호출만) — `EntityName (relation-type)`로 적으면 대상 실재·소유 spec을 게이트가 자동 해석하고 순환 참조를 advisory로 경고한다(구조화는 opt-in, SPEC-017). "응집 묶음"보다 훨씬 결정적인 경계 닻으로, dedup 게이트가 "1 Entity=1 spec" 판정을 사후 강제하고, cohesion 게이트가 Ownership.Entities가 `maxAggregateRootsPerSpec`(config, 기본 1)를 초과하면 "여러 aggregate 삼킴 의심"을 advisory로 신호한다(aggregate root + 그 자식 표를 한 spec이 함께 소유하는 모델이면 이 값을 상향). — 서로 다른 aggregate root를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **aggregate별로 분할**한다. 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
+- **입도 — 양방향:** (a) 한 모듈(레포) 안 spec을 너무 잘게 쪼개면 중복 리뷰 폭발(과편화), (b) 반대로 **한 spec에 여러 기능을 욱여넣으면 추적·소유권이 무력화**(under-fragmentation). 기준은 **1 spec = 1 aggregate(핵심 Entity) — dedup이 경계 강제(`DEDUP.md` §3)**: 한 spec = 한 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)를 소유 + 그 aggregate를 변경하는 Capability/Surface를 함께 소유. 다른 aggregate는 `## Dependencies`로 참조(읽기/호출만) — `EntityName (relation-type)`로 적으면 대상 실재·소유 spec을 게이트가 자동 해석하고 순환 참조를 advisory로 경고한다(구조화는 opt-in, SPEC-017). "응집 묶음"보다 훨씬 결정적인 경계 닻이다. dedup 게이트가 "1 Entity=1 spec" 판정을 사후 강제하고, cohesion 게이트는 Ownership.Entities가 `maxAggregateRootsPerSpec`(config, 기본 1)을 초과하면 "여러 aggregate 삼킴 의심"을 advisory로 신호한다(aggregate root + 그 자식 표를 한 spec이 함께 소유하는 모델이면 이 값을 상향). 서로 다른 aggregate root를 여럿 소유하거나 독립 user story 여러 개에 걸치면 **aggregate별로 분할**한다. 그 모듈의 spec은 `MODULE_MAP.md`(단일 모듈 매니페스트)로 인덱싱.
 
 ## 핵심 구분: 모듈 명세서(누적) vs feature 델타(병합)
 | | 정체 | 성격 |
@@ -43,11 +43,12 @@
 
 원칙(owner): 불필요한 FR은 **delete**(미룸 아님) — `deferred`는 "할 건데 아직"에만 쓴다. 유령 명세(0/N Active)가 리포트 노이즈로 쌓이면 그건 `Planned`(안 지음)거나 `Removed`(폐기) 둘 중 하나여야지, Active인 채 방치가 아니다.
 
-1. 사람이 제거 결정(spec-first) → `sdd-retire <SPEC-ID | SPEC-ID/FR-NNN>`(dry-run)로 **폐기 계획**(삭제 대상 + dangling `@covers` + 제거될 smoke 매니페스트 키 + 결과 번호 gap) 산출·검토(SPEC-018). 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
-2. `sdd-retire … --write`가 매니페스트·deferred 엔트리를 원자적 재sync + tasks 생성: "FR-NNN 코드·테스트 삭제". 폐기가 남긴 번호 gap은 `retiredIds`(config)에 기록하면 numbering 게이트가 "정상 retirement gap"으로 취급(사고성 결번과 구분, FR-006).
-3. 구현이 **코드 + 테스트를 같은 PR로 원자적 삭제** → 검증(빌드 green, dangling 없음).
-4. spec 파일 삭제 + `MODULE_MAP`/Change Log에 제거 기록. **git이 히스토리 보존**(graveyard 폴더 불필요).
-5. 사람 승인.
+1. 사람이 제거 결정(spec-first) → `sdd-retire <SPEC-ID | SPEC-ID/FR-NNN>`(dry-run)로 **폐기 계획**(삭제 대상 + dangling `@covers` + 제거될 smoke 매니페스트 키 + 결과 번호 gap + **inbound 참조** — 타 스펙의 구조화 관계·Dedup-Review 언급, SPEC-018 FR-008) 산출·검토(SPEC-018). 모듈 명세서에 **REMOVED 델타** 또는 spec `Status=Removed`.
+2. **참조 스펙 선갱신(같은 PR):** 계획이 지목한 inbound 참조를 정리한다 — 참조 스펙의 `Dependencies` 관계 항목 제거/이전, Dedup-Review는 "이웃 없음(삭제됨)" 등으로 갱신. 남기면 삭제 커밋이 관계 실재 hard(SPEC-017)·dangling advisory(SPEC-013)에 막힌다.
+3. `sdd-retire … --write`가 매니페스트·deferred 엔트리를 원자적 재sync + tasks 생성: "FR-NNN 코드·테스트 삭제". 폐기가 남긴 번호 gap은 `retiredIds`(config)에 기록하면 numbering 게이트가 "정상 retirement gap"으로 취급(사고성 결번과 구분, FR-006) — **최소번호(001 등) 스펙 폐기도 선행 번호 전부가 retiredIds에 있으면 001-시작 hard가 면제**되고(SPEC-014 FR-001), 기록된 폐기 ID를 새 스펙이 재사용하면 hard로 막힌다(FR-004 — 과거 참조 앨리어싱 방지).
+4. 구현이 **코드 + 테스트를 같은 PR로 원자적 삭제** → 검증(빌드 green, dangling 없음).
+5. spec 파일 삭제 + `MODULE_MAP`/Change Log에 제거 기록. **git이 히스토리 보존**(graveyard 폴더 불필요).
+6. 사람 승인.
 
 **"spec 삭제 ⟹ 코드 삭제" — 방향은 맞지만 자동 아님(정직):**
 - 코드는 spec의 파생물이라 spec에서 기능을 없애면 코드도 없어져야 한다. 그러나 `rm spec`이 코드를 자동 삭제하진 않는다 — 위 2~3(task→구현)으로 흐르고 **한 PR로 묶어 원자적**으로 한다.
@@ -60,7 +61,7 @@
 
 **과광역 glob 경고:** 여러 spec의 Files glob이 같은 파일을 덮으면(겹침) `check-spec-sync`가 **AND**로 동작 — 해당 파일 변경 시 *모든* 소유 스펙에 의미 있는 변경을 요구한다. 공유 유틸이 N개 스펙 편집을 강요하는 부담이 되므로 겹침은 최소화를 권장한다. 공유 코드는 별도 스펙(또는 미소유→converge-drift 소관)으로 두는 것이 좋다.
 
-**INFRA 스펙 config 파일 소유 관행(권장):** 프로젝트 루트 config 파일(`next.config.ts`·`tsconfig.json`·`vite.config.ts` 등)은 특정 기능 스펙의 소유가 아니어서 check-spec-sync가 침묵한다(converge-drift advisory만). 이 사각지대를 닫으려면 **INFRA 스펙**(`INFRA-001` 등)에 `Files: next.config.ts, tsconfig.json, …`으로 등록하는 관행을 권장한다. 채택하지 않으면 config 파일 변경은 advisory 그물만 적용된다(과장 금지).
+**INFRA 스펙 config 파일 소유 관행(권장):** 프로젝트 루트 config 파일(`next.config.ts`·`tsconfig.json`·`vite.config.ts` 등)은 특정 기능 스펙의 소유가 아니어서 check-spec-sync가 침묵한다(converge-drift advisory만). 이 사각지대를 닫으려면 **INFRA 스펙**(`INFRA-001` 등)에 `Files: next.config.ts, tsconfig.json, …`으로 등록하는 관행을 권장한다. 채택하지 않으면 config 파일 변경은 advisory 그물만 적용된다(과장 금지). **`sdd.config.json` 자신은 예외 없이 소유하라(감사 T1)** — 이 파일은 전 게이트의 강도를 통제하는 통제면이라, exempt에 넣으면 강제 무력화 커밋이 흔적 없이 통과한다. 스펙 소유(킷은 config 어댑터 스펙 SPEC-001의 Files)로 변경 흔적을 강제하고, spec-sync는 staged 판정을 HEAD 시점 config로 내려 "약화 커밋을 약화된 규칙이 심판"하는 순환을 막는다.
 
 **만성 unowned 경고 — exempt인가 소유인가(사용 규범):** `specSyncUnownedPolicy=warn`이 같은 파일을 매번 unowned로 표면화하면, 그건 둘 중 하나다 — **(a) 정당한 미소유**(서버 부트스트랩·테스트 하네스·생성물처럼 어느 기능 스펙에도 안 속하는 인프라): `specSyncExemptGlobs`에 선언해 "의도적 미소유"를 **한 번** 명문화한다(만성 노이즈 제거). **(b) 진짜 drift**(소유돼야 할 기능 코드가 어느 Files에도 안 잡힘): 그 스펙 `Files:`에 등록해 소유시킨다. 판정 기준은 "이 파일이 어떤 FR의 파생물인가" — 그렇다면 (b) 소유, 아니면 (a) exempt. **하지 말 것:** 진짜 기능 코드를 노이즈를 지우려고 exempt에 넣는 것(소유 사각지대를 영구화). exempt는 "이건 원래 아무 spec 것도 아님"의 선언이지 "지금 매핑하기 귀찮음"의 도피처가 아니다.
 

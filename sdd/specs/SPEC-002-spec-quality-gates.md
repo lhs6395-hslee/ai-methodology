@@ -54,7 +54,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 이 게이트군은 키의 파싱·정규화·검증을 SPEC-001에 위임한다.
-- **Modules**: key-pipeline
+- **Modules**: key-pipeline (references)
 
 ---
 
@@ -101,3 +101,4 @@
 | 2026-07-15 | cohesion FR 카운터를 `__frTokenRe`(평문 토큰) → `__frDeclRe`(`**FR-NNN**` 정의)로 + 회귀 테스트 | 도그푸딩(소비 프로젝트 B): Change Log·근거 문단의 FR 인용이 정의로 오집계돼 "FR 15>11" 오탐(실 본문 13) — coverage와 동일 사이트(정의만) 통일 |
 | 2026-07-15 | `check-fr-coverage`가 Status: Planned 스펙을 파싱해 `plannedSpecs`를 회계 코어에 전달 + 리포트에 `planned:` 세그먼트·R2 "planned" 메시지 | SPEC-018 FR-005 동반: fr 게이트 본체가 Planned 회계를 배선(판정 코어는 SPEC-007, enum은 SPEC-008) |
 | 2026-07-16 | fr 게이트가 `cfg.retiredIds`를 `numberingIssues`에 전달 — 폐기 gap이 잡음으로 뜨지 않게 배선(판정 코어는 SPEC-014) | SPEC-018 FR-006 동반: 번호 무결성 호출부가 retiredIds를 전달하는 배선점 |
+| 2026-07-16 | fr 게이트에 Planned↔커버리지 모순 검사 편입 — Status Planned인데 unit 커버 FR 실재면 exit 1(판정 FR은 SPEC-018 FR-007 소유, 이 spec은 fr 게이트 본체 배선) | 감사 T2 동반: Active→Planned 뒤집기로 strictSpecs·R3를 침묵시키는 회계 침묵기 경로 차단 |

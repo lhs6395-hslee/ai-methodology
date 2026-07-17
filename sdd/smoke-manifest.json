@@ -1,4 +1,12 @@
 {
+  "CICD-001/FR-001": {
+    "method": "smoke",
+    "evidence": ".github/workflows/sdd-gates.yml — 이 워크플로의 GitHub Actions 실행 로그(push/PR마다 스위트+게이트)"
+  },
+  "CICD-001/FR-002": {
+    "method": "smoke",
+    "evidence": ".github/workflows/sdd-gates.yml — PR run의 spec-sync(range) 스텝 로그 — merge-base 대비 판정"
+  },
   "SPEC-001/FR-005": {
     "method": "deferred",
     "reason": "Surface 형식 위반 분기(http/path/any)의 unit @covers 태깅 미부착 — 태깅 승격 백로그(2026-07-05 회계 도입 시점 스냅샷)"

@@ -53,7 +53,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > completeness 게이트 본체는 SPEC-002 소유(이 spec은 근거 판정 코어만), config 파생·글롭 컴파일은 SPEC-001·SPEC-003 소유, Python 복제는 SPEC-006 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync, runtime-parity
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references), runtime-parity (references)
 
 ---
 

@@ -52,7 +52,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 승격 판정 코어만 이 spec 소유. spec-sync 게이트 본체(changeset·트레일러·FR라인 diff 수집)는 SPEC-003, config knob 문법은 SPEC-001, Python 복제는 SPEC-006.
-- **Modules**: spec-sync, key-pipeline, runtime-parity
+- **Modules**: spec-sync (references), key-pipeline (references), runtime-parity (references)
 
 ---
 

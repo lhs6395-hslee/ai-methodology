@@ -32,7 +32,7 @@
 - **FR-001** (event): WHEN a spec declares a `Status` header, THE SYSTEM SHALL accept only the lifecycle enum Draft, Reviewed, Approved, Active, Deprecated, Removed, and the completeness gate SHALL flag an out-of-enum value or a missing header (advisory; hard under `--strict`).
 - **FR-002** (state): WHILE a spec's Status is Reviewed, Approved, or Active, THE SYSTEM SHALL require at least one `## Review Log` entry with a real date, actor, and verdict, flagged by the completeness gate when absent.
 - **FR-003** (state): WHILE a spec's Status is Reviewed, Approved, or Active, THE SYSTEM SHALL require a `## Dedup-Review` record naming at least one reviewed neighbor spec ID (or an explicit no-neighbor statement), flagged by the completeness gate when absent.
-- **FR-004** (unwanted): IF a changed code file is owned by a spec whose Status is Draft, THEN the spec-sync gate SHALL report a violation regardless of accompanying spec edits — hard in staged mode, advisory in range mode — escapable only via the `Spec-Impact: none` trailer with a reason.
+- **FR-004** (unwanted): IF a changed code file is owned by a spec whose declared Status is below Reviewed — Draft, Planned, or any out-of-enum value, judged by whitelist rather than by matching the literal `Draft` — THEN the spec-sync gate SHALL report a violation naming that status regardless of accompanying spec edits — hard in staged mode, advisory in range mode — escapable only via the `Spec-Impact: none` trailer with a reason; specs without a Status header remain legacy pass-through (FR-005).
 - **FR-005** (ubiquitous): THE SYSTEM SHALL treat specs without a Status header as legacy outside lifecycle enforcement — surfaced as a completeness warning, exempt from the Draft block — so adoption proceeds spec-by-spec.
 - **FR-006** (state): WHILE a spec carries a `Lifecycle` header, THE SYSTEM SHALL require its value to be one of `removable|permanent` and SHALL warn (hard under `--strict`) otherwise; absence is permitted (optional field, orthogonal to Status), so removable non-product tooling is machine-distinguishable from permanent product specs.
 - **FR-007** (state): WHILE `draftBlockPolicy` is `hard`, THE SYSTEM SHALL treat an FR-004 Draft-block violation as a hard error (non-zero exit) in range mode too, not only staged mode; WHILE `draftBlockPolicy` is `advisory` (default), range mode SHALL keep its existing non-blocking behavior; an out-of-enum value SHALL exit non-zero. This lets a CI job that runs the spec-sync gate in range mode against a merge base (the only enforcement point a git-hosting UI's server-side merge cannot skip, since local `commit-msg` hooks never run there) actually block the merge on a Draft-owned code change.
@@ -52,7 +52,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 소비 게이트 본체는 SPEC-002(completeness)·SPEC-003(spec-sync) 소유 — 이 spec은 수명주기 문법·판정 코어만 소유. Python 복제는 SPEC-006.
-- **Modules**: spec-quality-gates, spec-sync, runtime-parity
+- **Modules**: spec-quality-gates (references), spec-sync (references), runtime-parity (references)
 
 ---
 
@@ -87,3 +87,4 @@
 | 2026-07-06 | FR-006 신설 — `Lifecycle: removable\|permanent` 선택 필드(lifecycle-lib `parseLifecycle`·`LIFECYCLE_ENUM`), completeness가 있으면 enum 검증(--strict 하드), Node·Python 패리티 | SPEC-015(TEST 삭제가능 도메인) 동반 — 제품 vs 임시 도구를 기계가 구분(Status와 직교한 수명 성격) |
 | 2026-07-09 | FR-007 신설 — `draftBlockPolicy`(advisory\|hard) config knob, Node·Python 패리티(check-spec-sync.mjs·sdd_gates.py) | 도그푸딩(소비 프로젝트 B): CICD-001이 Draft인데 Jenkinsfile이 `Merge branch '...' into 'main'`(GitLab 웹 UI 병합)로 여러 커밋 통과 — 로컬 commit-msg 훅은 웹 UI 병합엔 절대 실행되지 않고, 소비 프로젝트 B Jenkinsfile엔 `sdd_gates.py` 호출 자체가 없어 range advisory조차 안 돔[검증]. "채택=상시 강제"가 로컬 훅 전용이라 서버측 병합엔 무력했던 구조적 사각지대 — CI가 range 모드로 이 knob을 `hard`로 켜면 MR 파이프라인에서 막을 수 있게 승격 |
 | 2026-07-15 | STATUS_ENUM에 `Planned` 추가(맨 앞) — 선언·미구현 백로그 상태, Node·Python | SPEC-018 FR-005 동반: Planned 스펙의 0-coverage를 회계에서 planned로 분류(유령 노이즈 제거) — enum 소유는 이 spec |
+| 2026-07-16 | FR-004 개정 — Draft 문자열 등가 검사를 `canLeadCode` 화이트리스트(Reviewed/Approved/Active/Deprecated/Removed)로 반전: Planned·enum 밖 값(Wip 등)도 소유 코드 차단, 위반 메시지가 실제 상태명 지목. lifecycle-lib `canLeadCode` 신설, Node·Python 패리티 | 감사 T2: "리뷰 없는 스펙이 코드를 이끌 수 없다"의 실구현이 한 상태의 이름 검사였음 — Draft보다 덜 리뷰된 Planned·비enum 상태가 코드를 자유롭게 이끌던 구멍(상태 순서 보장 복원) |

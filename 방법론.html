@@ -229,7 +229,7 @@
   <p class="sub">명세 기반이 완벽하다는 말이 아니다. SDD가 흔히 지적받는 약점을, 우리는 다음 장치로 메운다.</p>
   <div class="tablewrap"><table>
     <tr><th>SDD가 지적받는 단점</th><th>우리의 보완</th></tr>
-    <tr><td>작은 수정에도 절차가 붙는 <strong>오버헤드</strong></td><td><code>Spec-Impact: none</code> 탈출구·hotfix 경로로 <strong>사소한 변경은 가볍게</strong> 통과</td></tr>
+    <tr><td>작은 수정에도 절차가 붙는 <strong>오버헤드</strong></td><td>행위 불변(포맷팅·주석)은 <code>Spec-Impact: none</code> 트레일러, 행위 변경 hotfix는 <code>/speckit.fix</code>의 최소 스텁(Change Log 한 줄)으로 <strong>가볍게</strong> 통과</td></tr>
     <tr><td>코드와 스펙을 <strong>함께 관리하는 부담</strong></td><td><code>retag</code>·<code>smoke-scan</code>이 연결을 <strong>자동 갱신</strong> — 손품 최소화</td></tr>
     <tr><td>스펙이 낡으면 오히려 <strong>오해를 부름</strong></td><td>drift 게이트가 어긋남을 <strong>상시 감지</strong> — 낡기 전에 되돌림</td></tr>
     <tr><td>회계를 <strong>형식적으로 채울 위험</strong></td><td>근거·담당(<code>entityRegistry</code>) 등록을 <strong>필수화</strong> — 빈 양식 차단</td></tr>
@@ -411,7 +411,7 @@
     <tr><td><code>check-ownership</code> <span style="color:var(--muted)">(dedup)</span></td><td><strong>2개 spec이 같은 키 소유</strong> = 중복 + <strong>entity 등록제</strong>(<code>entityRegistry</code> — 미등록 entity·빈 사유) + <strong>Entity 관계</strong>(SPEC-017 — <code>Entity (relation-type)</code> 대상 실재 hard·순환 advisory)</td><td class="blk">차단</td><td>같은 방을 두 도면이 그림 / 무허가 지번</td></tr>
     <tr><td><code>check-spec-cohesion</code> <span style="color:var(--muted)">(거울상)</span></td><td><strong>1개 spec이 키/FR 과다</strong> = 욱여넣기</td><td class="pass">권고</td><td>한 도면에 집 전체를 우겨넣음</td></tr>
     <tr><td><code>check-spec-completeness</code></td><td>FR 있는데 <strong>SC·인수조건 없음</strong> + <strong>수명주기 기록</strong>(Status enum 밖 값·Reviewed 이상인데 Review Log/Dedup-Review 없음) + <strong>Change Log 근거 빈 값</strong>(선제 캡처 — 변경의 "왜"는 저술 시점에만 남는다) + <strong>문법 규범</strong>(Module 헤더 존재·값 단일성=1레포 1모듈, FR 라인 SHALL, Dedup-Review 참조 실재) + <strong>오브젝트 스토리지 결정</strong>(SPEC-016 — 마커 매치 시 버킷 선택·이전 기록)</td><td class="pass">권고</td><td>도면에 합격 기준·검수 도장·변경 사유가 안 적힘</td></tr>
-    <tr><td><code>check-spec-sync</code> <span style="color:var(--muted)">(spec-first)</span></td><td>소유 코드 변경에 스펙 미동반 + <strong>Draft 스펙 소유 코드</strong>(리뷰 전 코드 금지) + <strong>미소유 파일</strong>(<code>specSyncUnownedPolicy</code>)</td><td class="blk">차단(commit-msg)</td><td>도면 갱신 없이 공사 / 검토 안 된 도면으로 착공</td></tr>
+    <tr><td><code>check-spec-sync</code> <span style="color:var(--muted)">(spec-first)</span></td><td>소유 코드 변경에 스펙 미동반 + <strong>Reviewed 미만 상태(Draft·Planned·enum 밖) 스펙 소유 코드</strong>(화이트리스트 — 리뷰 전 코드 금지) + <strong>미소유 파일</strong>(<code>specSyncUnownedPolicy</code>) — staged 판정은 <strong>HEAD 시점 config</strong>(자기약화 커밋 방지), <code>Spec-Impact</code> 트레일러는 동반·상태 차단만 면제(글롭 문법·unowned는 우회 불가)</td><td class="blk">차단(commit-msg)</td><td>도면 갱신 없이 공사 / 검토 안 된 도면으로 착공</td></tr>
     <tr><td><code>check-derivation</code> <span style="color:var(--muted)">(재도출 회계)</span></td><td>재생성이 <strong>소스 클래스를 조용히 안 읽음</strong> — 9클래스(code·iac·ci·ops-docs·build-evidence·vcs-history·prior-traceability·prior-intent·human-intent) 전부 mapped ∨ none ∨ deferred 회계 + <strong>실재↔선언 교차검사</strong>(IaC 있는데 none = 차단)</td><td class="blk">차단</td><td>현장 실사 없이 도면만 보고 "다 봤다"는 감리</td></tr>
     <tr><td><code>sdd-smoke-scan</code> <span style="color:var(--muted)">(증거 자동 수집)</span></td><td>smoke 증거의 <strong>수동 연결·드리프트</strong> — 검증 태그(<code>@verifies</code>)를 CI 정의·스크립트·runbook에서 수집해 매니페스트를 재생성(<code>--write</code>), check 모드가 태그↔매니페스트 불일치 차단</td><td class="blk">차단(check)</td><td>검사 성적서를 손으로 옮겨 적다 틀리는 것</td></tr>
     <tr><td>보강 4종</td><td>빈 테스트 / 코드만 바뀜 / 명세 없는 코드 / 근거 없는 키</td><td class="pass">권고</td><td>advisory 경고</td></tr>
@@ -470,12 +470,13 @@
     <div class="step"><span class="n">3</span><b>plan</b><span>FR ↔ 컴포넌트 매핑</span></div>
     <div class="step"><span class="n">4</span><b>tasks</b><span>2~5분 TDD 작업으로 분해</span></div>
     <div class="step"><span class="n">5</span><b>analyze</b><span>누락·모순·중복 + 게이트(ownership/cohesion)</span></div>
+    <div class="step"><span class="n">5b</span><b>리뷰 기록·승격</b><span>5의 결과를 Review Log·Dedup-Review에 기록, Status: Reviewed↑ — 이 단계 없이 6으로 가면 commit-msg가 차단(SPEC-008)</span></div>
     <div class="step"><span class="n">6</span><b>구현</b><span>TDD RED→GREEN — 테스트 먼저, 통과시킴</span></div>
     <div class="step"><span class="n">7</span><b>머지</b><span>사람 PR 리뷰·승인</span></div>
     <div class="step"><span class="n">8</span><b>converge</b><span>시간 지나 drift났나 검사 → 갭 표면화</span></div>
     <div class="step"><span class="n">9</span><b>close-out</b><span>트래커 유래 작업이면 — 트래커 dev-done → 이해관계자 보고 → 리포터 confirm</span></div>
   </div>
-  <p class="note"><strong>양방향 동기화 — 작성은 LLM, 승인은 사람.</strong><br>· <strong>위→아래</strong>(spec→code): 사람이 spec 작성 → 미구현을 구현.<br>· <strong>아래→위</strong>(code→spec, 핫픽스 후): 코드가 먼저 바뀜 → <em>사람이 "무슨 기능·왜"(intent) 한 줄 입력</em> → LLM이 코드+intent로 spec 갱신 → 사람이 "정본화 vs 되돌리기" 승인. — 코드만 보고 spec을 자동으로 덮어쓰지 않는다(그러면 spec이 코드의 거울로 전락해 drift 탐지가 무의미해진다).</p>
+  <p class="note"><strong>양방향 동기화 — 작성은 LLM, 승인은 사람.</strong><br>· <strong>위→아래</strong>(spec→code): 사람이 spec 작성 → 미구현을 구현.<br>· <strong>아래→위</strong>(code→spec, 핫픽스): 커밋 1에 소유 스펙의 <em>최소 스텁</em>(Edge Case/Change Log 한 줄 — <code>/speckit.fix</code> 정공법, spec-first hard는 핫픽스 커밋에도 그대로) → <em>사람이 "무슨 기능·왜"(intent) 한 줄 입력</em> → LLM이 코드+intent로 spec 완전 갱신 → 사람이 "정본화 vs 되돌리기" 승인. <code>Spec-Impact: none</code>은 행위 불변(포맷팅) 전용 — 행위를 바꾸는 핫픽스에 쓰면 남용이다. — 코드만 보고 spec을 자동으로 덮어쓰지 않는다(그러면 spec이 코드의 거울로 전락해 drift 탐지가 무의미해진다).</p>
   <p class="note gate">⑨ <strong>완료 루프의 꼬리 — 원점 트래커 close-out.</strong> 실무 작업의 상당수는 QA/이슈 트래커에서 유래한다(예: 페이지별 QA 메모, open→done→confirmed). 그런 작업은 verify/merge로 끝이 아니라 — <strong>①트래커 dev-done</strong>(개발자) → <strong>②이해관계자 완료 보고</strong>(무엇·왜·어떻게+검증 경로) → <strong>③리포터 confirm</strong>(리포터/QA)까지가 완료다. <strong>2인 책임분리</strong>: 개발자는 confirm을 건드리지 않는다. 트래커·보고 채널은 킷에 하드코딩하지 않고 <code>trackerCloseout</code> config로 인스턴스화 — 외부 시스템·사람 몫이라 게이트가 아니라 규범이다.</p>
 </div></section>
 
@@ -747,12 +748,12 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
     <div class="step"><span class="n">3</span><b>스펙 갱신</b><span>FR 수정 또는 Edge Cases/Change Log 행 추가</span></div>
     <div class="step"><span class="n">4</span><b>git add + 재커밋</b><span>스펙 파일도 스테이징해야 통과</span></div>
   </div>
-  <p class="note">스펙과 진짜 무관한 변경(리팩터링·포맷팅·설정 파일)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러를 달면 즉시 통과. 사유 없이 <code>Spec-Impact: none</code>만 쓰면 차단(사유 필수).</p>
+  <p class="note">행위 불변 변경(리팩터링·포맷팅)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러로 통과(사유 필수 — 없으면 차단). 단 면제 범위는 <strong>동반 요구·상태 차단뿐</strong> — Files 글롭 문법 위반과 unowned closed-world는 트레일러로 우회할 수 없다(감사 T3). 공유 파일을 타 스펙 기능 때문에 고칠 땐 <code>Change-Driver: SPEC-X [@glob] &lt;사유&gt;</code> — <code>@glob</code> 경로 스코프를 달면 매치 파일만 완화된다(감사 T4).</p>
 
   <h3>스펙 수명주기 — 리뷰 안 된 스펙은 코드를 이끌 수 없다</h3>
-  <p>스펙 헤더 <code>Status:</code>는 enum이다 — <code>Draft → Reviewed → Approved → Active → Deprecated → Removed</code>. 강제하는 것은 <strong>시간 순서가 아니라 상태 순서</strong>다:</p>
+  <p>스펙 헤더 <code>Status:</code>는 enum이다 — <code>Planned → Draft → Reviewed → Approved → Active → Deprecated → Removed</code>. 차단은 화이트리스트(Reviewed 이상만 코드 주도 가능)라 Draft만이 아니라 Planned·enum 밖 값도 걸린다(감사 T2). 강제하는 것은 <strong>시간 순서가 아니라 상태 순서</strong>다:</p>
   <div class="pipe">
-    <div class="step"><span class="n">1</span><b>Draft</b><span>작성 중 — 이 스펙이 소유한 코드 변경은 commit-msg가 차단(스펙을 같이 고쳐도)</span></div>
+    <div class="step"><span class="n">1</span><b>Draft</b><span>작성 중 — Reviewed 미만(Planned·enum 밖 포함)이 소유한 코드 변경은 commit-msg가 차단(스펙을 같이 고쳐도)</span></div>
     <div class="step"><span class="n">2</span><b>Reviewed</b><span><code>/analyze</code>+<code>/checklist</code> 결과를 <code>## Review Log</code>(일시·수행자·판정)와 <code>## Dedup-Review</code>(이웃 검토)에 기록해야 승격 — 기록 존재를 completeness가 검사</span></div>
     <div class="step"><span class="n">3</span><b>Approved → Active</b><span>승인 후 구현 — 이때부터 소유 코드가 자유롭게 흐른다(동반 변경 규칙은 그대로)</span></div>
   </div>
@@ -764,7 +765,7 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
     <div class="card"><h4><code>draftBlockPolicy: "advisory"</code>(기본)</h4><p>하위호환 — range 모드는 지금처럼 경고만, exit 0.</p></div>
     <div class="card"><h4><code>draftBlockPolicy: "hard"</code></h4><p>range 모드에서도 Draft 위반이 exit 1. CI가 <code>&lt;GATE&gt; specsync [base]</code>를 MR 파이프라인에 걸면, 로컬 훅이 안 타는 웹 UI 병합도 이 지점에서 막힌다.</p></div>
   </div>
-  <p class="note gate">로컬 pre-push/commit-msg 훅과 이 CI 스텝은 서로를 대체하지 않는다 — 훅은 로컬 커밋 경로의 백스톱, 이 스텝은 훅이 절대 닿지 않는 <strong>서버측 병합 경로</strong>의 백스톱이다. 둘 다 있어야 "채택 = 상시 강제"가 실제로 완성된다.</p>
+  <p class="note gate">로컬 pre-push/commit-msg 훅과 이 CI 스텝은 서로를 대체하지 않는다 — 훅은 로컬 커밋 경로의 백스톱, 이 스텝은 훅이 절대 닿지 않는 <strong>서버측 병합 경로</strong>의 백스톱이다. 둘 다 있어야 "채택 = 상시 강제"가 실제로 완성된다. 킷 자신도 이 처방을 따른다 — <code>.github/workflows/sdd-gates.yml</code>(CICD-001)이 push/PR마다 스위트·게이트를, PR엔 range spec-sync(<code>draftBlockPolicy: hard</code>)를 강제한다.</p>
 
   <h3>재도출 소스 회계 — 재생성은 src만 읽으면 미완성이다</h3>
   <p>두 프로젝트 재생성 비교에서 <strong>[검증]</strong>된 결론: 재생성은 레포 안에서 도출 가능한 모든 것을 손작성본보다 잘 뽑지만, 초기 재도출이 src 밖(terraform/k8s/CI)을 아예 안 읽어 INFRA FR을 잃었고, smoke 실증거·<code>@covers</code> 재연결·인간 의도는 수작업으로 남았다. 그 4개 잔여를 전부 문법화했다:</p>
@@ -780,7 +781,7 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
 <section id="orbit"><div class="wrap">
   <span class="eyebrow">채택 후 일상 운영</span>
   <h2>채택 후 궤도 한 바퀴 — hook·게이트가 언제·무엇을 하나</h2>
-  <p><code>sdd-init</code>로 채택하면 <strong>SessionStart·PreToolUse·pre-commit이 자동 배선</strong>되고, 이후 모든 세션·커밋이 방법론 궤도를 강제받는다. pre-push는 <code>ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push</code>로 선택 연결한다. 아래가 실제 개발 하루 — 가상 기능 "직원 추천"을 기준으로.</p>
+  <p><code>sdd-init</code>로 채택하면 <strong>SessionStart·PreToolUse·pre-commit·pre-merge-commit이 자동 배선</strong>되고(pre-merge-commit은 무충돌 병합의 스펙 번호·ownership 키 경쟁을 병합 시점에 차단 — 감사 M5; pre-commit은 경로 필터 없이 매 커밋 실행 — 언어 무관, 감사 P3), 이후 모든 세션·커밋이 방법론 궤도를 강제받는다. pre-push는 <code>ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push</code>로 선택 연결한다. 아래가 실제 개발 하루 — 가상 기능 "직원 추천"을 기준으로.</p>
   <div class="note">두 레이어: <strong>Claude Code hook(상기)</strong> — 세션 시작·코드 편집 시 컨텍스트 주입(Claude Code에서만). <strong>git hook(hard 차단)</strong> — 커밋·푸시에서 언어·에이전트 무관 물리 차단(백스톱).</div>
 
   <div class="orbit">

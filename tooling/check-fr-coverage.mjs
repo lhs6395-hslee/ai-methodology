@@ -199,6 +199,14 @@ for (const f of specMdNames) {
   if (parseStatus(readFileSync(join(SPEC_DIR, f), "utf8")) === "Planned") plannedSpecs.add(id);
 }
 const acct = accountingActive ? classify(specs, covered, manifest, plannedSpecs) : null;
+// Planned↔커버리지 모순(SPEC-018 FR-007): Planned는 "안 지음" 선언인데 unit 커버 FR이 실재하면 모순 —
+// Active→Planned 뒤집기로 strictSpecs·R3를 침묵시키는 "회계 침묵기" 경로를 hard 차단(감사 T2).
+for (const spec of [...plannedSpecs].sort()) {
+  const cov = covered.get(spec);
+  if (cov && cov.size > 0) {
+    errors.push(`Planned 모순 ${spec}: Status Planned인데 unit 커버 FR ${cov.size}개 — 구현이면 Status 승격, 폐기면 sdd-retire(Planned=의도적 미구현 선언, SPEC-018)`);
+  }
+}
 
 // R2: coverage completeness.
 //   - incremental (default): partial coverage WARNS (adopt FR by FR).

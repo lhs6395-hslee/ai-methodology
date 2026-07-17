@@ -35,6 +35,7 @@
 - **FR-002** (event): WHEN a changed file's owning spec has no meaningful change of its own but a parsed Change-Driver names a different spec that is meaningfully changed in the same changeset, THE SYSTEM SHALL treat the owning spec's requirement as satisfied by reference and SHALL NOT report it as a spec-first violation.
 - **FR-003** (unwanted): IF a Change-Driver names a spec that does not exist or is not meaningfully changed in the changeset, THEN THE SYSTEM SHALL NOT relax the owning spec's requirement on its behalf, keeping the violation.
 - **FR-004** (ubiquitous): THE SYSTEM SHALL surface a relaxed owner as a reference note naming its driver rather than a forced Change Log entry, and SHALL NOT fabricate semantic ownership for the driven change — the boundary-reconsideration advisory for chronically shared surfaces is deferred pending cross-commit history.
+- **FR-005** (event): WHEN a Change-Driver trailer carries a path scope (`@<glob>[,<glob>]` between the spec id and the reason), THE SYSTEM SHALL relax an owning spec only for changed files matching one of those globs, keeping violations on files outside the scope — an unscoped trailer keeps the legacy commit-wide relaxation with its fan-out surfaced per file.
 
 ### Key Entities
 - **change driver** — the spec declared (via `Change-Driver` trailer) as the real reason a differently-owned shared file changed, distinct from the file's owning spec.
@@ -51,7 +52,7 @@
 
 ## Dependencies (참조 — dedup 제외)
 > 트레일러 파싱·완화 판정 코어만 이 spec 소유. spec-sync 게이트 본체(changeset·의미변경 판정)는 SPEC-003, ID 문법은 SPEC-001, Python 복제는 SPEC-006.
-- **Modules**: spec-sync, key-pipeline, runtime-parity
+- **Modules**: spec-sync (references), key-pipeline (references), runtime-parity (references)
 
 ---
 
@@ -83,3 +84,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — `Change-Driver: <SPEC-ID> <사유>` 트레일러 파싱 + 참조 완화(동인이 실재·의미변경일 때만) + 가짜 동인 비완화. `cross-spec-lib.mjs`(순수 코어)·`cross-spec.test.mjs`, Node·Python 패리티. 경계 재고 advisory(FR-004)는 deferred | 도그푸딩(소비 프로젝트 B) 통증 3: 공유 파일을 타 스펙 기능 때문에 고칠 때 소유 스펙에 억지 Change Log 강제 → 추적 왜곡. 진짜 동인을 기록해 완화 |
+| 2026-07-16 | FR-005 신설 — 경로 스코프 문법 `Change-Driver: <SPEC-ID> @<glob>[,<glob>] <사유>`(매치 파일만 완화, cross-spec-lib `relaxingDrivers`). 무스코프 트레일러는 레거시 유지(전 파일 완화 + 파일 단위 팬아웃 출력). Node·Python 패리티 | 감사 T4: 무스코프 완화가 커밋 내 무관한 모든 파일의 소유 스펙까지 일괄 완화 — 사소한 Change Log 행 하나 + 트레일러 하나로 커밋 전체의 spec-first 하한이 붕괴하던 전역 팬아웃을 파일 귀속으로 한정 |

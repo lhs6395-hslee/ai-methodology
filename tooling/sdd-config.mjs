@@ -114,6 +114,11 @@ export const DEFAULTS = {
   // "silent"(기본 = 현행 침묵 통과) | "warn"(advisory) | "error"(staged에서 차단 = closed-world).
   // 의도적 예외는 specSyncExemptGlobs로 선언(조합 탈출).
   specSyncUnownedPolicy: "silent",
+  // check-spec-sync의 changeset base ref(§5.7 "브랜치=staged ∪ base...HEAD"의 base).
+  // null(기본) = origin/main. 기본 브랜치가 master/trunk거나 리모트명이 다르면 여기 선언 —
+  // base 미해석 시 staged-only로 저하되어 멀티커밋 브랜치(스펙 선커밋→코드 후커밋)가 오차단된다.
+  // 우선순위: CLI positional > SDD_DIFF_BASE(env) > specSyncBase(config) > "origin/main".
+  specSyncBase: null,
   // check-spec-sync: Draft 소유 코드 변경(SPEC-008 FR-004) 위반을 range 모드에서도 hard로
   // 승격할지 — "advisory"(기본=현행, range는 exit 0) | "hard"(range도 exit 1). CI가 range
   // 모드로 MR diff를 검사하면 로컬 commit-msg 훅을 안 타는 웹 UI 병합도 이 정책으로 막을 수
@@ -176,6 +181,21 @@ export function loadConfig(start = process.cwd()) {
       process.exit(1);
     }
   }
+  return buildConfig(user, path, path ? dirname(path) : start);
+}
+
+// config JSON "문자열"에서 동일 파생 규칙으로 구성 — check-spec-sync가 staged 판정을
+// HEAD 시점 config로 내릴 때 사용(자기약화 커밋 방지: 이 커밋이 약화한 config가 아니라
+// 약화 "전" config가 이 커밋을 심판한다, SPEC-003). 파싱 실패는 null(호출부가 폴백).
+export function configFromString(raw, root) {
+  try {
+    return buildConfig(JSON.parse(raw), null, root);
+  } catch {
+    return null;
+  }
+}
+
+function buildConfig(user, path, root) {
   const cfg = {
     ...DEFAULTS,
     ...user,
@@ -183,7 +203,7 @@ export function loadConfig(start = process.cwd()) {
   };
   // 메타: 게이트들이 공통으로 쓰는 파생값.
   cfg.__path = path;
-  cfg.__root = path ? dirname(path) : start; // 모든 상대경로의 기준
+  cfg.__root = root; // 모든 상대경로의 기준
   cfg.__testRegex = cfg.testFileRegex.map((s) => new RegExp(s));
   // spec ID 접두어 파생값(게이트 공통). 예: ["SPEC","TEST","INFRA"] → "SPEC|TEST|INFRA"
   const alt = (cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes)

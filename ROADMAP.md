@@ -42,6 +42,13 @@
   - **런타임 스키마 드리프트(SPEC-022, R2′)**: 코드 기대 스키마 ↔ 배포 DB 실측 diff(`check-schema-drift`, 배포 preflight) — spec↔code green ≠ 배포 안전.
   - 에이전트 중립화(강제 메시지·비-Claude 에이전트 컨텍스트 자동 배선) + change_log.html 자동 생성 + 소비 프로젝트 마찰 3종(조용한 훅 스킵·retrofit Reviewed·병렬 저술 프로토콜).
 
+- **반사성·가장자리 감사 봉합 6차(2026-07-16)** — 적대적 전수 감사(이론=주장↔메커니즘 대조, 프로세스=전 절차 워크스루·픽스처 재현)에서 "강제 계층이 자기 자신을 보호하지 않던" 결함군을 문법화:
+  - **config 자기보호(T1)**: `sdd.config.json` exempt 해제·스펙 소유 편입 + spec-sync staged 판정을 **HEAD 시점 config**로(자기약화 커밋 방지, SPEC-003 FR-002).
+  - **상태 화이트리스트(T2)**: Draft 문자열 검사 → `canLeadCode`(Reviewed+) 반전 — Planned·enum 밖도 코드 차단(SPEC-008 FR-004) + Planned↔커버리지 모순 hard(SPEC-018 FR-007, 회계 침묵기 차단).
+  - **탈출구 스코프 축소(T3·T4)**: `Spec-Impact: none` 면제를 동반·상태 차단으로 한정(글롭 문법·unowned closed-world 우회 불가) + `Change-Driver @glob` 경로 귀속(SPEC-020 FR-005, 전역 팬아웃 봉합).
+  - **폐기 사슬 완결(P1·M3·M4)**: retire 계획에 inbound 참조 지목(SPEC-018 FR-008) + 폐기 ID 재사용 hard·최소번호 폐기 001-면제(SPEC-014 FR-001/004).
+  - **강제 지점 이식성(P3·M5·M1·M2)**: pre-commit 경로 필터 제거(비-JS 레이아웃 미발동 봉합)·sh 훅 배선·`pre-merge-commit`(병합 시점 번호·키 경쟁 차단)·sdd-sync R5(test-run 배선)·`specSyncBase` knob·**킷 자신 CI**(`.github/workflows`, CICD-001 — closed-world `error`·`draftBlockPolicy: hard` 승격).
+
 설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
 
 > **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.

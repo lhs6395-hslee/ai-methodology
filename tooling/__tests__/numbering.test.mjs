@@ -62,3 +62,24 @@ test("결정성 — 출력이 접두어·번호 순 정렬", () => {
   const b = numberingIssues(["INFRA-002", "TEST-005", "SPEC-003"]);
   assert.deepEqual(a, b); // 입력 순서 무관, 동일 출력
 });
+
+// ── 감사 봉합(2026-07-16): M3 폐기 ID 재사용 hard · M4 001-시작 retiredIds 면제 ──
+
+// @covers SPEC-014/FR-004
+test("폐기 ID 재사용: retiredIds에 기록된 번호가 실재 → hard(과거 참조 앨리어싱 차단)", () => {
+  const r = numberingIssues(["SPEC-001", "SPEC-002", "SPEC-003"], ["SPEC-002"]);
+  assert.equal(r.hard.length, 1);
+  assert.match(r.hard[0], /SPEC-002 폐기 ID 재사용/);
+});
+
+// @covers SPEC-014/FR-001
+test("001 미시작: 선행 번호가 전부 retiredIds면 hard 아님(최소번호 스펙 폐기 = 정상 gap)", () => {
+  // SPEC-001·002 폐기 후 003부터 실재 — hard 없음(감사 M4: 접두어 전체 재번호 강요 해소)
+  const ok = numberingIssues(["SPEC-003", "SPEC-004"], ["SPEC-001", "SPEC-002"]);
+  assert.deepEqual(ok.hard, []);
+  assert.deepEqual(ok.advisory, []);
+  // 선행 번호 일부만 폐기 기록이면 여전히 hard(사고성 결번과 구분)
+  const bad = numberingIssues(["SPEC-003", "SPEC-004"], ["SPEC-001"]);
+  assert.equal(bad.hard.length, 1);
+  assert.match(bad.hard[0], /001부터 시작하지 않음/);
+});

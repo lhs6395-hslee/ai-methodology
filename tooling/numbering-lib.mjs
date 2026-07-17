@@ -33,9 +33,22 @@ export function numberingIssues(specIds, retiredIds = []) {
     }
     const uniq = [...seen].sort((a, b) => a - b);
     if (uniq.length === 0) continue;
-    // 001 미시작 (전역 잔번·잘못된 시작)
+    // 폐기 ID 재사용(hard, SPEC-014 FR-004): retiredIds에 기록된 번호가 실재하면 과거 참조
+    // (@verifies·Change Log·vcs-history)가 의미 다른 새 스펙으로 앨리어싱된다 — 무신호 재사용 차단(감사 M3).
+    for (const n of uniq) {
+      if (retired.has(`${pfx}-${pad3(n)}`)) {
+        hard.push(`${pfx}-${pad3(n)} 폐기 ID 재사용 — retiredIds에 기록된 번호가 실재(과거 참조 앨리어싱). 새 번호를 쓰거나, 의도적 재사용이면 retiredIds에서 제거`);
+      }
+    }
+    // 001 미시작 (전역 잔번·잘못된 시작) — 단, 선행 번호(001..min-1)가 전부 retiredIds에 기록돼
+    // 있으면 정상 retirement gap이라 hard 아님(SPEC-014 FR-001 개정: 최소번호 스펙 폐기가
+    // 접두어 전체 재번호를 강요하던 모순 해소 — SPEC-018 FR-006과 정합, 감사 M4).
     if (uniq[0] !== 1) {
-      hard.push(`${pfx} 번호가 001부터 시작하지 않음 — 최소 ${pfx}-${pad3(uniq[0])} (접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag`);
+      let leadingRetired = true;
+      for (let n = 1; n < uniq[0]; n++) if (!retired.has(`${pfx}-${pad3(n)}`)) { leadingRetired = false; break; }
+      if (!leadingRetired) {
+        hard.push(`${pfx} 번호가 001부터 시작하지 않음 — 최소 ${pfx}-${pad3(uniq[0])} (접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag, 선행 번호가 폐기분이면 retiredIds에 기록`);
+      }
     }
     // 내부 gap (실제 최소~최대) — 001 미시작분은 gap으로 재보고하지 않음
     const present = new Set(uniq), max = uniq[uniq.length - 1], missing = [];

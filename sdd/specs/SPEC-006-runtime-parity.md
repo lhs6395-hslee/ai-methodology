@@ -50,7 +50,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 
 ## Dependencies (참조 — dedup 제외)
 > 판정 알고리즘의 정본은 Node판이 소유한다 — 이 spec은 그 동작의 "복제 충실도"만 소유.
-- **Modules**: key-pipeline, spec-quality-gates, spec-sync
+- **Modules**: key-pipeline (references), spec-quality-gates (references), spec-sync (references)
 
 ---
 
@@ -108,3 +108,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-16 | Python에 `test_run_verdict`·`cmd_testrun`·`testrun` 서브커맨드·`runTestsPolicy` DEFAULTS 미러(SPEC-021 동반) + 패리티 테스트 1종 — testrun 출력 Node↔Python 바이트 동일 | 테스트 실행 게이트 런타임 패리티 — FinOps가 Python 게이트로 도니 실행-결과 확인도 두 런타임 동일 |
 | 2026-07-16 | Python에 `schema_drift_verdict`·`cmd_schemadrift`·`schemadrift` 서브커맨드·DEFAULTS 미러(SPEC-022 동반) + 패리티 테스트 1종 — schemadrift 출력 Node↔Python 바이트 동일 | R2′ 스키마 드리프트 게이트 런타임 패리티 — 배포 preflight가 두 런타임에서 동일 |
 | 2026-07-16 | `ears-preset/templates/spec-template.md`를 `templates/module-spec.md`와 재동기(retrofit→Reviewed 안내 주석 반영, template-parity 유지) | retrofit 안내 추가(도그푸딩)가 두 템플릿 사본에 동일하게 들어가야 파리티 테스트 green |
+| 2026-07-16 | 감사 6차 Python 미러 일괄 — config_from_string(HEAD-config 판정)·can_lead_code(상태 화이트리스트)·트레일러 스코프 축소·parse_drivers @glob·relaxing_drivers·specSyncBase 체인·numbering 재사용/001-면제·Planned 모순, Node판과 동일 동작(패리티 테스트 green) | SPEC-003/008/014/018/020 감사 봉합 동반 — 전 게이트 패리티 유지(SPEC-006 소유는 복제 충실도) |

@@ -16,7 +16,7 @@
 | **원칙 위반** | constitution 위배 | `/speckit.constitution` | 반자동 |
 | **재도출 스코프 누락** | 재생성이 src 밖 소스(IaC/CI/운영문서/이력/의도)를 조용히 안 읽음 | **`check-derivation.mjs`(SPEC-009)**: 소스 9클래스 회계 + 실재↔선언 교차검사 | ★자동(CI) |
 | **의도 기록 누락** | 변경의 "왜"가 어디에도 안 남음(사후 재도출 불가) | **completeness의 Change Log 근거 검사(SPEC-009)** + Review Log·Dedup-Review(SPEC-008) — 존재만 | ★자동(CI) |
-| **미검증 FR(회계 누락)** | 모든 FR이 unit/smoke/deferred 중 하나로 회계됐나 — "조용히 미검증" | **검증 회계(SPEC-007)**: `requireAccounting` R3 exit 1 · `smokeManifest` dangling/빈 값 exit 1 · `strictSpecs` | ★자동(CI) |
+| **미검증 FR(회계 누락)** | 모든 FR이 unit/smoke/deferred/planned 중 하나로 회계됐나 — "조용히 미검증" | **검증 회계(SPEC-007)**: `requireAccounting` R3 exit 1 · `smokeManifest` dangling/빈 값 exit 1 · `strictSpecs` | ★자동(CI) |
 | **증거 드리프트** | `@verifies` 태그와 `smokeManifest`가 어긋남 | **`sdd-smoke-scan.mjs`(SPEC-010)**: 태그 수집→매니페스트 재생성·check 드리프트 exit 1 | ★자동(CI) |
 | **접두어↔클래스 오분류** | 소유 실파일이 전적 iac→INFRA·ci→CICD인데 접두어 불일치 | **prefix-class(SPEC-012)**: `check-fr-coverage` exit 1 · `prefixClassExemptions` 사유 관문 | ★자동(CI) |
 | **스펙 문법 위반** | Module 헤더 부재/다값 · FR 라인 SHALL 없음 · Dedup 참조 미실재 · Files 카테고리 | **grammar(SPEC-013)**: completeness·ownership·spec-sync 배선(warn·`--strict`/staged hard) | ★자동(CI) |

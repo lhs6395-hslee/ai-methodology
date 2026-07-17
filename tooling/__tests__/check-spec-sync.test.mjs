@@ -410,3 +410,137 @@ test("cross-spec: 공유 파일을 타 스펙 기능 때문에 변경 + Change-D
     assert.equal(bogus.code, 1, bogus.out);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── 감사 봉합(2026-07-16): T1 config 자기보호 · T2 상태 화이트리스트 · T3 트레일러 스코프 ·
+//    T4 동인 경로 스코프 · M2 specSyncBase ──
+
+// @covers SPEC-003/FR-002 — staged 판정은 HEAD 시점 config로(자기약화 커밋 방지)
+test("HEAD-config 판정: config 약화+소유 코드 변경 한 커밋 → 약화 전(HEAD) config가 심판(FAIL)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // config 불변 커밋엔 HEAD-config 노트가 없다(하위호환)
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1b\n");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**") + "\n| 2026-07-16 | 개정 | |\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "feat: normal\n");
+    const normal = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(normal.code, 0, normal.out);
+    assert.doesNotMatch(normal.out, /HEAD 시점 config로 판정/);
+    g("commit", "-qm", "normal");
+    // 같은 커밋에서 src/**를 exempt로 약화 + 소유 코드 변경(스펙 무변경) → HEAD config가 심판 → 위반
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncExemptGlobs: ["src/**"] }));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore: relax config\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /HEAD 시점 config로 판정/);
+    assert.match(r.out, /SPEC-001/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-008/FR-004 — 상태 화이트리스트: Draft만이 아니라 Planned·enum 밖도 코드 못 이끎
+test("상태 화이트리스트: Planned·enum 밖(Wip) 소유 코드 → staged FAIL / Status 미선언(레거시)은 통과", () => {
+  const { root, g } = repo();
+  const S = (status) =>
+    `# SPEC-001\n**Spec**: \`SPEC-001\`  **Status**: ${status}\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL x.\n\n## Ownership\n- **Entities**: thing\n- **Files**: src/lib/pdf/**\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n`;
+  try {
+    for (const [status, wantFail] of [["Planned", true], ["Wip", true], ["Active", false]]) {
+      writeFileSync(join(root, "sdd/specs/SPEC-001.md"), S(status));
+      writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+      g("add", "-A"); g("commit", "-qm", `base-${status}`);
+      writeFileSync(join(root, "src/lib/pdf/parse.ts"), `2-${status}\n`);
+      // 스펙도 함께 갱신(동반) — 상태 차단은 동반 여부와 무관해야 한다
+      writeFileSync(join(root, "sdd/specs/SPEC-001.md"), S(status) + `\n| 2026-07-16 | ${status} 개정 | |\n`);
+      g("add", "-A");
+      writeFileSync(join(root, "msg"), "feat: x\n");
+      const r = runGate(root, ["--staged", "--message-file", "msg"]);
+      if (wantFail) {
+        assert.equal(r.code, 1, `${status}: ${r.out}`);
+        assert.match(r.out, new RegExp(`SPEC-001이 ${status} 상태`));
+      } else {
+        assert.equal(r.code, 0, `${status}: ${r.out}`);
+      }
+      g("commit", "-qm", `advance-${status}`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-003/FR-003 — 트레일러는 동반·상태 차단만 면제, unowned closed-world·글롭 문법은 못 우회
+test("트레일러 스코프: Spec-Impact: none이 unowned(error)·글롭 문법 hard를 우회하지 못한다", () => {
+  const { root, g } = repo();
+  try {
+    // unowned closed-world: 트레일러 있어도 차단
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: "error" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "unowned.ts"), "1\n");
+    g("add", "unowned.ts");
+    writeFileSync(join(root, "msg"), "chore: x\n\nSpec-Impact: none 포맷팅\n");
+    const u = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(u.code, 1, u.out);
+    assert.match(u.out, /unowned/);
+    g("reset", "-q", "HEAD", "unowned.ts");
+    // 글롭 문법 위반: 트레일러 있어도 차단
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/{pdf}/**"));
+    g("add", "-A");
+    const gl = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(gl.code, 1, gl.out);
+    assert.match(gl.out, /glob 문법|미지원 glob/);
+    // 동반 요구·Draft 차단은 여전히 트레일러로 면제(문서화된 탈출구) — 기존 트레일러 PASS 테스트가 커버
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-020/FR-005 — 동인 경로 스코프: @glob 매치 파일만 완화(무스코프 전역 팬아웃 봉합)
+test("cross-spec 경로 스코프: Change-Driver @glob → 매치 파일만 완화, 밖 파일은 위반 유지", () => {
+  const { root, g } = repo();
+  const S2 = (files) =>
+    `# SPEC-002\n**Spec**: \`SPEC-002\`\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL z.\n\n## Ownership\n- **Files**: ${files}\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n`;
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "sdd/specs/SPEC-002.md"), S2("src/shared/**"));
+    mkdirSync(join(root, "src/shared"), { recursive: true });
+    writeFileSync(join(root, "src/shared/a.ts"), "1\n");
+    writeFileSync(join(root, "src/shared/b.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 두 공유 파일 변경 + SPEC-001만 의미변경. 스코프 동인은 a.ts만 귀속.
+    writeFileSync(join(root, "src/shared/a.ts"), "2\n");
+    writeFileSync(join(root, "src/shared/b.ts"), "2\n");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 확장 | |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "feat: x\n\nChange-Driver: SPEC-001 @src/shared/a.ts pdf 기능이 a만 확장\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /cross-spec: src\/shared\/a\.ts/);      // a는 완화
+    assert.match(r.out, /✗ src\/shared\/b\.ts → 소유 스펙 SPEC-002/); // b는 위반 유지
+    // 무스코프(레거시)는 둘 다 완화 → PASS
+    writeFileSync(join(root, "msg"), "feat: x\n\nChange-Driver: SPEC-001 pdf 기능이 공유 유틸 확장\n");
+    const legacy = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(legacy.code, 0, legacy.out);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-003/FR-006 — specSyncBase config knob: 기본 브랜치가 origin/main이 아니어도 base 선언으로 changeset=브랜치 유지
+test("specSyncBase: config로 base 선언 → 멀티커밋 브랜치(스펙 선커밋→코드 후커밋)가 staged에서 통과", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncBase: "trunk" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("branch", "-m", "trunk"); g("checkout", "-qb", "feat");
+    // 커밋 1: 스펙만(선커밋)
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**") + "\n| 2026-07-16 | 선커밋 개정 | |\n");
+    g("add", "-A"); g("commit", "-qm", "spec first");
+    // 커밋 2: 코드만 — base(trunk)...HEAD 합집합으로 스펙 선커밋이 인식되어야 한다
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "feat: code follow-up\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, /해석 불가/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

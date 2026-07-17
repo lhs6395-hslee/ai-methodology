@@ -33,6 +33,15 @@ export function isReviewedPlus(status) {
   return REVIEWED_PLUS.has(status);
 }
 
+// 소유 코드 변경을 이끌 수 있는 상태(SPEC-008 FR-008) — 리뷰를 통과했거나 수명 종료 단계.
+// 화이트리스트 방식: Draft만이 아니라 Planned(리뷰 전)·enum 밖 값(Wip 등)도 코드를 못 이끈다 —
+// "Draft 문자열만 검사"는 상태 순서 보장이 아니라 한 상태의 이름 검사였다(감사 T2).
+// null(레거시 — Status 미선언)은 통과(점진 도입 유지).
+const CODE_LEADING = new Set(["Reviewed", "Approved", "Active", "Deprecated", "Removed"]);
+export function canLeadCode(status) {
+  return status === null || CODE_LEADING.has(status);
+}
+
 // `## <heading>` 섹션 블록 추출(다음 ## 전까지). 섹션 없으면 null.
 export function sectionBlock(text, heading) {
   const m = text.match(new RegExp(`^##\\s+${heading}\\b`, "m"));
