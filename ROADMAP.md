@@ -49,6 +49,8 @@
   - **폐기 사슬 완결(P1·M3·M4)**: retire 계획에 inbound 참조 지목(SPEC-018 FR-008) + 폐기 ID 재사용 hard·최소번호 폐기 001-면제(SPEC-014 FR-001/004).
   - **강제 지점 이식성(P3·M5·M1·M2)**: pre-commit 경로 필터 제거(비-JS 레이아웃 미발동 봉합)·sh 훅 배선·`pre-merge-commit`(병합 시점 번호·키 경쟁 차단)·sdd-sync R5(test-run 배선)·`specSyncBase` knob·**킷 자신 CI**(`.github/workflows`, CICD-001 — closed-world `error`·`draftBlockPolicy: hard` 승격).
 
+- **FR 키 앵커(2026-07-17, SPEC-023)** — 소비 프로젝트 실측(FR bold가 수사적 장식뿐)에서 owner 제안: **bold를 키 앵커 전용으로 예약** — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(`frKeyAnchorPolicy` off|advisory|hard, consistency 게이트 배선, 코드 스팬은 리터럴). consistency(키→본문)와 합쳐 양방향 앵커. 도입 즉시 킷 자신에서 수사적 bold 1건 실수확·정리(advisory 상시 on).
+
 설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
 
 > **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.

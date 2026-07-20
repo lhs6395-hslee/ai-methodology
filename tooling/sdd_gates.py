@@ -86,6 +86,7 @@ DEFAULTS = {
     "commands": {},
     "retiredIds": [],
     "semanticDriftPolicy": "advisory",
+    "frKeyAnchorPolicy": "off",
     "runTestsPolicy": "off",
     "schemaDriftManifest": None,
     "migrationStatePolicy": "advisory",
@@ -1110,15 +1111,82 @@ def _key_tokens(key):
     return [t for t in re.findall(r"[a-z][a-z0-9_]+", key.lower()) if t not in _STOP_TOKENS]
 
 
+def _strip_code_spans(line):
+    """`...` 코드 스팬 제거 — 리터럴 인용은 강조가 아니다(key-anchor-lib.mjs 미러, SPEC-023)."""
+    return re.sub(r"`[^`]*`", "", str(line))
+
+
+def _is_fr_decl_line(line, req_alt="FR"):
+    return re.match(rf"^\s*-?\s*\*\*(?:{req_alt})-\d{{3}}[a-z]?\*\*", line) is not None
+
+
+def _extract_anchors(line, req_alt="FR"):
+    """FR 선언 라인의 평문 bold 토큰(코드 스팬 제거 후, FR-ID 제외) — 정규화(트림·소문자)."""
+    id_re = re.compile(rf"^(?:{req_alt})-\d{{3}}[a-z]?$")
+    out = []
+    for m in re.finditer(r"\*\*([^*]+?)\*\*", _strip_code_spans(line)):
+        tok = m.group(1).strip()
+        if not tok or id_re.match(tok):
+            continue
+        out.append(tok.lower())
+    return out
+
+
+def _build_key_set(own_sections, dep_sections):
+    """Ownership ∪ Dependencies 전 카테고리(Files 제외) 정규화 키 + 관계 서픽스 제거(SPEC-017)."""
+    keys = set()
+    for sec in (own_sections, dep_sections):
+        for cat, lst in (sec or {}).items():
+            if cat.lower() == "files":
+                continue
+            for raw in lst or []:
+                k = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip().lower()
+                if k and k not in ("—", "-"):
+                    keys.add(k)
+    return keys
+
+
+def _anchor_findings(fr_lines, key_set, req_alt="FR"):
+    """(matched, unmatched) — 각 원소 (fr, token). 라인 순·라인 내 등장 순(결정적)."""
+    fr_id = re.compile(rf"\*\*((?:{req_alt})-\d{{3}}[a-z]?)\*\*")
+    matched, unmatched = [], []
+    for line in fr_lines or []:
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = fr_id.search(line)
+        fr = m.group(1) if m else "?"
+        seen = set()
+        for tok in _extract_anchors(line, req_alt):
+            if tok in seen:
+                continue
+            seen.add(tok)
+            (matched if tok in key_set else unmatched).append((fr, tok))
+    return matched, unmatched
+
+
 def cmd_consistency(cfg, strict):
     categories = cfg["ownershipCategories"]
+    # FR 키 앵커(SPEC-023) — off(기본)|advisory|hard.
+    anchor_policy = cfg.get("frKeyAnchorPolicy") or "off"
+    if anchor_policy not in ("off", "advisory", "hard"):
+        print(f'✗ frKeyAnchorPolicy 값 위반 "{anchor_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     files = spec_md_files(cfg, missing_fatal=False)
     findings = []
-    for file in files:
+    anchor_matched = 0
+    anchor_unmatched = []  # (spec_id, fr, token)
+    for file in sorted(files):
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
         own = parse_section(text, "Ownership", categories)
+        # FR 키 앵커 대조(SPEC-023) — 정책이 켜진 경우만(off면 판정·출력 무변).
+        if anchor_policy != "off":
+            key_set = _build_key_set(own, parse_section(text, "Dependencies", categories))
+            mt, un = _anchor_findings(text.split("\n"), key_set, cfg["__reqAlt"])
+            anchor_matched += len(mt)
+            anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.
         body = text[: h.start()] if h else text
@@ -1132,8 +1200,18 @@ def cmd_consistency(cfg, strict):
     print(f"Spec 일관성(advisory): spec {len(files)}개 검사 — 근거 없는 키 {len(findings)}건.")
     for spec_id, cat, key in findings:
         print(f'  ⚠ [{spec_id}] {cat} "{key}": 본문에 근거 토큰 없음 → FR과 정렬 확인')
+    # FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
+    anchor_hard = anchor_policy == "hard" and len(anchor_unmatched) > 0
+    if anchor_policy != "off":
+        print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)}")
+        for spec_id, fr, tok in anchor_unmatched:
+            tag = "✗" if anchor_hard else "⚠"
+            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언')
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
+        sys.exit(1)
+    if anchor_hard:
+        print("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용 — 위 토큰을 정리하라(SPEC-023).", file=sys.stderr)
         sys.exit(1)
     print("일관성: advisory 경고(비차단)" if findings else "일관성: OK — 모든 키에 본문 근거.")
 
