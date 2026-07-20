@@ -25,7 +25,7 @@
 ## Ownership   ← 소유(권위). dedup 대상. 정규화·형식 검증 적용.
 - **Entities**: pjt_projects, pjt_project_staff       # 도메인 객체/테이블(스키마 식별자 그대로)
 - **Surfaces**: POST /api/pjt/recommend, /tools/pjt/new # route·화면·job(METHOD 대문자·path 소문자·{param})
-- **Capabilities**: project.create, staff.assign        # entity.verb (verb ∈ 허용 집합)
+- **Capabilities**: pjt_projects.create, pjt_project_staff.assign  # entity.verb — entity 조각은 위 소유 Entities와 일치(SPEC-024)
 
 ## Dependencies   ← 참조(읽기/호출만). dedup 제외. 같은 정규화 표기 권장(게이트 형식검증 대상 아님).
 - **Entities**: staff, invoice (has-many)   # 자유참조 + 구조화 관계 `Entity (relation-type)`(SPEC-017)

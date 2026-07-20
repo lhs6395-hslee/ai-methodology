@@ -86,6 +86,7 @@ DEFAULTS = {
     "commands": {},
     "retiredIds": [],
     "semanticDriftPolicy": "advisory",
+    "capabilityOwnershipPolicy": "advisory",
     "frKeyAnchorPolicy": "off",
     "runTestsPolicy": "off",
     "schemaDriftManifest": None,
@@ -554,9 +555,40 @@ def cmd_fr(cfg, strict):
 
 # ── ownership — 구조적 중복 dedup + 정규화·형식검증 (check-ownership.mjs) ──
 
+def capability_check_active(categories):
+    """entity·capability류 카테고리가 둘 다 있을 때만 활성(SPEC-024, capability-ownership-lib 미러)."""
+    return any(re.search("entit", c, re.IGNORECASE) for c in categories or []) \
+        and any(re.search("capabilit", c, re.IGNORECASE) for c in categories or [])
+
+
+def capability_ownership_findings(owned_entities, owned_capabilities):
+    """capability x.verb의 entity 조각이 소유 entity 집합에 없으면 위반(SPEC-024).
+    점 없는 capability는 validate_key 담당(이중 보고 금지). 반환 [(capability, entity)]."""
+    owned = {str(k).strip().lower() for k in owned_entities or []}
+    findings = []
+    for raw in owned_capabilities or []:
+        cap = str(raw).strip().lower()
+        dot = cap.find(".")
+        if dot <= 0:
+            continue
+        entity = cap[:dot]
+        if entity not in owned:
+            findings.append((cap, entity))
+    return findings
+
+
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
     ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
+    # Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
+    cap_cat = next((c for c in categories if re.search("capabilit", c, re.IGNORECASE)), None)
+    cap_policy = cfg.get("capabilityOwnershipPolicy") or "advisory"
+    if cap_policy not in ("off", "advisory", "hard"):
+        print(f'✗ capabilityOwnershipPolicy 값 위반 "{cap_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    cap_active = cap_policy != "off" and capability_check_active(categories)
+    cap_findings = []  # (spec_id, capability, entity)
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
     # 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -589,6 +621,10 @@ def cmd_ownership(cfg, strict):
                 if bad:
                     format_issues.append((spec_id, bad))
                 owners[cat].setdefault(key, []).append(spec_id)
+        # Capability 귀속(SPEC-024): entity 0개+capability 소유(기술 계층 스펙)·남의 entity 위 capability.
+        if cap_active and cap_cat:
+            for cap, entity in capability_ownership_findings(own.get(ent_cat), own.get(cap_cat)):
+                cap_findings.append((spec_id, cap, entity))
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
         # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
         deps = parse_section(text, "Dependencies", categories)
@@ -649,6 +685,17 @@ def cmd_ownership(cfg, strict):
         print(f"\n✗ ENTITY 레지스트리 위반 {len(entity_errors)}건:", file=sys.stderr)
         for e in entity_errors:
             print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    # Capability 귀속 리포트(SPEC-024) — 스펙 경계는 entity 기준.
+    cap_hard = cap_policy == "hard" and len(cap_findings) > 0
+    if cap_active and cap_findings:
+        print(f"Capability 귀속(capabilityOwnershipPolicy={cap_policy}): 위반 {len(cap_findings)}건 — capability는 그 entity를 소유한 스펙에 귀속")
+        for spec_id, cap, entity in cap_findings:
+            tag = "✗" if cap_hard else "⚠"
+            print(f'  {tag} [{spec_id}] Capabilities "{cap}" — entity "{entity}"를 이 스펙이 소유하지 않음: 그 entity 소유 스펙으로 이관(verb가 달라도 같은 스펙에 FR 신설), 이 스펙이 그 aggregate면 Entities에 소유 선언')
+    if cap_hard:
+        print("\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).",
+              file=sys.stderr)
         sys.exit(1)
     for c in relation_cycles:
         print(f"⚠ 관계 순환 참조: {' → '.join(c)} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)")

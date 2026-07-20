@@ -34,7 +34,7 @@
    - 원칙: 이 단계는 **어떤 미래 knob에도** 동작하도록 generic이다 — 특정 knob명을 하드코딩하지 않고 "DEFAULTS엔 있는데 프로젝트에 없는 것"을 기준으로 판단한다.
 5. **새 스펙 문법 마이그레이션 백로그 (스펙은 승인 전 안 건드림 — 이 단계가 빠지면 새 문법이 도구로만 도착하고 기존 스펙엔 영원히 미적용된다).**
    - **왜:** 고도화가 **스펙 본문 문법**을 확장하면(예: SPEC-017 Entity 관계 — 복수 `Ownership.Entities` → aggregate root 1개 + `## Dependencies`의 `EntityName (relation-type)`; SPEC-023 키 앵커 — FR bold를 키 앵커로), 도구·knob는 위 1~4로 오지만 **기존 스펙은 불변 규칙 때문에 자동 재구성되지 않는다**(실측: 소비 프로젝트가 update 후에도 스펙마다 entity 복수 소유 그대로).
-   - **탐지(기계):** 반영 후 게이트를 일괄 실행(`sdd-sync` 또는 개별)해 **새 문법 유래 advisory**를 수집한다 — cohesion의 "aggregate 삼킴 의심"(Entities > `maxAggregateRootsPerSpec`), ownership의 관계 미구조화(괄호 없는 자유참조), consistency의 키 앵커 미매치(`frKeyAnchorPolicy` advisory) 등.
+   - **탐지(기계):** 반영 후 게이트를 일괄 실행(`sdd-sync` 또는 개별)해 **새 문법 유래 advisory**를 수집한다 — cohesion의 "aggregate 삼킴 의심"(Entities > `maxAggregateRootsPerSpec`), ownership의 관계 미구조화(괄호 없는 자유참조)·**capability 귀속 위반**(entity 없는 capability 스펙·남의 entity 위 capability — SPEC-024, 해소=능력을 entity 소유 스펙으로 이관), consistency의 키 앵커 미매치(`frKeyAnchorPolicy` advisory) 등.
    - **제시(사람 승인 관문):** 수집 결과를 **스펙별 마이그레이션 백로그**로 사용자에게 제시한다 — "SPEC-005: Entities 7개 → root 1(`orders`) + 6개는 Dependencies 관계로" 식. 절차 정본: 킷 `APPLYING.md` §마이그레이션 노트("복수 Entity → aggregate root + 관계").
    - **수행(승인 후 별도 작업):** 사용자가 승인한 항목만 **작성=LLM·승인=사람** 경로로 재구성한다 — 이 update 절차 자체는 스펙을 편집하지 않는다(백로그 제시까지가 범위). 미승인 항목은 advisory로 남아 다음 update에서 재표면화된다(조용한 소실 없음).
 6. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그) 요약한다.

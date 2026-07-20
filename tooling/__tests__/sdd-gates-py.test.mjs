@@ -290,6 +290,25 @@ test("py consistency: 본문 근거 없는 키 → advisory warn, --strict exit 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-024/FR-002
+// @covers SPEC-024/FR-003
+test("py ownership Capability 귀속(SPEC-024): advisory ⚠·hard exit 1 — Node와 출력 바이트 동일", skip, () => {
+  const spec = "# S\n**Spec**: `SPEC-001`\n\n## Ownership\n- **Capabilities**: budget.aggregate\n- **Files**: src/**\n";
+  const root = fixture({ "sdd/specs/SPEC-001.md": spec },
+    { capabilityVerbs: ["aggregate"], capabilityOwnershipPolicy: "advisory" });
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /Capability 귀속.*위반 1건/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    writeFileSync(join(root, "sdd.config.json"),
+      JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], capabilityVerbs: ["aggregate"], capabilityOwnershipPolicy: "hard" }));
+    assert.equal(runPy(root, ["ownership"]).code, 1);
+    assert.equal(runNode(root, "check-ownership.mjs", []).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-023/FR-002
 // @covers SPEC-023/FR-003
 test("py consistency 키 앵커(SPEC-023): advisory ⚠·hard exit 1 — Node와 출력 바이트 동일", skip, () => {
