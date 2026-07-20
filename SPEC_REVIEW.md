@@ -29,6 +29,7 @@
 | **공유 표면 억지 Change Log** | 타 스펙 기능 때문에 고친 공유 파일에 비-동인 스펙이 잡음 Change Log | **cross-spec(SPEC-020)**: `Change-Driver` 트레일러로 진짜 동인 기록·참조 완화 | ★자동(배선) |
 | **커버리지 green ≠ 실행 green** | 태그 회계는 green인데 스위트가 실제로 안 돌거나 실패 | **test-execution(SPEC-021)**: `runTestsPolicy`로 `commands.test` 실행·exit 0 요구(opt-in) | ★자동(opt-in) + 완료 규범 |
 | **배포 스키마 드리프트(R2′)** | spec↔code green인데 배포 DB에 컬럼 미적용(42703) | **schema-drift(SPEC-022)**: 배포 preflight에서 코드 기대↔배포 실측 diff(`schemaDriftManifest`) | ★자동(opt-in, 배포 preflight) |
+| **수사적 bold(키 앵커 오염)** | FR 라인의 bold가 장식(키 아님) — FR→키 원천이 본문에 무흔적 | **key-anchor(SPEC-023)**: `frKeyAnchorPolicy`로 bold↔소유·참조 키 대조(advisory·hard) | ★자동(opt-in) |
 
 **요약:** 빈공란=`/clarify`, 한 기능 내 중복·모순·누락=`/analyze`, 체크리스트=`/checklist`, FR↔test=CI 게이트. **spec 간 중복**은 — **구조적**(같은 소유 키)=소유권 게이트로 **강제**, **의미적**(reworded)=좁힌 LLM 리뷰로 보조하되 *검토 기록의 존재*(`Dedup-Review`)와 *entity 어휘*(`entityRegistry`)는 게이트가 강제. (LLM은 누락을 내므로 결정적 게이트가 1차. 상세: `DEDUP.md` / `STRUCTURE.md` 소유권 유일성 규칙.)
 

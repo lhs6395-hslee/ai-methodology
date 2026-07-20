@@ -149,6 +149,10 @@ export const DEFAULTS = {
   // semantic drift 승격(SPEC-019): 소유 파일 리네임 감지 시 spec-sync 요구를
   // "Change Log 한 줄" → "FR 선언 라인 변경 ∨ Spec-Impact"로 승격. off|advisory(기본)|hard.
   semanticDriftPolicy: "advisory",
+  // FR 키 앵커(SPEC-023): FR 선언 라인의 평문 bold를 소유∪참조 키와 대조 — bold를 수사적
+  // 강조가 아닌 "키 앵커" 전용으로 예약(FR→키 도출의 원천 단어 가시화, consistency의 역방향 짝).
+  // off(기본, 판정 안 함)|advisory(미매치 경고)|hard(미매치 exit 1). 코드 스팬(`...`)은 앵커 아님.
+  frKeyAnchorPolicy: "off",
   // 테스트 스위트 실제 실행 게이트(SPEC-021): check-test-run이 commands.test를 돌려 green을 확인.
   // 커버리지 회계 ≠ 실행 결과. off(기본, 실행 안 함)|advisory(실패 경고)|hard(실패 exit 1).
   runTestsPolicy: "off",

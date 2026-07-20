@@ -50,6 +50,7 @@
 
 ## Functional Requirements (EARS)
 > 본문(FR·SC·Story) **정본은 영어**(SSOT.md §6). 현지어본은 생성만. 각 FR은 `**FR-NNN** (패턴): 문장` — `**FR-NNN**` 굵게(추적 게이트가 이 패턴으로 파싱). 예시(범용):
+<!-- 키 앵커(SPEC-023): FR 라인의 평문 **bold**는 수사적 강조가 아니라 "이 토큰이 Ownership/Dependencies 키"라는 선언 전용 — 예: WHEN **POST /api/x** ... SHALL **entity.verb** using **table_name**. 리터럴 인용은 백틱(`...`, 앵커 아님). frKeyAnchorPolicy(off|advisory|hard)를 켜면 게이트가 앵커↔선언 키를 대조한다(미매치 bold = 수사적 강조 또는 미선언 키). -->
 - **FR-001** (ubiquitous): THE SYSTEM SHALL store all timestamps in UTC.
 - **FR-002** (event): WHEN a user submits the form, THE SYSTEM SHALL validate required fields before saving.
 - **FR-003** (state): WHILE a record is locked, THE SYSTEM SHALL reject concurrent edits.

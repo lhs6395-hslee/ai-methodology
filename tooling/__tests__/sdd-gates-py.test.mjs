@@ -290,6 +290,26 @@ test("py consistency: 본문 근거 없는 키 → advisory warn, --strict exit 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-023/FR-002
+// @covers SPEC-023/FR-003
+test("py consistency 키 앵커(SPEC-023): advisory ⚠·hard exit 1 — Node와 출력 바이트 동일", skip, () => {
+  const spec = "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL run on **Fargate** using **pjt_projects**.\n## Ownership\n- **Entities**: pjt_projects\n";
+  const root = fixture({ "sdd/specs/SPEC-001.md": spec },
+    { frKeyAnchorPolicy: "advisory" });
+  try {
+    const py = runPy(root, ["consistency"]);
+    const nd = runNode(root, "check-spec-consistency.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /매치 1 · 미매치 1/);
+    assert.match(py.out, /bold "fargate"/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    writeFileSync(join(root, "sdd.config.json"),
+      JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], frKeyAnchorPolicy: "hard" }));
+    assert.equal(runPy(root, ["consistency"]).code, 1);
+    assert.equal(runNode(root, "check-spec-consistency.mjs", []).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("py adequacy: @covers 있는데 단언 없음 → warn, --strict exit 1", skip, () => {
   const root = fixture({
     "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** (event): x.\n",

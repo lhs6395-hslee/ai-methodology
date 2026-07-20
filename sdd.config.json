@@ -63,6 +63,7 @@
   ],
   "specSyncUnownedPolicy": "error",
   "draftBlockPolicy": "hard",
+  "frKeyAnchorPolicy": "advisory",
   "smokeScanDirs": [
     "tooling",
     ".github"
@@ -90,7 +91,8 @@
     "cross-spec-change": "Change-Driver 트레일러 → 공유 표면 변경 동인 추적·참조 완화(cross-spec-lib) — 억지 Change Log 제거 (SPEC-020)",
     "test-execution": "runTestsPolicy로 commands.test를 실제 실행해 green 확인(check-test-run) — 커버리지 회계 ≠ 실행 결과 (SPEC-021)",
     "runtime-schema-drift": "코드 기대 스키마 ↔ 배포 DB 실측 diff(check-schema-drift·schema-drift-lib) — R2′ 배포 경계 드리프트, 배포 preflight (SPEC-022)",
-    "kit-ci": "킷 자신의 CI 백스톱 — push/PR 스위트·게이트 + PR range spec-sync(서버측 병합 강제 지점, CICD-001)"
+    "kit-ci": "킷 자신의 CI 백스톱 — push/PR 스위트·게이트 + PR range spec-sync(서버측 병합 강제 지점, CICD-001)",
+    "fr-key-anchors": "FR 키 앵커 — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(frKeyAnchorPolicy, SPEC-023)"
   },
   "relationTypes": ["references"],
   "specSyncExemptGlobs": [
