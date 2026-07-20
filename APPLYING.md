@@ -270,4 +270,11 @@ SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 4. **원본 정리**: 이관한 FR·`Files`·`@covers` 태그·검증 회계 엔트리(smoke-manifest)를 원 제품 스펙에서 제거(재번호 필요 시 `sdd-retag`). `MODULE_MAP.md` 갱신.
 5. **삭제 시**: 도구를 지울 때 TEST 스펙 하나 + 그 격리된 인프라만 제거하면 된다 — 제품 스펙을 수술할 필요가 없다(도메인 격리의 값어치).
 
+**마이그레이션 — 복수 Entity 소유 스펙을 aggregate root 1개 + 관계로(SPEC-017).** 관계 문법 도입 전에 쓰인 스펙은 한 스펙이 Entity를 여러 개 소유(cohesion advisory "aggregate 삼킴 의심")하고 Dependencies가 자유 텍스트다 — `/sdd-update`는 스펙을 자동 재구성하지 않으므로(update.md 불변 규칙) 이 절차로 옮긴다:
+1. **대상 식별(기계):** `check-spec-cohesion`이 `Ownership.Entities > maxAggregateRootsPerSpec`(기본 1)로 지목한 스펙 목록이 백로그다(update.md 5단계가 제시).
+2. **root 선정(사람/LLM 저술):** 각 스펙에서 **독립적으로 생성·삭제되는 핵심 Entity 1개**를 aggregate root로 남긴다. root+자식 표를 한 스펙이 소유하는 모델이면 config `maxAggregateRootsPerSpec` 상향이 정답일 수도 있다(재구성 대신 선언 — 사유는 Change Log).
+3. **나머지 entity 이동:** Ownership에서 제거하고 `## Dependencies`에 `EntityName (relation-type)`로(어휘: `has-many`·`belongs-to`·`references` 등 — `relationTypes` 등록 시 화이트리스트). 그 entity가 독립 aggregate라면 소유 스펙을 신설/개정한다 — dedup 게이트가 "한 키=한 스펙"을 검증.
+4. **검증:** `check-ownership`(관계 대상 실재 hard·aggregate 간 순환 advisory) + `check-spec-cohesion` clean 도달까지. 스펙 변경이므로 Change Log 행(근거 포함)이 동반된다(spec-first).
+5. **원칙:** 작성=LLM·승인=사람 — 어느 도구도 이 재구성을 자동 수행하지 않는다(관계 의미 판정은 리뷰 경계 #13).
+
 **실전 사례 — 이 키트 자신(self-hosting).** 이 레포의 게이트 스위트(`tooling/`)가 실코드가 된 순간 "메타 레포 면제"가 사라졌다. 그래서 위 절차를 키트 자신에 그대로 적용했다: 루트 `sdd.config.json`(카테고리 Modules/Symbols/Artifacts) + [`sdd/specs/`](sdd/specs/)의 각 spec(1 aggregate씩, `Files` glob으로 tooling 소스·테스트 전부 소유) + 기존 테스트 `@covers` 태깅 + `tooling/harness/self-hooks-install.sh`로 자기 훅 배선(소비 프로젝트와 달리 `scripts/`가 아니라 `tooling/`을 직접 호출). 실증: 스펙 미동반 tooling 커밋을 스테이징하면 commit-msg가 `✗ … 소유 스펙에 의미 있는 변경 없음`으로 exit 1, `Spec-Impact: none <사유>` 트레일러로만 통과. 자기 검증 갭도 정직하게 회계된다 — `requireAccounting` 상시 on(미커버 FR은 `sdd/smoke-manifest.json`에 deferred 사유로), 재도출 소스는 `sdd/derivation.json`에 9클래스 회계.
