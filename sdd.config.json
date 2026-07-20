@@ -92,7 +92,8 @@
     "test-execution": "runTestsPolicy로 commands.test를 실제 실행해 green 확인(check-test-run) — 커버리지 회계 ≠ 실행 결과 (SPEC-021)",
     "runtime-schema-drift": "코드 기대 스키마 ↔ 배포 DB 실측 diff(check-schema-drift·schema-drift-lib) — R2′ 배포 경계 드리프트, 배포 preflight (SPEC-022)",
     "kit-ci": "킷 자신의 CI 백스톱 — push/PR 스위트·게이트 + PR range spec-sync(서버측 병합 강제 지점, CICD-001)",
-    "fr-key-anchors": "FR 키 앵커 — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(frKeyAnchorPolicy, SPEC-023)"
+    "fr-key-anchors": "FR 키 앵커 — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(frKeyAnchorPolicy, SPEC-023)",
+    "capability-ownership": "Capability 귀속 — capability x.verb는 entity x 소유 스펙만(스펙 경계=entity 기준, SPEC-024)"
   },
   "relationTypes": ["references"],
   "specSyncExemptGlobs": [

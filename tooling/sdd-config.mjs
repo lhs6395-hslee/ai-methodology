@@ -149,6 +149,11 @@ export const DEFAULTS = {
   // semantic drift 승격(SPEC-019): 소유 파일 리네임 감지 시 spec-sync 요구를
   // "Change Log 한 줄" → "FR 선언 라인 변경 ∨ Spec-Impact"로 승격. off|advisory(기본)|hard.
   semanticDriftPolicy: "advisory",
+  // Capability 귀속(SPEC-024): 스펙 경계는 entity 기준 — capability `x.verb`는 entity `x`를
+  // 소유한 스펙만 선언 가능(verb가 달라도 같은 스펙에 FR 신설, 참조 entity는 Dependencies 관계로).
+  // entity 없이 capability만 소유한 기술 계층 스펙(엔진/헬퍼)이 태어나는 것을 차단.
+  // off|advisory(기본 — entity·capability 카테고리가 둘 다 있을 때만 판정)|hard(위반 exit 1).
+  capabilityOwnershipPolicy: "advisory",
   // FR 키 앵커(SPEC-023): FR 선언 라인의 평문 bold를 소유∪참조 키와 대조 — bold를 수사적
   // 강조가 아닌 "키 앵커" 전용으로 예약(FR→키 도출의 원천 단어 가시화, consistency의 역방향 짝).
   // off(기본, 판정 안 함)|advisory(미매치 경고)|hard(미매치 exit 1). 코드 스팬(`...`)은 앵커 아님.

@@ -33,6 +33,7 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
+import { capabilityCheckActive, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -41,6 +42,16 @@ const STRICT = process.argv.includes("--strict");
 
 const CATEGORIES = cfg.ownershipCategories;
 const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
+// Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
+// entity·capability류 카테고리가 둘 다 있을 때만 활성(비-웹 카테고리 무영향).
+const CAP_CAT = CATEGORIES.find((c) => /capabilit/i.test(c));
+const CAP_POLICY = cfg.capabilityOwnershipPolicy || "advisory";
+if (!["off", "advisory", "hard"].includes(CAP_POLICY)) {
+  console.error(`✗ capabilityOwnershipPolicy 값 위반 "${CAP_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(CATEGORIES);
+const capFindings = []; // {specId, capability, entity}
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
 // 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -84,6 +95,14 @@ for (const file of files) {
       if (bad) formatIssues.push({ specId, cat, bad });
       if (!owners[cat].has(key)) owners[cat].set(key, []);
       owners[cat].get(key).push(specId);
+    }
+  }
+
+  // Capability 귀속(SPEC-024): 소유 capability의 entity 조각이 소유 entity에 없으면 위반 —
+  // entity 0개+capability 소유(기술 계층 스펙)와 남의 entity 위 capability를 모두 잡는다.
+  if (CAP_ACTIVE && CAP_CAT) {
+    for (const f of capabilityOwnershipFindings(own[ENT_CAT], own[CAP_CAT])) {
+      capFindings.push({ specId, ...f });
     }
   }
 
@@ -153,6 +172,19 @@ for (const w of registryWarns) console.log(`⚠ ${w}`);
 if (entityErrors.length) {
   console.error(`\n✗ ENTITY 레지스트리 위반 ${entityErrors.length}건:`);
   for (const e of entityErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+
+// Capability 귀속 리포트(SPEC-024) — 스펙 경계는 entity 기준.
+const capHard = CAP_POLICY === "hard" && capFindings.length > 0;
+if (CAP_ACTIVE && capFindings.length) {
+  console.log(`Capability 귀속(capabilityOwnershipPolicy=${CAP_POLICY}): 위반 ${capFindings.length}건 — capability는 그 entity를 소유한 스펙에 귀속`);
+  for (const f of capFindings) {
+    console.log(`  ${capHard ? "✗" : "⚠"} [${f.specId}] Capabilities "${f.capability}" — entity "${f.entity}"를 이 스펙이 소유하지 않음: 그 entity 소유 스펙으로 이관(verb가 달라도 같은 스펙에 FR 신설), 이 스펙이 그 aggregate면 Entities에 소유 선언`);
+  }
+}
+if (capHard) {
+  console.error(`\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).`);
   process.exit(1);
 }
 

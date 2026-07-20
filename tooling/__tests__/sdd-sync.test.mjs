@@ -25,7 +25,7 @@ function run(dir, args = []) {
 
 test("clean 프로젝트(FR↔test 커버·중복/과대 없음) → 전부 sync, exit 0", () => {
   const dir = fixture({
-    "sdd/specs/SPEC-001.md": "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n",
+    "sdd/specs/SPEC-001.md": "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n",
     "src/a.test.js": "// @covers SPEC-001/FR-001\nimport {test} from 'node:test';\ntest('a',()=>{expect(1).toBe(1)});\n",
   });
   const r = run(dir);
@@ -44,7 +44,7 @@ test("과대 spec(cohesion 위반) → R3 확인 필요, --strict exit 1", () =>
 
 test("R2에 check-spec-sync(range)가 배선됨", () => {
   const dir = fixture({
-    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n",
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n",
     "src/a.test.js": "// @covers SPEC-001/FR-001\nimport {test} from 'node:test';\ntest('a',()=>{expect(1).toBe(1)});\n",
   });
   const r = run(dir);
@@ -54,7 +54,7 @@ test("R2에 check-spec-sync(range)가 배선됨", () => {
 // @covers SPEC-004/FR-009
 test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내부 정합), 사람 텍스트 누출 0", () => {
   const dir = fixture({
-    "sdd/specs/SPEC-001.md": "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n",
+    "sdd/specs/SPEC-001.md": "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** The system SHALL create an item.\n**Given** x **When** y **Then** z\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.create\n## Success Criteria\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n",
     "src/a.test.js": "// @covers SPEC-001/FR-001\nimport {test} from 'node:test';\ntest('a',()=>{expect(1).toBe(1)});\n",
   });
   const r = run(dir, ["--json"]);

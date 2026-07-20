@@ -101,3 +101,4 @@
 | 2026-07-16 | config DEFAULTS에 `schemaDriftManifest: null`·`migrationStatePolicy: "advisory"` knob 추가(Node·Python) | SPEC-022 동반: 런타임 스키마 드리프트(R2′) 게이트 정책(판정·게이트는 SPEC-022) |
 | 2026-07-16 | `configFromString`(문자열→동일 파생 config) 신설 + DEFAULTS `specSyncBase: null` + 킷 자신 `sdd.config.json`을 이 스펙 Files로 소유 편입(exempt 해제) | 감사 T1: 게이트를 통제하는 config가 자기 자신을 게이트에서 면제(specSyncExemptGlobs 자기등재)하고 워킹트리 config로 판정돼, 한 줄 커밋으로 전 강제를 흔적 없이 무력화 가능하던 반사성 결함 — 소유 편입으로 config 변경에 스펙 동반(영속 흔적)을 강제 |
 | 2026-07-17 | config DEFAULTS에 `frKeyAnchorPolicy: "off"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-023 동반: FR 키 앵커 정책(판정 코어는 SPEC-023, 게이트 배선은 SPEC-002) |
+| 2026-07-20 | config DEFAULTS에 `capabilityOwnershipPolicy: "advisory"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-024 동반: capability 귀속 정책(판정 코어는 SPEC-024, 게이트 배선은 SPEC-002) |
