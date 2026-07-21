@@ -16,6 +16,13 @@ export function stripCodeSpans(line) {
   return String(line).replace(/`[^`]*`/g, "");
 }
 
+// 코드 스팬(백틱) 내용 추출 — 선언 키가 백틱에 있으면 앵커로 승격 대상(SPEC-023 FR-006).
+export function extractCodeSpans(line) {
+  const out = [];
+  for (const m of String(line).matchAll(/`([^`]+)`/g)) out.push(m[1].trim());
+  return out;
+}
+
 // FR "선언 라인"인가 — 불릿의 **<REQ>-NNN[a]** 로 시작하는 라인만(본문·Change Log의 FR 언급과 구분).
 export function isFrDeclLine(line, reqAlt = "FR") {
   return new RegExp(`^\\s*-?\\s*\\*\\*(?:${reqAlt})-\\d{3}[a-z]?\\*\\*`).test(line);
@@ -104,6 +111,30 @@ export function categoryMarkerFindings(frLines, keyKindMap, markers, reqAlt = "F
     }
   }
   return { missing, wrong };
+}
+
+// 백틱 안에 선언 키가 있으면 위반(SPEC-023 FR-006) — 키는 리터럴(백틱)이 아니라 **키** (마커) 앵커여야
+// 한다. "굵게 ⟺ 키" 규율의 세 번째 방향(키를 굵게 강제). keyKindMap 비면 inert. 반환 [{fr,token,expected}].
+export function backtickKeyFindings(frLines, keyKindMap, markers, reqAlt = "FR") {
+  const frId = new RegExp(`\\*\\*((?:${reqAlt})-\\d{3}[a-z]?)\\*\\*`);
+  const out = [];
+  if (!keyKindMap || keyKindMap.size === 0) return out;
+  for (const line of frLines || []) {
+    if (!isFrDeclLine(line, reqAlt)) continue;
+    const fr = (line.match(frId) || [null, "?"])[1];
+    const seen = new Set();
+    for (const span of extractCodeSpans(line)) {
+      const tok = span.trim().toLowerCase();
+      if (seen.has(tok)) continue;
+      seen.add(tok);
+      const kind = keyKindMap.get(tok);
+      if (!kind) continue;
+      const expected = (markers && markers[kind]) ? String(markers[kind]).toUpperCase() : null;
+      if (!expected) continue;
+      out.push({ fr, token: tok, expected });
+    }
+  }
+  return out;
 }
 
 // 스펙 한 장 판정 — frLines(선언 라인 배열)의 앵커를 keySet과 대조.

@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
-import { buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings } from "./key-anchor-lib.mjs";
+import { buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings } from "./key-anchor-lib.mjs";
 
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -25,7 +25,7 @@ const tokens = (key) => (key.toLowerCase().match(/[a-z][a-z0-9_]{1,}/g) || []).f
 
 const findings = [];
 const anchors = { matched: 0, findings: [] }; // findings: {specId, fr, token}
-const markers = { missing: [], wrong: [] }; // 카테고리 마커 findings: {specId, fr, token, expected[, got]}
+const markers = { missing: [], wrong: [], backtick: [] }; // 카테고리 마커 findings: {specId, fr, token, expected[, got]}
 const MARKERS = cfg.frAnchorMarkers || { entity: "E", surface: "R", capability: "C" };
 let specCount = 0;
 for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []; } })().sort()) {
@@ -42,9 +42,12 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
     anchors.matched += r.matched.length;
     for (const u of r.unmatched) anchors.findings.push({ specId, ...u });
     // 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
-    const cm = categoryMarkerFindings(lines, buildKeyKindMap(own, deps), MARKERS, cfg.__reqAlt);
+    const kindMap = buildKeyKindMap(own, deps);
+    const cm = categoryMarkerFindings(lines, kindMap, MARKERS, cfg.__reqAlt);
     for (const m of cm.missing) markers.missing.push({ specId, ...m });
     for (const m of cm.wrong) markers.wrong.push({ specId, ...m });
+    // 굵게 ⟺ 키 세 번째 방향(FR-006): 백틱에 든 선언 키는 앵커여야 함(리터럴 아님).
+    for (const m of backtickKeyFindings(lines, kindMap, MARKERS, cfg.__reqAlt)) markers.backtick.push({ specId, ...m });
   }
   // Extract body (FR text) — everything before the Ownership section
   const ownershipStart = text.search(/^##\s+Ownership\b/m);
@@ -65,7 +68,7 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
 console.log(`Spec 일관성(advisory): spec ${specCount}개 검사 — 근거 없는 키 ${findings.length}건.`);
 for (const f of findings) console.log(`  ⚠ [${f.specId}] ${f.cat} "${f.key}": 본문에 근거 토큰 없음 → FR과 정렬 확인`);
 // FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-const markerCount = markers.missing.length + markers.wrong.length;
+const markerCount = markers.missing.length + markers.wrong.length + markers.backtick.length;
 const anchorHard = ANCHOR_POLICY === "hard" && (anchors.findings.length > 0 || markerCount > 0);
 if (ANCHOR_POLICY !== "off") {
   console.log(`키 앵커(frKeyAnchorPolicy=${ANCHOR_POLICY}): 매치 ${anchors.matched} · 미매치 ${anchors.findings.length} · 카테고리 마커 위반 ${markerCount}`);
@@ -78,6 +81,10 @@ if (ANCHOR_POLICY !== "off") {
   }
   for (const m of markers.wrong) {
     console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" (${m.got}) — 마커 불일치: 이 키의 카테고리는 (${m.expected})`);
+  }
+  // 굵게 ⟺ 키(FR-006) — 백틱에 든 선언 키는 앵커여야 한다(리터럴 아님).
+  for (const m of markers.backtick) {
+    console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} 백틱 "${m.token}" — 선언 키는 백틱(리터럴)이 아니라 앵커: **${m.token}** (${m.expected})로 표기`);
   }
 }
 if (findings.length && STRICT) { console.error("\n✗ --strict: 근거 없는 키."); process.exit(1); }

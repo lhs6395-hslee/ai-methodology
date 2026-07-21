@@ -4,13 +4,14 @@
 // @covers SPEC-023/FR-003
 // @covers SPEC-023/FR-004
 // @covers SPEC-023/FR-005
+// @covers SPEC-023/FR-006
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings } from "../key-anchor-lib.mjs";
+import { stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings } from "../key-anchor-lib.mjs";
 
 const M = { entity: "E", surface: "R", capability: "C" };
 
@@ -140,6 +141,35 @@ test("게이트: 전 앵커 매치 + 올바른 카테고리 마커 → hard도 P
     assert.equal(r.code, 1);
     assert.match(r.out, /frKeyAnchorPolicy 값 위반/);
   } finally { rmSync(bad, { recursive: true, force: true }); }
+});
+
+test("extractCodeSpans / backtickKeyFindings: 백틱에 든 선언 키만 앵커 승격 대상(FR-006)", () => {
+  assert.deepEqual(extractCodeSpans("a `pjt_projects` b `project_category` c"), ["pjt_projects", "project_category"]);
+  const km = new Map([["pjt_projects", "entity"], ["post /api/x", "surface"]]);
+  const lines = [
+    "- **FR-001** WHEN `POST /api/x` hits, THE SYSTEM SHALL create a `pjt_projects` row with `project_category`.",
+  ];
+  // 선언 키(pjt_projects·post /api/x)만 → 백틱 위반; project_category(비키·필드)는 무시
+  assert.deepEqual(backtickKeyFindings(lines, km, M), [
+    { fr: "FR-001", token: "post /api/x", expected: "R" },
+    { fr: "FR-001", token: "pjt_projects", expected: "E" },
+  ]);
+  // keyKindMap 비면 inert
+  assert.deepEqual(backtickKeyFindings(lines, new Map(), M), []);
+});
+
+test("게이트: 백틱에 든 선언 키 → 앵커 승격 위반(굵게 ⟺ 키, FR-006)", () => {
+  // pjt_projects(entity)를 백틱으로 → 위반. project_category(비키)는 백틱 유지 OK.
+  const bt = "- **FR-001** THE SYSTEM SHALL insert a `pjt_projects` row with `project_category`.";
+  for (const [policy, wantCode] of [["advisory", 0], ["hard", 1]]) {
+    const root = fixture(policy, bt);
+    try {
+      const r = run(root);
+      assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
+      assert.match(r.out, /백틱 "pjt_projects" — 선언 키는 백틱\(리터럴\)이 아니라 앵커: \*\*pjt_projects\*\* \(E\)/);
+      assert.doesNotMatch(r.out, /project_category/); // 비키 필드는 백틱 유지(무관)
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });
 
 test("게이트: 굵은 키에 카테고리 마커 없음 → advisory ⚠(exit 0) / hard ✗(exit 1)", () => {
