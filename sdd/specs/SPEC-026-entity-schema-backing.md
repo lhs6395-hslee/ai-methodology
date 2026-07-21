@@ -77,3 +77,4 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-21 | 초안 — `entitySchemaBackingPolicy`(off\|advisory\|hard, 기본 off) + `entitySchemaSources`(인프라 무관 어댑터) + `entitySchemaExemptEntities`(면제) + `schema-backing-lib`(백킹 판정) + ownership 게이트 배선, Node·Python 패리티 | 소비 프로젝트 실측(gsn-ai-pm): capability 귀속을 지어낸 entity(`wizard`·`project_list`) 등록으로 우회 — 소유 entity의 실재를 검증하는 게이트 부재. owner가 "스키마 파일 대조(엄격)" 선택. 픽스처 재현에서 유령 지목·양판 바이트 동일 |
+| 2026-07-21 | 하드닝 — `validateSchemaPatterns` 신설 + `extractSchemaEntities` 크래시 방지(잘못된 정규식 skip). 소비자가 `entitySchemaSources.patterns`에 문법 오류 정규식을 쓰면 게이트가 스택 트레이스로 크래시하던 것을 "명확한 config 에러 + exit 1"로. 엔진별 메시지 미포함(Node↔Python 바이트 패리티) | 도그푸딩 사후 점검(owner "문제 확인"): opt-in knob이지만 config 오류가 불투명 크래시를 내던 저위험 결함 — 다른 knob의 "명확한 한 줄 안내" 원칙에 정렬 |

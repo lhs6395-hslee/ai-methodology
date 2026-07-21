@@ -18,13 +18,28 @@ export function schemaBackingActive(policy, sources, categories) {
     && (categories || []).some((c) => /entit/i.test(c));
 }
 
+// 스키마 소스별 패턴 문자열의 정규식 유효성 검사 — 잘못된 정규식은 {index, pattern}로 수집한다
+// (게이트가 크래시하지 않고 명확히 보고하도록). 엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티).
+export function validateSchemaPatterns(sources) {
+  const errors = [];
+  (sources || []).forEach((src, index) => {
+    for (const p of (src && src.patterns) || []) {
+      try { new RegExp(p, "g"); }
+      catch { errors.push({ index, pattern: String(p) }); }
+    }
+  });
+  return errors;
+}
+
 // 스키마 소스 텍스트에서 실재 entity 식별자 추출 — units: [{text, patterns:["정규식문자열"]}].
 // 각 패턴의 캡처그룹 1이 식별자. 전역 매치. 정규화(트림·소문자) 집합 반환.
+// 잘못된 정규식은 건너뛴다(크래시 방지 — 유효성은 validateSchemaPatterns가 별도 보고).
 export function extractSchemaEntities(units) {
   const set = new Set();
   for (const { text, patterns } of units || []) {
     for (const p of patterns || []) {
-      const rx = new RegExp(p, "g");
+      let rx;
+      try { rx = new RegExp(p, "g"); } catch { continue; }
       for (const m of String(text || "").matchAll(rx)) {
         const id = String(m[1] ?? "").trim().toLowerCase();
         if (id) set.add(id);
