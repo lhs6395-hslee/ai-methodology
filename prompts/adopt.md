@@ -38,14 +38,18 @@
 `/speckit.specify`가 하던 것을 손으로 한다:
 1. `templates/module-spec.md`(로컬 키트) 또는 raw base의 `templates/module-spec.md`를 복사해 `sdd/specs/SPEC-001-<slug>.md`로 만든다.
 2. **채운다:** `Module`(1 레포=1 모듈)·`Status`·User Story·**FR(EARS 형식, SHALL 필수)**·`## Ownership`(Modules/Symbols/Artifacts/Files — 유일 키)·`## Success Criteria`·`## Review Log`·`## Dedup-Review`·`## Change Log`. FR ID는 본문에 리터럴로 적지 않는다(팬텀 집계 방지, `**FR-001**` 선언 라인만).
-3. **셀프리뷰**(EARS 모호어·단일동작·측정형 — `SPEC_REVIEW.md`) 후 게이트 green 확인(`check-fr-coverage`·`check-ownership`·`check-spec-completeness`).
+   - **처음부터 방법론에 맞게(부채를 안 쌓는 저술):**
+     - **스펙 정체성 = entity.** 1 spec = 1 aggregate root(독립 생성·삭제 Entity) — 다른 aggregate는 `## Dependencies`에 `Name (relation-type)`로 참조(SPEC-017). "entity 없이 capability만 소유하는 기술 계층 스펙"(엔진·wizard 류)을 만들지 않는다.
+     - **capability 귀속(SPEC-024).** `Capabilities`의 `entity.verb`에서 entity는 **이 스펙이 소유한 Entities(또는 Dependencies 참조)의 스키마 식별자 그대로**여야 한다 — 도메인 약칭(`budget`·`wizard`)·유령 명사 금지. 같은 entity·다른 verb는 새 스펙이 아니라 같은 스펙의 새 FR.
+     - **FR 키 앵커(SPEC-023).** FR 문장에서 키의 원천 단어만 평문 **bold**로(예: `WHEN **POST /api/x**, THE SYSTEM SHALL **staff.recommend**`). 필드명·파일경로·강조어를 굵게 치지 않는다 — 리터럴 인용은 백틱.
+3. **다회 게이트-구동 수렴(정확성 우선 — 토큰보다 정합).** 셀프리뷰(EARS 모호어·단일동작·측정형 — `SPEC_REVIEW.md`) 후, 게이트를 한 번 보고 끝내지 말고 **전 게이트를 돌려 위반이 0(선언된 리뷰 경계 advisory만 남을 때)까지 저술→게이트→수정을 반복**한다: `check-fr-coverage`(+접두어·번호)·`check-ownership`(+dedup·entity 등록·**capability 귀속** SPEC-024·관계 SPEC-017)·`check-spec-cohesion`(1 aggregate)·`check-spec-completeness`(SC·수명주기·문법)·`check-spec-consistency`(+**FR 키 앵커** SPEC-023). 판단 항목(어느 entity가 root·유령 명사 처리)은 추정 말고 사용자에게 묻는다.
 4. **사용자 승인** 후 확정. 코드 착지는 그 다음(작성=LLM, 승인=사람).
 
 > **retrofit(기존 코드에 사후 스펙)은 `Status: Reviewed`로 바로 작성한다 — Draft 아님.** 템플릿 기본값 `Draft`는 **코드가 아직 없는 신규 기능**(spec-first)용이다. 이미 있는 코드를 스펙화하는 retrofit은 **작성 시점에 이미 코드 대조 검토가 끝난 상태**이므로, Draft로 두면 spec-sync 게이트가 "그 스펙이 소유한 (이미 존재하던) 코드를 같은 changeset에서 건드리는 것"을 Draft 차단으로 막아 **매 스펙마다 Draft→커밋실패→Reviewed 승격→재커밋**을 반복하게 된다(실측: 한 세션에서 SPEC-001~004 4회). 그러니 같은 저술 세션에서 **Review Log에 한 줄(일시·수행자=코드 대조 검토·판정)을 채우고 `Status: Reviewed`로 바로 작성**하라(신규 기능처럼 코드가 아직 없는 경우만 Draft가 맞다).
 
 ## 고정 규칙 (발명 금지)
 - spec은 `sdd/specs/`에만 둔다.
-- PREFIX는 **SPEC/INFRA/TEST**. 새 PREFIX가 필요하면 사유와 함께 사용자 승인 후 `sdd.config.json`의 `specIdPrefixes`에 등록.
+- PREFIX는 **SPEC/INFRA/TEST/CICD**(표준 4종). 새 PREFIX가 필요하면 사유와 함께 사용자 승인 후 `sdd.config.json`의 `specIdPrefixes`+`prefixRationale`에 등록.
 - **1 spec = 1 aggregate.**
 - 소유 코드 변경엔 **같은 changeset에 소유 spec 변경을 동반**한다(순수 hotfix만 커밋 트레일러 `Spec-Impact: none <사유>`).
 - 작성=LLM, 승인=사용자. 스펙 확정은 사용자 승인 후.
