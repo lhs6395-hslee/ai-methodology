@@ -41,6 +41,7 @@
 | CICD-001 | 킷 자신 CI 백스톱 — push/PR 스위트·게이트 + PR range spec-sync(서버측 병합 강제 지점) | `.github/workflows/sdd-gates.yml` | active |
 | SPEC-023 | FR 키 앵커 — 평문 bold를 소유∪참조 키와 대조(`frKeyAnchorPolicy`, consistency 배선) | `tooling/key-anchor-lib.mjs` | active |
 | SPEC-024 | Capability 귀속 — capability x.verb는 entity x 소유 스펙만(`capabilityOwnershipPolicy`, ownership 배선) | `tooling/capability-ownership-lib.mjs` | active |
+| SPEC-025 | 스펙 마이그레이션 실행기 `/sdd-migrate` — update 백로그를 승인 경유 실제 재구성(entity·키앵커·입도) | `tooling/harness/sdd-migrate.SKILL.md`, `prompts/migrate.md` | active |
 
 > "코드 경로"가 SSOT 3계층(spec/code/구조) 연결을 가시화한다(`STRUCTURE.md` §SSOT 3계층). 한 spec이 여러 기능을 욱여넣지 않도록 입도는 `check-spec-cohesion`이 advisory로 점검. SPEC-002는 5개 게이트를 한 응집 aggregate로 소유하므로 `maxKeysPerCategoryPerSpec`를 7로 조정했다(사유는 SPEC-002 Change Log).
 

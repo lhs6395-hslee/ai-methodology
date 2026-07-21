@@ -39,6 +39,7 @@
    - **탐지(기계):** 반영 후 게이트를 일괄 실행(`node scripts/sdd-sync.mjs` 또는 개별 게이트)해 **새 문법 유래 advisory**를 수집한다 — cohesion의 "aggregate 삼킴 의심"(Entities > `maxAggregateRootsPerSpec`), ownership의 관계 미구조화(괄호 없는 자유참조)·**capability 귀속 위반**(entity 없는 capability 스펙·남의 entity 위 capability — SPEC-024, 해소=능력을 entity 소유 스펙으로 이관), consistency의 키 앵커 미매치(`frKeyAnchorPolicy` advisory) 등. **전제:** 4단계에서 마이그레이션 표면화 knob(`frKeyAnchorPolicy` 등)을 `advisory`로 켰어야 이 스윕이 백로그를 낸다 — 아직 `off`면 이 단계에서 켜고 다시 돌린다. 스윕이 0건이면 그때 "마이그레이션 대상 없음"으로 보고한다(게이트를 실제로 돌린 근거와 함께).
    - **제시(사람 승인 관문):** 수집 결과를 **스펙별 마이그레이션 백로그**로 사용자에게 제시한다 — "SPEC-005: Entities 7개 → root 1(`orders`) + 6개는 Dependencies 관계로" 식. 절차 정본: 킷 `APPLYING.md` §마이그레이션 노트("복수 Entity → aggregate root + 관계").
    - **수행(승인 후 별도 작업):** 사용자가 승인한 항목만 **작성=LLM·승인=사람** 경로로 재구성한다 — 이 update 절차 자체는 스펙을 편집하지 않는다(백로그 제시까지가 범위). 미승인 항목은 advisory로 남아 다음 update에서 재표면화된다(조용한 소실 없음).
+   - **실행 경로(중요):** 실제 재구성은 `/sdd-migrate`(정본 `prompts/migrate.md`)가 담당한다 — update는 **목록**, migrate는 **실행**. update를 반복해도 스펙은 안 바뀌므로(불변 규칙), 백로그가 있으면 사용자에게 "`/sdd-migrate`로 재구성을 진행할까요?"를 제안하고 승인 시 그 스킬로 넘긴다.
 6. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그) 요약한다.
 
 ## 불변 규칙

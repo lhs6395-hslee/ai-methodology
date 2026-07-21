@@ -115,3 +115,4 @@
 | 2026-07-16 | 감사 봉합(P3·M5) — ① pre-commit 경로 필터 제거(src/lib/app/tests 하드코딩이 Go cmd/·pkg/ 등 비-JS 레이아웃에서 게이트를 영원히 미발동시키던 이식성 결함; 게이트는 전역 스캔이라 매 커밋 실행) ② --gate=sh에 fr·ownership 훅 배선 + --gate=go 미배선 명시 경고(기본 경로가 훅 0개로 "채택=상시 강제"와 어긋나던 것) ③ pre-merge-commit 훅 신설(node/py/sh·self-hooks — 무충돌 병합이 pre-commit을 타지 않아 두 브랜치의 같은 번호·같은 키가 main에 착지하던 경쟁 차단) | 감사 P3·M5: "언어 무관" 기둥이 강제 지점(훅 트리거)에서 깨져 있었고, merge commit은 로컬 게이트 사각지대였음 — 소비 프로젝트 도그푸딩 전 선제 봉합 |
 | 2026-07-17 | sdd-init Node 클로저에 `key-anchor-lib.mjs` 추가 | SPEC-023 동반: 소비 프로젝트 배선 폐포 유지 |
 | 2026-07-20 | sdd-init Node 클로저에 `capability-ownership-lib.mjs` 추가 | SPEC-024 동반: 소비 프로젝트 배선 폐포 유지 |
+| 2026-07-21 | sdd-init 수명주기 스킬 목록에 `sdd-migrate` 추가(4종 설치) | SPEC-025 동반: 스펙 마이그레이션 실행기 스킬을 소비 프로젝트에 배선 |
