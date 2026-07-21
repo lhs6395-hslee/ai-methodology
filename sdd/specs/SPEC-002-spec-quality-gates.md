@@ -106,3 +106,4 @@
 | 2026-07-20 | ownership 게이트에 Capability 귀속 대조 배선(SPEC-024 소비) — entity·capability 카테고리 공존 시에만, 정책 off면 출력 무변 | SPEC-024 동반: 스펙 경계=entity 기준의 기계 신호(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | ownership 게이트에 Entity 스키마 백킹 대조 배선(SPEC-026 소비) — 구조 SSOT 파일 글롭 수집·추출 후 소유 entity 대조, 정책 off/소스 없음/entity 카테고리 없음이면 출력 무변. consistency 게이트에 (E) 엔티티 마커 대조 배선(SPEC-023 확장) | SPEC-026·023 동반: 유령 entity 차단 + FR entity 앵커 (E) 표기(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | ownership 게이트에 `validateSchemaPatterns` 배선 — 잘못된 `entitySchemaSources` 정규식을 명확한 config 에러(exit 1)로 보고(크래시 방지, SPEC-026 소비) | SPEC-026 하드닝 동반: 게이트 배선점이 불투명 크래시 대신 명확 안내 |
+| 2026-07-21 | ownership 게이트에 면제 부채 표면화 배선(SPEC-026 FR-005 소비) — 사용 중 `entitySchemaExemptEntities`를 매 실행 advisory로 출력(hard에서도) | SPEC-026 FR-005 동반: 대량 면제가 조용한 '완료'로 읽히지 않게(게이트 본체는 이 spec 소유) |

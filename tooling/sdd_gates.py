@@ -765,7 +765,7 @@ def cmd_ownership(cfg, strict):
         sys.exit(1)
 
     # Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
-    sb_errors, sb_findings = [], []
+    sb_errors, sb_findings, sb_exempt_used = [], [], []
     if sb_active:
         exempt = cfg.get("entitySchemaExemptEntities") or {}
         exempt_set = set()
@@ -801,12 +801,16 @@ def cmd_ownership(cfg, strict):
                 except OSError:
                     pass
         sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set)
+        sb_exempt_used = sorted(e for e in exempt_set if e in owners[ent_cat])
     sb_hard = sb_policy == "hard" and len(sb_findings) > 0
     if sb_active and sb_findings:
         print(f"Entity 스키마 백킹(entitySchemaBackingPolicy={sb_policy}): 위반 {len(sb_findings)}건 — 소유 entity가 구조 SSOT에 없음(유령 entity 의심)")
         for spec_id, entity in sb_findings:
             tag = "✗" if sb_hard else "⚠"
             print(f'  {tag} [{spec_id}] Entities "{entity}" — 구조 SSOT(스키마)에 실재하지 않음: 실제 테이블이면 스키마에 존재해야 하고, UI/흐름 개념이면 Surface로 강등하고 capability를 실 entity로 재키(SPEC-026)')
+    # 면제는 조용히 '완료'가 되지 않게 항상 표면화(부채·리뷰 대상). 대량 면제는 개념 단위 분할 신호.
+    if sb_active and sb_exempt_used:
+        print(f'Entity 스키마 백킹: 스키마 대조 면제 {len(sb_exempt_used)}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): {", ".join(sb_exempt_used)}')
     if sb_errors:
         print(f"\n✗ entitySchemaExemptEntities 위반 {len(sb_errors)}건:", file=sys.stderr)
         for e in sb_errors:

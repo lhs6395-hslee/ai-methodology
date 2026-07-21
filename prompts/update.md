@@ -31,6 +31,7 @@
      - *값이 프로젝트별인 knob*(예: `trackerCloseout`의 트래커·보고 채널) → **자동 추정 금지.** 먼저 이 프로젝트 `CLAUDE.md`/관례에 선언돼 있으면 그 값으로 채우고, 없으면 **사용자에게 물어** 인스턴스화한다. 해당 없으면 기본 비활성값(`{}`·`[]`)으로 두고 사유를 남긴다.
      - *마이그레이션을 표면화하는 advisory knob*(`frKeyAnchorPolicy`·`capabilityOwnershipPolicy`·`entitySchemaBackingPolicy` 등 — 새 스펙 문법의 위반을 5단계에서 드러내는 knob) → 기본이 `off`거나 미설정이면 **`off`로 두지 말고 `advisory`로 켠다**(사용자 확인). ⚠ 꺼두면 5단계 백로그가 영원히 비어 마이그레이션이 표면화되지 않는다("기본값 충분"으로 판단하는 함정 — `frKeyAnchorPolicy`·`entitySchemaBackingPolicy` 기본이 정확히 `off`다). `hard` 승격은 백로그 정리 후.
        - ⚠ **`entitySchemaBackingPolicy`는 스키마 어댑터 동반 필수(SPEC-026):** 이 knob만 켜고 `entitySchemaSources`(구조 SSOT 위치+추출 패턴, 프리셋 참조)를 비워두면 판정이 inert다 — 이 프로젝트의 스키마 위치(Drizzle `schema.ts`·Prisma·SQL 마이그레이션·proto 등)를 CLAUDE.md 관례 또는 사용자에게 물어 `entitySchemaSources`로 인스턴스화한 뒤 `advisory`로 켠다. 이게 있어야 유령 entity(`wizard`·`project_list` 류 — capability 귀속을 지어낸 entity로 우회한 것)가 백로그로 드러난다.
+       - ⚠ **`entitySchemaExemptEntities`로 백로그를 대량 면제하지 말 것(실측 악용):** 스윕이 유령 entity를 내면 **면제가 아니라 원인별로 해소**한다 — (a) UI/흐름 개념(`wizard`·`project_list`·`dashboard`·`detail`, FR이 실 테이블을 조작)은 **Surface 강등 + capability 재키**(migrate/readopt), (b) 인프라·proto entity(`vpc`·`eks` 등)는 그 구조 SSOT(terraform·`.proto`)를 **`entitySchemaSources`에 소스로 추가**해 스키마 백킹, (c) 면제는 이 둘 다 아닌 "스키마 밖 실 외부 aggregate"에만 소수. 면제는 게이트가 매 실행 부채로 표면화하므로 조용한 '완료'가 되지 않는다. **대량 면제(수십 건)는 entity를 개념 단위로 쪼갠 신호 → readopt 대상**이지 면제 대상이 아니다.
      - *기본값으로 충분한 knob* → 그대로 둔다(하위호환).
    - **새 규범 반영:** 이번 최신화로 들어온 새 규범(예: 완료 루프 close-out — `speckit-fix` 스킬 단계·`METHODOLOGY.md`)이 프로젝트 관례(`CLAUDE.md`) 기입을 요구하면 사용자 확인 후 반영한다.
    - 원칙: 이 단계는 **어떤 미래 knob에도** 동작하도록 generic이다 — 특정 knob명을 하드코딩하지 않고 "DEFAULTS엔 있는데 프로젝트에 없는 것"을 기준으로 판단한다.
@@ -46,6 +47,7 @@
 6. **정책 강도 승격 권장 (graduation — advisory는 종착점이 아니라 경유지).**
    - **원칙:** 강제 knob의 목표 상태는 **strict(`hard`/`error`)**다. `off`·`advisory`·`warn`은 **마이그레이션 중 임시 상태**이지 영구 안착지가 아니다 — advisory에 방치하면 위반이 계속 "미채택 권장"으로 재등장할 뿐 강제되지 않는다. 그래서 update는 knob을 낮은 강도에 두는 것을 권하지 않고, **깨끗해지면 `hard`로 올리는 것을 권장**한다.
    - **판정(기계·generic):** 강도가 계단인 knob(`frKeyAnchorPolicy`·`capabilityOwnershipPolicy`·`entitySchemaBackingPolicy`·`draftBlockPolicy`·`semanticDriftPolicy`·`runTestsPolicy`·`migrationStatePolicy` → `hard`; `specSyncUnownedPolicy` → `error`; `requireAccounting`/`strictSpecs` → 전수)마다: 그 knob의 백로그(5단계 스윕 결과)가 **0건이면 `hard`(strict)로 승격을 권장**하고 사용자 승인 시 config에 반영한다. 백로그가 남아 있으면 "정리(migrate) 후 hard"를 목표로 제시한다 — 이때도 권장 종착지는 advisory가 아니라 hard다.
+   - **면제로 위장된 '백로그 0' 경계(SPEC-026):** `entitySchemaBackingPolicy`의 백로그가 0이어도 그게 **대량 `entitySchemaExemptEntities` 면제로 만든 0**이면 hard 승격은 '완료'가 아니다 — 게이트가 면제를 부채로 표면화하므로, 승격 전 면제 목록을 검토해 UI/흐름은 Surface(migrate/readopt)·인프라/proto는 소스 추가로 실제 해소하고, 남는 면제가 "실 외부 aggregate 소수"일 때만 hard가 참 종착지다. 수십 건 면제 위에 올린 hard는 거짓 완료(실측).
    - **강제 지점 동반:** `draftBlockPolicy: hard` 등 서버측 병합까지 막는 knob은 CI(range 모드 spec-sync)가 걸려 있어야 실효 — 없으면 `ci-examples.md`/`sdd-gates.yml`로 함께 안내.
    - **미승격 시:** 사용자가 hard 승격을 미루면 그 사유를 남기고(다음 update에서 다시 권장), 조용히 advisory로 방치하지 않는다.
 7. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그·**강도 승격 권장/반영**) 요약한다.

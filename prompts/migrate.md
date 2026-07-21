@@ -19,7 +19,7 @@
    |---|---|---|
    | Capability | **A 약칭 불일치** | 명사가 소유/참조 entity의 스키마명과 유사(`budget`↔`pjt_budgets`) → capability를 스키마 키로 개명 |
    | Capability | **B 교차 aggregate** | 명사가 *다른 스펙*이 소유한 entity → 그 FR을 소유 스펙으로 이관, 또는 `## Dependencies`에 `Name (references)` 선언 |
-   | Capability | **C 유령 entity** | 명사가 어느 스펙에도 없거나 스키마에 실재 안 함(`wizard`·`project_list` 등 — SPEC-026 스키마 백킹이 검출) → **판단 필요**: 실제 테이블이면 Entities에 소유 선언(스키마에 존재)·정당한 비-테이블 aggregate면 `entitySchemaExemptEntities` 면제, UI/흐름 개념이면 Surface로 강등하고 capability를 실 entity(`pjt_projects.<verb>`)로 재키 |
+   | Capability | **C 유령 entity** | 명사가 어느 스펙에도 없거나 스키마에 실재 안 함(`wizard`·`project_list` 등 — SPEC-026 스키마 백킹이 검출) → **원인별 해소(면제 남용 금지)**: (1) UI/흐름 개념(FR이 실 테이블 조작)이면 **Surface 강등 + capability를 실 entity(`pjt_projects.<verb>`)로 재키** — 이게 대다수, (2) 인프라·proto entity면 **그 구조 SSOT(terraform·`.proto`)를 `entitySchemaSources`에 소스 추가**(면제 아님), (3) 실 외부 aggregate(외부 API 자원 등)만 `entitySchemaExemptEntities` 소수 면제. ⚠ 수십 건을 일괄 면제하고 hard 올리는 것은 거짓 완료(실측) — 대량이면 readopt 대상 |
    | 키 앵커 | **수사적** | bold가 필드명·파일경로·강조어 → 평문 또는 백틱(`` `...` ``)으로 강등 |
    | 키 앵커 | **키여야 함** | bold가 실제 소유/참조 키인데 미선언 → Ownership/Dependencies에 선언 |
    | 키 앵커 | **(E) 마커** | entity 앵커에 `(E)` 누락 → `**entity** (E)`로; 비-entity에 `(E)` → entity면 Entities 선언, 아니면 `(E)` 제거(FR-005) |

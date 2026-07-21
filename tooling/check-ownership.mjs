@@ -206,6 +206,7 @@ if (capHard) {
 // Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
 const sbErrors = [];
 let sbFindings = [];
+let sbExemptUsed = []; // 사용 중(소유된) 면제 entity — 항상 표면화(부채, 조용한 '완료' 방지)
 if (SB_ACTIVE) {
   const EXEMPT = cfg.entitySchemaExemptEntities || {};
   const exemptSet = new Set();
@@ -243,6 +244,7 @@ if (SB_ACTIVE) {
     }
   }
   sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet);
+  sbExemptUsed = [...exemptSet].filter((e) => owners[ENT_CAT].has(e)).sort();
 }
 const sbHard = SB_POLICY === "hard" && sbFindings.length > 0;
 if (SB_ACTIVE && sbFindings.length) {
@@ -250,6 +252,12 @@ if (SB_ACTIVE && sbFindings.length) {
   for (const f of sbFindings) {
     console.log(`  ${sbHard ? "✗" : "⚠"} [${f.specId}] Entities "${f.entity}" — 구조 SSOT(스키마)에 실재하지 않음: 실제 테이블이면 스키마에 존재해야 하고, UI/흐름 개념이면 Surface로 강등하고 capability를 실 entity로 재키(SPEC-026)`);
   }
+}
+// 면제는 조용히 '완료'가 되지 않게 항상 표면화(부채·리뷰 대상). 대량 면제는 entity를 aggregate가
+// 아니라 개념 단위로 쪼갠 신호 — 면제로 우회하지 말고 UI/흐름은 Surface, 인프라/proto는 해당 구조
+// SSOT를 entitySchemaSources에 추가하라(실측: 소비 프로젝트가 40건을 일괄 면제하고 hard 승격).
+if (SB_ACTIVE && sbExemptUsed.length) {
+  console.log(`Entity 스키마 백킹: 스키마 대조 면제 ${sbExemptUsed.length}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): ${sbExemptUsed.join(", ")}`);
 }
 if (sbErrors.length) {
   console.error(`\n✗ entitySchemaExemptEntities 위반 ${sbErrors.length}건:`);
