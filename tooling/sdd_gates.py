@@ -1395,6 +1395,26 @@ def _backtick_key_findings(fr_lines, key_kind_map, markers, req_alt="FR"):
     return out
 
 
+def _unanchored_owned_key_findings(fr_lines, owned_kind_map, markers, req_alt="FR"):
+    """소유 entity/surface/capability 키가 FR에 굵게 앵커 안 됐으면 위반(SPEC-023 FR-007, (B)).
+    owned_kind_map 비면 inert. 반환 [(key, kind, expected)]."""
+    out = []
+    if not owned_kind_map:
+        return out
+    anchored = set()
+    for line in fr_lines or []:
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        for tok, _ in _extract_anchors_with_markers(line, req_alt):
+            anchored.add(tok)
+    for key, kind in owned_kind_map.items():
+        if key in anchored:
+            continue
+        expected = str(markers[kind]).upper() if markers and markers.get(kind) else None
+        out.append((key, kind, expected))
+    return out
+
+
 def _build_key_set(own_sections, dep_sections):
     """Ownership ∪ Dependencies 전 카테고리(Files 제외) 정규화 키 + 관계 서픽스 제거(SPEC-017)."""
     keys = set()
@@ -1443,6 +1463,7 @@ def cmd_consistency(cfg, strict):
     marker_missing = []    # (spec_id, fr, token, expected) — 카테고리 마커 누락
     marker_wrong = []      # (spec_id, fr, token, expected, got) — 마커 불일치
     marker_backtick = []   # (spec_id, fr, token, expected) — 백틱에 든 선언 키(FR-006)
+    marker_unanchored = [] # (spec_id, key, kind, expected) — 소유 키 앵커 강제(FR-007)
     for file in sorted(files):
         text = read_text(file)
         m = cfg["__specId"].search(text)
@@ -1464,6 +1485,9 @@ def cmd_consistency(cfg, strict):
             # 굵게 ⟺ 키 세 번째 방향(FR-006): 백틱에 든 선언 키는 앵커여야 함(리터럴 아님).
             for fr, tok, exp in _backtick_key_findings(lines, kind_map, markers, cfg["__reqAlt"]):
                 marker_backtick.append((spec_id, fr, tok, exp))
+            # 소유 키 앵커 강제(FR-007, (B)): 소유 entity/surface/capability 키는 FR에 굵게 앵커돼야 함.
+            for key, kind, exp in _unanchored_owned_key_findings(lines, _build_key_kind_map(own, {}), markers, cfg["__reqAlt"]):
+                marker_unanchored.append((spec_id, key, kind, exp))
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.
         body = text[: h.start()] if h else text
@@ -1478,7 +1502,7 @@ def cmd_consistency(cfg, strict):
     for spec_id, cat, key in findings:
         print(f'  ⚠ [{spec_id}] {cat} "{key}": 본문에 근거 토큰 없음 → FR과 정렬 확인')
     # FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-    marker_count = len(marker_missing) + len(marker_wrong) + len(marker_backtick)
+    marker_count = len(marker_missing) + len(marker_wrong) + len(marker_backtick) + len(marker_unanchored)
     anchor_hard = anchor_policy == "hard" and (len(anchor_unmatched) > 0 or marker_count > 0)
     if anchor_policy != "off":
         tag = "✗" if anchor_hard else "⚠"
@@ -1493,6 +1517,9 @@ def cmd_consistency(cfg, strict):
         # 굵게 ⟺ 키(FR-006) — 백틱에 든 선언 키는 앵커여야 한다(리터럴 아님).
         for spec_id, fr, tok, exp in marker_backtick:
             print(f'  {tag} [{spec_id}] {fr} 백틱 "{tok}" — 선언 키는 백틱(리터럴)이 아니라 앵커: **{tok}** ({exp})로 표기')
+        # 소유 키 앵커 강제(FR-007) — 소유 키는 FR에 굵게 앵커돼야 한다(산문·백틱에만 있으면 위반).
+        for spec_id, key, kind, exp in marker_unanchored:
+            print(f'  {tag} [{spec_id}] 소유 {kind} 키 "{key}" — 어느 FR에도 굵게 앵커되지 않음: 이 키를 세우는 FR에서 **{key}** ({exp})로 표기')
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
         sys.exit(1)

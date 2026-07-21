@@ -137,6 +137,26 @@ export function backtickKeyFindings(frLines, keyKindMap, markers, reqAlt = "FR")
   return out;
 }
 
+// 소유 키 앵커 강제(SPEC-023 FR-007, owner (B) "모든 키 참조를 굵게+마커로 강제") — 스펙이 소유한
+// entity/surface/capability 키는 각각 FR 선언 라인에서 최소 1회 굵게 앵커돼야 한다. 산문/백틱에만
+// 있고 굵게 앵커 안 된 소유 키는 위반(그 키를 FR에서 **키** (마커)로 드러내라). ownedKindMap 비면 inert.
+// 마커 정합은 FR-005가 별도 판정 — 여기선 "굵게 등장했는가"만(이중 보고 방지). 반환 [{key,kind,expected}].
+export function unanchoredOwnedKeyFindings(frLines, ownedKindMap, markers, reqAlt = "FR") {
+  const out = [];
+  if (!ownedKindMap || ownedKindMap.size === 0) return out;
+  const anchored = new Set();
+  for (const line of frLines || []) {
+    if (!isFrDeclLine(line, reqAlt)) continue;
+    for (const { token } of extractAnchorsWithMarkers(line, reqAlt)) anchored.add(token);
+  }
+  for (const [key, kind] of ownedKindMap) {
+    if (anchored.has(key)) continue;
+    const expected = (markers && markers[kind]) ? String(markers[kind]).toUpperCase() : null;
+    out.push({ key, kind, expected });
+  }
+  return out;
+}
+
 // 스펙 한 장 판정 — frLines(선언 라인 배열)의 앵커를 keySet과 대조.
 // 반환 {matched:[{fr,token}], unmatched:[{fr,token}]} (라인 순, 라인 내 등장 순 — 결정적).
 export function anchorFindings(frLines, keySet, reqAlt = "FR") {
