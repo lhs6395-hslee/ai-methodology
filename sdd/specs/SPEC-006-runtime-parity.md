@@ -115,3 +115,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-21 | Python 미러 — `validate_schema_patterns` + `extract_schema_entities` 크래시 방지(re.error skip) + cmd_ownership 배선, 잘못된 정규식 에러 문구 Node와 바이트 동일(엔진 메시지 미포함) | SPEC-026 하드닝 동반 — 전 게이트 패리티 유지 |
 | 2026-07-21 | Python 미러 — cmd_ownership 면제 부채 표면화(sb_exempt_used) 배선, Node와 출력 바이트 동일 | SPEC-026 FR-005 동반 — 전 게이트 패리티 유지 |
 | 2026-07-21 | Python 미러 — `_build_key_kind_map`·`_category_marker_findings` + `_extract_anchors_with_markers` 마커 글자 캡처 + cmd_consistency 카테고리 마커 배선 + DEFAULTS `frAnchorMarkers`, Node와 출력 바이트 동일 | SPEC-023 FR-005 일반화 동반 — 전 게이트 패리티 유지 |
+| 2026-07-21 | Python 미러 — `_extract_code_spans`·`_backtick_key_findings` + cmd_consistency FR-006 배선, Node와 출력 바이트 동일 | SPEC-023 FR-006 동반 — 전 게이트 패리티 유지 |

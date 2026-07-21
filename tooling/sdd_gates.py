@@ -1287,6 +1287,11 @@ def _strip_code_spans(line):
     return re.sub(r"`[^`]*`", "", str(line))
 
 
+def _extract_code_spans(line):
+    """코드 스팬(백틱) 내용 추출 — 선언 키가 백틱에 있으면 앵커 승격 대상(SPEC-023 FR-006)."""
+    return [m.group(1).strip() for m in re.finditer(r"`([^`]+)`", str(line))]
+
+
 def _is_fr_decl_line(line, req_alt="FR"):
     return re.match(rf"^\s*-?\s*\*\*(?:{req_alt})-\d{{3}}[a-z]?\*\*", line) is not None
 
@@ -1362,6 +1367,34 @@ def _category_marker_findings(fr_lines, key_kind_map, markers, req_alt="FR"):
     return missing, wrong
 
 
+def _backtick_key_findings(fr_lines, key_kind_map, markers, req_alt="FR"):
+    """백틱에 든 선언 키 → 앵커 승격 대상(SPEC-023 FR-006, "굵게 ⟺ 키"). key_kind_map 비면 inert.
+    반환 [(fr, token, expected)]."""
+    fr_id = re.compile(rf"\*\*((?:{req_alt})-\d{{3}}[a-z]?)\*\*")
+    out = []
+    if not key_kind_map:
+        return out
+    for line in fr_lines or []:
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = fr_id.search(line)
+        fr = m.group(1) if m else "?"
+        seen = set()
+        for span in _extract_code_spans(line):
+            tok = span.strip().lower()
+            if tok in seen:
+                continue
+            seen.add(tok)
+            kind = key_kind_map.get(tok)
+            if not kind:
+                continue
+            expected = str(markers[kind]).upper() if markers and markers.get(kind) else None
+            if not expected:
+                continue
+            out.append((fr, tok, expected))
+    return out
+
+
 def _build_key_set(own_sections, dep_sections):
     """Ownership ∪ Dependencies 전 카테고리(Files 제외) 정규화 키 + 관계 서픽스 제거(SPEC-017)."""
     keys = set()
@@ -1409,6 +1442,7 @@ def cmd_consistency(cfg, strict):
     anchor_unmatched = []  # (spec_id, fr, token)
     marker_missing = []    # (spec_id, fr, token, expected) — 카테고리 마커 누락
     marker_wrong = []      # (spec_id, fr, token, expected, got) — 마커 불일치
+    marker_backtick = []   # (spec_id, fr, token, expected) — 백틱에 든 선언 키(FR-006)
     for file in sorted(files):
         text = read_text(file)
         m = cfg["__specId"].search(text)
@@ -1423,9 +1457,13 @@ def cmd_consistency(cfg, strict):
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
             # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
-            miss, wr = _category_marker_findings(lines, _build_key_kind_map(own, deps), markers, cfg["__reqAlt"])
+            kind_map = _build_key_kind_map(own, deps)
+            miss, wr = _category_marker_findings(lines, kind_map, markers, cfg["__reqAlt"])
             marker_missing.extend((spec_id, fr, tok, exp) for fr, tok, exp in miss)
             marker_wrong.extend((spec_id, fr, tok, exp, got) for fr, tok, exp, got in wr)
+            # 굵게 ⟺ 키 세 번째 방향(FR-006): 백틱에 든 선언 키는 앵커여야 함(리터럴 아님).
+            for fr, tok, exp in _backtick_key_findings(lines, kind_map, markers, cfg["__reqAlt"]):
+                marker_backtick.append((spec_id, fr, tok, exp))
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.
         body = text[: h.start()] if h else text
@@ -1440,7 +1478,7 @@ def cmd_consistency(cfg, strict):
     for spec_id, cat, key in findings:
         print(f'  ⚠ [{spec_id}] {cat} "{key}": 본문에 근거 토큰 없음 → FR과 정렬 확인')
     # FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-    marker_count = len(marker_missing) + len(marker_wrong)
+    marker_count = len(marker_missing) + len(marker_wrong) + len(marker_backtick)
     anchor_hard = anchor_policy == "hard" and (len(anchor_unmatched) > 0 or marker_count > 0)
     if anchor_policy != "off":
         tag = "✗" if anchor_hard else "⚠"
@@ -1452,6 +1490,9 @@ def cmd_consistency(cfg, strict):
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 카테고리 마커 없음: **{tok}** ({exp})로 표기(굵은 키의 종류 명시)')
         for spec_id, fr, tok, exp, got in marker_wrong:
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" ({got}) — 마커 불일치: 이 키의 카테고리는 ({exp})')
+        # 굵게 ⟺ 키(FR-006) — 백틱에 든 선언 키는 앵커여야 한다(리터럴 아님).
+        for spec_id, fr, tok, exp in marker_backtick:
+            print(f'  {tag} [{spec_id}] {fr} 백틱 "{tok}" — 선언 키는 백틱(리터럴)이 아니라 앵커: **{tok}** ({exp})로 표기')
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
         sys.exit(1)
