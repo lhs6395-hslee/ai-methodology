@@ -158,6 +158,10 @@ export const DEFAULTS = {
   // 강조가 아닌 "키 앵커" 전용으로 예약(FR→키 도출의 원천 단어 가시화, consistency의 역방향 짝).
   // off(기본, 판정 안 함)|advisory(미매치 경고)|hard(미매치 exit 1). 코드 스팬(`...`)은 앵커 아님.
   frKeyAnchorPolicy: "off",
+  // FR 키 앵커의 카테고리 마커(SPEC-023) — 굵은 키마다 종류를 표기: entity `(E)`·surface/route
+  // `(R)`·capability `(C)`. frKeyAnchorPolicy가 켜지면 각 bold 키 앵커가 이 마커를 달았는지 대조.
+  // 종류별 글자는 프로젝트가 바꿀 수 있다(예: Surfaces를 (S)로). 키 아닌 bold엔 무관.
+  frAnchorMarkers: { entity: "E", surface: "R", capability: "C" },
   // 테스트 스위트 실제 실행 게이트(SPEC-021): check-test-run이 commands.test를 돌려 green을 확인.
   // 커버리지 회계 ≠ 실행 결과. off(기본, 실행 안 함)|advisory(실패 경고)|hard(실패 exit 1).
   runTestsPolicy: "off",
