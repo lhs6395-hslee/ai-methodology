@@ -165,6 +165,16 @@ export const DEFAULTS = {
   // {expected, deployed} 두 조회 명령(DB/ORM 중립 주입) 또는 null(비활성, 기본). 배포 preflight용.
   schemaDriftManifest: null,
   migrationStatePolicy: "advisory", // 드리프트 발견 시 강도: advisory(경고)|hard(exit 1).
+  // Entity 스키마 백킹(SPEC-026): Ownership.Entities의 소유 entity가 구조 SSOT(DB 스키마·
+  // 마이그레이션·proto 등)에 실재하는 식별자인지 대조 — 지어낸 개념 entity(UI 흐름·화면:
+  // wizard·project_list 류)에 capability를 얹어 capability 귀속(SPEC-024)을 우회하는 것을 차단.
+  // 인프라 무관: 스키마 위치·추출은 어댑터로 주입 — [{globs:[...], patterns:["정규식(캡처1=식별자)"]}].
+  // 비어 있으면 비활성(현행·킷). off(기본)|advisory(경고)|hard(exit 1). entity 카테고리 있을 때만 판정.
+  entitySchemaSources: [],
+  entitySchemaBackingPolicy: "off",
+  // 스키마에 없지만 정당한 aggregate(외부 API 자원·이벤트 스트림 등) 면제: { "<entity>": "<사유>" }.
+  // 빈 사유는 에러(entityRegistry 동형). 남용 방지 — 면제는 리뷰 관문.
+  entitySchemaExemptEntities: {},
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

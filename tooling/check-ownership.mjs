@@ -27,13 +27,15 @@
 // Usage: node scripts/check-ownership.mjs [--strict]
 //   --strict : Ownership 블록 없는 spec도 실패(완전 강제), 형식위반도 실패
 
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
+import { compileGlob } from "./spec-sync-lib.mjs";
+import { schemaBackingActive, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -52,6 +54,16 @@ if (!["off", "advisory", "hard"].includes(CAP_POLICY)) {
 }
 const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(CATEGORIES);
 const capFindings = []; // {specId, capability, entity}
+
+// Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
+const SB_POLICY = cfg.entitySchemaBackingPolicy || "off";
+if (!["off", "advisory", "hard"].includes(SB_POLICY)) {
+  console.error(`✗ entitySchemaBackingPolicy 값 위반 "${SB_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+const SB_SOURCES = cfg.entitySchemaSources || [];
+const SB_ACTIVE = schemaBackingActive(SB_POLICY, SB_SOURCES, CATEGORIES);
+const sbOwned = []; // {specId, entities:[raw...]}
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
 // 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -105,6 +117,9 @@ for (const file of files) {
       capFindings.push({ specId, ...f });
     }
   }
+
+  // Entity 스키마 백킹(SPEC-026): 소유 entity 수집 — 아래에서 구조 SSOT 실재 집합과 대조.
+  if (SB_ACTIVE && (own[ENT_CAT] || []).length) sbOwned.push({ specId, entities: own[ENT_CAT] });
 
   // Parse Dependencies section — do NOT add to owners (not a dedup target).
   // `EntityName (relation-type)` 항목만 구조화 관계로 뽑아 SPEC-017 판정에 넘긴다 — 괄호 없는
@@ -185,6 +200,60 @@ if (CAP_ACTIVE && capFindings.length) {
 }
 if (capHard) {
   console.error(`\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).`);
+  process.exit(1);
+}
+
+// Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
+const sbErrors = [];
+let sbFindings = [];
+if (SB_ACTIVE) {
+  const EXEMPT = cfg.entitySchemaExemptEntities || {};
+  const exemptSet = new Set();
+  for (const [k, v] of Object.entries(EXEMPT)) {
+    if (!String(v ?? "").trim()) sbErrors.push(`entitySchemaExemptEntities["${k}"] — 면제 사유 필요(빈 값 불가)`);
+    const key = String(k).trim().toLowerCase();
+    if (key) exemptSet.add(key);
+  }
+  // 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
+  const IGNORE = new Set(cfg.ignoreDirs);
+  const allFiles = [];
+  (function walk(dir, rel = "") {
+    let entries;
+    try { entries = readdirSync(dir).sort(); } catch { return; }
+    for (const name of entries) {
+      const p = join(dir, name), r = rel ? `${rel}/${name}` : name;
+      let st;
+      try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) { if (!IGNORE.has(name)) walk(p, r); }
+      else allFiles.push(r);
+    }
+  })(ROOT);
+  const units = [];
+  for (const src of SB_SOURCES) {
+    const globs = (src.globs || []).map(compileGlob);
+    const patterns = src.patterns || [];
+    if (!globs.length || !patterns.length) continue;
+    for (const rel of allFiles) {
+      if (!globs.some((rx) => rx.test(rel))) continue;
+      try { units.push({ text: readFileSync(join(ROOT, rel), "utf8"), patterns }); } catch { /* skip */ }
+    }
+  }
+  sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet);
+}
+const sbHard = SB_POLICY === "hard" && sbFindings.length > 0;
+if (SB_ACTIVE && sbFindings.length) {
+  console.log(`Entity 스키마 백킹(entitySchemaBackingPolicy=${SB_POLICY}): 위반 ${sbFindings.length}건 — 소유 entity가 구조 SSOT에 없음(유령 entity 의심)`);
+  for (const f of sbFindings) {
+    console.log(`  ${sbHard ? "✗" : "⚠"} [${f.specId}] Entities "${f.entity}" — 구조 SSOT(스키마)에 실재하지 않음: 실제 테이블이면 스키마에 존재해야 하고, UI/흐름 개념이면 Surface로 강등하고 capability를 실 entity로 재키(SPEC-026)`);
+  }
+}
+if (sbErrors.length) {
+  console.error(`\n✗ entitySchemaExemptEntities 위반 ${sbErrors.length}건:`);
+  for (const e of sbErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+if (sbHard) {
+  console.error(`\n✗ entitySchemaBackingPolicy=hard: 소유 entity는 구조 SSOT에 실재해야 한다 — 유령 entity(지어낸 개념)에 capability를 얹지 말고 실 entity로 재구성하라(SPEC-026).`);
   process.exit(1);
 }
 

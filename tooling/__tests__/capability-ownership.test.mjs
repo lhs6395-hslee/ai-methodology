@@ -48,7 +48,7 @@ function fixture(policy, ownership) {
     ...(policy === undefined ? {} : { capabilityOwnershipPolicy: policy }),
   }));
   writeFileSync(join(root, "sdd/specs/SPEC-001.md"), `# S\n**Spec**: \`SPEC-001\`\n\n## Ownership\n${ownership}\n`);
-  for (const f of ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs"])
+  for (const f of ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs", "spec-sync-lib.mjs", "schema-backing-lib.mjs"])
     cpSync(new URL(`../${f}`, import.meta.url).pathname, join(root, "scripts", f));
   return root;
 }

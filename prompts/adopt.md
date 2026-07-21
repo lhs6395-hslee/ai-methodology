@@ -40,8 +40,8 @@
 2. **채운다:** `Module`(1 레포=1 모듈)·`Status`·User Story·**FR(EARS 형식, SHALL 필수)**·`## Ownership`(Modules/Symbols/Artifacts/Files — 유일 키)·`## Success Criteria`·`## Review Log`·`## Dedup-Review`·`## Change Log`. FR ID는 본문에 리터럴로 적지 않는다(팬텀 집계 방지, `**FR-001**` 선언 라인만).
    - **처음부터 방법론에 맞게(부채를 안 쌓는 저술):**
      - **스펙 정체성 = entity.** 1 spec = 1 aggregate root(독립 생성·삭제 Entity) — 다른 aggregate는 `## Dependencies`에 `Name (relation-type)`로 참조(SPEC-017). "entity 없이 capability만 소유하는 기술 계층 스펙"(엔진·wizard 류)을 만들지 않는다.
-     - **capability 귀속(SPEC-024).** `Capabilities`의 `entity.verb`에서 entity는 **이 스펙이 소유한 Entities(또는 Dependencies 참조)의 스키마 식별자 그대로**여야 한다 — 도메인 약칭(`budget`·`wizard`)·유령 명사 금지. 같은 entity·다른 verb는 새 스펙이 아니라 같은 스펙의 새 FR.
-     - **FR 키 앵커(SPEC-023).** FR 문장에서 키의 원천 단어만 평문 **bold**로(예: `WHEN **POST /api/x**, THE SYSTEM SHALL **staff.recommend**`). 필드명·파일경로·강조어를 굵게 치지 않는다 — 리터럴 인용은 백틱.
+     - **capability 귀속(SPEC-024) + entity 실재(SPEC-026).** `Capabilities`의 `entity.verb`에서 entity는 **이 스펙이 소유한 Entities(또는 Dependencies 참조)의 스키마 식별자 그대로**여야 한다 — 도메인 약칭(`budget`)·유령 명사 금지. 특히 **소유 Entities는 구조 SSOT(DB 스키마·마이그레이션·proto)에 실재하는 테이블/식별자여야 한다** — 화면·흐름 개념(`wizard`·`project_list`)을 entity로 등록해 capability를 얹지 않는다(그건 Surface이고, 그 verb는 실 entity의 FR). 같은 entity·다른 verb는 새 스펙이 아니라 같은 스펙의 새 FR.
+     - **FR 키 앵커(SPEC-023).** FR 문장에서 키의 원천 단어만 평문 **bold**로(예: `WHEN **POST /api/x**, THE SYSTEM SHALL **staff.recommend**`). 필드명·파일경로·강조어를 굵게 치지 않는다 — 리터럴 인용은 백틱. **entity 앵커는 `**entity** (E)`로 표기**해 화면·능력 앵커와 구분한다(FR-005 — "이게 entity인지" 가독성).
 3. **다회 게이트-구동 수렴(정확성 우선 — 토큰보다 정합).** 셀프리뷰(EARS 모호어·단일동작·측정형 — `SPEC_REVIEW.md`) 후, 게이트를 한 번 보고 끝내지 말고 **전 게이트를 돌려 위반이 0(선언된 리뷰 경계 advisory만 남을 때)까지 저술→게이트→수정을 반복**한다: `check-fr-coverage`(+접두어·번호)·`check-ownership`(+dedup·entity 등록·**capability 귀속** SPEC-024·관계 SPEC-017)·`check-spec-cohesion`(1 aggregate)·`check-spec-completeness`(SC·수명주기·문법)·`check-spec-consistency`(+**FR 키 앵커** SPEC-023). 판단 항목(어느 entity가 root·유령 명사 처리)은 추정 말고 사용자에게 묻는다.
 4. **사용자 승인** 후 확정. 코드 착지는 그 다음(작성=LLM, 승인=사람).
 
