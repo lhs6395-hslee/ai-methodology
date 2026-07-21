@@ -103,3 +103,4 @@
 | 2026-07-17 | config DEFAULTS에 `frKeyAnchorPolicy: "off"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-023 동반: FR 키 앵커 정책(판정 코어는 SPEC-023, 게이트 배선은 SPEC-002) |
 | 2026-07-20 | config DEFAULTS에 `capabilityOwnershipPolicy: "advisory"` knob 추가(Node·Python) — off\|advisory\|hard | SPEC-024 동반: capability 귀속 정책(판정 코어는 SPEC-024, 게이트 배선은 SPEC-002) |
 | 2026-07-21 | entityRegistry에 `spec-migration`·`capability-ownership` 등록(킷 자신) | SPEC-025·024 동반: 신규 모듈 entity 어휘 등록(등록 관문) |
+| 2026-07-21 | config DEFAULTS에 `entitySchemaSources`(인프라 무관 어댑터 `[{globs,patterns}]`)·`entitySchemaBackingPolicy: "off"`·`entitySchemaExemptEntities: {}` 추가(Node·Python) + entityRegistry에 `entity-schema-backing` 등록 | SPEC-026 동반: 유령 entity 차단 정책(판정 코어는 SPEC-026, 게이트 배선은 SPEC-002) |

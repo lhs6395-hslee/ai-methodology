@@ -21,6 +21,7 @@
 - 매치 정규화: 트림·소문자 — Surface(`POST /api/x`)도 소문자 비교로 매치. Files 글롭·`—` 플레이스홀더는 키 집합에서 제외.
 - 앵커는 선택이다(모든 FR이 키를 언급하진 않음) — 게이트는 "bold가 있으면 키여야 한다"만 강제하고 "키가 bold여야 한다"는 강제하지 않는다(후자는 consistency의 키→본문 근거가 이미 커버).
 - 기본 `off` = 판정·출력 완전 무변(하위호환) — 소비 프로젝트는 기존 수사적 bold 정리 후 advisory→hard로 점진 승격.
+- **(E) 엔티티 마커**(owner 요구): FR 선언 라인의 entity 앵커는 `**토큰** (E)`로 표기해 화면(Surface)·능력(Capability) 앵커와 구분한다 — "이 bold가 entity인지"의 가독성. entity 키인데 (E)가 없으면(누락)·entity가 아닌데 (E)가 붙으면(오부착) 위반. entity 카테고리가 없는 프로젝트(킷 Modules·파이프라인 Datasets)는 마커 판정 inert. 마커는 **entity 카테고리에만** 국한(전 카테고리 병기 아님 — 소음 최소화). frKeyAnchorPolicy 강도를 공유(advisory 경고·hard 차단).
 
 ---
 
@@ -31,9 +32,10 @@
 - **FR-002** (event): WHEN the policy is advisory or hard, THE SYSTEM SHALL extract plain-bold tokens from each FR declaration line — excluding the requirement id and any code-span content — and match each, case-insensitively after trimming, against the spec's declared Ownership and Dependencies keys with relation-type suffixes stripped, reporting matched and unmatched counts.
 - **FR-003** (unwanted): IF a bold token matches no declared key, THEN THE SYSTEM SHALL name the spec, requirement id, and token — warning under advisory and exiting non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
+- **FR-005** (event): WHEN the policy is advisory or hard and the spec has an entity-like ownership category, THE SYSTEM SHALL require every FR-declaration-line bold token that matches an entity key to be immediately followed by an `(E)` marker, and require any `(E)` marker to follow only an entity key — reporting a missing marker on an entity anchor and a spurious marker on a non-entity anchor, warning under advisory and exiting non-zero under hard; where the spec has no entity-like category the marker evaluation is skipped.
 
 ### Key Entities
-- **key anchor** — a plain-bold token on an FR declaration line declaring "this word is (the source of) a declared ownership/dependency key", distinct from rhetorical emphasis.
+- **key anchor** — a plain-bold token on an FR declaration line declaring "this word is (the source of) a declared ownership/dependency key", distinct from rhetorical emphasis; an entity-category anchor additionally carries an `(E)` marker so entities are visually distinct from surface/capability anchors.
 
 ---
 
@@ -59,7 +61,7 @@
 
 ## Assumptions / Clarifications Retained
 - 앵커의 "의미 적정성"(이 FR에 앵커를 달았어야 하는가, 달지 않은 것이 정당한가)은 리뷰 경계 — 게이트는 "단 bold가 키인가"의 결정 신호만 강제한다.
-- 카테고리 병기(`(entity)` 등)는 채택하지 않는다 — 카테고리는 매치된 선언 절에서 기계가 판정 가능하고, 병기는 소음·드리프트 원천.
+- 카테고리 병기는 **entity에 한해** 채택한다(`**토큰** (E)`, owner 요구 "이게 entity인지 보이게") — entity는 aggregate-root 정체성이라 화면·능력 앵커와의 구분이 저술·리뷰에 가장 중요하다(FR-005). 나머지 카테고리(surface·capability)는 매치된 선언 절에서 기계 판정 가능하므로 병기하지 않는다(소음 최소화 — 초안의 전면 불채택을 entity 한정으로 개정).
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
@@ -78,3 +80,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-17 | 초안 — `frKeyAnchorPolicy`(off\|advisory\|hard) + `key-anchor-lib`(평문 bold 추출·코드 스팬 제외·키 대조) + consistency 게이트 배선, Node·Python 패리티. 킷 자신 advisory on | 소비 프로젝트 실측(owner 제기): FR bold가 수사적 장식뿐 — "어느 단어가 entity/surface인지" 강조가 키 도출의 가시적 앵커여야 한다는 제안. 도입 즉시 킷 자신에서 수사적 bold 1건(SPEC-003 "beginning") 실수확·정리 |
+| 2026-07-21 | (E) 엔티티 마커 신설(FR-005) — FR 선언 라인의 entity 앵커는 `**토큰** (E)` 표기(entity 식별 가독성). `key-anchor-lib`에 `extractAnchorsWithMarkers`·`buildEntityKeySet`·`entityMarkerFindings` + consistency 게이트 배선(frKeyAnchorPolicy 강도 공유), Node·Python 패리티. Assumptions의 '카테고리 병기 불채택'을 entity 한정 채택으로 개정 | owner 요구: "FR에서 entity는 명조처리하고 뒤에 (E)를 붙여 이게 그거(entity)인지 알게" — 초안의 병기 전면 불채택 결정을 entity에 한해 뒤집음 |

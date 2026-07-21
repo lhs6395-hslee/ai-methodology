@@ -91,6 +91,9 @@ DEFAULTS = {
     "runTestsPolicy": "off",
     "schemaDriftManifest": None,
     "migrationStatePolicy": "advisory",
+    "entitySchemaSources": [],
+    "entitySchemaBackingPolicy": "off",
+    "entitySchemaExemptEntities": {},
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -577,6 +580,38 @@ def capability_ownership_findings(owned_entities, owned_capabilities):
     return findings
 
 
+def schema_backing_active(policy, sources, categories):
+    """정책 on + 스키마 소스 선언 + Entities류 카테고리 존재일 때만 활성(SPEC-026, schema-backing-lib 미러)."""
+    return policy != "off" and isinstance(sources, list) and len(sources) > 0 \
+        and any(re.search("entit", c, re.IGNORECASE) for c in categories or [])
+
+
+def extract_schema_entities(units):
+    """구조 SSOT 텍스트에서 실재 entity 식별자 추출 — units:[{text, patterns:[정규식]}], 캡처1=식별자."""
+    out = set()
+    for unit in units or []:
+        text = unit.get("text") or ""
+        for p in unit.get("patterns") or []:
+            for m in re.finditer(p, text):
+                ident = str(m.group(1) or "").strip().lower()
+                if ident:
+                    out.add(ident)
+    return out
+
+
+def schema_backing_findings(owned_by_spec, schema_set, exempt_set):
+    """소유 entity가 스키마 집합(∪ 면제)에 없으면 위반. 반환 [(spec_id, entity)] (선언 순)."""
+    findings = []
+    for spec_id, entities in owned_by_spec or []:
+        for raw in entities or []:
+            ent = str(raw).strip().lower()
+            if not ent or ent in ("—", "-"):
+                continue
+            if ent not in schema_set and not (exempt_set and ent in exempt_set):
+                findings.append((spec_id, ent))
+    return findings
+
+
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
     ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
@@ -589,6 +624,16 @@ def cmd_ownership(cfg, strict):
         sys.exit(1)
     cap_active = cap_policy != "off" and capability_check_active(categories)
     cap_findings = []  # (spec_id, capability, entity)
+
+    # Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
+    sb_policy = cfg.get("entitySchemaBackingPolicy") or "off"
+    if sb_policy not in ("off", "advisory", "hard"):
+        print(f'✗ entitySchemaBackingPolicy 값 위반 "{sb_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    sb_sources = cfg.get("entitySchemaSources") or []
+    sb_active = schema_backing_active(sb_policy, sb_sources, categories)
+    sb_owned = []  # (spec_id, [raw...])
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
     # 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -625,6 +670,9 @@ def cmd_ownership(cfg, strict):
         if cap_active and cap_cat:
             for cap, entity in capability_ownership_findings(own.get(ent_cat), own.get(cap_cat)):
                 cap_findings.append((spec_id, cap, entity))
+        # Entity 스키마 백킹(SPEC-026): 소유 entity 수집 — 아래에서 구조 SSOT 실재 집합과 대조.
+        if sb_active and own.get(ent_cat):
+            sb_owned.append((spec_id, own[ent_cat]))
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
         # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
         deps = parse_section(text, "Dependencies", categories)
@@ -695,6 +743,56 @@ def cmd_ownership(cfg, strict):
             print(f'  {tag} [{spec_id}] Capabilities "{cap}" — entity "{entity}"를 이 스펙이 소유하지 않음: 그 entity 소유 스펙으로 이관(verb가 달라도 같은 스펙에 FR 신설), 이 스펙이 그 aggregate면 Entities에 소유 선언')
     if cap_hard:
         print("\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).",
+              file=sys.stderr)
+        sys.exit(1)
+
+    # Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
+    sb_errors, sb_findings = [], []
+    if sb_active:
+        exempt = cfg.get("entitySchemaExemptEntities") or {}
+        exempt_set = set()
+        for k, v in exempt.items():
+            if not str(v or "").strip():
+                sb_errors.append(f'entitySchemaExemptEntities["{k}"] — 면제 사유 필요(빈 값 불가)')
+            key = str(k).strip().lower()
+            if key:
+                exempt_set.add(key)
+        # 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
+        ignore = set(cfg["ignoreDirs"])
+        all_files = []
+        for dirpath, dirnames, filenames in os.walk(cfg["__root"]):
+            dirnames[:] = sorted(d for d in dirnames if d not in ignore)
+            rel_dir = os.path.relpath(dirpath, cfg["__root"])
+            for name in sorted(filenames):
+                all_files.append(name if rel_dir == "." else f"{rel_dir}/{name}")
+        units = []
+        for src in sb_sources:
+            globs = [compile_glob(g) for g in (src.get("globs") or [])]
+            patterns = src.get("patterns") or []
+            if not globs or not patterns:
+                continue
+            for rel in all_files:
+                if not any(rx.search(rel) for rx in globs):
+                    continue
+                try:
+                    with open(os.path.join(cfg["__root"], rel), encoding="utf-8") as fh:
+                        units.append({"text": fh.read(), "patterns": patterns})
+                except OSError:
+                    pass
+        sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set)
+    sb_hard = sb_policy == "hard" and len(sb_findings) > 0
+    if sb_active and sb_findings:
+        print(f"Entity 스키마 백킹(entitySchemaBackingPolicy={sb_policy}): 위반 {len(sb_findings)}건 — 소유 entity가 구조 SSOT에 없음(유령 entity 의심)")
+        for spec_id, entity in sb_findings:
+            tag = "✗" if sb_hard else "⚠"
+            print(f'  {tag} [{spec_id}] Entities "{entity}" — 구조 SSOT(스키마)에 실재하지 않음: 실제 테이블이면 스키마에 존재해야 하고, UI/흐름 개념이면 Surface로 강등하고 capability를 실 entity로 재키(SPEC-026)')
+    if sb_errors:
+        print(f"\n✗ entitySchemaExemptEntities 위반 {len(sb_errors)}건:", file=sys.stderr)
+        for e in sb_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if sb_hard:
+        print("\n✗ entitySchemaBackingPolicy=hard: 소유 entity는 구조 SSOT에 실재해야 한다 — 유령 entity(지어낸 개념)에 capability를 얹지 말고 실 entity로 재구성하라(SPEC-026).",
               file=sys.stderr)
         sys.exit(1)
     for c in relation_cycles:
@@ -1167,16 +1265,59 @@ def _is_fr_decl_line(line, req_alt="FR"):
     return re.match(rf"^\s*-?\s*\*\*(?:{req_alt})-\d{{3}}[a-z]?\*\*", line) is not None
 
 
-def _extract_anchors(line, req_alt="FR"):
-    """FR 선언 라인의 평문 bold 토큰(코드 스팬 제거 후, FR-ID 제외) — 정규화(트림·소문자)."""
+def _extract_anchors_with_markers(line, req_alt="FR"):
+    """평문 bold 토큰 + 뒤 "(E)" 마커 유무 — entity 앵커 식별(SPEC-023 확장). [(token, entity_marked)]."""
     id_re = re.compile(rf"^(?:{req_alt})-\d{{3}}[a-z]?$")
     out = []
-    for m in re.finditer(r"\*\*([^*]+?)\*\*", _strip_code_spans(line)):
+    for m in re.finditer(r"\*\*([^*]+?)\*\*(\s*\(E\))?", _strip_code_spans(line)):
         tok = m.group(1).strip()
         if not tok or id_re.match(tok):
             continue
-        out.append(tok.lower())
+        out.append((tok.lower(), bool(m.group(2))))
     return out
+
+
+def _extract_anchors(line, req_alt="FR"):
+    """FR 선언 라인의 평문 bold 토큰(코드 스팬 제거 후, FR-ID 제외) — 정규화(트림·소문자)."""
+    return [tok for tok, _ in _extract_anchors_with_markers(line, req_alt)]
+
+
+def _build_entity_key_set(own_sections, dep_sections):
+    """entity 카테고리(/entit/)만 — (E) 마커 대조용. 관계 서픽스 제거. entity 카테고리 없으면 빈 집합(inert)."""
+    keys = set()
+    for sec in (own_sections, dep_sections):
+        for cat, lst in (sec or {}).items():
+            if not re.search(r"entit", cat, re.IGNORECASE):
+                continue
+            for raw in lst or []:
+                k = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip().lower()
+                if k and k not in ("—", "-"):
+                    keys.add(k)
+    return keys
+
+
+def _entity_marker_findings(fr_lines, entity_key_set, req_alt="FR"):
+    """(missing, spurious) — entity 앵커엔 (E) 필수·(E)는 entity에만. entity_key_set 비면 inert."""
+    fr_id = re.compile(rf"\*\*((?:{req_alt})-\d{{3}}[a-z]?)\*\*")
+    missing, spurious = [], []
+    if not entity_key_set:
+        return missing, spurious
+    for line in fr_lines or []:
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = fr_id.search(line)
+        fr = m.group(1) if m else "?"
+        seen = set()
+        for tok, marked in _extract_anchors_with_markers(line, req_alt):
+            if tok in seen:
+                continue
+            seen.add(tok)
+            is_entity = tok in entity_key_set
+            if is_entity and not marked:
+                missing.append((fr, tok))
+            elif not is_entity and marked:
+                spurious.append((fr, tok))
+    return missing, spurious
 
 
 def _build_key_set(own_sections, dep_sections):
@@ -1223,6 +1364,8 @@ def cmd_consistency(cfg, strict):
     findings = []
     anchor_matched = 0
     anchor_unmatched = []  # (spec_id, fr, token)
+    marker_missing = []    # (spec_id, fr, token) — entity 앵커 (E) 누락
+    marker_spurious = []   # (spec_id, fr, token) — 비-entity에 (E)
     for file in sorted(files):
         text = read_text(file)
         m = cfg["__specId"].search(text)
@@ -1230,10 +1373,16 @@ def cmd_consistency(cfg, strict):
         own = parse_section(text, "Ownership", categories)
         # FR 키 앵커 대조(SPEC-023) — 정책이 켜진 경우만(off면 판정·출력 무변).
         if anchor_policy != "off":
-            key_set = _build_key_set(own, parse_section(text, "Dependencies", categories))
-            mt, un = _anchor_findings(text.split("\n"), key_set, cfg["__reqAlt"])
+            deps = parse_section(text, "Dependencies", categories)
+            lines = text.split("\n")
+            key_set = _build_key_set(own, deps)
+            mt, un = _anchor_findings(lines, key_set, cfg["__reqAlt"])
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
+            # (E) 엔티티 마커(SPEC-023 확장): entity 앵커는 **토큰** (E), (E)는 entity에만.
+            miss, spur = _entity_marker_findings(lines, _build_entity_key_set(own, deps), cfg["__reqAlt"])
+            marker_missing.extend((spec_id, fr, tok) for fr, tok in miss)
+            marker_spurious.extend((spec_id, fr, tok) for fr, tok in spur)
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.
         body = text[: h.start()] if h else text
@@ -1248,17 +1397,23 @@ def cmd_consistency(cfg, strict):
     for spec_id, cat, key in findings:
         print(f'  ⚠ [{spec_id}] {cat} "{key}": 본문에 근거 토큰 없음 → FR과 정렬 확인')
     # FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-    anchor_hard = anchor_policy == "hard" and len(anchor_unmatched) > 0
+    marker_count = len(marker_missing) + len(marker_spurious)
+    anchor_hard = anchor_policy == "hard" and (len(anchor_unmatched) > 0 or marker_count > 0)
     if anchor_policy != "off":
-        print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)}")
+        tag = "✗" if anchor_hard else "⚠"
+        print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)} · (E)마커 위반 {marker_count}")
         for spec_id, fr, tok in anchor_unmatched:
-            tag = "✗" if anchor_hard else "⚠"
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언')
+        # (E) 엔티티 마커(SPEC-023 확장) — entity 앵커는 **토큰** (E)로 표기해 화면·참조 키와 구분.
+        for spec_id, fr, tok in marker_missing:
+            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — entity 키인데 (E) 마커 없음: **{tok}** (E)로 표기(entity임을 명시)')
+        for spec_id, fr, tok in marker_spurious:
+            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" (E) — entity 키가 아닌데 (E) 마커: entity면 Entities에 선언, 아니면 (E) 제거')
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
         sys.exit(1)
     if anchor_hard:
-        print("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용 — 위 토큰을 정리하라(SPEC-023).", file=sys.stderr)
+        print("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 entity 앵커는 (E) 마커 필수 — 위 토큰을 정리하라(SPEC-023).", file=sys.stderr)
         sys.exit(1)
     print("일관성: advisory 경고(비차단)" if findings else "일관성: OK — 모든 키에 본문 근거.")
 
