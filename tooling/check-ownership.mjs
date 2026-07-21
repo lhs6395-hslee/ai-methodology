@@ -35,7 +35,7 @@ import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
-import { schemaBackingActive, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
+import { schemaBackingActive, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -213,6 +213,10 @@ if (SB_ACTIVE) {
     if (!String(v ?? "").trim()) sbErrors.push(`entitySchemaExemptEntities["${k}"] — 면제 사유 필요(빈 값 불가)`);
     const key = String(k).trim().toLowerCase();
     if (key) exemptSet.add(key);
+  }
+  // 잘못된 정규식은 크래시 대신 명확히 보고(엔진별 메시지 미포함 — 패리티).
+  for (const e of validateSchemaPatterns(SB_SOURCES)) {
+    sbErrors.push(`entitySchemaSources[${e.index}].patterns "${e.pattern}" — 잘못된 정규식(문법 오류): 이 knob의 추출 패턴을 확인하라`);
   }
   // 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
   const IGNORE = new Set(cfg.ignoreDirs);

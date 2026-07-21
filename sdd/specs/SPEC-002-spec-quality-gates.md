@@ -105,3 +105,4 @@
 | 2026-07-17 | consistency 게이트에 FR 키 앵커 대조 배선(SPEC-023 소비) — 정책 off면 판정·출력 무변, 스캔 순서 정렬(결정성) | SPEC-023 동반: 키→본문 근거(기존)와 본문 bold→키(신규)의 양방향 앵커 — 게이트 본체는 이 spec 소유 |
 | 2026-07-20 | ownership 게이트에 Capability 귀속 대조 배선(SPEC-024 소비) — entity·capability 카테고리 공존 시에만, 정책 off면 출력 무변 | SPEC-024 동반: 스펙 경계=entity 기준의 기계 신호(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | ownership 게이트에 Entity 스키마 백킹 대조 배선(SPEC-026 소비) — 구조 SSOT 파일 글롭 수집·추출 후 소유 entity 대조, 정책 off/소스 없음/entity 카테고리 없음이면 출력 무변. consistency 게이트에 (E) 엔티티 마커 대조 배선(SPEC-023 확장) | SPEC-026·023 동반: 유령 entity 차단 + FR entity 앵커 (E) 표기(게이트 본체는 이 spec 소유) |
+| 2026-07-21 | ownership 게이트에 `validateSchemaPatterns` 배선 — 잘못된 `entitySchemaSources` 정규식을 명확한 config 에러(exit 1)로 보고(크래시 방지, SPEC-026 소비) | SPEC-026 하드닝 동반: 게이트 배선점이 불투명 크래시 대신 명확 안내 |

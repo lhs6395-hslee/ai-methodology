@@ -11,7 +11,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { schemaBackingActive, extractSchemaEntities, schemaBackingFindings } from "../schema-backing-lib.mjs";
+import { schemaBackingActive, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "../schema-backing-lib.mjs";
 
 const GATE = new URL("../check-ownership.mjs", import.meta.url).pathname;
 
@@ -46,6 +46,15 @@ test("schemaBackingFindings: 스키마에 없는 소유 entity만 위반 — 실
   ];
   const f = schemaBackingFindings(owned, schema, exempt);
   assert.deepEqual(f, [{ specId: "SPEC-002", entity: "wizard" }, { specId: "SPEC-012", entity: "project_list" }]);
+});
+
+test("validateSchemaPatterns: 잘못된 정규식 수집(엔진 메시지 미포함) / extractSchemaEntities 크래시 안 함", () => {
+  const errs = validateSchemaPatterns([{ globs: ["s.ts"], patterns: ["ok([a-z]+)", "bad((("] }]);
+  assert.deepEqual(errs, [{ index: 0, pattern: "bad(((" }]);
+  assert.deepEqual(validateSchemaPatterns([{ patterns: ["fine"] }]), []);
+  // 잘못된 정규식이 섞여도 추출은 크래시하지 않고 유효 패턴만 반영
+  const set = extractSchemaEntities([{ text: "table users;", patterns: ["bad(((", "table ([a-z]+)"] }]);
+  assert.deepEqual([...set], ["users"]);
 });
 
 // ── 게이트 e2e (entitySchemaBackingPolicy off|advisory|hard) ──
@@ -122,5 +131,17 @@ test("게이트: enum 밖 정책 값 → exit 1", () => {
     const r = run(root);
     assert.equal(r.code, 1);
     assert.match(r.out, /entitySchemaBackingPolicy 값 위반/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트: 잘못된 정규식은 크래시 대신 명확한 config 에러 + exit 1", () => {
+  const root = fixture("advisory", { extraConfig: {
+    entityRegistry: { pjt_projects: "실 aggregate", wizard: "x" },
+    entitySchemaSources: [{ globs: ["src/db/*.ts"], patterns: ["pgTable((("] }] } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /entitySchemaSources\[0\]\.patterns "pgTable\(\(\(" — 잘못된 정규식/);
+    assert.doesNotMatch(r.out, /SyntaxError|Invalid regular expression|Unterminated/); // 엔진 스택 노출 안 함
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

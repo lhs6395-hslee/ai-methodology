@@ -586,13 +586,31 @@ def schema_backing_active(policy, sources, categories):
         and any(re.search("entit", c, re.IGNORECASE) for c in categories or [])
 
 
+def validate_schema_patterns(sources):
+    """소스별 패턴의 정규식 유효성 검사 — 잘못된 정규식은 (index, pattern)로 수집(크래시 대신 보고).
+    엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티)."""
+    errors = []
+    for index, src in enumerate(sources or []):
+        for p in (src or {}).get("patterns") or []:
+            try:
+                re.compile(p)
+            except re.error:
+                errors.append((index, str(p)))
+    return errors
+
+
 def extract_schema_entities(units):
-    """구조 SSOT 텍스트에서 실재 entity 식별자 추출 — units:[{text, patterns:[정규식]}], 캡처1=식별자."""
+    """구조 SSOT 텍스트에서 실재 entity 식별자 추출 — units:[{text, patterns:[정규식]}], 캡처1=식별자.
+    잘못된 정규식은 건너뛴다(크래시 방지 — 유효성은 validate_schema_patterns가 별도 보고)."""
     out = set()
     for unit in units or []:
         text = unit.get("text") or ""
         for p in unit.get("patterns") or []:
-            for m in re.finditer(p, text):
+            try:
+                rx = re.compile(p)
+            except re.error:
+                continue
+            for m in rx.finditer(text):
                 ident = str(m.group(1) or "").strip().lower()
                 if ident:
                     out.add(ident)
@@ -757,6 +775,9 @@ def cmd_ownership(cfg, strict):
             key = str(k).strip().lower()
             if key:
                 exempt_set.add(key)
+        # 잘못된 정규식은 크래시 대신 명확히 보고(엔진별 메시지 미포함 — 패리티).
+        for idx, pat in validate_schema_patterns(sb_sources):
+            sb_errors.append(f'entitySchemaSources[{idx}].patterns "{pat}" — 잘못된 정규식(문법 오류): 이 knob의 추출 패턴을 확인하라')
         # 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
         ignore = set(cfg["ignoreDirs"])
         all_files = []
