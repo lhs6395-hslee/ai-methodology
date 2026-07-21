@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
-import { buildKeySet, anchorFindings, buildEntityKeySet, entityMarkerFindings } from "./key-anchor-lib.mjs";
+import { buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings } from "./key-anchor-lib.mjs";
 
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -25,7 +25,8 @@ const tokens = (key) => (key.toLowerCase().match(/[a-z][a-z0-9_]{1,}/g) || []).f
 
 const findings = [];
 const anchors = { matched: 0, findings: [] }; // findings: {specId, fr, token}
-const markers = { missing: [], spurious: [] }; // (E) 엔티티 마커 findings: {specId, fr, token}
+const markers = { missing: [], wrong: [] }; // 카테고리 마커 findings: {specId, fr, token, expected[, got]}
+const MARKERS = cfg.frAnchorMarkers || { entity: "E", surface: "R", capability: "C" };
 let specCount = 0;
 for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []; } })().sort()) {
   if (!f.endsWith(".md")) continue;
@@ -40,10 +41,10 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
     const r = anchorFindings(lines, keySet, cfg.__reqAlt);
     anchors.matched += r.matched.length;
     for (const u of r.unmatched) anchors.findings.push({ specId, ...u });
-    // (E) 엔티티 마커(SPEC-023 확장): entity 앵커는 **토큰** (E), (E)는 entity에만.
-    const em = entityMarkerFindings(lines, buildEntityKeySet(own, deps), cfg.__reqAlt);
-    for (const m of em.missing) markers.missing.push({ specId, ...m });
-    for (const m of em.spurious) markers.spurious.push({ specId, ...m });
+    // 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
+    const cm = categoryMarkerFindings(lines, buildKeyKindMap(own, deps), MARKERS, cfg.__reqAlt);
+    for (const m of cm.missing) markers.missing.push({ specId, ...m });
+    for (const m of cm.wrong) markers.wrong.push({ specId, ...m });
   }
   // Extract body (FR text) — everything before the Ownership section
   const ownershipStart = text.search(/^##\s+Ownership\b/m);
@@ -64,21 +65,21 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
 console.log(`Spec 일관성(advisory): spec ${specCount}개 검사 — 근거 없는 키 ${findings.length}건.`);
 for (const f of findings) console.log(`  ⚠ [${f.specId}] ${f.cat} "${f.key}": 본문에 근거 토큰 없음 → FR과 정렬 확인`);
 // FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-const markerCount = markers.missing.length + markers.spurious.length;
+const markerCount = markers.missing.length + markers.wrong.length;
 const anchorHard = ANCHOR_POLICY === "hard" && (anchors.findings.length > 0 || markerCount > 0);
 if (ANCHOR_POLICY !== "off") {
-  console.log(`키 앵커(frKeyAnchorPolicy=${ANCHOR_POLICY}): 매치 ${anchors.matched} · 미매치 ${anchors.findings.length} · (E)마커 위반 ${markerCount}`);
+  console.log(`키 앵커(frKeyAnchorPolicy=${ANCHOR_POLICY}): 매치 ${anchors.matched} · 미매치 ${anchors.findings.length} · 카테고리 마커 위반 ${markerCount}`);
   for (const a of anchors.findings) {
     console.log(`  ${anchorHard ? "✗" : "⚠"} [${a.specId}] ${a.fr} bold "${a.token}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언`);
   }
-  // (E) 엔티티 마커(SPEC-023 확장) — entity 앵커는 **토큰** (E)로 표기해 화면·참조 키와 구분.
+  // 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (R)·capability (C).
   for (const m of markers.missing) {
-    console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" — entity 키인데 (E) 마커 없음: **${m.token}** (E)로 표기(entity임을 명시)`);
+    console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" — 카테고리 마커 없음: **${m.token}** (${m.expected})로 표기(굵은 키의 종류 명시)`);
   }
-  for (const m of markers.spurious) {
-    console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" (E) — entity 키가 아닌데 (E) 마커: entity면 Entities에 선언, 아니면 (E) 제거`);
+  for (const m of markers.wrong) {
+    console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" (${m.got}) — 마커 불일치: 이 키의 카테고리는 (${m.expected})`);
   }
 }
 if (findings.length && STRICT) { console.error("\n✗ --strict: 근거 없는 키."); process.exit(1); }
-if (anchorHard) { console.error("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 entity 앵커는 (E) 마커 필수 — 위 토큰을 정리하라(SPEC-023)."); process.exit(1); }
+if (anchorHard) { console.error("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 각 키는 카테고리 마커(E/R/C) 필수 — 위 토큰을 정리하라(SPEC-023)."); process.exit(1); }
 console.log(findings.length ? "일관성: advisory 경고(비차단)" : "일관성: OK — 모든 키에 본문 근거.");

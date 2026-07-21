@@ -88,6 +88,7 @@ DEFAULTS = {
     "semanticDriftPolicy": "advisory",
     "capabilityOwnershipPolicy": "advisory",
     "frKeyAnchorPolicy": "off",
+    "frAnchorMarkers": {"entity": "E", "surface": "R", "capability": "C"},
     "runTestsPolicy": "off",
     "schemaDriftManifest": None,
     "migrationStatePolicy": "advisory",
@@ -1291,14 +1292,14 @@ def _is_fr_decl_line(line, req_alt="FR"):
 
 
 def _extract_anchors_with_markers(line, req_alt="FR"):
-    """평문 bold 토큰 + 뒤 "(E)" 마커 유무 — entity 앵커 식별(SPEC-023 확장). [(token, entity_marked)]."""
+    """평문 bold 토큰 + 뒤 "(X)" 카테고리 마커 — 굵은 키의 종류 표기(SPEC-023 확장). [(token, marker or None)]."""
     id_re = re.compile(rf"^(?:{req_alt})-\d{{3}}[a-z]?$")
     out = []
-    for m in re.finditer(r"\*\*([^*]+?)\*\*(\s*\(E\))?", _strip_code_spans(line)):
+    for m in re.finditer(r"\*\*([^*]+?)\*\*(?:\s*\(([A-Za-z])\))?", _strip_code_spans(line)):
         tok = m.group(1).strip()
         if not tok or id_re.match(tok):
             continue
-        out.append((tok.lower(), bool(m.group(2))))
+        out.append((tok.lower(), m.group(2).upper() if m.group(2) else None))
     return out
 
 
@@ -1307,42 +1308,58 @@ def _extract_anchors(line, req_alt="FR"):
     return [tok for tok, _ in _extract_anchors_with_markers(line, req_alt)]
 
 
-def _build_entity_key_set(own_sections, dep_sections):
-    """entity 카테고리(/entit/)만 — (E) 마커 대조용. 관계 서픽스 제거. entity 카테고리 없으면 빈 집합(inert)."""
-    keys = set()
+def _build_key_kind_map(own_sections, dep_sections):
+    """키 → 종류(entity/surface/capability) 맵 — 마커 대조용. 관계 서픽스 제거, 첫 등장 우선.
+    세 종류 카테고리가 하나도 없으면(킷 Modules 등) 빈 맵(inert)."""
+    def kind_of(cat):
+        if re.search(r"entit", cat, re.IGNORECASE):
+            return "entity"
+        if re.search(r"surface", cat, re.IGNORECASE):
+            return "surface"
+        if re.search(r"capabilit", cat, re.IGNORECASE):
+            return "capability"
+        return None
+    km = {}
     for sec in (own_sections, dep_sections):
         for cat, lst in (sec or {}).items():
-            if not re.search(r"entit", cat, re.IGNORECASE):
+            kind = kind_of(cat)
+            if not kind:
                 continue
             for raw in lst or []:
                 k = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip().lower()
-                if k and k not in ("—", "-"):
-                    keys.add(k)
-    return keys
+                if k and k not in ("—", "-") and k not in km:
+                    km[k] = kind
+    return km
 
 
-def _entity_marker_findings(fr_lines, entity_key_set, req_alt="FR"):
-    """(missing, spurious) — entity 앵커엔 (E) 필수·(E)는 entity에만. entity_key_set 비면 inert."""
+def _category_marker_findings(fr_lines, key_kind_map, markers, req_alt="FR"):
+    """(missing, wrong) — 굵은 키마다 그 카테고리 마커(E/R/C) 대조. 키 아니면 스킵. key_kind_map 비면 inert.
+    missing:[(fr,token,expected)], wrong:[(fr,token,expected,got)]."""
     fr_id = re.compile(rf"\*\*((?:{req_alt})-\d{{3}}[a-z]?)\*\*")
-    missing, spurious = [], []
-    if not entity_key_set:
-        return missing, spurious
+    missing, wrong = [], []
+    if not key_kind_map:
+        return missing, wrong
     for line in fr_lines or []:
         if not _is_fr_decl_line(line, req_alt):
             continue
         m = fr_id.search(line)
         fr = m.group(1) if m else "?"
         seen = set()
-        for tok, marked in _extract_anchors_with_markers(line, req_alt):
+        for tok, marker in _extract_anchors_with_markers(line, req_alt):
             if tok in seen:
                 continue
             seen.add(tok)
-            is_entity = tok in entity_key_set
-            if is_entity and not marked:
-                missing.append((fr, tok))
-            elif not is_entity and marked:
-                spurious.append((fr, tok))
-    return missing, spurious
+            kind = key_kind_map.get(tok)
+            if not kind:
+                continue
+            expected = str(markers[kind]).upper() if markers and markers.get(kind) else None
+            if not expected:
+                continue
+            if not marker:
+                missing.append((fr, tok, expected))
+            elif marker != expected:
+                wrong.append((fr, tok, expected, marker))
+    return missing, wrong
 
 
 def _build_key_set(own_sections, dep_sections):
@@ -1385,12 +1402,13 @@ def cmd_consistency(cfg, strict):
         print(f'✗ frKeyAnchorPolicy 값 위반 "{anchor_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
               file=sys.stderr)
         sys.exit(1)
+    markers = cfg.get("frAnchorMarkers") or {"entity": "E", "surface": "R", "capability": "C"}
     files = spec_md_files(cfg, missing_fatal=False)
     findings = []
     anchor_matched = 0
     anchor_unmatched = []  # (spec_id, fr, token)
-    marker_missing = []    # (spec_id, fr, token) — entity 앵커 (E) 누락
-    marker_spurious = []   # (spec_id, fr, token) — 비-entity에 (E)
+    marker_missing = []    # (spec_id, fr, token, expected) — 카테고리 마커 누락
+    marker_wrong = []      # (spec_id, fr, token, expected, got) — 마커 불일치
     for file in sorted(files):
         text = read_text(file)
         m = cfg["__specId"].search(text)
@@ -1404,10 +1422,10 @@ def cmd_consistency(cfg, strict):
             mt, un = _anchor_findings(lines, key_set, cfg["__reqAlt"])
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
-            # (E) 엔티티 마커(SPEC-023 확장): entity 앵커는 **토큰** (E), (E)는 entity에만.
-            miss, spur = _entity_marker_findings(lines, _build_entity_key_set(own, deps), cfg["__reqAlt"])
-            marker_missing.extend((spec_id, fr, tok) for fr, tok in miss)
-            marker_spurious.extend((spec_id, fr, tok) for fr, tok in spur)
+            # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
+            miss, wr = _category_marker_findings(lines, _build_key_kind_map(own, deps), markers, cfg["__reqAlt"])
+            marker_missing.extend((spec_id, fr, tok, exp) for fr, tok, exp in miss)
+            marker_wrong.extend((spec_id, fr, tok, exp, got) for fr, tok, exp, got in wr)
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.
         body = text[: h.start()] if h else text
@@ -1422,23 +1440,23 @@ def cmd_consistency(cfg, strict):
     for spec_id, cat, key in findings:
         print(f'  ⚠ [{spec_id}] {cat} "{key}": 본문에 근거 토큰 없음 → FR과 정렬 확인')
     # FR 키 앵커 리포트(SPEC-023) — bold는 키 앵커 전용: 미매치 = 수사적 강조 또는 미선언 키.
-    marker_count = len(marker_missing) + len(marker_spurious)
+    marker_count = len(marker_missing) + len(marker_wrong)
     anchor_hard = anchor_policy == "hard" and (len(anchor_unmatched) > 0 or marker_count > 0)
     if anchor_policy != "off":
         tag = "✗" if anchor_hard else "⚠"
-        print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)} · (E)마커 위반 {marker_count}")
+        print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)} · 카테고리 마커 위반 {marker_count}")
         for spec_id, fr, tok in anchor_unmatched:
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언')
-        # (E) 엔티티 마커(SPEC-023 확장) — entity 앵커는 **토큰** (E)로 표기해 화면·참조 키와 구분.
-        for spec_id, fr, tok in marker_missing:
-            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — entity 키인데 (E) 마커 없음: **{tok}** (E)로 표기(entity임을 명시)')
-        for spec_id, fr, tok in marker_spurious:
-            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" (E) — entity 키가 아닌데 (E) 마커: entity면 Entities에 선언, 아니면 (E) 제거')
+        # 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (R)·capability (C).
+        for spec_id, fr, tok, exp in marker_missing:
+            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 카테고리 마커 없음: **{tok}** ({exp})로 표기(굵은 키의 종류 명시)')
+        for spec_id, fr, tok, exp, got in marker_wrong:
+            print(f'  {tag} [{spec_id}] {fr} bold "{tok}" ({got}) — 마커 불일치: 이 키의 카테고리는 ({exp})')
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
         sys.exit(1)
     if anchor_hard:
-        print("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 entity 앵커는 (E) 마커 필수 — 위 토큰을 정리하라(SPEC-023).", file=sys.stderr)
+        print("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 각 키는 카테고리 마커(E/R/C) 필수 — 위 토큰을 정리하라(SPEC-023).", file=sys.stderr)
         sys.exit(1)
     print("일관성: advisory 경고(비차단)" if findings else "일관성: OK — 모든 키에 본문 근거.")
 

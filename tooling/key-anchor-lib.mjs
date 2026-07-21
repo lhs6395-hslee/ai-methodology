@@ -21,17 +21,17 @@ export function isFrDeclLine(line, reqAlt = "FR") {
   return new RegExp(`^\\s*-?\\s*\\*\\*(?:${reqAlt})-\\d{3}[a-z]?\\*\\*`).test(line);
 }
 
-// FR 선언 라인에서 앵커+엔티티마커 추출 — 코드 스팬 제거 후 평문 bold 토큰과 그 뒤 "(E)" 마커
-// 유무. entity 앵커는 **토큰** (E)로 표기해 화면·참조 키와 구분한다(SPEC-023 확장, owner 요구).
-// 반환: [{token(정규화 트림·소문자), entityMarked}] (등장 순), FR-ID 제외.
+// FR 선언 라인에서 앵커+카테고리 마커 추출 — 코드 스팬 제거 후 평문 bold 토큰과 그 뒤 "(X)" 마커.
+// 굵은 키마다 그게 무슨 종류인지 표기한다(owner 요구): entity `(E)`·surface/route `(R)`·capability `(C)`.
+// 반환: [{token(정규화 트림·소문자), marker(대문자 1글자 or null)}] (등장 순), FR-ID 제외.
 export function extractAnchorsWithMarkers(line, reqAlt = "FR") {
   const idRe = new RegExp(`^(?:${reqAlt})-\\d{3}[a-z]?$`);
   const out = [];
   const stripped = stripCodeSpans(line);
-  for (const m of stripped.matchAll(/\*\*([^*]+?)\*\*(\s*\(E\))?/g)) {
+  for (const m of stripped.matchAll(/\*\*([^*]+?)\*\*(?:\s*\(([A-Za-z])\))?/g)) {
     const tok = m[1].trim();
     if (!tok || idRe.test(tok)) continue;
-    out.push({ token: tok.toLowerCase(), entityMarked: !!m[2] });
+    out.push({ token: tok.toLowerCase(), marker: m[2] ? m[2].toUpperCase() : null });
   }
   return out;
 }
@@ -59,44 +59,51 @@ export function buildKeySet(ownSections, depSections) {
   return keys;
 }
 
-// entity 카테고리(Ownership∪Dependencies의 /entit/ 매칭 카테고리) 키만 — (E) 마커 대조용.
-// Dependencies 구조화 관계의 "(relation-type)" 서픽스는 제거. 반환 정규화(트림·소문자) 집합.
-// entity 카테고리가 없는 프로젝트(킷 Modules/Symbols·파이프라인 Datasets 등)는 빈 집합 → 마커 판정 inert.
-export function buildEntityKeySet(ownSections, depSections) {
-  const keys = new Set();
-  const add = (raw) => {
+// 키 → 카테고리 종류(entity|surface|capability) 맵 — 마커 대조용. Ownership∪Dependencies에서
+// /entit/·/surface/·/capabilit/ 매칭 카테고리만(Files·기타 제외), 관계 서픽스 제거, 첫 등장 우선.
+// 그 세 종류 카테고리가 하나도 없으면(킷 Modules/Symbols·파이프라인 Datasets 등) 빈 맵 → 마커 판정 inert.
+export function buildKeyKindMap(ownSections, depSections) {
+  const map = new Map();
+  const kindOf = (cat) =>
+    /entit/i.test(cat) ? "entity" : /surface/i.test(cat) ? "surface" : /capabilit/i.test(cat) ? "capability" : null;
+  const add = (raw, kind) => {
     const k = String(raw).replace(/\s*\([a-z][a-z0-9-]*\)\s*$/, "").trim().toLowerCase();
-    if (k && k !== "—" && k !== "-") keys.add(k);
+    if (k && k !== "—" && k !== "-" && !map.has(k)) map.set(k, kind);
   };
   for (const sec of [ownSections, depSections]) {
     for (const [cat, list] of Object.entries(sec || {})) {
-      if (!/entit/i.test(cat)) continue;
-      for (const raw of list || []) add(raw);
+      const kind = kindOf(cat);
+      if (!kind) continue;
+      for (const raw of list || []) add(raw, kind);
     }
   }
-  return keys;
+  return map;
 }
 
-// (E) 엔티티 마커 판정(SPEC-023 확장) — FR 선언 라인의 bold 앵커가 entity 키면 뒤에 "(E)"가
-// 따라야 하고, "(E)"는 entity 키에만 붙어야 한다("이게 그거(entity)인지" 가독성·owner 요구).
-// entityKeySet이 비면(entity 카테고리 없음) 판정 안 함(inert). 반환 {missing, spurious} (결정적).
-export function entityMarkerFindings(frLines, entityKeySet, reqAlt = "FR") {
+// 카테고리 마커 판정(SPEC-023 확장) — FR 선언 라인의 각 bold 키 앵커가 그 키의 카테고리 마커를
+// 달았는지 대조한다(굵은 키가 무슨 종류인지 즉시 구분 — owner 요구). markers = {entity,surface,capability}
+// → 각 종류의 마커 글자(기본 E/R/C). 키가 아닌 bold는 여기서 스킵(anchorFindings가 미매치로 처리).
+// keyKindMap이 비면 판정 안 함(inert). 반환 {missing:[{fr,token,expected}], wrong:[{fr,token,expected,got}]}.
+export function categoryMarkerFindings(frLines, keyKindMap, markers, reqAlt = "FR") {
   const frId = new RegExp(`\\*\\*((?:${reqAlt})-\\d{3}[a-z]?)\\*\\*`);
-  const missing = [], spurious = [];
-  if (!entityKeySet || entityKeySet.size === 0) return { missing, spurious };
+  const missing = [], wrong = [];
+  if (!keyKindMap || keyKindMap.size === 0) return { missing, wrong };
   for (const line of frLines || []) {
     if (!isFrDeclLine(line, reqAlt)) continue;
     const fr = (line.match(frId) || [null, "?"])[1];
     const seen = new Set();
-    for (const { token, entityMarked } of extractAnchorsWithMarkers(line, reqAlt)) {
+    for (const { token, marker } of extractAnchorsWithMarkers(line, reqAlt)) {
       if (seen.has(token)) continue;
       seen.add(token);
-      const isEntity = entityKeySet.has(token);
-      if (isEntity && !entityMarked) missing.push({ fr, token });
-      else if (!isEntity && entityMarked) spurious.push({ fr, token });
+      const kind = keyKindMap.get(token);
+      if (!kind) continue; // 키가 아니면 스킵(base anchorFindings 소관)
+      const expected = (markers && markers[kind]) ? String(markers[kind]).toUpperCase() : null;
+      if (!expected) continue;
+      if (!marker) missing.push({ fr, token, expected });
+      else if (marker !== expected) wrong.push({ fr, token, expected, got: marker });
     }
   }
-  return { missing, spurious };
+  return { missing, wrong };
 }
 
 // 스펙 한 장 판정 — frLines(선언 라인 배열)의 앵커를 keySet과 대조.

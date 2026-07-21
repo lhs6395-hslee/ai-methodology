@@ -10,7 +10,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildEntityKeySet, entityMarkerFindings } from "../key-anchor-lib.mjs";
+import { stripCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings } from "../key-anchor-lib.mjs";
+
+const M = { entity: "E", surface: "R", capability: "C" };
 
 const GATE = new URL("../check-spec-consistency.mjs", import.meta.url).pathname;
 
@@ -66,7 +68,7 @@ function fixture(policy, frLine) {
   writeFileSync(join(root, "sdd.config.json"),
     JSON.stringify({ specDir: "sdd/specs", ...(policy === undefined ? {} : { frKeyAnchorPolicy: policy }) }));
   writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
-    `# S\n**Spec**: \`SPEC-001\`\n\n${frLine}\n\n## Ownership\n- **Entities**: pjt_projects\n\n## Dependencies\n- **Entities**: staff (references)\n`);
+    `# S\n**Spec**: \`SPEC-001\`\n\n${frLine}\n\n## Ownership\n- **Entities**: pjt_projects\n- **Surfaces**: POST /api/x\n- **Capabilities**: pjt_projects.create\n\n## Dependencies\n- **Entities**: staff (references)\n`);
   return root;
 }
 function run(root) {
@@ -94,37 +96,42 @@ test("게이트: off(기본) → 판정·출력 무변(하위호환) / advisory 
   }
 });
 
-test("extractAnchorsWithMarkers: bold 토큰 + (E) 마커 유무 — entity 앵커 식별", () => {
+test("extractAnchorsWithMarkers: bold 토큰 + 카테고리 마커(E/R/C) 캡처 — 대문자 정규화", () => {
   assert.deepEqual(
-    extractAnchorsWithMarkers("- **FR-001** WHEN **staff** (E) changes, THE SYSTEM SHALL update **monthly_salary**."),
-    [{ token: "staff", entityMarked: true }, { token: "monthly_salary", entityMarked: false }]);
+    extractAnchorsWithMarkers("- **FR-001** WHEN **staff** (E) changes via **POST /api/x** (r), THE SYSTEM SHALL update **monthly_salary**."),
+    [{ token: "staff", marker: "E" }, { token: "post /api/x", marker: "R" }, { token: "monthly_salary", marker: null }]);
 });
 
-test("buildEntityKeySet: entity 카테고리만(Files·Surfaces·Capabilities 제외), 관계 서픽스 제거", () => {
-  const ek = buildEntityKeySet(
-    { Entities: ["pjt_projects"], Surfaces: ["POST /api/x"], Capabilities: ["pjt_projects.create"] },
+test("buildKeyKindMap: 카테고리별 종류(entity/surface/capability) 매핑, 관계 서픽스 제거, 첫 등장 우선", () => {
+  const km = buildKeyKindMap(
+    { Entities: ["pjt_projects"], Surfaces: ["POST /api/x"], Capabilities: ["pjt_projects.create"], Files: ["src/**"] },
     { Entities: ["staff (references)"] });
-  assert.deepEqual([...ek].sort(), ["pjt_projects", "staff"]);
-  // entity 카테고리 없는 프로젝트(킷 Modules 등) → 빈 집합(마커 판정 inert)
-  assert.equal(buildEntityKeySet({ Modules: ["key-pipeline"], Symbols: ["x.mjs"] }, {}).size, 0);
+  assert.equal(km.get("pjt_projects"), "entity");
+  assert.equal(km.get("staff"), "entity");
+  assert.equal(km.get("post /api/x"), "surface");
+  assert.equal(km.get("pjt_projects.create"), "capability");
+  assert.equal(km.has("src/**"), false); // Files는 마커 대상 아님
+  // entity/surface/capability 카테고리 없는 프로젝트(킷 Modules 등) → 빈 맵(마커 판정 inert)
+  assert.equal(buildKeyKindMap({ Modules: ["key-pipeline"], Symbols: ["x.mjs"] }, {}).size, 0);
 });
 
-test("entityMarkerFindings: entity 앵커엔 (E) 필수·(E)는 entity에만 / entityKeySet 비면 inert", () => {
-  const ek = new Set(["pjt_projects", "staff"]);
+test("categoryMarkerFindings: 굵은 키마다 카테고리 마커(E/R/C) 대조 — 누락·불일치, 키 아니면 스킵", () => {
+  const km = new Map([["pjt_projects", "entity"], ["staff", "entity"], ["post /api/x", "surface"], ["pjt_projects.create", "capability"]]);
   const lines = [
-    "- **FR-001** WHEN **staff** is added, THE SYSTEM SHALL insert **pjt_projects** (E).", // staff: (E) 누락 / pjt_projects: OK
-    "- **FR-002** THE SYSTEM SHALL emphasize **monthly_salary** (E) wrongly.",             // 비-entity에 (E)
+    "- **FR-001** WHEN **staff** is added via **POST /api/x** (R), THE SYSTEM SHALL **pjt_projects.create** (C).", // staff: 마커 누락 / route·cap OK
+    "- **FR-002** THE SYSTEM SHALL insert **pjt_projects** (R) rows.",                                              // entity인데 (R) 오마커
+    "- **FR-003** THE SYSTEM SHALL emphasize **whatever** (E).",                                                    // 키 아님 → 스킵
   ];
-  const r = entityMarkerFindings(lines, ek);
-  assert.deepEqual(r.missing, [{ fr: "FR-001", token: "staff" }]);
-  assert.deepEqual(r.spurious, [{ fr: "FR-002", token: "monthly_salary" }]);
-  // entityKeySet 비면 판정 안 함(inert) — 킷/파이프라인 하위호환
-  assert.deepEqual(entityMarkerFindings(lines, new Set()), { missing: [], spurious: [] });
+  const r = categoryMarkerFindings(lines, km, M);
+  assert.deepEqual(r.missing, [{ fr: "FR-001", token: "staff", expected: "E" }]);
+  assert.deepEqual(r.wrong, [{ fr: "FR-002", token: "pjt_projects", expected: "E", got: "R" }]);
+  // keyKindMap 비면 판정 안 함(inert) — 킷/파이프라인 하위호환
+  assert.deepEqual(categoryMarkerFindings(lines, new Map(), M), { missing: [], wrong: [] });
 });
 
-test("게이트: 전 앵커 매치(소유+참조 키) → hard도 PASS / enum 밖 정책 값 → exit 1", () => {
-  // entity 앵커(staff 참조·pjt_projects 소유)는 (E) 마커 동반 — 새 문법(owner 요구)
-  const clean = "- **FR-001** WHEN **staff** (E) is requested, THE SYSTEM SHALL use **pjt_projects** (E).";
+test("게이트: 전 앵커 매치 + 올바른 카테고리 마커 → hard도 PASS / enum 밖 정책 값 → exit 1", () => {
+  // 각 키에 종류 마커 동반: entity (E)·surface (R)·capability (C) — 새 문법(owner 요구)
+  const clean = "- **FR-001** WHEN **staff** (E) hits **POST /api/x** (R), THE SYSTEM SHALL **pjt_projects.create** (C) a **pjt_projects** (E).";
   const ok = fixture("hard", clean);
   try { assert.equal(run(ok).code, 0, run(ok).out); } finally { rmSync(ok, { recursive: true, force: true }); }
   const bad = fixture("strict", clean);
@@ -135,16 +142,17 @@ test("게이트: 전 앵커 매치(소유+참조 키) → hard도 PASS / enum �
   } finally { rmSync(bad, { recursive: true, force: true }); }
 });
 
-test("게이트: entity 앵커에 (E) 마커 없음 → advisory ⚠(exit 0) / hard ✗(exit 1)", () => {
-  // pjt_projects(소유 entity)·staff(참조 entity) 앵커인데 (E) 마커 누락
-  const noMarker = "- **FR-001** WHEN **staff** is added, THE SYSTEM SHALL use **pjt_projects**.";
+test("게이트: 굵은 키에 카테고리 마커 없음 → advisory ⚠(exit 0) / hard ✗(exit 1)", () => {
+  // staff(참조 entity)·pjt_projects.create(capability) 앵커인데 마커 누락
+  const noMarker = "- **FR-001** WHEN **staff** is added, THE SYSTEM SHALL **pjt_projects.create**.";
   for (const [policy, wantCode] of [["advisory", 0], ["hard", 1]]) {
     const root = fixture(policy, noMarker);
     try {
       const r = run(root);
       assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
-      assert.match(r.out, /\(E\)마커 위반 2/);              // staff·pjt_projects 둘 다
-      assert.match(r.out, /entity 키인데 \(E\) 마커 없음/);
+      assert.match(r.out, /카테고리 마커 위반 2/);          // staff(E)·pjt_projects.create(C) 둘 다 누락
+      assert.match(r.out, /카테고리 마커 없음/);
+      assert.match(r.out, /\(C\)로 표기/);                   // capability 마커 안내
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
