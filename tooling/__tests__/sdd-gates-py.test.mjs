@@ -7,6 +7,7 @@
 // @covers SPEC-006/FR-003
 // @covers SPEC-008/FR-007
 // @covers SPEC-017/FR-001
+// @covers SPEC-027/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -870,6 +871,33 @@ test("py schemadrift: 미설정·드리프트·일치·조회실패·미정의�
       const p = runPy(root, ["schemadrift"]);
       assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg)})`);
       assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(cfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+// ── ratchet 게이트 패리티(SPEC-027) ──
+test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·미정의정책 — Node·Python 바이트 동일", skip, () => {
+  const scen = [
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "off" }, "main"],
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "advisory" }, "main"],
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "hard" }, "main"],
+    [{ frKeyAnchorPolicy: "advisory" }, { frKeyAnchorPolicy: "hard", policyRatchetPolicy: "hard" }, "main"],
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard", policyRatchetExceptions: ["frKeyAnchorPolicy"] }, "main"],
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard" }, "no-such-ref"],
+    [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "hard", policyRatchetPolicy: "strict" }, "main"],
+  ];
+  for (const [baseCfg, curCfg, base] of scen) {
+    const root = mkdtempSync(join(tmpdir(), "sdd-py-ratchet-"));
+    const git = (args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    try {
+      git(["init", "-q"]); git(["config", "user.email", "t@t"]); git(["config", "user.name", "t"]);
+      writeFileSync(join(root, "sdd.config.json"), JSON.stringify(baseCfg));
+      git(["add", "-A"]); git(["commit", "-qm", "base"]); git(["branch", "-M", "main"]);
+      writeFileSync(join(root, "sdd.config.json"), JSON.stringify(curCfg));
+      const n = runNode(root, "check-policy-ratchet.mjs", [base]);
+      const p = runPy(root, ["ratchet", base]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(curCfg)})`);
+      assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(curCfg)})`);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

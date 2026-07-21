@@ -117,3 +117,4 @@
 | 2026-07-20 | sdd-init Node 클로저에 `capability-ownership-lib.mjs` 추가 | SPEC-024 동반: 소비 프로젝트 배선 폐포 유지 |
 | 2026-07-21 | sdd-init 수명주기 스킬 목록에 `sdd-migrate` 추가(4종 설치) | SPEC-025 동반: 스펙 마이그레이션 실행기 스킬을 소비 프로젝트에 배선 |
 | 2026-07-21 | sdd-init Node 클로저에 `schema-backing-lib.mjs` 추가 | SPEC-026 동반: check-ownership 의존 lib을 소비 프로젝트에 배선(폐포 유지 — 미포함 시 ERR_MODULE_NOT_FOUND) |
+| 2026-07-21 | sdd-sync RULES에 R6(정책 래칫) 추가 + sdd-init 매니페스트에 `policy-ratchet-lib.mjs`·`check-policy-ratchet.mjs` 배선 | SPEC-027 동반: 강도 단조 게이트를 detector 스윕·소비 프로젝트 설치에 편입(미포함 시 게이트 누락) |

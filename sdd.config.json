@@ -95,7 +95,8 @@
     "fr-key-anchors": "FR 키 앵커 — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(frKeyAnchorPolicy, SPEC-023)",
     "spec-migration": "스펙 마이그레이션 실행기(/sdd-migrate) — update가 표면화한 백로그를 승인 경유 실제 재구성(SPEC-025)",
     "capability-ownership": "Capability 귀속 — capability x.verb는 entity x 소유 스펙만(스펙 경계=entity 기준, SPEC-024)",
-    "entity-schema-backing": "Entity 스키마 백킹 — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단, capability 귀속 우회로 봉합, SPEC-026)"
+    "entity-schema-backing": "Entity 스키마 백킹 — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단, capability 귀속 우회로 봉합, SPEC-026)",
+    "policy-ratchet": "정책 래칫 — 강제 정책 knob의 강도 단조성(하향 회피 차단, advisory 경유지·hard 종착지의 기계화, SPEC-027)"
   },
   "relationTypes": ["references"],
   "specSyncExemptGlobs": [

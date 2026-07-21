@@ -176,6 +176,13 @@ export const DEFAULTS = {
   // 비어 있으면 비활성(현행·킷). off(기본)|advisory(경고)|hard(exit 1). entity 카테고리 있을 때만 판정.
   entitySchemaSources: [],
   entitySchemaBackingPolicy: "off",
+  // 정책 래칫(SPEC-027): 강제 정책 knob의 강도를 낮추는 것(off<advisory<hard 역행)을 차단 —
+  // hard에서 위반이 대량으로 떠도 knob을 내려 빨간불을 끄는 escape를 봉쇄(단조 증가만 허용).
+  // base ref(specSyncBase||origin/main) 대비 하향 감지. off|advisory(기본, 경고)|hard(exit 1).
+  policyRatchetPolicy: "advisory",
+  // 래칫 예외 — 정당한 하향(진짜 롤백 등)에 한해 knob 이름을 선언(loud override). 선언된 하향은
+  // 차단되지 않되 "부채"로 항상 표면화된다(남용 방지 — entitySchemaExemptEntities 동형).
+  policyRatchetExceptions: [],
   // 스키마에 없지만 정당한 aggregate(외부 API 자원·이벤트 스트림 등) 면제: { "<entity>": "<사유>" }.
   // 빈 사유는 에러(entityRegistry 동형). 남용 방지 — 면제는 리뷰 관문.
   entitySchemaExemptEntities: {},

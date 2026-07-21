@@ -95,10 +95,42 @@ DEFAULTS = {
     "entitySchemaSources": [],
     "entitySchemaBackingPolicy": "off",
     "entitySchemaExemptEntities": {},
+    "policyRatchetPolicy": "advisory",
+    "policyRatchetExceptions": [],
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
 STANDARD_PREFIXES = {"SPEC", "INFRA", "TEST", "CICD"}
+
+# 정책 래칫(SPEC-027) — policy-ratchet-lib.mjs 미러. 강도 순위·대상 knob은 byte-parity.
+POLICY_RANK = {"off": 0, "silent": 0, "advisory": 1, "warn": 1, "hard": 2, "error": 2}
+RATCHETED_POLICIES = [
+    "specSyncUnownedPolicy", "draftBlockPolicy", "semanticDriftPolicy",
+    "capabilityOwnershipPolicy", "frKeyAnchorPolicy", "runTestsPolicy",
+    "migrationStatePolicy", "entitySchemaBackingPolicy",
+]
+
+
+def rank_of(v):
+    return POLICY_RANK.get(str(v))
+
+
+def classify_ratchet(base_cfg, cur_cfg, exceptions=None):
+    """base 대비 cur에서 강도가 낮아진 knob을 분류(policy-ratchet-lib.mjs classifyRatchet 미러).
+    반환 (violations, allowed_downgrades) — 각 [{knob, from, to}]."""
+    ex = set(exceptions or [])
+    violations, allowed = [], []
+    for knob in RATCHETED_POLICIES:
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = rank_of(base_cfg.get(knob))
+        to = rank_of(cur_cfg.get(knob) if cur_cfg else None)
+        if frm is None or to is None:
+            continue
+        if to < frm:
+            rec = {"knob": knob, "from": base_cfg.get(knob), "to": cur_cfg.get(knob)}
+            (allowed if knob in ex else violations).append(rec)
+    return violations, allowed
 
 
 def find_config(start):
@@ -2490,7 +2522,46 @@ def cmd_schemadrift(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet> [...]"
+
+
+def cmd_ratchet(cfg, base_arg):
+    policy = cfg.get("policyRatchetPolicy") or "advisory"
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ policyRatchetPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        print("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = policy == "hard"
+    base = base_arg or os.environ.get("SDD_DIFF_BASE") or cfg.get("specSyncBase") or "origin/main"
+    cfg_rel = (_git(cfg, ["ls-files", "--full-name", "--", "sdd.config.json"]) or "").strip().split("\n")[0]
+    if not cfg_rel:
+        cfg_rel = os.path.relpath(cfg["__path"], cfg["__root"]) if cfg.get("__path") else "sdd.config.json"
+    base_raw = _git(cfg, ["show", f"{base}:{cfg_rel}"])
+    if base_raw is None:
+        print(f"정책 래칫 게이트 — base({base}) config 조회 불가(git 없음·최초 채택) — 건너뜀")
+        sys.exit(0)
+    base_cfg = config_from_string(base_raw, cfg["__root"])
+    if not base_cfg:
+        print(f"정책 래칫 게이트 — base({base}) config 파싱 실패 — 건너뜀")
+        sys.exit(0)
+    violations, allowed = classify_ratchet(base_cfg, cfg, cfg.get("policyRatchetExceptions") or [])
+    print(f"정책 래칫 게이트 — base:{base} mode:{policy} violations:{len(violations)} allowed-downgrades:{len(allowed)}")
+    for d in allowed:
+        print(f"  · [부채] {d['knob']}: {d['from']} → {d['to']} (policyRatchetExceptions로 허용된 하향 — 재승격 대상)")
+    for v in violations:
+        print(f'  · {v["knob"]}: {v["from"]} → {v["to"]} — 강도 하향 금지(단조 증가만). 정당한 롤백이면 policyRatchetExceptions에 "{v["knob"]}" 선언')
+    if violations:
+        msg = "정책 래칫 위반 — 강제 정책 강도를 낮췄다. 위반을 knob 하향으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지)."
+        if hard:
+            print(f"\n✗ {msg}", file=sys.stderr)
+            sys.exit(1)
+        print(f"\n⚠ {msg} (policyRatchetPolicy:advisory — 경고)")
+        sys.exit(0)
+    print("정책 래칫 게이트: OK — 강도 하향 없음.")
+    sys.exit(0)
 
 
 def main():
@@ -2552,6 +2623,8 @@ def main():
         cmd_testrun(cfg)
     elif sub == "schemadrift":
         cmd_schemadrift(cfg)
+    elif sub == "ratchet":
+        cmd_ratchet(cfg, positional[0] if positional else None)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

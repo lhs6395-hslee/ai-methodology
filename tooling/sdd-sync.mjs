@@ -26,6 +26,9 @@ const RULES = [
   // R5(감사 M1): 테스트 실행 결과 — runTestsPolicy가 off(기본)면 게이트가 스스로 no-op라 비용 0.
   // SPEC-021이 선언한 "CI·pre-push" 발동 지점의 실제 배선(선언만 있고 호출처 0곳이던 결함 봉합).
   { rule: "R5 test 실행(commands.test)", gates: ["check-test-run.mjs"] },
+  // R6(SPEC-027): 강제 정책 강도의 단조성 — knob 하향(회피)을 차단. policyRatchetPolicy가
+  // off면 게이트가 스스로 no-op. base config 미조회(최초 채택)면 skip이라 비용 0.
+  { rule: "R6 정책 래칫(강도 단조)", gates: ["check-policy-ratchet.mjs"] },
 ];
 
 function runGate(file) {
