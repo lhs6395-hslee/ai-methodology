@@ -40,9 +40,15 @@
    - **제시(사람 승인 관문):** 수집 결과를 **스펙별 마이그레이션 백로그**로 사용자에게 제시한다 — "SPEC-005: Entities 7개 → root 1(`orders`) + 6개는 Dependencies 관계로" 식. 절차 정본: 킷 `APPLYING.md` §마이그레이션 노트("복수 Entity → aggregate root + 관계").
    - **수행(승인 후 별도 작업):** 사용자가 승인한 항목만 **작성=LLM·승인=사람** 경로로 재구성한다 — 이 update 절차 자체는 스펙을 편집하지 않는다(백로그 제시까지가 범위). 미승인 항목은 advisory로 남아 다음 update에서 재표면화된다(조용한 소실 없음).
    - **실행 경로(중요):** 실제 재구성은 `/sdd-migrate`(정본 `prompts/migrate.md`)가 담당한다 — update는 **목록**, migrate는 **실행**. update를 반복해도 스펙은 안 바뀌므로(불변 규칙), 백로그가 있으면 사용자에게 "`/sdd-migrate`로 재구성을 진행할까요?"를 제안하고 승인 시 그 스킬로 넘긴다.
-6. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그) 요약한다.
+6. **정책 강도 승격 권장 (graduation — advisory는 종착점이 아니라 경유지).**
+   - **원칙:** 강제 knob의 목표 상태는 **strict(`hard`/`error`)**다. `off`·`advisory`·`warn`은 **마이그레이션 중 임시 상태**이지 영구 안착지가 아니다 — advisory에 방치하면 위반이 계속 "미채택 권장"으로 재등장할 뿐 강제되지 않는다. 그래서 update는 knob을 낮은 강도에 두는 것을 권하지 않고, **깨끗해지면 `hard`로 올리는 것을 권장**한다.
+   - **판정(기계·generic):** 강도가 계단인 knob(`frKeyAnchorPolicy`·`capabilityOwnershipPolicy`·`draftBlockPolicy`·`semanticDriftPolicy`·`runTestsPolicy`·`migrationStatePolicy` → `hard`; `specSyncUnownedPolicy` → `error`; `requireAccounting`/`strictSpecs` → 전수)마다: 그 knob의 백로그(5단계 스윕 결과)가 **0건이면 `hard`(strict)로 승격을 권장**하고 사용자 승인 시 config에 반영한다. 백로그가 남아 있으면 "정리(migrate) 후 hard"를 목표로 제시한다 — 이때도 권장 종착지는 advisory가 아니라 hard다.
+   - **강제 지점 동반:** `draftBlockPolicy: hard` 등 서버측 병합까지 막는 knob은 CI(range 모드 spec-sync)가 걸려 있어야 실효 — 없으면 `ci-examples.md`/`sdd-gates.yml`로 함께 안내.
+   - **미승격 시:** 사용자가 hard 승격을 미루면 그 사유를 남기고(다음 update에서 다시 권장), 조용히 advisory로 방치하지 않는다.
+7. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그·**강도 승격 권장/반영**) 요약한다.
 
 ## 불변 규칙
 - 사용자 스펙·FR·작업물(`sdd/specs/*`)은 **이 절차가 직접 건드리지 않는다** — 최신화 대상은 방법론 도구(게이트·훅·템플릿)와 config knob·규범 인스턴스화. 새 스펙 문법의 기존 스펙 적용은 5단계 **백로그 제시 → 사용자 승인 → 별도 마이그레이션 작업**으로만 흐른다(자동 재구성 금지).
 - 기존 config 값은 보존한다 — 새 knob만 추가/인스턴스화(기존 값 덮어쓰기 금지).
 - 자동 덮어쓰기 금지, 사람 승인 필수. 값이 프로젝트별인 knob은 추정하지 말고 CLAUDE.md 관례 또는 사용자에게 확인.
+- **강도 knob의 권장 종착지는 `hard`(strict)다** — advisory/off/warn은 마이그레이션 중 임시 상태. update는 낮은 강도 유지를 권하지 않고, 백로그가 깨끗해지면 hard 승격을 권장한다(승격 자체는 사람 승인). "advisory로 두는 게 권장"이 아니다.

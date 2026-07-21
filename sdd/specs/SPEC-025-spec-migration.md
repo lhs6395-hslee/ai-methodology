@@ -77,3 +77,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-21 | 초안 — `/sdd-migrate` 실행기 스킬 + 정본 절차 `prompts/migrate.md` + 계약 테스트. update(표면화)와 분리된 백로그 실행(승인 관문·한 스펙 한 커밋). entity 재구성·키 앵커 정합 중심 | 실측(소비 프로젝트): update 반복해도 스펙 불변("똑같다") — 백로그를 실제 재구성으로 실행하는 경로 부재. owner가 (b) 실행기 스킬 선택, "update가 방법론 방식에 따라 스펙 재구성으로 이어져야" |
+| 2026-07-21 | 강도 승격 권장(graduation) 명문화 — update.md 6단계 신설(강도 knob은 백로그 0에서 hard 승격 권장, advisory=경유지)·migrate.md 6단계·presets frKeyAnchorPolicy 종착지=hard. 낮은 강도 유지를 권하지 않음 | owner: update가 'advisory 유지(미채택)'를 권장으로 내세우던 것 → 'hard 승격'을 권장으로 뒤집음(강제가 목표) |
