@@ -105,3 +105,4 @@
 | 2026-07-21 | entityRegistry에 `spec-migration`·`capability-ownership` 등록(킷 자신) | SPEC-025·024 동반: 신규 모듈 entity 어휘 등록(등록 관문) |
 | 2026-07-21 | config DEFAULTS에 `entitySchemaSources`(인프라 무관 어댑터 `[{globs,patterns}]`)·`entitySchemaBackingPolicy: "off"`·`entitySchemaExemptEntities: {}` 추가(Node·Python) + entityRegistry에 `entity-schema-backing` 등록 | SPEC-026 동반: 유령 entity 차단 정책(판정 코어는 SPEC-026, 게이트 배선은 SPEC-002) |
 | 2026-07-21 | config DEFAULTS에 `frAnchorMarkers`(`{entity:"E",surface:"R",capability:"C"}`) 추가(Node·Python) — FR 카테고리 마커 글자 매핑, 프로젝트 조정 가능 | SPEC-023 FR-005 일반화 동반: 굵은 키의 카테고리 마커(판정 코어는 SPEC-023, 배선은 SPEC-002) |
+| 2026-07-21 | config DEFAULTS에 `policyRatchetPolicy`(off\|advisory\|hard, 기본 advisory) + `policyRatchetExceptions`([]) 추가(Node) | SPEC-027 동반: 강제 정책 강도 단조성(판정 코어·게이트는 SPEC-027) |
