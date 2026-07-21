@@ -109,3 +109,4 @@
 | 2026-07-21 | ownership 게이트에 면제 부채 표면화 배선(SPEC-026 FR-005 소비) — 사용 중 `entitySchemaExemptEntities`를 매 실행 advisory로 출력(hard에서도) | SPEC-026 FR-005 동반: 대량 면제가 조용한 '완료'로 읽히지 않게(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | consistency 게이트의 (E) 마커 배선을 **카테고리 마커(E/R/C)** 로 일반화(SPEC-023 FR-005 확장 소비) — `buildKeyKindMap`+`categoryMarkerFindings`+`frAnchorMarkers` 소비, 굵은 키마다 종류 대조(누락·불일치) | SPEC-023 FR-005 일반화 동반: 굵은 키의 카테고리 구분(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | consistency 게이트에 FR-006 배선(백틱에 든 선언 키 → 앵커 승격 위반) — `backtickKeyFindings` 소비, "굵게 ⟺ 사유 있는 키" 규율 완성 | SPEC-023 FR-006 동반: 키를 백틱에 두는 것 금지(게이트 본체는 이 spec 소유) |
+| 2026-07-21 | consistency 게이트에 FR-007 배선(소유 키 앵커 강제) — `unanchoredOwnedKeyFindings` 소비, 소유 키가 FR에 굵게 앵커 안 되면 위반 | SPEC-023 FR-007 동반: (B) 모든 키 참조 앵커 강제(게이트 본체는 이 spec 소유) |

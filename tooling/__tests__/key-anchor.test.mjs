@@ -5,13 +5,14 @@
 // @covers SPEC-023/FR-004
 // @covers SPEC-023/FR-005
 // @covers SPEC-023/FR-006
+// @covers SPEC-023/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings } from "../key-anchor-lib.mjs";
+import { stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "../key-anchor-lib.mjs";
 
 const M = { entity: "E", surface: "R", capability: "C" };
 
@@ -158,6 +159,36 @@ test("extractCodeSpans / backtickKeyFindings: 백틱에 든 선언 키만 앵커
   assert.deepEqual(backtickKeyFindings(lines, new Map(), M), []);
 });
 
+test("unanchoredOwnedKeyFindings: 소유 키가 FR에 굵게 앵커 안 됐으면 위반(FR-007, (B))", () => {
+  const owned = new Map([["ticket_evidence", "entity"], ["finops_classification", "entity"], ["finops_classification.classify", "capability"]]);
+  const lines = [
+    "- **FR-001** THE SYSTEM SHALL ingest into `ticket_evidence` records.",           // 백틱만 → 앵커 안 됨
+    "- **FR-002** WHEN classified, THE SYSTEM SHALL set **finops_classification** (E).", // 굵게 앵커됨 → OK
+  ];
+  const r = unanchoredOwnedKeyFindings(lines, owned, M);
+  // finops_classification은 앵커됨 → 제외. ticket_evidence·classify는 미앵커 → 위반
+  assert.deepEqual(r, [
+    { key: "ticket_evidence", kind: "entity", expected: "E" },
+    { key: "finops_classification.classify", kind: "capability", expected: "C" },
+  ]);
+  // ownedKindMap 비면 inert(킷 Modules 등)
+  assert.deepEqual(unanchoredOwnedKeyFindings(lines, new Map(), M), []);
+});
+
+test("게이트: 소유 키가 FR에 앵커 안 됨 → advisory ⚠ / hard ✗ (FR-007, (B))", () => {
+  // Ownership에 pjt_projects·POST /api/x·pjt_projects.create 소유, FR은 아무 것도 앵커 안 함
+  const noAnchor = "- **FR-001** THE SYSTEM SHALL do something in prose only.";
+  for (const [policy, wantCode] of [["advisory", 0], ["hard", 1]]) {
+    const root = fixture(policy, noAnchor);
+    try {
+      const r = run(root);
+      assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
+      assert.match(r.out, /소유 entity 키 "pjt_projects" — 어느 FR에도 굵게 앵커되지 않음/);
+      assert.match(r.out, /\*\*pjt_projects\*\* \(E\)로 표기/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 test("게이트: 백틱에 든 선언 키 → 앵커 승격 위반(굵게 ⟺ 키, FR-006)", () => {
   // pjt_projects(entity)를 백틱으로 → 위반. project_category(비키)는 백틱 유지 OK.
   const bt = "- **FR-001** THE SYSTEM SHALL insert a `pjt_projects` row with `project_category`.";
@@ -173,16 +204,17 @@ test("게이트: 백틱에 든 선언 키 → 앵커 승격 위반(굵게 ⟺ �
 });
 
 test("게이트: 굵은 키에 카테고리 마커 없음 → advisory ⚠(exit 0) / hard ✗(exit 1)", () => {
-  // staff(참조 entity)·pjt_projects.create(capability) 앵커인데 마커 누락
-  const noMarker = "- **FR-001** WHEN **staff** is added, THE SYSTEM SHALL **pjt_projects.create**.";
+  // 소유 3키를 전부 굵게 앵커(FR-007 충족)하되 마커 누락 → FR-005만 3건
+  const noMarker = "- **FR-001** WHEN **POST /api/x** hits, THE SYSTEM SHALL **pjt_projects.create** for **pjt_projects**.";
   for (const [policy, wantCode] of [["advisory", 0], ["hard", 1]]) {
     const root = fixture(policy, noMarker);
     try {
       const r = run(root);
       assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
-      assert.match(r.out, /카테고리 마커 위반 2/);          // staff(E)·pjt_projects.create(C) 둘 다 누락
+      assert.match(r.out, /카테고리 마커 위반 3/);          // pjt_projects(E)·POST /api/x(R)·pjt_projects.create(C)
       assert.match(r.out, /카테고리 마커 없음/);
       assert.match(r.out, /\(C\)로 표기/);                   // capability 마커 안내
+      assert.doesNotMatch(r.out, /앵커되지 않음/);           // 전부 앵커됨 → FR-007 무발생
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
