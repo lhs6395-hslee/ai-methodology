@@ -31,8 +31,8 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `schemaDriftManifest` is absent or lacks an `expected` or `deployed` command (default), THE SYSTEM SHALL not execute any command and SHALL exit zero, noting the gate is inactive.
-- **FR-002** (event): WHEN `schemaDriftManifest` declares both commands, THE SYSTEM SHALL run each, compute the schema identifiers present in the expected set but absent from the deployed set, and report them as drift — exiting non-zero WHILE `migrationStatePolicy` is `hard` and warning without failing WHILE `advisory`.
+- **FR-001** (state): WHILE `schemaDriftManifest` is absent or lacks an `expected` or `deployed` command (default), the **runtime-schema-drift** (E) gate **check-schema-drift.mjs** (S) SHALL not execute any command and SHALL exit zero, noting the gate is inactive.
+- **FR-002** (event): WHEN `schemaDriftManifest` declares both commands, THE SYSTEM SHALL run each and **schema-drift-lib.mjs** (S) SHALL compute the schema identifiers present in the expected set but absent from the deployed set, and report them as drift — exiting non-zero WHILE `migrationStatePolicy` is `hard` and warning without failing WHILE `advisory`.
 - **FR-003** (unwanted): IF either declared command fails to run, THEN THE SYSTEM SHALL report that drift cannot be determined and SHALL NOT pass silently — exiting non-zero WHILE `hard`, warning WHILE `advisory`.
 - **FR-004** (unwanted): IF `migrationStatePolicy` holds a value outside `advisory|hard`, THEN THE SYSTEM SHALL report it and exit non-zero.
 
@@ -83,3 +83,4 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — `schemaDriftManifest`{expected,deployed} + `migrationStatePolicy`(advisory|hard) + `check-schema-drift` 게이트(코드 기대 vs 배포 실측 diff) + 순수 코어 `schemaDriftVerdict`, Node·Python 패리티 | 도그푸딩(소비 프로젝트 B): spec↔code green인데 배포 DB 컬럼 미적용으로 42703 500이 3회 반복 — 드리프트 철학을 배포 경계(R2′)까지 확장, migrate-on-deploy/preflight 규범 동반 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 3건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

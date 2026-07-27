@@ -32,7 +32,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the completeness gate scans a spec whose body matches a configured object-storage marker, THE SYSTEM SHALL require an Object Storage Decision section and SHALL warn — hard under `--strict` — when that section is absent.
+- **FR-001** (event): WHEN the completeness gate scans a spec whose body matches a configured object-storage marker, the **object-storage-decision** (E) judgment in **object-storage-lib.mjs** (S) SHALL require an Object Storage Decision section and SHALL warn — hard under `--strict` — when that section is absent.
 - **FR-002** (state): WHILE a spec carries an Object Storage Decision section, THE SYSTEM SHALL warn when it lacks the Bucket or the Consolidation label, so the bucket-selection and consolidation choices are recorded.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL read the marker set from `objectStorageMarkers` config (default list, empty list disables the check), keeping detection portable and stack-agnostic.
 
@@ -88,3 +88,4 @@
 |---|---|---|
 | 2026-07-06 | 초안 — `objectStorageMarkers` 감지 + Object Storage Decision 섹션(Bucket·Consolidation 라벨) completeness 검사(advisory·--strict), Node·Python 동시 | QA 도구가 전용 S3 버킷을 무계획 생성해 제품 버킷과 분리 방치[실측] — 스토리지 도입 시 버킷 선택·이전 기준을 설계 단계에 기록하도록 강제 |
 | 2026-07-06 | 마커 스캔에서 감사 트레일(Review Log/Dedup-Review/Change Log) 제외 (Node·Python) | 자기 서술 오탐[검증]: 메타 스펙(SPEC-001·002·004·006)의 Change Log가 "오브젝트 스토리지 게이트"를 언급하자 게이트가 자기·이웃을 물었음 — 도입 신호는 설계 본문에서만 판정 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

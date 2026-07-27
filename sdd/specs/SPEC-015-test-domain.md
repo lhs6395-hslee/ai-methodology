@@ -31,7 +31,7 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates owned files, THE SYSTEM SHALL exit non-zero when a file matching `testInfraGlobs` is owned by a non-TEST spec, naming an example file, so test infrastructure stays isolated to the TEST domain.
+- **FR-001** (event): WHEN the coverage gate evaluates owned files, the **test-domain** (E) judgment in **test-domain-lib.mjs** (S) SHALL exit non-zero when a file matching `testInfraGlobs` is owned by a non-TEST spec, naming an example file, so test infrastructure stays isolated to the TEST domain.
 - **FR-002** (state): WHILE a spec uses the TEST prefix, THE SYSTEM SHALL exempt it from the prefix-class infra requirement so a TEST spec may own its own runtime and infrastructure (iac/ci) files.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL read `testInfraGlobs` from config (empty list disables the isolation check), keeping the test-infra namespace convention portable and stack-agnostic.
 
@@ -81,3 +81,4 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-06 | 초안 — TEST 인프라 소유 허용(prefix-class 면제) + `testInfraGlobs` 네임스페이스 격리 게이트(Node·Python), Lifecycle removable 관례 | QA 도구가 제품 SPEC/INFRA로 승격돼 도메인 누수[실측] — TEST를 런타임·인프라 자기완결 삭제가능 도메인으로 확장 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

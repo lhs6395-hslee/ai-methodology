@@ -28,7 +28,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
 - **FR-001** (state): WHILE `capabilityOwnershipPolicy` is off, THE SYSTEM SHALL perform no capability-ownership evaluation and keep the ownership gate's output unchanged.
-- **FR-002** (event): WHEN the policy is advisory or hard, THE SYSTEM SHALL require, for each owned capability key, that its entity segment — the token before the first dot, compared after trimming and lowercasing — be among the spec's own owned entity keys, reporting each violation with the spec id, capability, and entity segment.
+- **FR-002** (event): WHEN the policy is advisory or hard, the **capability-ownership** (E) core in **capability-ownership-lib.mjs** (S) SHALL require, for each owned capability key, that its entity segment — the token before the first dot, compared after trimming and lowercasing — be among the spec's own owned entity keys, reporting each violation with the spec id, capability, and entity segment.
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
 - **FR-005** (unwanted): IF the policy is not off but the configured ownership categories cannot support the judgment — no entity-like or no capability-like category — THEN THE SYSTEM SHALL yield each missing-category reason so the consuming gate can surface the inert policy instead of passing silently.
@@ -82,3 +82,4 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 | 2026-07-27 | FR-005 신설(`capabilityInertReasons` — 정책 on + 카테고리 불일치 사유) + FR-001 개정(off만 무판정) + Edge Case "inert는 침묵하지 않는다", Node·Python 패리티 | 감사 이슈 #21 A-1 실측: 카테고리를 `Entities`→`Aggregates`로 개명하면 `capabilityOwnershipPolicy: hard`가 완전 no-op이 되고 스킵 신호가 한 줄도 없어 유령 entity가 `✓ 구조적 중복 없음` exit 0으로 통과. SPEC-026 FR-005가 *개별 면제*를 부채로 표면화하는 것과 동형으로 *정책 전체의 inert*도 표면화 — 정당한 inert는 명시적 `off`가 탈출구 |
 | 2026-07-27 | `capabilityCheckActive`·`capabilityInertReasons`가 카테고리 배열 대신 역할(`{entity,surface,capability}`)을 받는다 | SPEC-001 FR-010 동반: 이름 추측 제거 — 카테고리를 개명해도 선언이 있으면 판정이 유지된다 |
 | 2026-07-27 | 킷 자신은 `capabilityOwnershipPolicy` **advisory 유지**(명시적 off로 내리지 않음) | 킷 카테고리엔 capability 역할이 없어 inert지만, off로 내리면 SPEC-027 래칫이 강도 하향으로 정당하게 차단한다(도그푸딩 발견). 매 실행 출력되는 inert 사유 한 줄이 곧 표면화이므로 침묵시킬 이유가 없다 — "정당한 inert는 명시적 off"라는 서술과 래칫의 단조성이 충돌하는 지점은 별도 과제로 이관 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

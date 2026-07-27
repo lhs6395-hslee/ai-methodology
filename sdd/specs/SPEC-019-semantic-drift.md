@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the changeset renames a file owned by a spec (git rename status), THE SYSTEM SHALL require that spec to have either a changed FR declaration line or a `Spec-Impact` trailer in the changeset, and SHALL report a drift-escalation violation for that spec otherwise.
+- **FR-001** (event): WHEN the changeset renames a file owned by a spec (git rename status), the **semantic-drift** (E) judgment in **drift-lib.mjs** (S) SHALL require that spec to have either a changed FR declaration line or a `Spec-Impact` trailer in the changeset, and SHALL report a drift-escalation violation for that spec otherwise.
 - **FR-002** (event): WHEN a changed file's owning spec set differs from its pre-change ownership (ownership move), THE SYSTEM SHALL apply the same escalation as a rename — deferred to a later increment pending two-revision ownership diffing.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL consider the escalation satisfied only by a changed FR declaration line in the owning spec or a `Spec-Impact` trailer, and SHALL NOT judge whether the FR body semantically matches the new code — that match is a review checkpoint, not a gate.
 - **FR-004** (state): WHILE no owned file in the changeset is renamed or ownership-moved, THE SYSTEM SHALL leave the existing spec-sync requirement unchanged, adding no escalation on ordinary edits.
@@ -84,3 +84,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — 리네임 트리거 → spec-sync 요구 승격(FR 라인 변경 ∨ Spec-Impact) + `semanticDriftPolicy` knob + 리뷰 경계 선언. `drift-lib.mjs`(순수 코어)·`drift.test.mjs`, Node·Python 패리티. FR-002(소유 이동)는 deferred | 도그푸딩(소비 프로젝트 B) 통증 2: 코드 리네임·목적변경인데 FR 본문이 옛 의미 유지해도 무통과 — "의미 방치"를 기계 트리거로 리뷰에 라우팅 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN `sdd-retire` is invoked with a spec ID or a spec/requirement ID, THE SYSTEM SHALL compute a retirement plan — the declarations to remove, the dangling `@covers` tags, the smoke-manifest keys to drop, and the resulting numbering gap — and print it, exiting zero in dry-run (default) mode.
+- **FR-001** (event): WHEN **sdd-retire.mjs** (S) is invoked with a spec ID or a spec/requirement ID, the **spec-retirement** (E) planner in **retire-lib.mjs** (S) SHALL compute a retirement plan — the declarations to remove, the dangling `@covers` tags, the smoke-manifest keys to drop, and the resulting numbering gap — and print it, exiting zero in dry-run (default) mode.
 - **FR-002** (event): WHEN invoked with `--write`, THE SYSTEM SHALL apply the plan atomically (remove the requirement line or mark the spec removed, drop matching manifest and deferred entries), making no change if the plan fails validation.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL report `@covers` tags that reference the retired requirement as dangling for human-driven atomic deletion, and SHALL NOT modify test source files.
 - **FR-004** (unwanted): IF the retirement target does not exist in the spec corpus, THEN THE SYSTEM SHALL make no change and exit non-zero.
@@ -93,3 +93,4 @@
 | 2026-07-16 | SC-001 정직 조정 — 게이트 경로 판정(FR-005/006)은 Node↔Python 패리티 필수(달성), `sdd-retire` 커맨드·`retire-lib`는 Node 참조 구현(런타임 패리티 비대상)임을 명시 | 커맨드 파리티는 CI 판정 밖 유지보수 도구라 실익 없음 — SC가 없는 패리티를 주장하지 않게(스펙↔현실 드리프트 방지) |
 | 2026-07-16 | FR-007 신설(Planned 모순 — Status Planned인데 unit 커버 FR 실재 = fr 게이트 hard) + FR-008 신설(폐기 계획에 inbound 참조 — 타 스펙 구조화 관계·Dedup-Review 언급을 dry-run이 지목, retire-lib `inboundReferences`) | 감사 T2·P1: Active→Planned 한 줄 뒤집기로 strictSpecs·R3를 침묵시키는 회계 침묵기 + 참조된 스펙 폐기 시 dry-run은 침묵하고 --write 후 삭제 커밋이 관계 실재 hard(SPEC-017)에 막히는 dead-end(킷 자신 SPEC-011 dry-run으로 실증 — SPEC-014 관계·Dedup 언급 3건 지목) |
 | 2026-07-27 | `sdd-retire`의 entity 카테고리 해석을 `cfg.__roles.entity`로 전환(자체 이름 폴백 제거) | SPEC-001 FR-010 동반: 역할 판정 단일 소스화 — 폴백 복붙 3곳 중 하나 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 3건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

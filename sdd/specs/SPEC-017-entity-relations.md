@@ -32,7 +32,7 @@ spec A가 B를 참조하고 B가 다시 A를 참조하면(구조화 관계 기�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a `Dependencies.Entities` line item matches `EntityName (relation-type)` where relation-type is a single lowercase-kebab token, THE SYSTEM SHALL treat it as a structured relation; an item without that bracket form SHALL remain an unchecked legacy free-text reference.
+- **FR-001** (event): WHEN a `Dependencies.Entities` line item matches `EntityName (relation-type)` where relation-type is a single lowercase-kebab token, the **entity-relations** (E) parser in **relation-lib.mjs** (S) SHALL treat it as a structured relation; an item without that bracket form SHALL remain an unchecked legacy free-text reference.
 - **FR-002** (unwanted): IF a structured relation's target entity name matches no spec's owned `Entities` key, THEN THE SYSTEM SHALL report a missing-target violation naming the referencing spec, the entity, and the relation-type, and exit non-zero.
 - **FR-003** (event): WHEN `relationTypes` is non-empty and a structured relation's type is absent from it, THE SYSTEM SHALL exit non-zero for an unregistered relation-type; WHERE `relationTypes` is empty (default), THE SYSTEM SHALL accept any well-formed token.
 - **FR-004** (event): WHEN the resolved structured-relation graph (spec → owning spec of each referenced entity) contains a cycle, THE SYSTEM SHALL print an advisory naming the cycle's spec sequence without failing the gate.
@@ -85,3 +85,4 @@ spec A가 B를 참조하고 B가 다시 A를 참조하면(구조화 관계 기�
 |---|---|---|
 | 2026-07-09 | 초안 — `EntityName (relation-type)` 구조화 표기, 실재·소유 spec 해석(hard)·순환 탐지(advisory), `relationTypes` config(capabilityVerbs 동형), Node·Python 동시 | 도그푸딩(소비 프로젝트 B SPEC-005 aggregate 7개 초과 백로그 논의 중 사용자 제기): "1 spec = 1 aggregate" 원칙이 실사용에서 무너지면 쪼개진 Entity 간 관계를 적을 문법이 필요 — 기존 `Dependencies.Entities` 자유 텍스트를 구조화 |
 | 2026-07-16 | 킷 자신 채택(self-hosting) — 전 스펙(21개) Dependencies.Modules 항목을 `(references)` 구조화 표기로 전환 + `relationTypes: ["references"]` 어휘 등록 | 채택 전 킷의 구조화 관계 사용이 0건이라 관계 검사(실재 hard·순환 advisory)가 자기 자신에겐 빈 대상(no-op)이었음 — 전환 준비 스캔에서 SPEC-014의 dangling 참조 `traceability-retag`(실소유 키는 `retag`, SPEC-011) 실증 검출: 자유 텍스트라 게이트가 못 잡던 오류 클래스가 구조화로 hard 검출됨을 킷 자신이 입증 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

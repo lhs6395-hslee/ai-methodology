@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `runTestsPolicy` is `off` (default), THE SYSTEM SHALL not execute any command and SHALL exit zero, noting that the suite should be run manually before claiming completion (coverage accounting is not execution result).
+- **FR-001** (state): WHILE `runTestsPolicy` is `off` (default), the **test-execution** (E) gate **check-test-run.mjs** (S) SHALL not execute any command and SHALL exit zero, noting that the suite should be run manually before claiming completion (coverage accounting is not execution result).
 - **FR-002** (event): WHEN `runTestsPolicy` is `advisory` or `hard` and `commands.test` is declared, THE SYSTEM SHALL execute that command and report its result, exiting non-zero on failure WHILE `hard` and warning without failing WHILE `advisory`.
 - **FR-003** (unwanted): IF `runTestsPolicy` is `advisory` or `hard` but `commands.test` is not declared, THEN THE SYSTEM SHALL report that execution cannot be verified — exiting non-zero WHILE `hard`, warning WHILE `advisory`.
 - **FR-004** (unwanted): IF `runTestsPolicy` holds a value outside `off|advisory|hard`, THEN THE SYSTEM SHALL report it and exit non-zero (no undefined value).
@@ -84,3 +84,4 @@
 |---|---|---|
 | 2026-07-16 | 초안 — `runTestsPolicy`(off|advisory|hard) + `check-test-run` 게이트(`commands.test` 실제 실행·exit 판정) + 판정 코어 `testRunVerdict`, Node·Python 패리티 | 도그푸딩(소비 프로젝트 B): sync 전부 green인데 단위 스위트 3-error — 커버리지 회계 ≠ 실행 결과라는 구조적 오인, "완료 주장 전 실행+결과 확인"을 문법화 |
 | 2026-07-16 | 발동 지점 배선 — sdd-sync 규칙표에 R5(check-test-run) 추가(pre-push 경유) + 킷 자신 CI(.github/workflows, CICD-001)가 동일 스위트를 push/PR마다 실행 | 감사 M1: 스펙 본문이 "CI·pre-push에서 돈다"고 선언했으나 훅·sdd-sync·CI 샘플 어디에도 호출처 0곳 — knob(runTestsPolicy=hard)만 있고 발동 지점이 없던 스펙↔배선 드리프트 봉합 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
