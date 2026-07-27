@@ -27,7 +27,7 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a commit is pushed to the default branch or a pull request is opened or updated, THE SYSTEM SHALL run the unit suite, the quality gates, and the smoke-evidence drift check, failing the workflow on any non-zero exit.
+- **FR-001** (event): WHEN a commit is pushed to the default branch or a pull request is opened or updated, THE **kit-ci** (E) pipeline SHALL run the unit suite, the quality gates, and the smoke-evidence drift check, failing the workflow on any non-zero exit.
 - **FR-002** (event): WHEN a pull request is evaluated, THE SYSTEM SHALL additionally run the spec-sync gate in range mode against the merge base, so that server-side merges cannot bypass the locally-hooked enforcement.
 
 ### Key Entities
@@ -75,3 +75,4 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — push/PR 스위트+게이트+smoke 드리프트, PR range spec-sync(merge-base·fetch-depth 0), `@verifies` 태그로 smoke 회계 | 감사 M1: `runTestsPolicy: "hard"` 선언·"CI가 웹 UI 병합을 막는다" 처방과 달리 킷 자신은 `.github/` 부재로 발동 지점 0곳 — 선언과 배선의 드리프트를 킷 자신의 CI 인스턴스로 봉합 |
+| 2026-07-27 | FR-001 주어를 `THE SYSTEM`에서 **kit-ci** (E)로 교체 — 소유 entity 키 FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화 — 익명 주어라 이 스펙이 세우는 aggregate가 FR 선언 라인에 흔적이 없던 것을 명시(동작 불변) |
