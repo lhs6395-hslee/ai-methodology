@@ -37,7 +37,7 @@
 **정규화 절대규칙 (결정성의 심장):**
 - **Entity**: 스키마·모델·마이그레이션의 테이블/타입명 식별자 그대로 + `trim().toLowerCase()`. 단복수 임의변환 금지(스키마가 진실). **entity 레지스트리(`entityRegistry`, 선택):** config에 `{ "<entity>": "<도입 사유>" }`로 채우면 Ownership의 aggregate-root 카테고리 키는 **등록된 것만** 허용된다(미등록 exit 1, 빈 사유 exit 1) — capabilityVerbs·PREFIX 거버넌스와 동형 패턴: **신규 entity 신설 = config 변경 = 리뷰 관문.** 말만 바꾼 유사 entity의 무단 증식을 어휘 수준에서 차단한다(비어 있으면 비활성 = 현행).
 - **Surface**: `<METHOD> <path>` — METHOD 대문자, path 소문자, path param `{name}` 표준형(`:id`·`<id>` → `{id}`), trailing slash 제거. 이벤트=`event:<name>`, job=`job:<name>`.
-- **Capability**: `<entity>.<verb>` — 점 정확히 1개, 소문자, verb ∈ CRUD 기본(`create·read·update·delete·list`) + config `capabilityVerbs` 등록 verb만. 미등록 verb = 형식 위반. 임의 동의어 금지.
+- **Capability**: `<entity>.<verb>` — 점 정확히 1개, 소문자, verb ∈ CRUD 기본(`create·read·update·delete·list`) + config `capabilityVerbs` 등록 verb만. 미등록 verb = 형식 위반. 임의 동의어 금지. **강도(정직):** 형식 위반(점 개수·미등록 verb·Surface 형식)은 `validateKey`가 잡지만 **기본은 ⚠ warn·exit 0**이고 `check-ownership --strict`에서만 exit 1이다 — 설치 훅·CI 기본 호출엔 `--strict`가 없다(`tooling/harness/pre-commit`). 즉 오늘의 실효 관문은 게이트 차단이 아니라 **config 리뷰**다. **권장 종착지는 hard**(`--strict` 없이도 미등록 verb 차단) — 그때까지는 어휘를 닫아두려면 `--strict`를 CI에 배선하라.
 
 **라우팅 결정트리(새 요구 → 새 spec? 개정?):**
 1. 새 요구의 키 산출: 어떤 Entity / Surface / Capability인가.

@@ -124,7 +124,7 @@ EARS 문장으로 쓴 FR은 구체적인 Ownership 키로 이어진다. 아래 �
 
 **verb 집합:**
 - **CRUD 기본 (코드 고정)**: `create · read · update · delete · list`
-- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반.
+- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반 — **기본 강도는 ⚠ warn(exit 0)**, `check-ownership --strict`에서 exit 1(설치 훅·CI 기본 호출엔 `--strict` 없음). 따라서 현재 실효 관문은 차단이 아니라 위 config 리뷰이며, **권장 종착지는 hard**(`--strict` 없이도 차단). `APPLYING.md`의 `⚠ 미등록 verb` 행이 이 강도의 정본 표기다.
 
 **키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}**, THE SYSTEM SHALL **staff.recommend** using **pjt_projects**`). 리터럴 인용은 백틱(`` `...` ``, 앵커 아님). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. 앵커는 선택("bold면 키여야 한다"만 강제 — 모든 FR이 키를 언급하진 않음).
 
