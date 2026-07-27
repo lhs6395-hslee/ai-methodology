@@ -2,7 +2,8 @@
 // 스펙 문법 규범 순수 코어 (SPEC-013) — 문서(STORAGE·STRUCTURE·METHODOLOGY·DEDUP)에 규범으로
 // 선언됐지만 게이트가 없던 항목의 결정적 판정을 문법화한다:
 //   · Module 헤더 존재(STORAGE §2.3 "본문 필수") + 값 단일성(STRUCTURE.md 1 레포 = 1 모듈)
-//   · FR 선언 라인의 SHALL 토큰(EARS 5패턴 공통 필수 — METHODOLOGY EARS 규칙의 기계 신호)
+//   · FR 선언 라인의 SHALL 토큰(EARS 5패턴 공통 필수 — METHODOLOGY EARS 규칙의 기계 신호).
+//     라인 규율은 frDeclarations와 같은 `isFrDeclLine`(불릿 옵션) — 선언 라인 정의는 킷에 하나뿐
 //   · FR "선언"의 범위(frDeclarations) — FR 섹션 안 라인 시작만. 산문·Change Log의 FR 인용 제외
 //   · Dedup-Review 기록이 참조한 이웃 스펙 ID의 실재(DEDUP.md "존재·형식" 검사의 연장)
 //   · ownershipCategories의 Files 금지(DEDUP.md §3 명시 금지 — 글롭이 dedup 키로 유입 방지)
@@ -20,15 +21,24 @@ export function parseModule(text) {
   return m && m[1].trim() ? m[1].trim() : null;
 }
 
-// FR 선언 라인(- **FR-NNN** …) 중 SHALL 토큰이 없는 라인의 FR ID들.
+// FR 선언 라인(`- **FR-NNN**` / `**FR-NNN**` — 불릿 유무 무관) 중 SHALL 토큰이 없는 라인의 FR ID들.
 // EARS 5패턴(ubiquitous/event/state/unwanted/optional) 모두 "THE SYSTEM SHALL"을 포함한다.
+// 라인 규율은 `isFrDeclLine` 단일 정의를 쓴다(SPEC-013 FR-003). 자체 `^\s*-\s*`(불릿 **필수**)를
+// 갖고 있던 동안 비불릿 스타일 선언은 SHALL 검사를 통째로 건너뛰었다 — 거짓 **음성**(실측: 소비
+// 프로젝트 PM에 비불릿 선언 173줄, 마침 전부 SHALL을 갖고 있어 발견이 늦었다). FR-008이 "선언 =
+// 라인 시작, 불릿 옵션"을 규범으로 세운 뒤 킷 안에 선언 라인 정의가 둘로 갈라졌고, 좁은 쪽만
+// 진짜 EARS 결함을 조용히 흘렸다. 넓은 쪽으로 통일한다 — 판정 내용(advisory)은 그대로.
 // frDeclSource = cfg.__frDeclRe.source (requirementIdPrefixes 파생 — 전 사이트 동일 문법).
+// reqAlt = cfg.__reqAlt. **호출부는 반드시 넘긴다** — 기본값 "FR"에 맡기면 다중 접두어 사이트에서
+// `**INFRA-001**` 선언이 라인 규율에서 탈락해 검사가 사라진다(실측 finops 11줄: 좁은 거짓 음성을
+// 더 큰 거짓 음성으로 바꾸는 함정). 기본값은 접두어를 커스터마이즈하지 않은 사이트·테스트 편의용.
 // 라인 단위 판정(다중행 서술이면 선언 라인에 SHALL이 오도록) — advisory 신호.
-export function frLinesMissingShall(text, frDeclSource) {
-  const lineRe = new RegExp(`^\\s*-\\s*${frDeclSource}`);
+export function frLinesMissingShall(text, frDeclSource, reqAlt = "FR") {
+  const idRe = new RegExp(frDeclSource);
   const out = [];
   for (const line of text.split("\n")) {
-    const m = line.match(lineRe);
+    if (!isFrDeclLine(line, reqAlt)) continue;   // 라인 시작 규율은 여기 단일 정의(중복 정규식 금지)
+    const m = line.match(idRe);                  // isFrDeclLine이 라인 시작을 보장 → 첫 토큰이 선언
     if (m && !/\bSHALL\b/.test(line)) out.push(m[1]);
   }
   return out;

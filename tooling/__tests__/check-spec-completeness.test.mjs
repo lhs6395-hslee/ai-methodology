@@ -25,8 +25,10 @@ function run(dir, args = []) {
 }
 
 test("FR + SC + 인수조건 + 수명주기 기록 완비 → 통과", () => {
+  // FR 선언 라인은 SHALL을 갖는다 — "완비" 픽스처가 실제로 완비여야 한다. 라인 규율이 불릿 필수였던
+  // 동안 이 비불릿 선언은 SHALL 검사를 통째로 건너뛰어, EARS 위반인 픽스처가 "구비"로 통과했다(SPEC-013 FR-003).
   const dir = fixture({ "sdd/specs/SPEC-001.md":
-    "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** a\n**Given** x **When** y **Then** z\n## Success Criteria\n- **SC-001**: 정확도 ≥ 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n" });
+    "**Module**: `m`  **Spec**: `SPEC-001`  **Status**: Active\n**FR-001** (event): WHEN x, THE SYSTEM SHALL a.\n**Given** x **When** y **Then** z\n## Success Criteria\n- **SC-001**: 정확도 ≥ 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 2026-07-05 이웃 없음: 단독 spec\n" });
   const r = run(dir);
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /구비/);

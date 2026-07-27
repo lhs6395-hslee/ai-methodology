@@ -31,6 +31,27 @@ test("frLinesMissingShall: SHALL 없는 FR 선언 라인만 지목", () => {
   assert.deepEqual(frLinesMissingShall(text, FR_DECL_SRC), ["FR-002"]);
 });
 
+// 거짓 음성 회귀: 라인 규율이 `^\s*-\s*`(불릿 **필수**)였을 때 비불릿 선언은 SHALL 검사를 통째로
+// 건너뛰었다. FR-008의 isFrDeclLine(불릿 옵션)으로 통일 — 선언 라인 정의는 킷에 하나뿐이어야 한다.
+test("frLinesMissingShall: 비불릿 선언 라인도 검사한다 (불릿 필수 시절의 거짓 음성)", () => {
+  const text = "**FR-001** (event): WHEN x, THE SYSTEM SHALL y.\n"
+    + "**FR-002** (event): does y without the keyword.\n"           // 비불릿·SHALL 없음 → 반드시 잡힌다
+    + "  - **FR-003** (event): indented bullet, no keyword.\n"       // 들여쓴 불릿도 여전히 잡힌다
+    + "산문 속 **FR-004** 인용은 선언이 아니다(라인 시작 아님).\n";  // 라인 시작 규율은 유지
+  assert.deepEqual(frLinesMissingShall(text, FR_DECL_SRC), ["FR-002", "FR-003"]);
+});
+
+// 다중 접두어 함정: reqAlt를 넘기지 않으면 기본값 "FR"이 걸려 INFRA 선언이 라인 규율에서 탈락하고
+// 검사가 조용히 사라진다(실측 finops 11줄). 호출부는 cfg.__reqAlt를 반드시 넘긴다.
+test("frLinesMissingShall: reqAlt를 넘기면 다중 접두어(INFRA) 선언도 검사 — 기본값에 맡기면 무검사", () => {
+  const src = "\\*\\*((?:FR|INFRA)-\\d{3}[a-z]?)\\*\\*";
+  const text = "- **INFRA-001** (event): provisions the bucket without the keyword.\n"
+    + "**INFRA-002** (event): non-bullet, also without the keyword.\n"
+    + "- **FR-001** (event): THE SYSTEM SHALL x.\n";
+  assert.deepEqual(frLinesMissingShall(text, src, "FR|INFRA"), ["INFRA-001", "INFRA-002"]);
+  assert.deepEqual(frLinesMissingShall(text, src), []);  // reqAlt 생략 = INFRA가 통째로 빠지는 함정
+});
+
 // @covers SPEC-013/FR-008
 test("frDeclarations: Change Log 표 행의 bold FR ID는 선언 아님 (PM SPEC-003 실측 오탐)", () => {
   const text = "## Functional Requirements (EARS)\n"

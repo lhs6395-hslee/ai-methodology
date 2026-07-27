@@ -78,7 +78,8 @@ for (const { text, specId } of texts) {
   if (!(/\b(Given|Acceptance)\b/i.test(text) || /수용\s*기준/.test(text)))
     findings.push({ specId, miss: "인수조건(Given-When-Then) 없음" });
   // EARS 기계 신호(SPEC-013): FR 선언 라인은 SHALL 포함 — 어휘 질·측정가능성은 리뷰 몫.
-  for (const fr of frLinesMissingShall(text, cfg.__frDeclRe.source))
+  // __reqAlt를 반드시 넘긴다 — 생략하면 기본값 "FR"이 걸려 다중 접두어 사이트의 INFRA 선언이 무검사.
+  for (const fr of frLinesMissingShall(text, cfg.__frDeclRe.source, cfg.__reqAlt))
     findings.push({ specId, miss: `${fr} 선언 라인에 SHALL 없음 — EARS 5패턴 공통 필수 토큰(다중행 서술이면 선언 라인에 SHALL 포함)` });
 }
 // 1 레포 = 1 모듈(SPEC-013, STRUCTURE.md): Module 값이 갈라지면 레포 분할 신호.

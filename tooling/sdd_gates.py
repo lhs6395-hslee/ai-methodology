@@ -1267,11 +1267,21 @@ def parse_module(text):
     return val or None
 
 
-def fr_lines_missing_shall(text, fr_decl_re):
-    line_re = re.compile(r"^\s*-\s*" + fr_decl_re.pattern)
+def fr_lines_missing_shall(text, fr_decl_re, req_alt="FR"):
+    """SHALL 토큰 없는 FR 선언 라인의 ID들(SPEC-013 FR-003, grammar-lib.mjs frLinesMissingShall 미러).
+
+    라인 규율은 _is_fr_decl_line 단일 정의(불릿 유무 무관). 자체 `^\\s*-\\s*`(불릿 필수)를 쓰던 동안
+    비불릿 스타일 선언은 SHALL 검사를 통째로 건너뛰었다 — 거짓 음성(실측 PM 173줄, 전부 SHALL을
+    갖고 있어 발견이 늦었다). FR-008이 "라인 시작·불릿 옵션"을 규범으로 세운 뒤 선언 라인 정의가
+    둘로 갈라져 있었고 좁은 쪽만 진짜 EARS 결함을 흘렸다. 넓은 쪽으로 통일 — advisory는 그대로.
+    req_alt는 호출부가 반드시 넘긴다(기본값 "FR"이면 다중 접두어 사이트의 INFRA 선언이 무검사).
+    """
+    tok = re.compile(fr_decl_re.pattern)
     out = []
     for line in text.split("\n"):
-        m = line_re.match(line)
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = tok.search(line)  # 라인 시작이 보장되므로 첫 토큰이 선언
         if m and not re.search(r"\bSHALL\b", line):
             out.append(m.group(1))
     return out
@@ -1509,7 +1519,8 @@ def cmd_completeness(cfg, strict):
         if not (re.search(r"\b(Given|Acceptance)\b", text, re.IGNORECASE) or re.search(r"수용\s*기준", text)):
             findings.append((spec_id, "인수조건(Given-When-Then) 없음"))
         # EARS 기계 신호(SPEC-013): FR 선언 라인은 SHALL 포함 — 어휘 질·측정가능성은 리뷰 몫.
-        for fr in fr_lines_missing_shall(text, cfg["__frDecl"]):
+        # __reqAlt를 반드시 넘긴다 — 생략하면 기본값 "FR"이 걸려 다중 접두어 사이트의 INFRA 선언이 무검사.
+        for fr in fr_lines_missing_shall(text, cfg["__frDecl"], cfg["__reqAlt"]):
             findings.append((spec_id, f"{fr} 선언 라인에 SHALL 없음 — EARS 5패턴 공통 필수 토큰(다중행 서술이면 선언 라인에 SHALL 포함)"))
 
     # 1 레포 = 1 모듈(SPEC-013, STRUCTURE.md): Module 값이 갈라지면 레포 분할 신호.

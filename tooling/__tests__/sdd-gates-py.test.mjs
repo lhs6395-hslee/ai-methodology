@@ -650,6 +650,41 @@ test("패리티: completeness 수명주기(Status 없음·미정의·Reviewed �
   } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-013/FR-003
+// 거짓 음성 회귀 + 런타임 패리티: SHALL 판정의 라인 규율이 불릿 **필수**였을 때 비불릿 선언은
+// 양쪽 런타임에서 똑같이 무검사였다. 다중 접두어(INFRA)까지 한 픽스처에 넣어 reqAlt 주입도 고정한다.
+test("패리티: completeness 비불릿·다중 접두어 FR 선언의 SHALL 누락 — Node와 Python 출력 동일", skip, () => {
+  const files = {
+    // SPEC-001: 비불릿 선언 2개(하나는 SHALL 없음) + 산문 볼드 인용(선언 아님)
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Active\n"
+      + "## Functional Requirements\n"
+      + "**FR-001** (event): WHEN x, THE SYSTEM SHALL y.\n"
+      + "**FR-002** (event): does y without the keyword.\n"
+      + "산문 속 **FR-003** 인용은 선언이 아니다.\n"
+      + "**Given** x\n- **SC-001**: 90%\n"
+      + "## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 이웃 없음\n",
+    // INFRA-001: 다중 접두어 선언(불릿·SHALL 없음) — reqAlt 미주입이면 통째로 빠진다
+    "sdd/specs/SPEC-002.md": "**Spec**: `SPEC-002`  **Status**: Active\n"
+      + "## Functional Requirements\n"
+      + "- **INFRA-001** (event): provisions the bucket without the keyword.\n"
+      + "**Given** x\n- **SC-001**: 90%\n"
+      + "## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 이웃 없음\n",
+  };
+  const cfg = { requirementIdPrefixes: ["FR", "INFRA"] };
+  const a = fixture(files, cfg);
+  const b = fixture(files, cfg);
+  try {
+    const p = runPy(a, ["completeness"]);
+    const n = runNode(b, "check-spec-completeness.mjs");
+    assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치(바이트 동일해야 함)\npy:${p.out}\nnode:${n.out}`);
+    assert.match(p.out, /FR-002 선언 라인에 SHALL 없음/);      // 비불릿 선언도 잡힌다
+    assert.match(p.out, /INFRA-001 선언 라인에 SHALL 없음/);   // 다중 접두어도 잡힌다
+    assert.doesNotMatch(p.out, /FR-001 선언 라인에 SHALL 없음/); // SHALL 있는 선언은 조용
+    assert.doesNotMatch(p.out, /FR-003 선언 라인에 SHALL 없음/); // 산문 인용은 선언 아님
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-016/FR-001
 test("패리티: completeness 오브젝트 스토리지 결정(S3 마커+섹션 없음 warn) — Node와 Python 출력 동일", skip, () => {
   const files = {
