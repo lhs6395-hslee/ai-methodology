@@ -33,7 +33,7 @@ function specFiles() {
 }
 
 // aggregate root 카테고리: /entit/i 패턴에 맞는 첫 카테고리, 없으면 첫 번째.
-const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
+const ENT_CAT = cfg.__roles.entity || CATEGORIES[0]; // 역할 선언 우선(SPEC-001 FR-010)
 
 // 고유 FR-ID 수 — 문법은 config의 requirementIdPrefixes에서 파생(coverage와 동일 사이트 통일).
 function countFRs(text) {

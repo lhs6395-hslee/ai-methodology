@@ -9,13 +9,14 @@
 // Drizzle·Prisma·SQL DDL·proto·어떤 스키마든 같은 게이트가 동작(파일 IO는 게이트가, 여기선 순수).
 // 판정은 문자열 집합 대조만(git 비의존). off|advisory|hard. Python판 sdd_gates.py 미러(SPEC-006).
 
-// 활성 조건: 정책 on + 스키마 소스 선언 + Entities류 카테고리 존재.
-// 셋 중 하나라도 없으면 inert — 스키마 없는 프로젝트(순수 라이브러리)·킷 자신(Modules 카테고리)·
-// 파이프라인(Datasets)은 영향 없음(하위호환).
-export function schemaBackingActive(policy, sources, categories) {
+// 활성 조건: 정책 on + 스키마 소스 선언 + entity 역할 카테고리 해석.
+// 역할은 config가 선언하고(ownershipCategoryRoles) 미선언 시 이름 정규식 폴백(SPEC-001 FR-010) —
+// 카테고리 이름 추측을 없앤 자리다. 셋 중 하나라도 없으면 inert(사유는 아래 함수가 표면화).
+// roles: {entity, surface, capability} — 각 카테고리명 or null.
+export function schemaBackingActive(policy, sources, roles) {
   return policy !== "off"
     && Array.isArray(sources) && sources.length > 0
-    && (categories || []).some((c) => /entit/i.test(c));
+    && Boolean(roles && roles.entity);
 }
 
 // 정책이 off가 **아닌데** 판정이 성립하지 않는(inert) 사유 — 침묵 금지(감사 A-1·A-3 실측:
@@ -24,14 +25,14 @@ export function schemaBackingActive(policy, sources, categories) {
 // 동형으로, *정책 전체의 inert*도 매 실행 표면화한다 — "hard 선언 + 무판정"은 거짓 안전이므로
 // 소비 게이트가 차단하고, 스키마 없는 프로젝트는 정책을 명시적 off(기본값)로 두어 조용히 통과한다.
 // 반환: 사유 문자열 배열(빈 배열 = 판정 성립 ∨ off). 순수 — 출력·exit은 소비 게이트.
-export function schemaBackingInertReasons(policy, sources, categories) {
+export function schemaBackingInertReasons(policy, sources, roles) {
   if (policy === "off") return [];
   const reasons = [];
   if (!Array.isArray(sources) || sources.length === 0) {
     reasons.push("entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)");
   }
-  if (!(categories || []).some((c) => /entit/i.test(c))) {
-    reasons.push("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)");
+  if (!(roles && roles.entity)) {
+    reasons.push("entity 역할 카테고리 미해석(ownershipCategoryRoles에 entity 선언 없음 + 이름 폴백 실패)");
   }
   return reasons;
 }

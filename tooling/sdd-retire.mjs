@@ -48,7 +48,7 @@ const deferredKeys = manifestKeys.filter((k) => manifest[k]?.method === "deferre
 // 남으면 관계 실재 hard(SPEC-017)·dangling advisory(SPEC-013)로 삭제 커밋이 막힌다. 계획이 미리 지목.
 const t = parseTarget(target);
 const CATS = cfg.ownershipCategories;
-const ENT_CAT = CATS.find((c) => /entit/i.test(c)) || CATS[0];
+const ENT_CAT = cfg.__roles.entity || CATS[0]; // 역할 선언 우선(SPEC-001 FR-010)
 const ownedKeys = t && specText.has(t.specId)
   ? new Set(parseSection(specText.get(t.specId), "Ownership", [ENT_CAT])[ENT_CAT] || [])
   : new Set();

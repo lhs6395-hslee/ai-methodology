@@ -10,6 +10,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { resolveCategoryRoles } from "./ownership-keys.mjs";
 
 export const DEFAULTS = {
   // spec(.md)들이 있는 디렉토리(루트 기준 상대경로).
@@ -33,6 +34,15 @@ export const DEFAULTS = {
   //   라이브러리/CLI: ["Modules", "Symbols", "Artifacts"]
   //   데이터파이프라인: ["Datasets", "Jobs", "Sinks"]
   ownershipCategories: ["Entities", "Surfaces", "Capabilities"],
+  // 카테고리 → 역할 선언(SPEC-001 FR-010). 방법론 판정 다수가 "어느 카테고리가 aggregate root인가
+  // (entity)·표면인가(surface)·능력인가(capability)"에 걸려 있는데, 그동안 카테고리 **이름**을
+  // 정규식(/entit/·/surface/·/capabilit/)으로 추측했다. 그래서 (a) 이름을 바꾸면 판정이 조용히
+  // inert가 되고(감사 A-1), (b) 킷 자신처럼 Modules/Symbols를 쓰는 프로젝트는 규칙 전체를 자기에게
+  // 적용할 수 없었다(도그푸딩 공백). 여기서 **선언**하면 이름과 무관하게 역할이 확정된다.
+  //   예(킷): { "Modules": "entity", "Symbols": "surface" }
+  //   예(파이프라인): { "Datasets": "entity", "Sinks": "surface" }
+  // 미선언 카테고리는 역할 없음(판정 대상 밖). 이 맵이 비면 기존 이름 정규식으로 폴백(하위호환).
+  ownershipCategoryRoles: {},
   // 테스트 "단언" 토큰 정규식(test-adequacy 게이트용). 언어 무관 폭넓은 기본값.
   assertionPatterns: [
     "\\b(expect|assert|assertEquals|assertThat|should)\\b",
@@ -250,6 +260,9 @@ function buildConfig(user, path, root) {
   cfg.__frDeclRe = new RegExp(`\\*\\*((?:${reqAlt})-\\d{3}[a-z]?)\\*\\*`, "g"); // spec 본문의 **FR-NNN[a]** 선언
   cfg.__frTokenRe = new RegExp(`\\b(?:${reqAlt})-\\d{3}[a-z]?\\b`, "g");        // 집계/면제용 토큰
   cfg.__coversRe = new RegExp(`@covers\\s+((?:${alt})-\\d{3})\\/((?:${reqAlt})-\\d{3}[a-z]?)\\b`, "g"); // 서픽스는 소문자 1자(FR-003a) — \b로 2자(FR-003ab) 절단 캡처 금지
+
+  // 카테고리 역할 파생값(SPEC-001 FR-010) — 판정 코어·게이트가 공유하는 단일 소스.
+  cfg.__roles = resolveCategoryRoles(cfg.ownershipCategories, cfg.ownershipCategoryRoles);
 
   // Verb 파생값
   const CRUD = ["create", "read", "update", "delete", "list"];

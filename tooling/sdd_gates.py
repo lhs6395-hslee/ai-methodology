@@ -43,6 +43,7 @@ DEFAULTS = {
     ],
     "testFileRegex": [r"\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$"],
     "ownershipCategories": ["Entities", "Surfaces", "Capabilities"],
+    "ownershipCategoryRoles": {},
     "assertionPatterns": [
         r"\b(expect|assert|assertEquals|assertThat|should)\b",
         r"\bt\.(Error|Fatal|Errorf|Fatalf)\b",
@@ -204,6 +205,8 @@ def _build_config(user, path, root):
     # 서픽스는 소문자 1자(FR-003a) — \b로 2자(FR-003ab) 절단 캡처 금지
     cfg["__covers"] = re.compile(rf"@covers\s+((?:{alt})-\d{{3}})/((?:{req_alt})-\d{{3}}[a-z]?)\b")
     cfg["__allVerbs"] = set(v.strip().lower() for v in CRUD + list(cfg.get("capabilityVerbs") or []))
+    # 카테고리 역할 파생값(SPEC-001 FR-010) — Node cfg.__roles 미러(판정 코어 공유 단일 소스).
+    cfg["__roles"] = resolve_category_roles(cfg.get("ownershipCategories"), cfg.get("ownershipCategoryRoles"))
     return cfg
 
 
@@ -602,22 +605,40 @@ def cmd_fr(cfg, strict):
 
 # ── ownership — 구조적 중복 dedup + 정규화·형식검증 (check-ownership.mjs) ──
 
-def capability_check_active(categories):
+def resolve_category_roles(categories, roles):
+    """카테고리 → 역할 해석(SPEC-001 FR-010) — ownership-keys.mjs resolveCategoryRoles 미러.
+    선언 우선(대소문자 무관 카테고리 매칭) → 미선언 역할만 이름 정규식 폴백(하위호환).
+    반환 {"entity":..., "surface":..., "capability":...} (각 카테고리명 or None)."""
+    cats = categories or []
+    out = {"entity": None, "surface": None, "capability": None}
+    for cat, role in (roles or {}).items():
+        r = str(role or "").strip().lower()
+        if r not in out:
+            continue  # 미지의 역할은 무시 — 오타가 판정을 뒤집지 않게
+        match = next((c for c in cats if str(c).strip().lower() == str(cat).strip().lower()), None)
+        if match and not out[r]:
+            out[r] = match
+    for role, pat in (("entity", "entit"), ("surface", "surface"), ("capability", "capabilit")):
+        if not out[role]:
+            out[role] = next((c for c in cats if re.search(pat, c, re.IGNORECASE)), None)
+    return out
+
+
+def capability_check_active(roles):
     """entity·capability류 카테고리가 둘 다 있을 때만 활성(SPEC-024, capability-ownership-lib 미러)."""
-    return any(re.search("entit", c, re.IGNORECASE) for c in categories or []) \
-        and any(re.search("capabilit", c, re.IGNORECASE) for c in categories or [])
+    return bool(roles and roles.get("entity") and roles.get("capability"))
 
 
-def capability_inert_reasons(policy, categories):
+def capability_inert_reasons(policy, roles):
     """정책이 off가 아닌데 판정이 성립하지 않는 사유(capability-ownership-lib capabilityInertReasons 미러).
     빈 목록 = 판정 성립 ∨ 명시적 off. 침묵 금지 — hard 선언 + 무판정은 거짓 안전(감사 A-1)."""
     if policy == "off":
         return []
     reasons = []
-    if not any(re.search("entit", c, re.IGNORECASE) for c in categories or []):
-        reasons.append("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)")
-    if not any(re.search("capabilit", c, re.IGNORECASE) for c in categories or []):
-        reasons.append("capability류 카테고리 없음(ownershipCategories에 capabilit 매치 없음)")
+    if not (roles and roles.get("entity")):
+        reasons.append("entity 역할 카테고리 미해석(ownershipCategoryRoles에 entity 선언 없음 + 이름 폴백 실패)")
+    if not (roles and roles.get("capability")):
+        reasons.append("capability 역할 카테고리 미해석(ownershipCategoryRoles에 capability 선언 없음 + 이름 폴백 실패)")
     return reasons
 
 
@@ -637,13 +658,13 @@ def capability_ownership_findings(owned_entities, owned_capabilities):
     return findings
 
 
-def schema_backing_active(policy, sources, categories):
+def schema_backing_active(policy, sources, roles):
     """정책 on + 스키마 소스 선언 + Entities류 카테고리 존재일 때만 활성(SPEC-026, schema-backing-lib 미러)."""
     return policy != "off" and isinstance(sources, list) and len(sources) > 0 \
-        and any(re.search("entit", c, re.IGNORECASE) for c in categories or [])
+        and bool(roles and roles.get("entity"))
 
 
-def schema_backing_inert_reasons(policy, sources, categories):
+def schema_backing_inert_reasons(policy, sources, roles):
     """정책이 off가 아닌데 판정이 성립하지 않는 사유(schema-backing-lib schemaBackingInertReasons 미러).
     빈 목록 = 판정 성립 ∨ off. 정책 전체의 inert도 FR-005(개별 면제)와 동형으로 표면화한다."""
     if policy == "off":
@@ -651,8 +672,8 @@ def schema_backing_inert_reasons(policy, sources, categories):
     reasons = []
     if not isinstance(sources, list) or len(sources) == 0:
         reasons.append("entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)")
-    if not any(re.search("entit", c, re.IGNORECASE) for c in categories or []):
-        reasons.append("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)")
+    if not (roles and roles.get("entity")):
+        reasons.append("entity 역할 카테고리 미해석(ownershipCategoryRoles에 entity 선언 없음 + 이름 폴백 실패)")
     return reasons
 
 
@@ -702,17 +723,18 @@ def schema_backing_findings(owned_by_spec, schema_set, exempt_set):
 
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
-    ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
+    roles = cfg["__roles"]
+    ent_cat = roles["entity"] or categories[0]
     # Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
-    cap_cat = next((c for c in categories if re.search("capabilit", c, re.IGNORECASE)), None)
+    cap_cat = roles["capability"]
     cap_policy = cfg.get("capabilityOwnershipPolicy") or "advisory"
     if cap_policy not in ("off", "advisory", "hard"):
         print(f'✗ capabilityOwnershipPolicy 값 위반 "{cap_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
               file=sys.stderr)
         sys.exit(1)
-    cap_active = cap_policy != "off" and capability_check_active(categories)
+    cap_active = cap_policy != "off" and capability_check_active(roles)
     # 정책이 off가 아닌데 판정이 성립하지 않으면(inert) 사유를 반드시 출력 — hard면 차단(거짓 안전).
-    cap_inert = capability_inert_reasons(cap_policy, categories)
+    cap_inert = capability_inert_reasons(cap_policy, roles)
     cap_findings = []  # (spec_id, capability, entity)
 
     # Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
@@ -722,8 +744,8 @@ def cmd_ownership(cfg, strict):
               file=sys.stderr)
         sys.exit(1)
     sb_sources = cfg.get("entitySchemaSources") or []
-    sb_active = schema_backing_active(sb_policy, sb_sources, categories)
-    sb_inert = schema_backing_inert_reasons(sb_policy, sb_sources, categories)
+    sb_active = schema_backing_active(sb_policy, sb_sources, roles)
+    sb_inert = schema_backing_inert_reasons(sb_policy, sb_sources, roles)
     sb_owned = []  # (spec_id, [raw...])
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
@@ -950,7 +972,8 @@ def cmd_cohesion(cfg, strict):
     max_keys = cfg["maxKeysPerCategoryPerSpec"]
     max_frs = cfg["maxFRsPerSpec"]
     max_agg = cfg.get("maxAggregateRootsPerSpec", 1)
-    ent_cat = next((c for c in categories if re.search("entit", c, re.IGNORECASE)), categories[0])
+    roles = cfg["__roles"]
+    ent_cat = roles["entity"] or categories[0]
     files = spec_md_files(cfg)
 
     violations = []  # (spec_id, kind, n, max)
@@ -1435,10 +1458,18 @@ def _extract_anchors(line, req_alt="FR"):
     return [tok for tok, _ in _extract_anchors_with_markers(line, req_alt)]
 
 
-def _build_key_kind_map(own_sections, dep_sections):
+def _build_key_kind_map(own_sections, dep_sections, roles=None):
     """키 → 종류(entity/surface/capability) 맵 — 마커 대조용. 관계 서픽스 제거, 첫 등장 우선.
     세 종류 카테고리가 하나도 없으면(킷 Modules 등) 빈 맵(inert)."""
+    by_role = None
+    if roles and (roles.get("entity") or roles.get("surface") or roles.get("capability")):
+        by_role = {str(c).strip().lower(): k for k, c in
+                   (("entity", roles.get("entity")), ("surface", roles.get("surface")),
+                    ("capability", roles.get("capability"))) if c}
+
     def kind_of(cat):
+        if by_role is not None:
+            return by_role.get(str(cat).strip().lower())
         if re.search(r"entit", cat, re.IGNORECASE):
             return "entity"
         if re.search(r"surface", cat, re.IGNORECASE):
@@ -1600,7 +1631,7 @@ def cmd_consistency(cfg, strict):
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
             # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (S)·capability (C).
-            kind_map = _build_key_kind_map(own, deps)
+            kind_map = _build_key_kind_map(own, deps, cfg["__roles"])
             miss, wr = _category_marker_findings(lines, kind_map, markers, cfg["__reqAlt"])
             marker_missing.extend((spec_id, fr, tok, exp) for fr, tok, exp in miss)
             marker_wrong.extend((spec_id, fr, tok, exp, got) for fr, tok, exp, got in wr)
@@ -1608,7 +1639,7 @@ def cmd_consistency(cfg, strict):
             for fr, tok, exp in _backtick_key_findings(lines, kind_map, markers, cfg["__reqAlt"]):
                 marker_backtick.append((spec_id, fr, tok, exp))
             # 소유 키 앵커 강제(FR-007, (B)): 소유 entity/surface/capability 키는 FR에 굵게 앵커돼야 함.
-            for key, kind, exp in _unanchored_owned_key_findings(lines, _build_key_kind_map(own, {}), markers, cfg["__reqAlt"]):
+            for key, kind, exp in _unanchored_owned_key_findings(lines, _build_key_kind_map(own, {}, cfg["__roles"]), markers, cfg["__reqAlt"]):
                 marker_unanchored.append((spec_id, key, kind, exp))
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.

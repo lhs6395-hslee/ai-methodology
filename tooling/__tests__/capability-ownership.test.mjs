@@ -7,6 +7,7 @@
 // @covers SPEC-024/FR-005
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { resolveCategoryRoles } from "../ownership-keys.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,27 +18,33 @@ const GATE = new URL("../check-ownership.mjs", import.meta.url).pathname;
 
 // ── 순수 코어 ──
 
+// 역할 해석 헬퍼 — 게이트와 같은 파생을 테스트도 쓴다(선언 우선 → 이름 폴백, SPEC-001 FR-010).
+const R = (cats, roles) => resolveCategoryRoles(cats, roles);
+
+
 test("capabilityCheckActive: entity·capability 카테고리 둘 다 있어야 활성(비-웹 무영향)", () => {
-  assert.equal(capabilityCheckActive(["Entities", "Surfaces", "Capabilities"]), true);
-  assert.equal(capabilityCheckActive(["Modules", "Symbols", "Artifacts"]), false); // 킷 자신
-  assert.equal(capabilityCheckActive(["Datasets", "Jobs", "Sinks"]), false);        // 파이프라인
-  assert.equal(capabilityCheckActive(["Entities", "Surfaces"]), false);              // capability 없음
+  assert.equal(capabilityCheckActive(R(["Entities", "Surfaces", "Capabilities"])), true);
+  assert.equal(capabilityCheckActive(R(["Modules", "Symbols", "Artifacts"])), false); // 킷 자신(선언 없음)
+  // 역할 선언(SPEC-001 FR-010)으로 이름과 무관하게 활성 — 이름 추측을 없앤 자리
+  assert.equal(capabilityCheckActive(R(["Modules", "Symbols", "Deeds"], { Modules: "entity", Deeds: "capability" })), true);
+  assert.equal(capabilityCheckActive(R(["Datasets", "Jobs", "Sinks"])), false);        // 파이프라인
+  assert.equal(capabilityCheckActive(R(["Entities", "Surfaces"])), false);              // capability 없음
 });
 
 test("capabilityInertReasons: off는 침묵(의도된 비활성) / 정책 on + 카테고리 불일치는 사유 반환", () => {
   // 명시적 off = 문서화된 탈출구 → 조용히 통과(사유 없음)
-  assert.deepEqual(capabilityInertReasons("off", ["Modules", "Symbols", "Artifacts"]), []);
+  assert.deepEqual(capabilityInertReasons("off", R(["Modules", "Symbols", "Artifacts"])), []);
   // 판정 성립 → 사유 없음
-  assert.deepEqual(capabilityInertReasons("hard", ["Entities", "Surfaces", "Capabilities"]), []);
+  assert.deepEqual(capabilityInertReasons("hard", R(["Entities", "Surfaces", "Capabilities"])), []);
   // A-1 재현: Entities→Aggregates 개명만으로 hard 정책이 완전 no-op이 되던 자리 — 이제 사유가 남는다
-  const renamed = capabilityInertReasons("hard", ["Aggregates", "Surfaces", "Capabilities"]);
+  const renamed = capabilityInertReasons("hard", R(["Aggregates", "Surfaces", "Capabilities"]));
   assert.equal(renamed.length, 1);
-  assert.match(renamed[0], /entity류 카테고리 없음/);
+  assert.match(renamed[0], /entity 역할 카테고리 미해석/);
   // 카테고리 둘 다 없으면 사유 2건(선언 순: entity → capability)
-  const both = capabilityInertReasons("advisory", ["Modules", "Symbols", "Artifacts"]);
+  const both = capabilityInertReasons("advisory", R(["Modules", "Symbols", "Artifacts"]));
   assert.equal(both.length, 2);
-  assert.match(both[0], /entity류/);
-  assert.match(both[1], /capability류/);
+  assert.match(both[0], /entity 역할/);
+  assert.match(both[1], /capability 역할/);
 });
 
 test("findings: 소유 entity 위 capability만 통과 — entity 0개(기술 계층 스펙)·남의 entity 모두 위반", () => {

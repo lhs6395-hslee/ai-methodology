@@ -67,12 +67,19 @@ export function buildKeySet(ownSections, depSections) {
 }
 
 // 키 → 카테고리 종류(entity|surface|capability) 맵 — 마커 대조용. Ownership∪Dependencies에서
-// /entit/·/surface/·/capabilit/ 매칭 카테고리만(Files·기타 제외), 관계 서픽스 제거, 첫 등장 우선.
-// 그 세 종류 카테고리가 하나도 없으면(킷 Modules/Symbols·파이프라인 Datasets 등) 빈 맵 → 마커 판정 inert.
-export function buildKeyKindMap(ownSections, depSections) {
+// **역할이 해석된** 카테고리만(Files·역할 없는 카테고리 제외), 관계 서픽스 제거, 첫 등장 우선.
+// 역할은 config가 선언하고(ownershipCategoryRoles) 미선언 시 이름 정규식 폴백(SPEC-001 FR-010).
+// roles 미전달 시 기존 이름 규칙으로 동작(하위호환). 셋 다 미해석이면 빈 맵 → 마커 판정 inert.
+export function buildKeyKindMap(ownSections, depSections, roles = null) {
   const map = new Map();
-  const kindOf = (cat) =>
-    /entit/i.test(cat) ? "entity" : /surface/i.test(cat) ? "surface" : /capabilit/i.test(cat) ? "capability" : null;
+  const byRole = roles && (roles.entity || roles.surface || roles.capability)
+    ? new Map([[roles.entity, "entity"], [roles.surface, "surface"], [roles.capability, "capability"]]
+        .filter(([c]) => c)
+        .map(([c, k]) => [String(c).trim().toLowerCase(), k]))
+    : null;
+  const kindOf = (cat) => byRole
+    ? (byRole.get(String(cat).trim().toLowerCase()) || null)
+    : (/entit/i.test(cat) ? "entity" : /surface/i.test(cat) ? "surface" : /capabilit/i.test(cat) ? "capability" : null);
   const add = (raw, kind) => {
     const k = String(raw).replace(/\s*\([a-z][a-z0-9-]*\)\s*$/, "").trim().toLowerCase();
     if (k && k !== "—" && k !== "-" && !map.has(k)) map.set(k, kind);

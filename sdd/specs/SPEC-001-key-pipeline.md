@@ -23,6 +23,9 @@
 - `loadConfig`가 `sdd.config.json` JSON 파싱에 실패하면 stderr로 경로·사유를 출력하고 `process.exit(1)`한다(조용한 무시 금지).
 - `validateKey`의 Capability는 점 1개(`entity.verb`)가 아니거나 verb가 `__allVerbs`(CRUD + 등록 verb)에 없으면 위반 사유 문자열을 돌려준다.
 - `__coversRe`의 요구 ID 문법은 접두어(`requirementIdPrefixes` 파생, 기본 `FR`) + 3자리 + 선택적 소문자 서픽스 1자이며 경계까지 요구한다 — 2자 서픽스 토큰은 부분(절단) 캡처 없이 통째로 불인정(절단 오판 금지). (ID 예시를 리터럴로 안 쓰는 이유: 게이트가 예시 토큰을 이 spec의 FR로 집계하기 때문 — SPEC-003과 동일 규칙.)
+- 카테고리 역할은 **선언 우선·이름 폴백**이다 — `ownershipCategoryRoles`에 없는 역할만 기존 이름 정규식(`/entit/`·`/surface/`·`/capabilit/`)으로 추측한다. 그래서 기존 프로젝트는 무영향이고, 이름을 바꾼 프로젝트·비-웹 카테고리(킷 `Modules`/`Symbols`)는 선언으로 역할을 확정한다.
+- 역할이 해석되지 않은 카테고리는 **역할 없음**이며 그 역할에 걸린 판정은 inert다 — 조용히 통과하지 않고 소비 게이트가 사유를 표면화한다(SPEC-024·SPEC-026 inert 고지와 같은 계열).
+- 한 역할에는 카테고리 하나만 매핑된다(선언 순 첫 매치) — 두 카테고리에 같은 역할을 주면 뒤엣것은 무시한다. 미지의 역할 문자열은 무시(오타가 판정을 뒤집지 않게).
 - 요구 ID 정규식 3종(`__frDeclRe`·`__frTokenRe`·`__coversRe`)은 전부 `requirementIdPrefixes` 한 곳에서 파생된다 — 게이트가 자체 요구 정규식을 하드코딩하면 사이트 간 문법 불일치(절단 태그·조용한 누락)가 재발한다.
 
 ---
@@ -39,6 +42,7 @@
 - **FR-007** (event): WHEN config is loaded, THE SYSTEM SHALL derive the shared regexes `__specIdRe` and `__coversRe` from `specIdPrefixes`, set `__root` to the config directory (or the start directory when no config file exists), and build `__allVerbs` from CRUD plus `capabilityVerbs`.
 - **FR-008** (unwanted): IF `sdd.config.json` exists but fails to parse as JSON, THEN THE SYSTEM SHALL print the path and error to stderr and exit with a non-zero code.
 - **FR-009** (event): WHEN config is loaded, THE SYSTEM SHALL derive the requirement-ID regexes — declaration (`__frDeclRe`), token (`__frTokenRe`), and covers (`__coversRe`) — from `requirementIdPrefixes` (default FR) with an optional single lowercase-letter suffix and boundary enforcement, as the single grammar shared by every parsing site.
+- **FR-010** (event): WHEN config is loaded, THE **key-pipeline** (E) SHALL resolve each ownership category's role — entity, surface, capability — from the declared `ownershipCategoryRoles` map first and only then fall back to the legacy name patterns, exposing the result as one derived value (`__roles`) that every judgment core and gate consumes, so that a category's role never depends on guessing its name.
 
 ### Key Entities
 - **config object** — the merged runtime config: `specDir`, `scanDirs`, `ignoreDirs`, `testFileRegex`, `ownershipCategories`, `specIdPrefixes`, plus derived `__root`/`__testRegex`/`__specIdRe`/`__coversRe`/`__allVerbs`.
@@ -107,3 +111,4 @@
 | 2026-07-21 | config DEFAULTS에 `frAnchorMarkers`(`{entity:"E",surface:"R",capability:"C"}`) 추가(Node·Python) — FR 카테고리 마커 글자 매핑, 프로젝트 조정 가능 | SPEC-023 FR-005 일반화 동반: 굵은 키의 카테고리 마커(판정 코어는 SPEC-023, 배선은 SPEC-002) |
 | 2026-07-21 | config DEFAULTS에 `policyRatchetPolicy`(off\|advisory\|hard, 기본 advisory) + `policyRatchetExceptions`([]) 추가(Node) | SPEC-027 동반: 강제 정책 강도 단조성(판정 코어·게이트는 SPEC-027) |
 | 2026-07-27 | `frAnchorMarkers` 기본값의 surface 글자 `"R"`→`"S"`(Node·Python DEFAULTS + 게이트 fallback) | SPEC-023 Change Log 동반: 마커 글자를 카테고리 이름 머리글자(E/S/C)로 통일 — knob 자체는 불변이라 라우트 전용 프로젝트는 `{surface:"R"}` 오버라이드 가능 |
+| 2026-07-27 | FR-010 신설 — 카테고리 역할 해석(`ownershipCategoryRoles` + `resolveCategoryRoles` → `cfg.__roles`). 판정 코어 3종(capability 귀속·스키마 백킹·키 종류 맵)과 게이트가 이 단일 소스를 소비, Node·Python 미러 | Ownership 감사 #21 근본 원인: 역할을 카테고리 **이름**으로 추측해 (a) 개명 시 판정이 조용히 inert(A-1) (b) 킷 자신(Modules/Symbols)이 규칙 9종을 자기에게 적용 불가(도그푸딩 공백). `ENT_CAT` 폴백이 3개 파일에 복붙(F8)돼 있던 것도 함께 제거 |

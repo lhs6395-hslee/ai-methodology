@@ -3,9 +3,10 @@
 // @covers SPEC-001/FR-002
 // @covers SPEC-001/FR-003
 // @covers SPEC-001/FR-004
+// @covers SPEC-001/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSection, normalizeKey, validateKey } from "../ownership-keys.mjs";
+import { parseSection, normalizeKey, validateKey, resolveCategoryRoles } from "../ownership-keys.mjs";
 import { loadConfig } from "../sdd-config.mjs";
 
 const cfg = { ...loadConfig("/nonexistent"), capabilityVerbs: ["recommend"] };
@@ -76,4 +77,41 @@ test("validateKey: surfaceFormat 'any' → Surface 형식 검증 안함", () => 
 test("normalizeKey: surfaceFormat 'path' → 소문자 + trailing slash 제거(METHOD 파싱 안함)", () => {
   const pathCfg = { ...cfg, surfaceFormat: "path" };
   assert.equal(normalizeKey("Surfaces", "Src/App/API/route.ts/", pathCfg), "src/app/api/route.ts");
+});
+
+// ── 카테고리 역할 해석(FR-010) — 선언 우선·이름 폴백 ──
+
+test("resolveCategoryRoles: 선언이 이름을 이긴다(카테고리 이름 무관)", () => {
+  // 킷 자신 — 이름 폴백은 전부 실패하지만 선언으로 역할이 확정된다(도그푸딩 공백의 해소 지점)
+  assert.deepEqual(
+    resolveCategoryRoles(["Modules", "Symbols", "Artifacts"], { Modules: "entity", Symbols: "surface" }),
+    { entity: "Modules", surface: "Symbols", capability: null });
+  // 개명해도 선언이 있으면 판정 유지(감사 A-1: 개명 한 줄로 hard가 무음 사망하던 자리)
+  assert.deepEqual(
+    resolveCategoryRoles(["Aggregates", "Routes", "Abilities"],
+      { Aggregates: "entity", Routes: "surface", Abilities: "capability" }),
+    { entity: "Aggregates", surface: "Routes", capability: "Abilities" });
+});
+
+test("resolveCategoryRoles: 선언 없으면 이름 정규식 폴백(하위호환) / 매치 없으면 null", () => {
+  assert.deepEqual(resolveCategoryRoles(["Entities", "Surfaces", "Capabilities"], {}),
+    { entity: "Entities", surface: "Surfaces", capability: "Capabilities" });
+  assert.deepEqual(resolveCategoryRoles(["Modules", "Symbols", "Artifacts"], {}),
+    { entity: null, surface: null, capability: null });
+  assert.deepEqual(resolveCategoryRoles(["Datasets", "Jobs", "Sinks"], null),
+    { entity: null, surface: null, capability: null });
+});
+
+test("resolveCategoryRoles: 부분 선언은 나머지만 폴백 / 오타·중복·미실재는 무해", () => {
+  // surface만 선언 → entity는 이름 폴백으로 채워진다
+  assert.deepEqual(resolveCategoryRoles(["Entities", "Panels"], { Panels: "surface" }),
+    { entity: "Entities", surface: "Panels", capability: null });
+  // 미지의 역할 문자열은 무시(오타가 판정을 뒤집지 않게)
+  assert.equal(resolveCategoryRoles(["Modules"], { Modules: "entty" }).entity, null);
+  // 한 역할에 둘 선언 → 선언 순 첫 매치
+  assert.equal(resolveCategoryRoles(["A", "B"], { A: "entity", B: "entity" }).entity, "A");
+  // ownershipCategories에 없는 카테고리 선언은 무시
+  assert.equal(resolveCategoryRoles(["Modules"], { Nope: "entity" }).entity, null);
+  // 대소문자 무관 매칭
+  assert.equal(resolveCategoryRoles(["Modules"], { modules: "entity" }).entity, "Modules");
 });

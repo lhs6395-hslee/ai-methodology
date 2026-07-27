@@ -43,18 +43,21 @@ const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
 
 const CATEGORIES = cfg.ownershipCategories;
-const ENT_CAT = CATEGORIES.find((c) => /entit/i.test(c)) || CATEGORIES[0];
+// 역할은 config 선언(ownershipCategoryRoles)에서 오고 미선언 시 이름 폴백(SPEC-001 FR-010) —
+// 이름 정규식 폴백이 3개 파일에 복붙돼 있던 것(감사 F8: 개명+순서 조합에서 엉뚱한 카테고리 조준)을 없앴다.
+const ROLES = cfg.__roles;
+const ENT_CAT = ROLES.entity || CATEGORIES[0];
 // Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
 // entity·capability류 카테고리가 둘 다 있을 때만 활성(비-웹 카테고리 무영향).
-const CAP_CAT = CATEGORIES.find((c) => /capabilit/i.test(c));
+const CAP_CAT = ROLES.capability;
 const CAP_POLICY = cfg.capabilityOwnershipPolicy || "advisory";
 if (!["off", "advisory", "hard"].includes(CAP_POLICY)) {
   console.error(`✗ capabilityOwnershipPolicy 값 위반 "${CAP_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
   process.exit(1);
 }
-const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(CATEGORIES);
+const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(ROLES);
 // 정책이 off가 아닌데 판정이 성립하지 않으면(inert) 사유를 반드시 출력한다 — hard면 차단(거짓 안전).
-const CAP_INERT = capabilityInertReasons(CAP_POLICY, CATEGORIES);
+const CAP_INERT = capabilityInertReasons(CAP_POLICY, ROLES);
 const capFindings = []; // {specId, capability, entity}
 
 // Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
@@ -64,8 +67,8 @@ if (!["off", "advisory", "hard"].includes(SB_POLICY)) {
   process.exit(1);
 }
 const SB_SOURCES = cfg.entitySchemaSources || [];
-const SB_ACTIVE = schemaBackingActive(SB_POLICY, SB_SOURCES, CATEGORIES);
-const SB_INERT = schemaBackingInertReasons(SB_POLICY, SB_SOURCES, CATEGORIES);
+const SB_ACTIVE = schemaBackingActive(SB_POLICY, SB_SOURCES, ROLES);
+const SB_INERT = schemaBackingInertReasons(SB_POLICY, SB_SOURCES, ROLES);
 const sbOwned = []; // {specId, entities:[raw...]}
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면

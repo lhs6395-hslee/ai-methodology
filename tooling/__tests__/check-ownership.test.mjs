@@ -151,7 +151,7 @@ test("inert 고지: 카테고리 개명 + capability 귀속 hard → ✗ 사유 
     { ownershipCategories: RENAMED, capabilityOwnershipPolicy: "hard" });
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /✗ Capability 귀속\(capabilityOwnershipPolicy=hard\): 판정 불가\(inert\)/);
-  assert.match(r.out, /entity류 카테고리 없음/);
+  assert.match(r.out, /entity 역할 카테고리 미해석/);
   assert.match(r.out, /hard 선언 \+ 무판정/);
 });
 
