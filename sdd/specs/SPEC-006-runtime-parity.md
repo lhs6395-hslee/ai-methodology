@@ -29,10 +29,10 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (ubiquitous): THE SYSTEM SHALL provide a Python runtime gate with behavior parity to the full Node gate suite — coverage with prefix governance, ownership with key normalization and format validation, cohesion, completeness, consistency, adequacy, orphan surfaces, converge drift, spec-sync, and the stage runner — reading the same `sdd.config.json`.
+- **FR-001** (ubiquitous): THE **sdd_gates.py** (S) runtime SHALL provide behavior parity with the full Node gate suite — coverage with prefix governance, ownership with key normalization and format validation, cohesion, completeness, consistency, adequacy, orphan surfaces, converge drift, spec-sync, and the stage runner — reading the same `sdd.config.json`.
 - **FR-002** (event): WHEN any runtime parses requirement IDs at any site (declaration, aggregation, exemption, covers tag, spec-sync line judgment), THE SYSTEM SHALL derive the grammar from `requirementIdPrefixes` (three digits plus an optional single lowercase-letter suffix, boundary enforced) so that no site keeps a hardcoded prefix.
-- **FR-003** (event): WHEN the same fixture is evaluated by the Node gate and the Python gate, THE SYSTEM SHALL produce an identical exit code and identical report output.
-- **FR-004** (ubiquitous): THE SYSTEM SHALL keep the shell and Go runtimes' core commands (coverage with prefix governance, ownership, runner) on the same ID grammar and the same defaults as the Node canonical DEFAULTS.
+- **FR-003** (event): WHEN the same fixture is evaluated by the Node gate and the Python gate, THE **runtime-parity** (E) contract SHALL require an identical exit code and identical report output.
+- **FR-004** (ubiquitous): THE **sdd_gates.sh** (S) and **go-gate** (S) runtimes SHALL keep their core commands (coverage with prefix governance, ownership, runner) on the same ID grammar and the same defaults as the Node canonical DEFAULTS.
 - **FR-005** (unwanted): IF the ears-preset spec template omits any gate-parsed anchor present in the canonical module-spec template (an ownership category line including Files, the Dependencies section, Edge Cases, or Change Log), THEN THE SYSTEM SHALL fail the template-parity test so preset-path specs are never silently exempt from spec-first enforcement.
 
 ### Key Entities
@@ -123,3 +123,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-27 | Python 미러 — `capability_inert_reasons`·`schema_backing_inert_reasons` + cmd_ownership의 inert 고지·hard 차단 배선, Node와 출력·exit 바이트 동일 | SPEC-024 FR-005·SPEC-026 FR-006·SPEC-002 FR-010 동반 — 양판 패리티 유지(감사 이슈 #21 A-1/A-3) |
 | 2026-07-27 | Python 미러 — `exempt_glob_findings` + cmd_ownership 배선, Node와 출력·exit 바이트 동일 | SPEC-013 FR-007 동반 — 전 게이트 패리티 유지 |
 | 2026-07-27 | Python 미러 — `resolve_category_roles` + `cfg["__roles"]` 파생, capability/스키마백킹/키종류맵 호출부 역할 기반 전환. Node와 출력 바이트 동일 | SPEC-001 FR-010 동반 — 전 게이트 패리티 유지 |
+| 2026-07-27 | FR-001·003·004 주어를 `THE SYSTEM`에서 실제 런타임/계약으로 교체 — **sdd_gates.py**·**sdd_gates.sh**·**go-gate**·aggregate **runtime-parity** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 4건이 FR 선언 라인에 흔적이 없던 것을 명시(판정 범위·패리티 요구는 불변) |
