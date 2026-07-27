@@ -390,25 +390,43 @@ def classify_accounting(specs, covered, entries, planned_specs=None):
 
 # ── fr — FR↔test 추적 + PREFIX 거버넌스 (check-fr-coverage.mjs) ──
 
+def group_numbers(ids):
+    """순수 원형(spec-ID·FR 공용) — "접두어-3자리[소문자서픽스]" ID 집합을 접두어별로 묶는다
+    (SPEC-014, numbering-lib.mjs groupNumbers 미러). 반환: 접두어 사전순 dict 리스트
+    {prefix, nums(기저 번호 유일·정렬), dup_ids(완전 동일 ID 중복·정렬), min, missing(내부 결번)}.
+    severity·문구는 호출자(도메인)가 정한다 — spec-ID의 001미시작은 hard지만 FR은 advisory."""
+    by_prefix = {}
+    for raw in ids or []:
+        m = re.match(r"^([A-Z]+)-(\d{3})([a-z]?)$", str(raw).strip())
+        if not m:
+            continue
+        pfx, num, sfx = m.group(1), m.group(2), m.group(3)
+        g = by_prefix.setdefault(pfx, {"seen": set(), "dup": set(), "nums": []})
+        full = f"{pfx}-{num}{sfx}"
+        (g["dup"] if full in g["seen"] else g["seen"]).add(full)
+        g["nums"].append(int(num))
+    out = []
+    for pfx in sorted(by_prefix):
+        g = by_prefix[pfx]
+        nums = sorted(set(g["nums"]))
+        present = set(nums)
+        missing = [n for n in range(nums[0], nums[-1] + 1) if n not in present] if nums else []
+        out.append({"prefix": pfx, "nums": nums, "dup_ids": sorted(g["dup"]),
+                    "min": nums[0] if nums else None, "missing": missing})
+    return out
+
+
 def numbering_issues(spec_ids, retired_ids=None):
     """접두어별 spec-ID 번호 무결성 (SPEC-014, numbering-lib.mjs 미러 — 바이트 동일).
     hard: 중복 / 001 미시작. advisory: 실제 최소~최대 내부 gap. (hard, advisory) 반환.
     retired_ids: 폐기 기록된 spec-ID — 그 번호의 gap은 정상 retirement gap이라 제외(SPEC-018 FR-006)."""
     retired = {str(s).strip() for s in (retired_ids or [])}
-    by_prefix = {}
-    for sid in spec_ids or []:
-        m = re.match(r"^([A-Z]+)-(\d{3})$", sid)
-        if not m:
-            continue
-        by_prefix.setdefault(m.group(1), []).append(int(m.group(2)))
     hard, advisory = [], []
-    for pfx in sorted(by_prefix):
-        seen, dups = set(), set()
-        for n in by_prefix[pfx]:
-            (dups if n in seen else seen).add(n)
-        for d in sorted(dups):
-            hard.append(f"{pfx}-{d:03d} 번호 중복 — 같은 접두어·번호가 둘 이상(유일해야 함)")
-        uniq = sorted(seen)
+    for g in group_numbers(spec_ids):
+        pfx = g["prefix"]
+        for d in g["dup_ids"]:
+            hard.append(f"{d} 번호 중복 — 같은 접두어·번호가 둘 이상(유일해야 함)")
+        uniq = g["nums"]
         if not uniq:
             continue
         # 폐기 ID 재사용(hard, SPEC-014 FR-004): 무신호 재사용 차단 — numbering-lib.mjs 미러(감사 M3).
@@ -422,12 +440,33 @@ def numbering_issues(spec_ids, retired_ids=None):
             if not leading_retired:
                 hard.append(f"{pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{uniq[0]:03d} "
                             f"(접두어별 001 순차 규칙, SPEC-014). 재번호는 sdd-retag, 선행 번호가 폐기분이면 retiredIds에 기록")
-        present, mx = set(uniq), uniq[-1]
         # retired에 기록된 번호는 정상 retirement gap이라 재보고하지 않음(SPEC-018 FR-006)
-        missing = [n for n in range(uniq[0], mx + 1) if n not in present and f"{pfx}-{n:03d}" not in retired]
+        missing = [n for n in g["missing"] if f"{pfx}-{n:03d}" not in retired]
         if missing:
             joined = ", ".join(f"{pfx}-{n:03d}" for n in missing)
             advisory.append(f"{pfx} 번호 중간 gap: {joined} — 제거·retag 잔분(정상일 수 있음)")
+    return hard, advisory
+
+
+def fr_numbering_issues(spec_id, fr_ids):
+    """FR 번호(스펙별 001 연번) 무결성 (SPEC-014, numbering-lib.mjs frNumberingIssues 미러 — 바이트 동일).
+    입력은 **한 스펙의** FR 선언 목록(중복 판정에 중복이 필요하므로 set이 아니라 list).
+    식별자는 `<SPEC-ID>/FR-NNN`이고 스펙 ID가 이미 네임스페이스라 번호는 스펙 안에서만 유일하면 된다.
+    hard: 같은 FR ID 중복(정당한 케이스 없음 — 정책 knob 없이 항상). advisory: 001 미시작·내부 결번."""
+    hard, advisory = [], []
+    for g in group_numbers(fr_ids):
+        pfx = g["prefix"]
+        for d in g["dup_ids"]:
+            hard.append(f"{spec_id}/{d} FR 번호 중복 — 한 스펙 안에 같은 FR 번호가 둘 이상(스펙 내 유일 필수, SPEC-014). "
+                        f"병합이 같은 번호를 양쪽에서 추가했으면 뒤 선언을 새 번호로 옮기고 sdd-retag로 @covers·smokeManifest를 함께 이행")
+        if not g["nums"]:
+            continue
+        if g["min"] != 1:
+            advisory.append(f"{spec_id}: {pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{g['min']:03d} "
+                            f"(스펙별 001 연번 규칙, SPEC-014)")
+        if g["missing"]:
+            joined = ", ".join(f"{pfx}-{n:03d}" for n in g["missing"])
+            advisory.append(f"{spec_id}: {pfx} 번호 중간 결번: {joined} — FR 폐기 잔분일 수 있음(SPEC-018)")
     return hard, advisory
 
 
@@ -511,7 +550,8 @@ def cmd_fr(cfg, strict):
         sys.exit(1)
 
     # 1. spec별 선언 FR 수집.
-    specs = {}  # SPEC-ID -> set(FR-ID)
+    specs = {}     # SPEC-ID -> set(FR-ID)
+    fr_decls = {}  # SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — set은 중복을 삼킨다)
     for f in spec_names:
         if not (f.endswith(".md") and any(f.startswith(p + "-") for p in cfg["__prefixes"])):
             continue
@@ -519,7 +559,17 @@ def cmd_fr(cfg, strict):
         if not m:
             continue
         text = read_text(os.path.join(spec_dir, f))
-        specs[m.group(0)] = set(cfg["__frDecl"].findall(text))
+        lst = cfg["__frDecl"].findall(text)
+        fr_decls[m.group(0)] = lst
+        specs[m.group(0)] = set(lst)
+
+    # 1b. FR 번호 무결성(SPEC-014 FR-005/006): 스펙별 001 연번 — 중복 hard, 001미시작·결번 advisory.
+    #     FR 선언 파싱은 __frDecl 단일 문법(SPEC-001 FR-009)을 그대로 소비한다(자체 정규식 없음).
+    fr_num_hard, fr_num_advisory = [], []
+    for sid in sorted(fr_decls):
+        h, a = fr_numbering_issues(sid, fr_decls[sid])
+        fr_num_hard.extend(h)
+        fr_num_advisory.extend(a)
 
     # 2. 테스트 파일의 @covers 수집.
     covered = {}
@@ -533,6 +583,10 @@ def cmd_fr(cfg, strict):
                     bad_refs.append((file, spec, fr))
 
     errors, warnings = [], list(prefix_class_warnings)  # 0b의 advisory(미사용 면제·INFRA 검출 0건)
+    # FR 번호 무결성(1b) 배선 — 중복은 정책 knob 없이 항상 hard, advisory는 --strict에서만 승격.
+    errors.extend(fr_num_hard)
+    for a in fr_num_advisory:
+        (errors if strict else warnings).append(a)
     for file, spec, fr in bad_refs:
         errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
 

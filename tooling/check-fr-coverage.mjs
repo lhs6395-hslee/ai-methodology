@@ -30,7 +30,7 @@ import { parseStatus } from "./lifecycle-lib.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
-import { numberingIssues } from "./numbering-lib.mjs";
+import { numberingIssues, frNumberingIssues } from "./numbering-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 
 const cfg = loadConfig();
@@ -145,15 +145,26 @@ if (prefixErrors.length) {
 }
 
 // 1. Collect declared FRs per spec.
-const specs = new Map(); // SPEC-ID -> Set(FR-ID)
+const specs = new Map();    // SPEC-ID -> Set(FR-ID)
+const frDecls = new Map();  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md") || !PREFIXES.some((p) => f.startsWith(p + "-"))) continue;
   const id = f.match(SPEC_ID)?.[0];
   if (!id) continue;
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
-  const frs = new Set();
-  for (const m of text.matchAll(FR_DECL)) frs.add(m[1]);
-  specs.set(id, frs);
+  const list = [];
+  for (const m of text.matchAll(FR_DECL)) list.push(m[1]);
+  frDecls.set(id, list);
+  specs.set(id, new Set(list));
+}
+
+// 1b. FR 번호 무결성(SPEC-014 FR-005/006): 스펙별 001 연번 — 중복 hard, 001미시작·결번 advisory.
+//     FR 선언 파싱은 cfg.__frDeclRe 단일 문법(SPEC-001 FR-009)을 그대로 소비한다(자체 정규식 없음).
+const frNumHard = [], frNumAdvisory = [];
+for (const id of [...frDecls.keys()].sort()) {
+  const { hard, advisory } = frNumberingIssues(id, frDecls.get(id));
+  frNumHard.push(...hard);
+  frNumAdvisory.push(...advisory);
 }
 
 // 2. Collect @covers tags from test files.
@@ -177,6 +188,10 @@ for (const dir of SCAN_DIRS) {
 // 3. Evaluate rules.
 const errors = [];
 const warnings = [...prefixClassWarnings]; // 0b의 advisory(미사용 면제·INFRA 검출 0건)
+
+// FR 번호 무결성(1b) 배선 — 중복은 정책 knob 없이 항상 hard, advisory는 `--strict`에서만 승격.
+errors.push(...frNumHard);
+for (const a of frNumAdvisory) (STRICT ? errors : warnings).push(a);
 
 // R1: bad references
 for (const { file, spec, fr } of badRefs) {

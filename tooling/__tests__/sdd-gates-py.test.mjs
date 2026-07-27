@@ -130,6 +130,44 @@ test("py fr: 접두어별 번호 001 미시작(INFRA-011/013) → Node·Python �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-014/FR-005
+test("py fr: 한 스펙 FR 번호 중복(FR-023 2회) → Node·Python 둘 다 exit 1 + 출력 바이트 동일 (SPEC-014 FR 패리티)", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n"
+      + "- **FR-023** THE SYSTEM SHALL a.\n- **FR-024** THE SYSTEM SHALL b.\n- **FR-023** THE SYSTEM SHALL c.\n",
+  };
+  const a = fixture(files), b = fixture(files);
+  try {
+    const py = runPy(a, ["fr"]);
+    const nd = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out); // 바이트 동일(패리티)
+    assert.match(nd.out, /SPEC-001\/FR-023 FR 번호 중복/);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-014/FR-006
+test("py fr: FR 001미시작·결번 advisory → Node·Python 바이트 동일(exit 0), --strict 승격도 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-005** THE SYSTEM SHALL a.\n- **FR-007** THE SYSTEM SHALL b.\n",
+  };
+  const a = fixture(files), b = fixture(files);
+  try {
+    const py = runPy(a, ["fr"]);
+    const nd = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(py.code, 0, py.out);
+    assert.equal(nd.code, 0, nd.out);
+    assert.equal(py.out, nd.out);
+    assert.match(nd.out, /중간 결번: FR-006/);
+    const pys = runPy(a, ["fr", "--strict"]);
+    const nds = runNode(b, "check-fr-coverage.mjs", ["--strict"]);
+    assert.equal(pys.code, 1, pys.out);
+    assert.equal(nds.code, 1, nds.out);
+    assert.equal(pys.out, nds.out);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-012/FR-001
 test("py fr: ci 전용 소유 INFRA 스펙 → CICD 요구, Node·Python 바이트 동일 (CICD 접두어 패리티)", skip, () => {
   const files = {

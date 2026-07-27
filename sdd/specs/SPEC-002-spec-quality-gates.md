@@ -117,3 +117,4 @@
 | 2026-07-27 | ownership 게이트에 `exemptGlobFindings` 배선(카테고리 Files 금지와 동형 — 파싱 전 config 검증) | SPEC-013 FR-007 동반: 면제 목록 무결성(판정 코어는 SPEC-013 소유) |
 | 2026-07-27 | ownership·cohesion 게이트가 `cfg.__roles`를 소비하도록 배선(자체 이름 추측·`CATEGORIES[0]` 폴백 제거) | SPEC-001 FR-010 동반: 역할 판정의 단일 소스화 |
 | 2026-07-27 | FR-002~008 문장의 익명 주어 `THE SYSTEM`을 실제 판정 주체로 교체해 소유 키 7종을 앵커(FR-002 check-ownership.mjs·FR-003 check-spec-cohesion.mjs·FR-004 check-spec-completeness.mjs·FR-005 check-spec-consistency.mjs·FR-006 check-fr-coverage.mjs·FR-007 spec-quality-gates(E)·FR-008 check-test-adequacy.mjs) — 백틱 인용 2건은 앵커로 승격, 판정 내용 무변 | SPEC-001 FR-010으로 역할 선언이 들어오며 SPEC-023 키 앵커(FR-005·006·007)가 킷 자신에게 처음 발화 — 자기적용 마이그레이션(감사 이슈 #21) |
+| 2026-07-27 | fr 게이트에 FR 번호 무결성 배선(1b) — 스펙별 FR 선언 목록을 순서 그대로 수집(`Set`은 중복을 삼킨다)해 중복 hard·001미시작/결번 advisory를 판정 코어에 위임 | SPEC-014 FR-005/006 동반: 판정 코어는 SPEC-014 소유, FR 선언을 이미 파싱하는 이 게이트가 소비 지점 |
