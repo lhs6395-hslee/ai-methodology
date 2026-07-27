@@ -114,3 +114,4 @@
 | 2026-07-21 | consistency 게이트에 FR-007 배선(소유 키 앵커 강제) — `unanchoredOwnedKeyFindings` 소비, 소유 키가 FR에 굵게 앵커 안 되면 위반 | SPEC-023 FR-007 동반: (B) 모든 키 참조 앵커 강제(게이트 본체는 이 spec 소유) |
 | 2026-07-27 | consistency 게이트의 마커 fallback 기본값 surface `(R)`→`(S)` | SPEC-023 Change Log 동반: 마커 글자를 카테고리 머리글자(E/S/C)로 통일 — 배선 로직 불변, fallback 리터럴만 |
 | 2026-07-27 | ownership 게이트에 정책 inert 고지 배선(FR-010 신설 — capability 귀속·entity 스키마 백킹의 inert 사유 출력, hard면 차단·advisory면 플레인 고지) + Edge Case 1건 | 감사 이슈 #21 A-1·A-3: `hard` 선언된 정책 2종이 카테고리 개명·`entitySchemaSources: []` 한 줄로 완전 no-op이 되면서 스킵 신호가 전무했다(유령 entity가 `✓ 구조적 중복 없음` exit 0으로 통과). 선언과 실제 판정의 괴리를 매 실행 표면화 |
+| 2026-07-27 | ownership 게이트에 `exemptGlobFindings` 배선(카테고리 Files 금지와 동형 — 파싱 전 config 검증) | SPEC-013 FR-007 동반: 면제 목록 무결성(판정 코어는 SPEC-013 소유) |

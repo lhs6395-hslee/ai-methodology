@@ -10,6 +10,7 @@
 // 설계: SPEC-013 (Python판 sdd_gates.py가 동일 동작을 미러 — SPEC-006 패리티).
 
 import { sectionBlock } from "./lifecycle-lib.mjs";
+import { compileGlob } from "./spec-sync-lib.mjs";
 
 // 스펙 헤더의 `**Module**: <name>` 파싱(백틱 유무 무관). 없으면 null.
 export function parseModule(text) {
@@ -47,4 +48,35 @@ export function ownershipCategoriesFindings(categories) {
   return (categories || [])
     .filter((c) => String(c).trim().toLowerCase() === "files")
     .map((c) => `ownershipCategories에 "${c}" 금지 — Files는 spec-sync 소유선언 전용(dedup 키 아님, DEDUP.md §3)`);
+}
+
+// specSyncExemptGlobs 무결성 — 면제 목록은 강제의 통제면이므로 강제를 통째로 무력화하는 항목을
+// 담을 수 없다. `sdd.config.presets.md`·`METHODOLOGY.md`가 **프로즈로** 금지("`sdd.config.json`
+// 자신은 넣지 말 것 — 감사 T1")하던 것을 게이트로 승격한다(ownershipCategories Files 금지와 동형).
+// 금지 2종:
+//   ① config 파일 자신을 매치하는 글롭(직접·`*.json`·`**/*` 등 어떤 표기든 — 실제 매치로 판정).
+//      등재되면 config 변경이 스펙 동반 없이 무흔적 통과해 다른 모든 우회로(정책 하향·면제 확대·
+//      상한 상향)가 영속 흔적 0으로 실행된다(감사 A-4 실측: 소비 프로젝트가 실제로 등재).
+//   ② 전면 면제(`**`·`**/*`) — unowned closed-world(SPEC-003 FR-010)와 spec-first 동반 요구가
+//      한 줄로 공허해진다.
+// 게이트 코드 디렉토리(`scripts/**`)는 **의도적으로 제외** — 설치된 하네스의 소유 처방이 방법론에
+// 없어(감사 M-14: error면 /sdd-update 자체가 커밋 불가, exempt면 게이트 코드가 무흔적 구역) 금지가
+// 처방 없는 강요가 된다. M-14 해결(하네스 소유 규범 신설) 시 이 목록에 추가 검토.
+// configRel: repo 루트 기준 config 상대경로(호출부가 주입 — 서브디렉토리 채택 지원). 순수 함수.
+export function exemptGlobFindings(globs, configRel = "sdd.config.json") {
+  const findings = [];
+  for (const raw of globs || []) {
+    const g = String(raw).trim();
+    if (!g) continue;
+    if (g === "**" || g === "**/*") {
+      findings.push(`specSyncExemptGlobs "${g}" — 전면 면제 금지: 모든 경로를 면제하면 unowned closed-world와 spec-first 동반 요구가 공허해진다(생성물·락파일처럼 좁은 범위로 선언하라)`);
+      continue;
+    }
+    let re;
+    try { re = compileGlob(g); } catch { continue; }
+    if (re.test(configRel)) {
+      findings.push(`specSyncExemptGlobs "${g}" — config 파일(${configRel}) 면제 금지: config는 강제의 통제면이라 변경에 스펙 동반(영속 흔적)을 강제해야 한다 — 소유 스펙 Files에 편입하라(감사 T1)`);
+    }
+  }
+  return findings;
 }

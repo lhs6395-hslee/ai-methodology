@@ -28,10 +28,10 @@
 //   --strict : Ownership 블록 없는 spec도 실패(완전 강제), 형식위반도 실패
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
-import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
+import { ownershipCategoriesFindings, exemptGlobFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
@@ -74,6 +74,19 @@ const catErrors = ownershipCategoriesFindings(CATEGORIES);
 if (catErrors.length) {
   console.error("✗ ownershipCategories 위반:");
   for (const e of catErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+
+// specSyncExemptGlobs 무결성(SPEC-013 FR-007) — 면제 목록이 강제 자체를 무력화하는 것을 막는다.
+// config 자기면제·전면 면제는 프로즈로만 금지돼 있었고(감사 A-4 실측: 소비 프로젝트가 실제 등재),
+// 그러면 정책 하향·면제 확대·상한 상향이 전부 영속 흔적 0으로 실행된다. 위 카테고리 검증과 동형.
+const exemptErrors = exemptGlobFindings(
+  cfg.specSyncExemptGlobs,
+  cfg.__path ? relative(ROOT, cfg.__path) : "sdd.config.json",
+);
+if (exemptErrors.length) {
+  console.error("✗ specSyncExemptGlobs 위반:");
+  for (const e of exemptErrors) console.error(`  ✗ ${e}`);
   process.exit(1);
 }
 

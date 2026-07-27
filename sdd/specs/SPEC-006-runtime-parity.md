@@ -121,3 +121,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-27 | Python 미러 — `frAnchorMarkers` DEFAULTS·cmd_consistency fallback의 surface 글자 `"R"`→`"S"`, Node와 출력 바이트 동일 | SPEC-023 Change Log 동반 — 마커 기본값 변경의 양판 패리티 유지 |
 | 2026-07-27 | Python 미러 — `RATCHETED_POLICIES` 자기포함(`policyRatchetPolicy` 선두) + `effective_ratchet_policy` + `cmd_ratchet`이 base config를 off 단락보다 먼저 조회(자기약화 고지 포함), Node와 출력·exit 바이트 동일 | SPEC-027 FR-007 동반 — 양판 패리티 유지(감사 이슈 #21 A-2) |
 | 2026-07-27 | Python 미러 — `capability_inert_reasons`·`schema_backing_inert_reasons` + cmd_ownership의 inert 고지·hard 차단 배선, Node와 출력·exit 바이트 동일 | SPEC-024 FR-005·SPEC-026 FR-006·SPEC-002 FR-010 동반 — 양판 패리티 유지(감사 이슈 #21 A-1/A-3) |
+| 2026-07-27 | Python 미러 — `exempt_glob_findings` + cmd_ownership 배선, Node와 출력·exit 바이트 동일 | SPEC-013 FR-007 동반 — 전 게이트 패리티 유지 |

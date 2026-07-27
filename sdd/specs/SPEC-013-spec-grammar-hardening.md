@@ -24,6 +24,9 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 - Module 값 단일성은 값이 선언된 스펙만 집계한다 — 헤더 부재는 별도 신호(이중 계산 없음).
 - Files 카테고리 금지는 대소문자 무관("files"도 금지) — 우회 표기를 막는다.
 - 글롭 staged 차단은 스펙 동반 위반과 독립이다 — 동반 위반이 있으면 그 에러 경로로, 없어도 글롭 위반만으로 exit 1.
+- config 자기면제 판정은 **표기가 아니라 실제 매치**다 — `sdd.config.json`·`*.json`·`sdd*`·`**/*.json` 어느 표기든 config 경로를 매치하면 위반(우회 표기 차단, Files 카테고리 금지가 대소문자를 무관하게 보는 것과 동형). config가 서브디렉토리에 있으면 그 상대경로로 판정하므로 루트 밖 채택도 정확하다.
+- 게이트 코드 디렉토리(`scripts/**`)는 **의도적으로 금지 목록 밖**이다 — 설치된 하네스의 소유 처방이 방법론에 아직 없어(`error`로 올리면 방법론 최신화 자체가 커밋 불가, exempt하면 게이트 코드가 무흔적 변경 구역) 금지가 처방 없는 강요가 된다. 하네스 소유 규범이 서면 이 목록에 추가 검토.
+- 잘못된 글롭 문법은 이 판정에서 건너뛴다(크래시 방지) — 문법 자체는 FR-006이 별도로 본다.
 - 셸/Go판에는 이 계층이 없다(핵심 3커맨드 계약 밖, 정직한 델타 — SPEC-006 Change Log·ci-examples 매트릭스 명시).
 
 ---
@@ -37,6 +40,7 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 - **FR-004** (event): WHEN a spec's Dedup-Review section references a spec ID that does not exist in the spec directory, THE SYSTEM SHALL flag the dangling reference (advisory) — extending the existence-and-form check to referential integrity.
 - **FR-005** (unwanted): IF `ownershipCategories` contains Files in any letter case, THEN THE SYSTEM SHALL exit non-zero before parsing ownership — glob strings must never enter the dedup key space.
 - **FR-006** (event): WHEN spec-sync runs in staged mode and any spec's Files line carries unsupported glob syntax, THE SYSTEM SHALL exit non-zero, WHILE range mode SHALL keep the warning advisory.
+- **FR-007** (unwanted): IF `specSyncExemptGlobs` contains a glob that matches the config file itself, or a blanket glob (`**`, `**/*`), THEN THE SYSTEM SHALL name the offending entry with its reason and exit non-zero before parsing ownership — the exemption list is part of the control plane, so an entry that exempts the control plane or the whole tree would let every other weakening land with no persisted trace.
 
 ### Key Entities
 - **spec grammar norm** — a documented, deterministic spec-form rule (required header, token, referential existence, forbidden config value) that gates can check without judging meaning.
@@ -87,3 +91,4 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 | 2026-07-06 | 초안 — Module 존재·단일성, FR 라인 SHALL, Dedup-Review 참조 실재(advisory·strict) + Files 카테고리 금지·글롭 문법 staged 차단(hard) (Node·Python 동시) | 고도화 4차 전 문서 감사[검증]: 문서 규범 6건이 게이트 없이 존재 — 결정적 신호가 있는 것은 게이트로, 의미 판정은 리뷰 경계 선언으로(미강제 규범 제거) |
 | 2026-07-16 | `grammar-hardening.test.mjs`의 check-spec-sync 임포트 클로저 복사 목록에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 테스트 하네스도 복사해야 ERR_MODULE_NOT_FOUND 없이 게이트 실행(픽스처 배선만, 판정 불변) |
 | 2026-07-16 | 같은 복사 목록에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib) 픽스처 배선(판정 불변) |
+| 2026-07-27 | FR-007 신설 — `specSyncExemptGlobs` 무결성(config 자기면제·전면 면제 금지, 실제 매치 기준). `exemptGlobFindings` + check-ownership 배선, Node·Python 바이트 패리티. `scripts/**`는 의도적 제외(하네스 소유 처방 부재) | Ownership 감사 #21 A-4: `presets.md`·`METHODOLOGY.md`가 **프로즈로만** 금지하던 것을 게이트로 승격 — 실측 소비 프로젝트가 `sdd.config.json`을 실제로 등재해 config 변경이 무흔적 통과, 정책 하향·면제 확대·상한 상향이 전부 영속 흔적 0으로 실행되던 상태 |

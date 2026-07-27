@@ -6,13 +6,14 @@
 // @covers SPEC-013/FR-004
 // @covers SPEC-013/FR-005
 // @covers SPEC-013/FR-006
+// @covers SPEC-013/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseModule, frLinesMissingShall, dedupReviewDanglingIds, ownershipCategoriesFindings } from "../grammar-lib.mjs";
+import { parseModule, frLinesMissingShall, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
 
 const FR_DECL_SRC = "\\*\\*((?:FR)-\\d{3}[a-z]?)\\*\\*";
 const SPEC_ID_RE = /(?:SPEC|INFRA|TEST)-\d{3}/;
@@ -116,6 +117,28 @@ test("ownership: ownershipCategories에 Files → exit 1", () => {
   assert.match(r.out, /Files.*금지/);
 });
 
+// ── ownership 게이트 통합(면제 목록 무결성, FR-007) — Files 금지와 동형 배선 ──
+
+test("ownership: specSyncExemptGlobs가 config 자신을 면제 → exit 1", () => {
+  const spec = { "sdd/specs/SPEC-001.md": FULL("SPEC-001", "m") };
+  for (const g of ["sdd.config.json", "*.json", "**/*.json"]) {
+    const r = runGate("check-ownership.mjs", spec, { specSyncExemptGlobs: ["docs/**", g] });
+    assert.equal(r.code, 1, `${g}: ${r.out}`);
+    assert.match(r.out, /config 파일.*면제 금지/);
+  }
+});
+
+test("ownership: 전면 면제(**) → exit 1 / 정상 면제만이면 통과", () => {
+  const spec = { "sdd/specs/SPEC-001.md": FULL("SPEC-001", "m") };
+  const bad = runGate("check-ownership.mjs", spec, { specSyncExemptGlobs: ["**"] });
+  assert.equal(bad.code, 1, bad.out);
+  assert.match(bad.out, /전면 면제 금지/);
+  // 교착 방지: 위험 항목을 지운 상태(=수정 커밋 시점)는 통과해야 한다.
+  const ok = runGate("check-ownership.mjs", spec, { specSyncExemptGlobs: ["docs/**", "*.md"] });
+  assert.equal(ok.code, 0, ok.out);
+  assert.doesNotMatch(ok.out, /specSyncExemptGlobs 위반/);
+});
+
 // ── spec-sync staged: 미지원 glob 문법 hard ──
 
 function repo() {
@@ -124,7 +147,7 @@ function repo() {
   mkdirSync(join(root, "src"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "grammar-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
@@ -157,4 +180,37 @@ test("spec-sync: 미지원 glob 문법(?)은 staged=exit 1 / range=advisory 유�
     assert.equal(range.code, 0, range.out);
     assert.match(range.out, /미지원 glob 문법/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── specSyncExemptGlobs 무결성(FR-007) — 프로즈 금지의 게이트 승격(감사 A-4) ──
+
+test("exemptGlobFindings: config 파일을 매치하는 글롭 금지(직접·와일드카드·전면)", () => {
+  // 실측(finops): `sdd.config.json`이 exempt에 등재돼 config 변경이 무흔적 통과 — 모든 우회로의 문
+  const direct = exemptGlobFindings(["sdd.config.json"]);
+  assert.equal(direct.length, 1);
+  assert.match(direct[0], /config 파일/);
+  assert.equal(exemptGlobFindings(["*.json"]).length, 1);          // 와일드카드로 우회 불가
+  assert.equal(exemptGlobFindings(["**/*.json"]).length, 1);
+  assert.equal(exemptGlobFindings(["sdd*"]).length, 1);
+  // 서브디렉토리 config(루트 상대경로 주입)
+  assert.equal(exemptGlobFindings(["sub/sdd.config.json"], "sub/sdd.config.json").length, 1);
+  assert.deepEqual(exemptGlobFindings(["sdd.config.json"], "sub/sdd.config.json"), []); // 다른 파일은 무관
+});
+
+test("exemptGlobFindings: 전면 면제(**·**/*)는 별도 사유로 금지", () => {
+  for (const g of ["**", "**/*"]) {
+    const f = exemptGlobFindings([g]);
+    assert.equal(f.length, 1, g);
+    assert.match(f[0], /전면 면제/);
+  }
+  // 한 목록에 둘 다 있으면 2건(선언 순)
+  assert.equal(exemptGlobFindings(["**", "sdd.config.json"]).length, 2);
+});
+
+test("exemptGlobFindings: 정상 면제(생성물·문서·락파일)는 위반 아님 + 잘못된 값 무해", () => {
+  assert.deepEqual(exemptGlobFindings([
+    "docs/**", "*.md", "src/lib/pdf/generated/**", "pnpm-lock.yaml", "tooling/*.yml"]), []);
+  assert.deepEqual(exemptGlobFindings([]), []);
+  assert.deepEqual(exemptGlobFindings(null), []);
+  assert.deepEqual(exemptGlobFindings(["  "]), []); // 빈 문자열은 건너뜀
 });

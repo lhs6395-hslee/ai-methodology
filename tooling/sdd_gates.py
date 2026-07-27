@@ -735,6 +735,18 @@ def cmd_ownership(cfg, strict):
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
 
+    # specSyncExemptGlobs 무결성(SPEC-013 FR-007) — 면제 목록이 강제 자체를 무력화하는 것을 막는다.
+    # config 자기면제·전면 면제는 프로즈로만 금지돼 있었다(감사 A-4 실측). 위 카테고리 검증과 동형.
+    exempt_errors = exempt_glob_findings(
+        cfg.get("specSyncExemptGlobs"),
+        rel_from_root(cfg, cfg["__path"]) if cfg.get("__path") else "sdd.config.json",
+    )
+    if exempt_errors:
+        print("✗ specSyncExemptGlobs 위반:", file=sys.stderr)
+        for e in exempt_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
     files = spec_md_files(cfg)
 
     owners = {c: {} for c in categories}
@@ -1165,6 +1177,27 @@ def dedup_review_dangling_ids(text, spec_id_re, known_ids):
 def ownership_categories_findings(categories):
     return [f'ownershipCategories에 "{c}" 금지 — Files는 spec-sync 소유선언 전용(dedup 키 아님, DEDUP.md §3)'
             for c in (categories or []) if str(c).strip().lower() == "files"]
+
+
+def exempt_glob_findings(globs, config_rel="sdd.config.json"):
+    """specSyncExemptGlobs 무결성(SPEC-013 FR-007) — grammar-lib.mjs exemptGlobFindings 미러.
+    금지 2종: ①config 파일 자신을 매치하는 글롭(표기 무관, 실제 매치로 판정) ②전면 면제(**·**/*).
+    게이트 코드 디렉토리(scripts/**)는 의도적 제외(감사 M-14 — 하네스 소유 처방 부재)."""
+    findings = []
+    for raw in (globs or []):
+        g = str(raw).strip()
+        if not g:
+            continue
+        if g in ("**", "**/*"):
+            findings.append(f'specSyncExemptGlobs "{g}" — 전면 면제 금지: 모든 경로를 면제하면 unowned closed-world와 spec-first 동반 요구가 공허해진다(생성물·락파일처럼 좁은 범위로 선언하라)')
+            continue
+        try:
+            rx = compile_glob(g)
+        except Exception:
+            continue
+        if rx.match(config_rel):
+            findings.append(f'specSyncExemptGlobs "{g}" — config 파일({config_rel}) 면제 금지: config는 강제의 통제면이라 변경에 스펙 동반(영속 흔적)을 강제해야 한다 — 소유 스펙 Files에 편입하라(감사 T1)')
+    return findings
 
 
 def walk_all_rel(root_dir, cfg, rel_base=""):
