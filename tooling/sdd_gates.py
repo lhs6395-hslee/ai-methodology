@@ -1290,7 +1290,8 @@ def fr_lines_missing_shall(text, fr_decl_re, req_alt="FR"):
 def fr_declarations(text, fr_decl_re, req_alt="FR"):
     """FR "선언"의 범위 판정(SPEC-013 FR-008, grammar-lib.mjs frDeclarations 미러).
 
-    선언 = ① `## Functional Requirements` 섹션 안 ② 라인 시작(불릿 유무 무관) ③ 그 라인의 첫 FR 토큰.
+    선언 = ① `## Functional Requirements` 섹션 안 ② 라인 시작(`_is_fr_decl_line` 단일 정의 — 불릿
+    유무 무관. 중복 정규식 금지: 사본이 좁게 드리프트하면 진짜 결함을 조용히 흘린다) ③ 그 라인의 첫 FR 토큰.
     전문 스캔은 Change Log 표 행의 bold FR 인용(`FR-011→**FR-037**`)을 선언으로 집계해 거짓
     "FR 번호 중복" hard를 냈다. 표 행은 `|`로 시작해 ②에서 탈락한다. 문법(fr_decl_re)은
     SPEC-001 FR-009 공유 자산이라 손대지 않는다 — 좁힌 것은 범위뿐.
@@ -1299,11 +1300,10 @@ def fr_declarations(text, fr_decl_re, req_alt="FR"):
     """
     block = section_block(text, "Functional Requirements")
     scope = text if block is None else block
-    decl_line = re.compile(rf"^\s*-?\s*\*\*(?:{req_alt})-\d{{3}}[a-z]?\*\*")
     tok = re.compile(fr_decl_re.pattern)
     out = []
     for line in scope.split("\n"):
-        if not decl_line.match(line):
+        if not _is_fr_decl_line(line, req_alt):
             continue
         m = tok.search(line)
         if m:
