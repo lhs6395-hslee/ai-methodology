@@ -22,7 +22,7 @@
    | Capability | **C 유령 entity** | 명사가 어느 스펙에도 없거나 스키마에 실재 안 함(`wizard`·`project_list` 등 — SPEC-026 스키마 백킹이 검출) → **원인별 해소(면제 남용 금지)**: (1) UI/흐름 개념(FR이 실 테이블 조작)이면 **Surface 강등 + capability를 실 entity(`pjt_projects.<verb>`)로 재키** — 이게 대다수, (2) 인프라·proto entity면 **그 구조 SSOT(terraform·`.proto`)를 `entitySchemaSources`에 소스 추가**(면제 아님), (3) 실 외부 aggregate(외부 API 자원 등)만 `entitySchemaExemptEntities` 소수 면제. ⚠ 수십 건을 일괄 면제하고 hard 올리는 것은 거짓 완료(실측) — 대량이면 readopt 대상 |
    | 키 앵커 | **수사적** | bold가 필드명·파일경로·강조어 → 평문 또는 백틱(`` `...` ``)으로 강등 |
    | 키 앵커 | **키여야 함** | bold가 실제 소유/참조 키인데 미선언 → Ownership/Dependencies에 선언 |
-   | 키 앵커 | **카테고리 마커** | 굵은 키에 종류 마커 누락·불일치 → entity `**x** (E)`·surface/route `**x** (R)`·capability `**x** (C)`로 맞춤(FR-005; 글자는 `frAnchorMarkers`) |
+   | 키 앵커 | **카테고리 마커** | 굵은 키에 종류 마커 누락·불일치 → entity `**x** (E)`·surface `**x** (S)`·capability `**x** (C)`로 맞춤(FR-005; 글자는 `frAnchorMarkers`) |
    | 키 앵커 | **백틱 키(FR-006)** | 선언 키가 백틱(리터럴)에 있음 → `**x** (마커)` 앵커로 승격(키는 백틱 아님). 비키(필드·enum·경로)는 백틱 유지 |
    | 입도 | **분할/관계** | root 1개 선정(독립 생성·삭제 Entity) + 나머지 `Name (relation-type)`로 이동 (또는 root+자식 모델이면 `maxAggregateRootsPerSpec` 상향을 사유와 함께) |
 3. **승인 관문 (HALT — 자동 확정 금지).** 스펙별 제안을 사람에게 제시하고 **승인을 받은 뒤에만** 편집한다. 특히 판단 항목(C 유령 entity의 테이블/UI 여부, aggregate root 선정, B의 이관 vs 참조)은 **추정하지 말고 물어본다** — 도메인 사실(무엇이 실제 테이블인가)을 창작하지 않는다.

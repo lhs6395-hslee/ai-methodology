@@ -26,7 +26,7 @@ const tokens = (key) => (key.toLowerCase().match(/[a-z][a-z0-9_]{1,}/g) || []).f
 const findings = [];
 const anchors = { matched: 0, findings: [] }; // findings: {specId, fr, token}
 const markers = { missing: [], wrong: [], backtick: [], unanchored: [] }; // 마커 findings
-const MARKERS = cfg.frAnchorMarkers || { entity: "E", surface: "R", capability: "C" };
+const MARKERS = cfg.frAnchorMarkers || { entity: "E", surface: "S", capability: "C" };
 let specCount = 0;
 for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []; } })().sort()) {
   if (!f.endsWith(".md")) continue;
@@ -41,7 +41,7 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
     const r = anchorFindings(lines, keySet, cfg.__reqAlt);
     anchors.matched += r.matched.length;
     for (const u of r.unmatched) anchors.findings.push({ specId, ...u });
-    // 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
+    // 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (S)·capability (C).
     const kindMap = buildKeyKindMap(own, deps);
     const cm = categoryMarkerFindings(lines, kindMap, MARKERS, cfg.__reqAlt);
     for (const m of cm.missing) markers.missing.push({ specId, ...m });
@@ -77,7 +77,7 @@ if (ANCHOR_POLICY !== "off") {
   for (const a of anchors.findings) {
     console.log(`  ${anchorHard ? "✗" : "⚠"} [${a.specId}] ${a.fr} bold "${a.token}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언`);
   }
-  // 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (R)·capability (C).
+  // 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (S)·capability (C).
   for (const m of markers.missing) {
     console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] ${m.fr} bold "${m.token}" — 카테고리 마커 없음: **${m.token}** (${m.expected})로 표기(굵은 키의 종류 명시)`);
   }

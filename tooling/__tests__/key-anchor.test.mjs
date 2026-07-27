@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "../key-anchor-lib.mjs";
 
-const M = { entity: "E", surface: "R", capability: "C" };
+const M = { entity: "E", surface: "S", capability: "C" };
 
 const GATE = new URL("../check-spec-consistency.mjs", import.meta.url).pathname;
 
@@ -98,10 +98,10 @@ test("게이트: off(기본) → 판정·출력 무변(하위호환) / advisory 
   }
 });
 
-test("extractAnchorsWithMarkers: bold 토큰 + 카테고리 마커(E/R/C) 캡처 — 대문자 정규화", () => {
+test("extractAnchorsWithMarkers: bold 토큰 + 카테고리 마커(E/S/C) 캡처 — 대문자 정규화", () => {
   assert.deepEqual(
-    extractAnchorsWithMarkers("- **FR-001** WHEN **staff** (E) changes via **POST /api/x** (r), THE SYSTEM SHALL update **monthly_salary**."),
-    [{ token: "staff", marker: "E" }, { token: "post /api/x", marker: "R" }, { token: "monthly_salary", marker: null }]);
+    extractAnchorsWithMarkers("- **FR-001** WHEN **staff** (E) changes via **POST /api/x** (s), THE SYSTEM SHALL update **monthly_salary**."),
+    [{ token: "staff", marker: "E" }, { token: "post /api/x", marker: "S" }, { token: "monthly_salary", marker: null }]);
 });
 
 test("buildKeyKindMap: 카테고리별 종류(entity/surface/capability) 매핑, 관계 서픽스 제거, 첫 등장 우선", () => {
@@ -117,23 +117,23 @@ test("buildKeyKindMap: 카테고리별 종류(entity/surface/capability) 매핑,
   assert.equal(buildKeyKindMap({ Modules: ["key-pipeline"], Symbols: ["x.mjs"] }, {}).size, 0);
 });
 
-test("categoryMarkerFindings: 굵은 키마다 카테고리 마커(E/R/C) 대조 — 누락·불일치, 키 아니면 스킵", () => {
+test("categoryMarkerFindings: 굵은 키마다 카테고리 마커(E/S/C) 대조 — 누락·불일치, 키 아니면 스킵", () => {
   const km = new Map([["pjt_projects", "entity"], ["staff", "entity"], ["post /api/x", "surface"], ["pjt_projects.create", "capability"]]);
   const lines = [
-    "- **FR-001** WHEN **staff** is added via **POST /api/x** (R), THE SYSTEM SHALL **pjt_projects.create** (C).", // staff: 마커 누락 / route·cap OK
-    "- **FR-002** THE SYSTEM SHALL insert **pjt_projects** (R) rows.",                                              // entity인데 (R) 오마커
+    "- **FR-001** WHEN **staff** is added via **POST /api/x** (S), THE SYSTEM SHALL **pjt_projects.create** (C).", // staff: 마커 누락 / route·cap OK
+    "- **FR-002** THE SYSTEM SHALL insert **pjt_projects** (S) rows.",                                              // entity인데 (S) 오마커
     "- **FR-003** THE SYSTEM SHALL emphasize **whatever** (E).",                                                    // 키 아님 → 스킵
   ];
   const r = categoryMarkerFindings(lines, km, M);
   assert.deepEqual(r.missing, [{ fr: "FR-001", token: "staff", expected: "E" }]);
-  assert.deepEqual(r.wrong, [{ fr: "FR-002", token: "pjt_projects", expected: "E", got: "R" }]);
+  assert.deepEqual(r.wrong, [{ fr: "FR-002", token: "pjt_projects", expected: "E", got: "S" }]);
   // keyKindMap 비면 판정 안 함(inert) — 킷/파이프라인 하위호환
   assert.deepEqual(categoryMarkerFindings(lines, new Map(), M), { missing: [], wrong: [] });
 });
 
 test("게이트: 전 앵커 매치 + 올바른 카테고리 마커 → hard도 PASS / enum 밖 정책 값 → exit 1", () => {
-  // 각 키에 종류 마커 동반: entity (E)·surface (R)·capability (C) — 새 문법(owner 요구)
-  const clean = "- **FR-001** WHEN **staff** (E) hits **POST /api/x** (R), THE SYSTEM SHALL **pjt_projects.create** (C) a **pjt_projects** (E).";
+  // 각 키에 종류 마커 동반: entity (E)·surface (S)·capability (C) — 새 문법(owner 요구)
+  const clean = "- **FR-001** WHEN **staff** (E) hits **POST /api/x** (S), THE SYSTEM SHALL **pjt_projects.create** (C) a **pjt_projects** (E).";
   const ok = fixture("hard", clean);
   try { assert.equal(run(ok).code, 0, run(ok).out); } finally { rmSync(ok, { recursive: true, force: true }); }
   const bad = fixture("strict", clean);
@@ -152,7 +152,7 @@ test("extractCodeSpans / backtickKeyFindings: 백틱에 든 선언 키만 앵커
   ];
   // 선언 키(pjt_projects·post /api/x)만 → 백틱 위반; project_category(비키·필드)는 무시
   assert.deepEqual(backtickKeyFindings(lines, km, M), [
-    { fr: "FR-001", token: "post /api/x", expected: "R" },
+    { fr: "FR-001", token: "post /api/x", expected: "S" },
     { fr: "FR-001", token: "pjt_projects", expected: "E" },
   ]);
   // keyKindMap 비면 inert
@@ -211,7 +211,7 @@ test("게이트: 굵은 키에 카테고리 마커 없음 → advisory ⚠(exit 
     try {
       const r = run(root);
       assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
-      assert.match(r.out, /카테고리 마커 위반 3/);          // pjt_projects(E)·POST /api/x(R)·pjt_projects.create(C)
+      assert.match(r.out, /카테고리 마커 위반 3/);          // pjt_projects(E)·POST /api/x(S)·pjt_projects.create(C)
       assert.match(r.out, /카테고리 마커 없음/);
       assert.match(r.out, /\(C\)로 표기/);                   // capability 마커 안내
       assert.doesNotMatch(r.out, /앵커되지 않음/);           // 전부 앵커됨 → FR-007 무발생
