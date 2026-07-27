@@ -814,6 +814,30 @@ test("패리티: ownership Files 카테고리 금지 — Node와 Python 출력 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("패리티: ownership 정책 inert 고지(hard 차단·advisory 고지·off 침묵) — Node와 Python 출력 동일", skip, () => {
+  const spec = { "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\nwizard 얘기.\n## Ownership\n- **Aggregates**: wizard\n- **Capabilities**: wizard.create\n" };
+  const scen = [
+    // 카테고리 개명(A-1): capability 귀속 hard → inert 사유 + exit 1
+    { ownershipCategories: ["Aggregates", "Surfaces", "Capabilities"], capabilityOwnershipPolicy: "hard" },
+    { ownershipCategories: ["Aggregates", "Surfaces", "Capabilities"], capabilityOwnershipPolicy: "advisory" },
+    { ownershipCategories: ["Aggregates", "Surfaces", "Capabilities"], capabilityOwnershipPolicy: "off" },
+    // sources 비우기(A-3): 백킹 hard → inert 사유 + exit 1
+    { capabilityOwnershipPolicy: "off", entitySchemaBackingPolicy: "hard", entitySchemaSources: [] },
+    { capabilityOwnershipPolicy: "off", entitySchemaBackingPolicy: "advisory", entitySchemaSources: [] },
+    // 비-웹 카테고리 + 기본 정책(킷 자신) — 양판 동일하게 플레인 고지
+    { ownershipCategories: ["Modules", "Symbols", "Artifacts"] },
+  ];
+  for (const cfg of scen) {
+    const root = fixture(spec, cfg);
+    try {
+      const p = runPy(root, ["ownership"]);
+      const n = runNode(root, "check-ownership.mjs");
+      assert.equal(p.out, n.out, `출력 불일치 (${JSON.stringify(cfg)})\npy:${p.out}\nnode:${n.out}`);
+      assert.equal(p.code, n.code, `exit 불일치 (${JSON.stringify(cfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 test("py specsync staged: 미지원 glob 문법 → exit 1 (Node 패리티)", skip, () => {
   const root = fixture({
     "sdd/specs/SPEC-001.md": "# SPEC-001\n**Spec**: `SPEC-001`\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL x.\n\n## Ownership\n- **Files**: src/lib/?.ts\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | r |\n",

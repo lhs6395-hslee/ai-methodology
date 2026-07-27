@@ -608,6 +608,19 @@ def capability_check_active(categories):
         and any(re.search("capabilit", c, re.IGNORECASE) for c in categories or [])
 
 
+def capability_inert_reasons(policy, categories):
+    """정책이 off가 아닌데 판정이 성립하지 않는 사유(capability-ownership-lib capabilityInertReasons 미러).
+    빈 목록 = 판정 성립 ∨ 명시적 off. 침묵 금지 — hard 선언 + 무판정은 거짓 안전(감사 A-1)."""
+    if policy == "off":
+        return []
+    reasons = []
+    if not any(re.search("entit", c, re.IGNORECASE) for c in categories or []):
+        reasons.append("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)")
+    if not any(re.search("capabilit", c, re.IGNORECASE) for c in categories or []):
+        reasons.append("capability류 카테고리 없음(ownershipCategories에 capabilit 매치 없음)")
+    return reasons
+
+
 def capability_ownership_findings(owned_entities, owned_capabilities):
     """capability x.verb의 entity 조각이 소유 entity 집합에 없으면 위반(SPEC-024).
     점 없는 capability는 validate_key 담당(이중 보고 금지). 반환 [(capability, entity)]."""
@@ -628,6 +641,19 @@ def schema_backing_active(policy, sources, categories):
     """정책 on + 스키마 소스 선언 + Entities류 카테고리 존재일 때만 활성(SPEC-026, schema-backing-lib 미러)."""
     return policy != "off" and isinstance(sources, list) and len(sources) > 0 \
         and any(re.search("entit", c, re.IGNORECASE) for c in categories or [])
+
+
+def schema_backing_inert_reasons(policy, sources, categories):
+    """정책이 off가 아닌데 판정이 성립하지 않는 사유(schema-backing-lib schemaBackingInertReasons 미러).
+    빈 목록 = 판정 성립 ∨ off. 정책 전체의 inert도 FR-005(개별 면제)와 동형으로 표면화한다."""
+    if policy == "off":
+        return []
+    reasons = []
+    if not isinstance(sources, list) or len(sources) == 0:
+        reasons.append("entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)")
+    if not any(re.search("entit", c, re.IGNORECASE) for c in categories or []):
+        reasons.append("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)")
+    return reasons
 
 
 def validate_schema_patterns(sources):
@@ -685,6 +711,8 @@ def cmd_ownership(cfg, strict):
               file=sys.stderr)
         sys.exit(1)
     cap_active = cap_policy != "off" and capability_check_active(categories)
+    # 정책이 off가 아닌데 판정이 성립하지 않으면(inert) 사유를 반드시 출력 — hard면 차단(거짓 안전).
+    cap_inert = capability_inert_reasons(cap_policy, categories)
     cap_findings = []  # (spec_id, capability, entity)
 
     # Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
@@ -695,6 +723,7 @@ def cmd_ownership(cfg, strict):
         sys.exit(1)
     sb_sources = cfg.get("entitySchemaSources") or []
     sb_active = schema_backing_active(sb_policy, sb_sources, categories)
+    sb_inert = schema_backing_inert_reasons(sb_policy, sb_sources, categories)
     sb_owned = []  # (spec_id, [raw...])
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
@@ -796,6 +825,23 @@ def cmd_ownership(cfg, strict):
         for e in entity_errors:
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
+    # 선언된 정책이 아무것도 판정하지 않으면(inert) 사유 고지(SPEC-002 FR-010) — 침묵 금지.
+    # hard는 ✗+차단, advisory는 플레인 `·` 고지(기본값 프로젝트의 하네스 flagged 판정 무오염).
+    if cap_inert:
+        tag = "✗" if cap_policy == "hard" else "·"
+        print(f"{tag} Capability 귀속(capabilityOwnershipPolicy={cap_policy}): 판정 불가(inert) — {'; '.join(cap_inert)}")
+    if sb_inert:
+        tag = "✗" if sb_policy == "hard" else "·"
+        print(f"{tag} Entity 스키마 백킹(entitySchemaBackingPolicy={sb_policy}): 판정 불가(inert) — {'; '.join(sb_inert)}")
+    if cap_policy == "hard" and cap_inert:
+        print("\n✗ capabilityOwnershipPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. ownershipCategories에 entity류·capability류 카테고리를 두어 판정을 성립시키거나, 이 프로젝트에 capability 개념이 없으면 정책을 off로 명시하라(SPEC-024).",
+              file=sys.stderr)
+        sys.exit(1)
+    if sb_policy == "hard" and sb_inert:
+        print("\n✗ entitySchemaBackingPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. entitySchemaSources에 구조 SSOT 어댑터를 선언하고 entity류 카테고리를 두어 판정을 성립시키거나, 스키마가 없는 프로젝트면 정책을 off로 명시하라(SPEC-026).",
+              file=sys.stderr)
+        sys.exit(1)
+
     # Capability 귀속 리포트(SPEC-024) — 스펙 경계는 entity 기준.
     cap_hard = cap_policy == "hard" and len(cap_findings) > 0
     if cap_active and cap_findings:

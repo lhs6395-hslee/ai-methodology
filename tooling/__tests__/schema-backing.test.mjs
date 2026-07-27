@@ -6,13 +6,14 @@
 // @covers SPEC-026/FR-003
 // @covers SPEC-026/FR-004
 // @covers SPEC-026/FR-005
+// @covers SPEC-026/FR-006
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { schemaBackingActive, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "../schema-backing-lib.mjs";
+import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "../schema-backing-lib.mjs";
 
 const GATE = new URL("../check-ownership.mjs", import.meta.url).pathname;
 
@@ -25,6 +26,21 @@ test("schemaBackingActive: 정책 on + 소스 선언 + Entities류 카테고리,
   assert.equal(schemaBackingActive("off", src, ["Entities"]), false);        // 정책 off
   assert.equal(schemaBackingActive("advisory", [], ["Entities"]), false);     // 소스 없음
   assert.equal(schemaBackingActive("advisory", src, ["Modules", "Symbols"]), false); // 킷: entity 카테고리 없음
+});
+
+test("schemaBackingInertReasons: off는 침묵 / 정책 on + 소스 비어있음·카테고리 불일치는 사유 반환", () => {
+  const src = [{ globs: ["s.ts"], patterns: ["x"] }];
+  assert.deepEqual(schemaBackingInertReasons("off", [], ["Modules"]), []);       // 명시적 off = 탈출구
+  assert.deepEqual(schemaBackingInertReasons("hard", src, ["Entities"]), []);    // 판정 성립
+  // A-3 재현: sources를 비우면 백킹 hard가 무음 사망하던 자리
+  const noSrc = schemaBackingInertReasons("hard", [], ["Entities"]);
+  assert.equal(noSrc.length, 1);
+  assert.match(noSrc[0], /entitySchemaSources/);
+  // A-1 재현: 카테고리 개명
+  const renamed = schemaBackingInertReasons("hard", src, ["Aggregates", "Surfaces"]);
+  assert.equal(renamed.length, 1);
+  assert.match(renamed[0], /entity류 카테고리 없음/);
+  assert.equal(schemaBackingInertReasons("advisory", [], ["Modules"]).length, 2); // 둘 다
 });
 
 test("extractSchemaEntities: 패턴 캡처1 = 식별자, 정규화(소문자), 다중 소스·패턴 합집합", () => {

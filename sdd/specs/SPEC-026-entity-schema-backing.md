@@ -15,6 +15,7 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 ### Edge Cases
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 - 정책 on + 스키마 소스 선언 + Entities류 카테고리 존재, **셋 다** 있을 때만 활성 — 스키마 없는 프로젝트(순수 라이브러리·CLI)·킷 자신(Modules 카테고리)·파이프라인(Datasets)은 무영향(inert, 하위호환).
+- **inert도 침묵하지 않는다(FR-006):** 정책이 off가 아닌데 소스가 비었거나 카테고리가 없어 판정이 성립하지 않으면 그 사유를 출력한다 — `hard`면 그 자체로 차단(hard 선언 + 무판정 = 거짓 안전이고, 특히 `entitySchemaSources: []` 한 줄이 백킹 hard를 무음 사망시키는 우회로였다 — 감사 A-3), `advisory`면 플레인 고지(경고 글리프 없이 — 소급 범람 금지). 스키마가 없는 프로젝트는 기본값 `off`라 애초에 조용하고, 켰다가 정당히 끄는 경우엔 명시적 `off`가 탈출구다(그 하향은 래칫이 기록). 이는 FR-005(개별 면제의 상시 부채화)를 *정책 전체*로 확장한 것이다.
 - 인프라 무관: 소스는 `[{globs, patterns}]` 어댑터 — 각 패턴의 캡처그룹 1이 식별자다. Drizzle(`pgTable("x", …)`)·Prisma(`model X`)·SQL DDL(`CREATE TABLE x`)·proto(`message X`) 등 무엇이든 config로 표현(게이트에 스키마 종류 하드코딩 없음).
 - 대조는 정규화(트림·소문자) — 스키마 표기와 Ownership 표기의 대소문자 편차에 비의존.
 - 정당한 비-스키마 aggregate(외부 API 자원·이벤트 스트림 등 구조 SSOT 파일에 없는 실체)는 `entitySchemaExemptEntities`에 사유와 함께 면제 — 빈 사유는 에러(entityRegistry 동형, 남용 방지·리뷰 관문). **면제는 대량 우회 수단이 아니다:** UI/흐름 개념(`wizard`·`project_list`·`dashboard`·`detail` — FR이 실 테이블을 조작)은 면제가 아니라 **Surface 강등 + capability 재키**(migrate/readopt)로 해소하고, 인프라(`vpc`·`eks`)·proto entity는 면제가 아니라 **그 구조 SSOT(terraform·`.proto`)를 `entitySchemaSources`에 추가**해 스키마 백킹으로 해소한다. 면제는 이 둘 다 아닌 "스키마 밖 실 외부 aggregate"에만. **실측 실패: 소비 프로젝트가 유령 40건을 일괄 면제하고 hard 승격 → 거짓 완료**(FR-005로 표면화).
@@ -27,11 +28,12 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `entitySchemaBackingPolicy` is off, or `entitySchemaSources` is empty, or the ownership categories lack an entity-like category, THE SYSTEM SHALL perform no schema-backing evaluation and keep the ownership gate's output unchanged.
+- **FR-001** (state): WHILE `entitySchemaBackingPolicy` is off, THE SYSTEM SHALL perform no schema-backing evaluation and keep the ownership gate's output unchanged.
 - **FR-002** (event): WHEN the policy is advisory or hard, THE SYSTEM SHALL extract the set of real entity identifiers from the files matched by each source's globs using that source's capture patterns, and require every owned entity key — trimmed and lowercased — to be present in that set or in `entitySchemaExemptEntities`, reporting each violation with the spec id and entity.
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, or an `entitySchemaExemptEntities` entry has an empty rationale, or an `entitySchemaSources` pattern is not a valid regular expression, THEN THE SYSTEM SHALL report it clearly and exit non-zero (without leaking a runtime stack trace).
 - **FR-005** (state): WHILE schema-backing evaluation is active and one or more owned entities are exempted via `entitySchemaExemptEntities`, THE SYSTEM SHALL surface those exempted entities as an advisory review-debt line on every run regardless of policy strength — so that a large exemption set cannot silently read as clean under hard — naming each and pointing to restructuring (Surface demotion) or adding the relevant structure SSOT rather than exemption.
+- **FR-006** (unwanted): IF the policy is not off but the evaluation cannot be established — `entitySchemaSources` empty, or no entity-like ownership category — THEN THE SYSTEM SHALL yield each such reason so the consuming gate can surface the inert policy instead of passing silently.
 
 ### Key Entities
 - **schema backing** — the property that an owned entity corresponds to a real identifier in the project's structure SSOT (schema/migration/proto), so a spec's aggregate root is a genuine data entity rather than an invented concept.
@@ -81,3 +83,4 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 | 2026-07-21 | 초안 — `entitySchemaBackingPolicy`(off\|advisory\|hard, 기본 off) + `entitySchemaSources`(인프라 무관 어댑터) + `entitySchemaExemptEntities`(면제) + `schema-backing-lib`(백킹 판정) + ownership 게이트 배선, Node·Python 패리티 | 소비 프로젝트 실측(gsn-ai-pm): capability 귀속을 지어낸 entity(`wizard`·`project_list`) 등록으로 우회 — 소유 entity의 실재를 검증하는 게이트 부재. owner가 "스키마 파일 대조(엄격)" 선택. 픽스처 재현에서 유령 지목·양판 바이트 동일 |
 | 2026-07-21 | 하드닝 — `validateSchemaPatterns` 신설 + `extractSchemaEntities` 크래시 방지(잘못된 정규식 skip). 소비자가 `entitySchemaSources.patterns`에 문법 오류 정규식을 쓰면 게이트가 스택 트레이스로 크래시하던 것을 "명확한 config 에러 + exit 1"로. 엔진별 메시지 미포함(Node↔Python 바이트 패리티) | 도그푸딩 사후 점검(owner "문제 확인"): opt-in knob이지만 config 오류가 불투명 크래시를 내던 저위험 결함 — 다른 knob의 "명확한 한 줄 안내" 원칙에 정렬 |
 | 2026-07-21 | 면제 남용 방지(FR-005 신설) — 사용 중 면제를 매 실행 advisory 부채로 표면화(hard에서도), UI/흐름은 Surface·인프라/proto는 구조 SSOT 추가·면제는 실 외부 aggregate만이라는 방향 명시. Node·Python 패리티 | 소비 프로젝트 실측(update 11회차): 유령 40건(wizard·project_list·theme·vpc 등)을 일괄 면제하고 hard 승격해 "거짓 완료" — 면제 탈출구가 대량 우회로 악용됨. 면제를 조용한 완료가 아닌 상시 부채로 |
+| 2026-07-27 | FR-006 신설(`schemaBackingInertReasons` — 정책 on + 소스 비어있음·카테고리 불일치 사유) + FR-001 개정(off만 무판정) + Edge Case "inert도 침묵하지 않는다", Node·Python 패리티 | 감사 이슈 #21 A-1·A-3 실측: `entitySchemaSources: []` 한 줄 또는 카테고리 개명으로 `entitySchemaBackingPolicy: hard`가 완전 no-op이 되면서 신호가 한 줄도 없었다(래칫이 감시하지 않는 우회로 21개 중 2개). FR-005가 개별 면제를 상시 부채로 표면화하는 것과 동형으로 정책 전체의 inert를 표면화하고, hard 선언 + 무판정은 차단 |

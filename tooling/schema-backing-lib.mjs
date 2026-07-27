@@ -18,6 +18,24 @@ export function schemaBackingActive(policy, sources, categories) {
     && (categories || []).some((c) => /entit/i.test(c));
 }
 
+// 정책이 off가 **아닌데** 판정이 성립하지 않는(inert) 사유 — 침묵 금지(감사 A-1·A-3 실측:
+// `entitySchemaSources: []` 한 줄 또는 카테고리 개명으로 `entitySchemaBackingPolicy: hard`가
+// 완전 no-op이 되면서 스킵 신호가 없었다). FR-005가 *개별 면제*를 매 실행 부채로 표면화하는 것과
+// 동형으로, *정책 전체의 inert*도 매 실행 표면화한다 — "hard 선언 + 무판정"은 거짓 안전이므로
+// 소비 게이트가 차단하고, 스키마 없는 프로젝트는 정책을 명시적 off(기본값)로 두어 조용히 통과한다.
+// 반환: 사유 문자열 배열(빈 배열 = 판정 성립 ∨ off). 순수 — 출력·exit은 소비 게이트.
+export function schemaBackingInertReasons(policy, sources, categories) {
+  if (policy === "off") return [];
+  const reasons = [];
+  if (!Array.isArray(sources) || sources.length === 0) {
+    reasons.push("entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)");
+  }
+  if (!(categories || []).some((c) => /entit/i.test(c))) {
+    reasons.push("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)");
+  }
+  return reasons;
+}
+
 // 스키마 소스별 패턴 문자열의 정규식 유효성 검사 — 잘못된 정규식은 {index, pattern}로 수집한다
 // (게이트가 크래시하지 않고 명확히 보고하도록). 엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티).
 export function validateSchemaPatterns(sources) {

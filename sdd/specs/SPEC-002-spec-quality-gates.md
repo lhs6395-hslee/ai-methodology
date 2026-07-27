@@ -21,6 +21,7 @@
 - Ownership 블록이 없는 spec은 비-strict에서 **warn**(점진 도입) — dedup은 건너뛴다.
 - cohesion에서 aggregate-root 카테고리(config의 첫 카테고리, 여기서는 Modules) 키가 `maxAggregateRootsPerSpec`(기본 1) 초과면 "여러 aggregate 삼킴" 신호로 warn — aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 프로젝트는 이 값을 상향(자식은 별도 root 아님).
 - completeness는 FR이 0개인 spec(순수 인프라)은 SC·인수조건 검사에서 면제한다.
+- 선언된 정책이 아무것도 판정하지 않는(inert) 상태는 침묵하지 않는다 — ownership 게이트가 정책 이름과 판정 불가 사유를 매 실행 출력하고, 그 정책이 `hard`면 그것만으로 exit 1(hard 선언 + 무판정 = 거짓 안전), `advisory`면 플레인 고지 후 exit 0(정책 기본값 프로젝트를 소급 오염시키지 않는다). 판정 성립 여부는 각 판정 코어(SPEC-024 FR-005·SPEC-026 FR-006)가 사유로 반환하고, 이 게이트는 출력·exit만 담당한다. 정당한 inert의 탈출구는 그 정책을 명시적 `off`로 두는 것.
 - consistency는 `## Ownership` **이전** 본문만 근거로 삼는다 — 키가 자기 선언 줄로 근거되는 것을 방지하며, 근거 없는 키는 advisory warn(비차단)이다.
 - 요구 ID는 접두어(`requirementIdPrefixes` 파생, 기본 `FR`) + 3자리 + 선택적 소문자 서픽스 1자(`FR-002b`) — coverage의 FR 선언 추출, cohesion의 FR 수 집계, completeness의 FR-존재 면제 판단이 모두 config 파생값(`__frDeclRe`/`__frTokenRe`) 하나를 쓴다(사이트별 자체 정규식 = 절단 태그·조용한 FR 누락의 뿌리 — 하드코딩 사이트 금지).
 
@@ -38,6 +39,7 @@
 - **FR-007** (state): WHILE running without `--strict`, THE SYSTEM SHALL treat quality signals (missing ownership, cohesion, completeness, consistency, partial coverage) as non-blocking warnings and exit zero, deferring hard enforcement to `--strict`.
 - **FR-008** (event): WHEN `check-test-adequacy.mjs` runs over `@covers`-tagged test files, THE SYSTEM SHALL report any tagged file containing no assertion tokens (per `assertionPatterns` in config) as an adequacy violation, exiting zero in advisory mode and non-zero under `--strict`.
 - **FR-009** (event): WHEN `entityRegistry` is non-empty, THE SYSTEM SHALL exit non-zero from the ownership gate for an owned aggregate-root-category key absent from the registry or a registry entry with an empty rationale (the PREFIX-governance pattern), warn for registered keys no spec owns, and stay inactive when the registry is empty (current behavior).
+- **FR-010** (unwanted): IF an ownership policy is declared at a strength other than off while its evaluation is inert — no category or adapter for it to judge — THEN THE SYSTEM SHALL name the policy and every reason it cannot judge on every run, exiting non-zero when that policy is hard (a hard declaration that judges nothing is false safety) and exiting zero with a plain disclosure line when it is advisory.
 
 ### Key Entities
 - **quality finding** — a per-spec signal (conflict / split advisory / completeness gap / ungrounded key / dangling cover) produced by a gate.
@@ -111,3 +113,4 @@
 | 2026-07-21 | consistency 게이트에 FR-006 배선(백틱에 든 선언 키 → 앵커 승격 위반) — `backtickKeyFindings` 소비, "굵게 ⟺ 사유 있는 키" 규율 완성 | SPEC-023 FR-006 동반: 키를 백틱에 두는 것 금지(게이트 본체는 이 spec 소유) |
 | 2026-07-21 | consistency 게이트에 FR-007 배선(소유 키 앵커 강제) — `unanchoredOwnedKeyFindings` 소비, 소유 키가 FR에 굵게 앵커 안 되면 위반 | SPEC-023 FR-007 동반: (B) 모든 키 참조 앵커 강제(게이트 본체는 이 spec 소유) |
 | 2026-07-27 | consistency 게이트의 마커 fallback 기본값 surface `(R)`→`(S)` | SPEC-023 Change Log 동반: 마커 글자를 카테고리 머리글자(E/S/C)로 통일 — 배선 로직 불변, fallback 리터럴만 |
+| 2026-07-27 | ownership 게이트에 정책 inert 고지 배선(FR-010 신설 — capability 귀속·entity 스키마 백킹의 inert 사유 출력, hard면 차단·advisory면 플레인 고지) + Edge Case 1건 | 감사 이슈 #21 A-1·A-3: `hard` 선언된 정책 2종이 카테고리 개명·`entitySchemaSources: []` 한 줄로 완전 no-op이 되면서 스킵 신호가 전무했다(유령 entity가 `✓ 구조적 중복 없음` exit 0으로 통과). 선언과 실제 판정의 괴리를 매 실행 표면화 |

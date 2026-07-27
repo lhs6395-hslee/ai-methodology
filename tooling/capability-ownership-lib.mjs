@@ -16,6 +16,24 @@ export function capabilityCheckActive(categories) {
     && (categories || []).some((c) => /capabilit/i.test(c));
 }
 
+// 정책이 off가 **아닌데** 판정이 성립하지 않는(inert) 사유 — 침묵 금지(감사 A-1 실측: `Entities`를
+// 의미 동일한 `Aggregates`로 개명하면 `capabilityOwnershipPolicy: hard`가 완전 no-op이 되면서
+// 스킵 신호가 한 줄도 없었다 → 유령 entity가 "✓ 구조적 중복 없음"으로 통과). "hard 선언 + 무판정"은
+// 거짓 안전이므로 소비 게이트가 차단하고, 정당한 inert(순수 라이브러리·파이프라인 등 capability
+// 개념 자체가 없는 프로젝트)는 정책을 **명시적 off**로 두어 조용히 통과한다(문서화된 탈출구).
+// 반환: 사유 문자열 배열(빈 배열 = 판정 성립 ∨ 명시적 off). 순수 — 출력·exit은 소비 게이트.
+export function capabilityInertReasons(policy, categories) {
+  if (policy === "off") return [];
+  const reasons = [];
+  if (!(categories || []).some((c) => /entit/i.test(c))) {
+    reasons.push("entity류 카테고리 없음(ownershipCategories에 entit 매치 없음)");
+  }
+  if (!(categories || []).some((c) => /capabilit/i.test(c))) {
+    reasons.push("capability류 카테고리 없음(ownershipCategories에 capabilit 매치 없음)");
+  }
+  return reasons;
+}
+
 // 스펙 한 장 판정 — 소유 capability들의 entity 조각이 소유 entity 집합에 있는가.
 //   ownedEntities/ownedCapabilities: 그 스펙 Ownership의 해당 카테고리 키(raw — 여기서 정규화).
 // 점 없는 capability는 형식 위반이라 validateKey가 담당(이중 보고 금지 — 여기선 스킵).

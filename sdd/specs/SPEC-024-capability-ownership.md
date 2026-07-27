@@ -15,6 +15,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ### Edge Cases
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 - entity류·capability류 카테고리가 **둘 다** 있을 때만 활성 — 비-웹 카테고리(킷 자신의 Modules/Symbols/Artifacts, 파이프라인의 Datasets/Jobs/Sinks)는 capability 개념이 없어 무영향.
+- **그러나 inert는 침묵하지 않는다:** 정책이 off가 아닌데 카테고리 때문에 판정이 성립하지 않으면 게이트가 사유를 출력한다 — `hard`면 그 자체로 차단(hard 선언 + 무판정 = 거짓 안전), `advisory`면 플레인 고지(경고 글리프 없이 — 기본값이 advisory라 비-웹 프로젝트의 하네스 리포트를 소급 오염시키지 않는다). 정당한 inert의 탈출구는 정책을 **명시적 `off`**로 두는 것이며, 그 하향은 래칫(SPEC-027)이 loud하게 기록한다. 근거: 감사 A-1 실측 — `Entities`를 의미 동일한 `Aggregates`로 개명하면 `hard` 정책이 완전 no-op이 되면서 유령 entity가 `✓ 구조적 중복 없음`으로 통과(exit 0)했고 스킵 신호가 한 줄도 없었다.
 - 점 없는 capability는 형식 위반이라 `validateKey`가 담당 — 이 판정은 스킵(이중 보고 금지).
 - 대조는 정규화(트림·소문자) — Ownership 선언의 표기 편차에 비의존.
 - 참조 entity(Dependencies) 위의 capability도 위반이다 — 참조는 읽기/호출 선언이지 능력 소유 근거가 아니며, 그 능력은 entity 소유 스펙의 FR이다(owner 확정: verb가 달라도 같은 스펙).
@@ -26,10 +27,11 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `capabilityOwnershipPolicy` is off, or the ownership categories lack an entity-like or a capability-like category, THE SYSTEM SHALL perform no capability-ownership evaluation and keep the ownership gate's output unchanged.
+- **FR-001** (state): WHILE `capabilityOwnershipPolicy` is off, THE SYSTEM SHALL perform no capability-ownership evaluation and keep the ownership gate's output unchanged.
 - **FR-002** (event): WHEN the policy is advisory or hard, THE SYSTEM SHALL require, for each owned capability key, that its entity segment — the token before the first dot, compared after trimming and lowercasing — be among the spec's own owned entity keys, reporting each violation with the spec id, capability, and entity segment.
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
+- **FR-005** (unwanted): IF the policy is not off but the configured ownership categories cannot support the judgment — no entity-like or no capability-like category — THEN THE SYSTEM SHALL yield each missing-category reason so the consuming gate can surface the inert policy instead of passing silently.
 
 ### Key Entities
 - **capability ownership** — the rule that a capability key belongs to the spec owning its entity segment: spec boundaries are entity-based, so verbs never spawn specs and engines never own foreign capabilities.
@@ -77,3 +79,4 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-20 | 초안 — `capabilityOwnershipPolicy`(off\|advisory\|hard, 기본 advisory) + `capability-ownership-lib`(귀속 판정) + ownership 게이트 배선, Node·Python 패리티. METHODOLOGY "Dependencies의 entity여도 무방" 탈출구 문장 개정 동반 | 소비 프로젝트 실측(budget-engine — Entities 0개+capability 4개, owner 판정: "이 스펙은 생성되면 안 되는 것"): 스펙 경계=entity 기준에 기계 신호가 없어 기술 계층 스펙이 태어남. 픽스처 재현에서 위반 4건 전부 지목·양판 바이트 동일 확인 |
+| 2026-07-27 | FR-005 신설(`capabilityInertReasons` — 정책 on + 카테고리 불일치 사유) + FR-001 개정(off만 무판정) + Edge Case "inert는 침묵하지 않는다", Node·Python 패리티 | 감사 이슈 #21 A-1 실측: 카테고리를 `Entities`→`Aggregates`로 개명하면 `capabilityOwnershipPolicy: hard`가 완전 no-op이 되고 스킵 신호가 한 줄도 없어 유령 entity가 `✓ 구조적 중복 없음` exit 0으로 통과. SPEC-026 FR-005가 *개별 면제*를 부채로 표면화하는 것과 동형으로 *정책 전체의 inert*도 표면화 — 정당한 inert는 명시적 `off`가 탈출구 |

@@ -33,9 +33,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
-import { capabilityCheckActive, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
+import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
-import { schemaBackingActive, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
+import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -53,6 +53,8 @@ if (!["off", "advisory", "hard"].includes(CAP_POLICY)) {
   process.exit(1);
 }
 const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(CATEGORIES);
+// 정책이 off가 아닌데 판정이 성립하지 않으면(inert) 사유를 반드시 출력한다 — hard면 차단(거짓 안전).
+const CAP_INERT = capabilityInertReasons(CAP_POLICY, CATEGORIES);
 const capFindings = []; // {specId, capability, entity}
 
 // Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
@@ -63,6 +65,7 @@ if (!["off", "advisory", "hard"].includes(SB_POLICY)) {
 }
 const SB_SOURCES = cfg.entitySchemaSources || [];
 const SB_ACTIVE = schemaBackingActive(SB_POLICY, SB_SOURCES, CATEGORIES);
+const SB_INERT = schemaBackingInertReasons(SB_POLICY, SB_SOURCES, CATEGORIES);
 const sbOwned = []; // {specId, entities:[raw...]}
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
@@ -187,6 +190,24 @@ for (const w of registryWarns) console.log(`⚠ ${w}`);
 if (entityErrors.length) {
   console.error(`\n✗ ENTITY 레지스트리 위반 ${entityErrors.length}건:`);
   for (const e of entityErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+
+// 선언된 정책이 아무것도 판정하지 않으면(inert) 사유를 고지한다(SPEC-002 FR-010) — 침묵 금지.
+// hard는 ✗+차단("hard 선언 + 무판정"은 거짓 안전), advisory는 플레인 `·` 고지(정책 기본값 프로젝트의
+// 하네스 flagged 판정을 오염시키지 않는다 — 소급 범람 금지), 명시적 off는 이 함수가 사유를 안 낸다.
+if (CAP_INERT.length) {
+  console.log(`${CAP_POLICY === "hard" ? "✗" : "·"} Capability 귀속(capabilityOwnershipPolicy=${CAP_POLICY}): 판정 불가(inert) — ${CAP_INERT.join("; ")}`);
+}
+if (SB_INERT.length) {
+  console.log(`${SB_POLICY === "hard" ? "✗" : "·"} Entity 스키마 백킹(entitySchemaBackingPolicy=${SB_POLICY}): 판정 불가(inert) — ${SB_INERT.join("; ")}`);
+}
+if (CAP_POLICY === "hard" && CAP_INERT.length) {
+  console.error(`\n✗ capabilityOwnershipPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. ownershipCategories에 entity류·capability류 카테고리를 두어 판정을 성립시키거나, 이 프로젝트에 capability 개념이 없으면 정책을 off로 명시하라(SPEC-024).`);
+  process.exit(1);
+}
+if (SB_POLICY === "hard" && SB_INERT.length) {
+  console.error(`\n✗ entitySchemaBackingPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. entitySchemaSources에 구조 SSOT 어댑터를 선언하고 entity류 카테고리를 두어 판정을 성립시키거나, 스키마가 없는 프로젝트면 정책을 off로 명시하라(SPEC-026).`);
   process.exit(1);
 }
 

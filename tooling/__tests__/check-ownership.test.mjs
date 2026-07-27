@@ -2,6 +2,7 @@
 // @covers SPEC-002/FR-002
 // @covers SPEC-002/FR-007
 // @covers SPEC-002/FR-009
+// @covers SPEC-002/FR-010
 // @covers SPEC-017/FR-001
 // @covers SPEC-017/FR-002
 // @covers SPEC-017/FR-003
@@ -136,4 +137,51 @@ test("관계: relationTypes 등록 시 미등록 type은 exit 1, 등록·빈 목
   assert.equal(registered.code, 0, registered.out);
   const unrestricted = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { relationTypes: [] });
   assert.equal(unrestricted.code, 0, unrestricted.out);
+});
+
+// ── 정책이 선언됐는데 판정이 성립하지 않으면(inert) 반드시 사유를 낸다 (SPEC-002 FR-010, 감사 A-1/A-3) ──
+// 재현: 카테고리를 Entities→Aggregates로 개명하면 capabilityOwnershipPolicy·entitySchemaBackingPolicy가
+// hard여도 완전 no-op이 되면서 유령 entity가 "✓ 구조적 중복 없음"으로 통과(exit 0)했다.
+
+const RENAMED = ["Aggregates", "Surfaces", "Capabilities"];
+const GHOST = "# SPEC-001\nwizard 얘기.\n## Ownership\n- **Aggregates**: wizard\n- **Capabilities**: wizard.create\n";
+
+test("inert 고지: 카테고리 개명 + capability 귀속 hard → ✗ 사유 출력 + exit 1(거짓 안전 차단)", () => {
+  const r = runWithConfig({ "SPEC-001.md": GHOST },
+    { ownershipCategories: RENAMED, capabilityOwnershipPolicy: "hard" });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /✗ Capability 귀속\(capabilityOwnershipPolicy=hard\): 판정 불가\(inert\)/);
+  assert.match(r.out, /entity류 카테고리 없음/);
+  assert.match(r.out, /hard 선언 \+ 무판정/);
+});
+
+test("inert 고지: advisory는 사유만 고지(플레인 · 라인, ⚠ 없음) + exit 0 — 소급 범람 금지", () => {
+  const r = runWithConfig({ "SPEC-001.md": GHOST },
+    { ownershipCategories: RENAMED, capabilityOwnershipPolicy: "advisory" });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /· Capability 귀속\(capabilityOwnershipPolicy=advisory\): 판정 불가\(inert\)/);
+  assert.doesNotMatch(r.out, /⚠ Capability 귀속/); // 하네스 flagged 판정을 오염시키지 않는다(기본값 프로젝트 무영향)
+});
+
+test("inert 고지: 정책을 off로 명시하면 조용히 통과(문서화된 탈출구)", () => {
+  const r = runWithConfig({ "SPEC-001.md": GHOST },
+    { ownershipCategories: RENAMED, capabilityOwnershipPolicy: "off" });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /Capability 귀속/);
+});
+
+test("inert 고지: 스키마 백킹 hard + entitySchemaSources 비어있음 → ✗ 사유 출력 + exit 1 (A-3)", () => {
+  const A = "# SPEC-001\nwizard 얘기.\n## Ownership\n- **Entities**: wizard\n";
+  const r = runWithConfig({ "SPEC-001.md": A },
+    { capabilityOwnershipPolicy: "off", entitySchemaBackingPolicy: "hard", entitySchemaSources: [] });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /✗ Entity 스키마 백킹\(entitySchemaBackingPolicy=hard\): 판정 불가\(inert\)/);
+  assert.match(r.out, /entitySchemaSources/);
+});
+
+test("inert 고지: 백킹 기본값(off)·정상 활성 프로젝트는 새 라인이 없다(하위호환)", () => {
+  const A = "# SPEC-001\nrecommendation 얘기.\n## Ownership\n- **Entities**: recommendation\n- **Capabilities**: recommendation.create\n";
+  const dflt = runWithConfig({ "SPEC-001.md": A }, {});
+  assert.equal(dflt.code, 0, dflt.out);
+  assert.doesNotMatch(dflt.out, /판정 불가\(inert\)/);
 });
