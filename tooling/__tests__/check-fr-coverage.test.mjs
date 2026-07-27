@@ -74,6 +74,48 @@ test("FR-001 미시작·중간 결번 → advisory(exit 0), --strict에서 hard 
   assert.match(strict.out, /중간 결번: FR-006/);
 });
 
+// ── 선언 범위 좁힘(SPEC-014 FR-005 개정: "선언" = FR 섹션 안 라인 시작) ──
+// 실측 오탐: PM tool SPEC-003의 Change Log가 흡수 이력을 `FR-011→**FR-037**`로 굵게 적어
+// FR-037~044 8건이 거짓 중복 hard로 막혔다. Change Log 표 행은 `|`로 시작해 선언이 아니다.
+
+// @covers SPEC-014/FR-005
+test("Change Log 표 행의 bold FR ID는 중복으로 세지 않는다 (PM SPEC-003 거짓 중복 실측 재현)", () => {
+  const r = run({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-001** (event): THE SYSTEM SHALL a.\n"
+      + "**FR-002** (optional): WHERE x, THE SYSTEM SHALL b.\n"
+      + "\n## Change Log\n"
+      + "| 날짜 | 변경 | 근거 |\n"
+      + "| 2026-07-27 | SPEC-008 흡수 **완성** — FR-011→**FR-001**, FR-012→**FR-002** | main 대조 |\n",
+  });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /번호 중복/);
+});
+
+// @covers SPEC-014/FR-005
+test("FR 섹션 안 라인 시작 bold는 불릿 유무 무관하게 선언 — 진짜 중복은 여전히 hard (PM SPEC-004/FR-057 실측)", () => {
+  const r = run({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-057** (optional): WHERE a row matches, THE SYSTEM SHALL render a badge.\n"
+      + "**FR-057** (event): WHEN a user accesses the page, THE SYSTEM SHALL fetch own rows.\n"
+      + "\n## Change Log\n| 2026-07-27 | 흡수 | 근거 |\n",
+  });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /SPEC-001\/FR-057 FR 번호 중복/);
+});
+
+// @covers SPEC-002/FR-001
+test("선언 범위 좁힘이 @covers 대조를 깨지 않는다 — Change Log만 언급한 FR은 dangling 대상", () => {
+  const r = run({
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-001** (event): THE SYSTEM SHALL a.\n"
+      + "\n## Change Log\n| 2026-07-27 | **FR-002** 폐기 | 근거 |\n",
+    "src/a.test.mjs": TAG + "SPEC-001/FR-001\n" + TAG + "SPEC-001/FR-002\ntest('y', () => {});\n",
+  });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /dangling @covers SPEC-001\/FR-002/);
+});
+
 // @covers SPEC-014/FR-005
 test("스펙별 독립 판정 — 스펙 A의 FR-001과 스펙 B의 FR-001은 중복 아님(SPEC-ID가 네임스페이스)", () => {
   const r = run({

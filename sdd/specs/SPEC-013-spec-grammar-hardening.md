@@ -27,6 +27,10 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 - config 자기면제 판정은 **표기가 아니라 실제 매치**다 — `sdd.config.json`·`*.json`·`sdd*`·`**/*.json` 어느 표기든 config 경로를 매치하면 위반(우회 표기 차단, Files 카테고리 금지가 대소문자를 무관하게 보는 것과 동형). config가 서브디렉토리에 있으면 그 상대경로로 판정하므로 루트 밖 채택도 정확하다.
 - 게이트 코드 디렉토리(`scripts/**`)는 **의도적으로 금지 목록 밖**이다 — 설치된 하네스의 소유 처방이 방법론에 아직 없어(`error`로 올리면 방법론 최신화 자체가 커밋 불가, exempt하면 게이트 코드가 무흔적 변경 구역) 금지가 처방 없는 강요가 된다. 하네스 소유 규범이 서면 이 목록에 추가 검토.
 - 잘못된 글롭 문법은 이 판정에서 건너뛴다(크래시 방지) — 문법 자체는 FR-006이 별도로 본다.
+- 선언 범위(FR-008)와 SHALL 판정(FR-003)은 라인 규율이 다르다 — SHALL은 불릿 선언 라인만 보고(advisory·기존 출력 불변), 선언 범위는 불릿 유무를 무관하게 본다. 소비 프로젝트가 두 스타일을 섞어 쓰는 실측 때문에 "불릿만"으로 좁히면 진짜 중복을 놓친다.
+- Change Log·Assumptions·Dedup-Review에 굵은 요구 ID를 적는 것은 정당한 저술이다(이관·흡수 이력이 어느 번호로 갔는지 밝히는 것) — 선언 범위가 FR 섹션 밖을 보지 않으므로 게이트가 막지 않는다. 표 행은 `|`로 시작해 라인 시작 규율에서도 탈락한다.
+- 같은 선언 라인 뒤쪽의 굵은 상호참조(`… SHALL x — **FR-002**를 확장`)는 선언이 아니다 — 라인의 첫 요구 토큰만 선언으로 센다.
+- FR 섹션 명칭이 다른 사이트(현지어 헤딩 등)에서는 전문 폴백으로 퇴화한다 — 선언 집합이 통째로 비어 `@covers` dangling이 폭발하는 것이 더 나쁜 실패라서 안전한 방향을 택했다. 폴백에서도 라인 시작 규율은 유지되므로 표 행 오탐은 재발하지 않는다.
 - 셸/Go판에는 이 계층이 없다(핵심 3커맨드 계약 밖, 정직한 델타 — SPEC-006 Change Log·ci-examples 매트릭스 명시).
 
 ---
@@ -42,8 +46,10 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 - **FR-006** (event): WHEN spec-sync runs in staged mode and any spec's Files line carries unsupported glob syntax, THE SYSTEM SHALL exit non-zero, WHILE range mode SHALL keep the warning advisory.
 - **FR-007** (unwanted): IF `specSyncExemptGlobs` contains a glob that matches the config file itself, or a blanket glob (`**`, `**/*`), THEN THE SYSTEM SHALL name the offending entry with its reason and exit non-zero before parsing ownership — the exemption list is part of the control plane, so an entry that exempts the control plane or the whole tree would let every other weakening land with no persisted trace.
 
+- **FR-008** (ubiquitous): THE SYSTEM SHALL expose one **spec-grammar-hardening** (E) scope judgment in **grammar-lib.mjs** (S) that every requirement-aggregating gate consumes, counting a requirement as declared only when its bold token opens a line (bullet optional) inside the Functional Requirements section and taking the first such token on that line, and falling back to the whole document only when that section is absent — the shared token grammar itself stays untouched, so narrowing the scanned area is what separates authored declarations from the prose and history rows that legitimately cite requirement ids.
+
 ### Key Entities
-- **spec grammar norm** — a documented, deterministic spec-form rule (required header, token, referential existence, forbidden config value) that gates can check without judging meaning.
+- **spec grammar norm** — a documented, deterministic spec-form rule (required header, token, referential existence, forbidden config value, declaration scope) that gates can check without judging meaning.
 
 ---
 
@@ -93,3 +99,4 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 | 2026-07-16 | 같은 복사 목록에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib) 픽스처 배선(판정 불변) |
 | 2026-07-27 | FR-007 신설 — `specSyncExemptGlobs` 무결성(config 자기면제·전면 면제 금지, 실제 매치 기준). `exemptGlobFindings` + check-ownership 배선, Node·Python 바이트 패리티. `scripts/**`는 의도적 제외(하네스 소유 처방 부재) | Ownership 감사 #21 A-4: `presets.md`·`METHODOLOGY.md`가 **프로즈로만** 금지하던 것을 게이트로 승격 — 실측 소비 프로젝트가 `sdd.config.json`을 실제로 등재해 config 변경이 무흔적 통과, 정책 하향·면제 확대·상한 상향이 전부 영속 흔적 0으로 실행되던 상태 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-07-28 | FR-008 신설 — FR "선언" 범위 단일 판정(`frDeclarations`): FR 섹션 안 라인 시작(불릿 유무 무관)의 첫 요구 토큰만 선언, 섹션 부재 시 전문 폴백. `isFrDeclLine`(SPEC-023) 재사용, Node·Python 미러. 요구 집계 5소비처(fr·cohesion·retag·smoke-scan·retire)를 이 단일 정의로 통일 | SPEC-014 FR-005(번호 중복 hard) 오탐 실측: 소비 프로젝트 PM에서 Change Log 표 행이 흡수 이력을 `FR-011→**FR-037**`로 굵게 적어 SPEC-003 8건·SPEC-004 4건이 거짓 중복으로 차단됐다(진짜 중복은 SPEC-004/FR-057 1건뿐). 공유 문법 `cfg.__frDeclRe`(SPEC-001 FR-009)를 바꾸면 5소비처에 파급되므로 **범위**만 좁혔다. 킷 스펙은 Change Log에 요구 ID를 볼드 없이 적는 관례라 자기적용에선 발현하지 않았음(전수 실측 0건) — 게이트 green이 안전의 증거가 아니었던 사례 |

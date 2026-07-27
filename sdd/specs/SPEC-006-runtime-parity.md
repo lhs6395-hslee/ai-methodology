@@ -127,3 +127,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-27 | preset spec-template 재동기(정식 templates/module-spec.md와 바이트 동일) — FR 번호 규범 주석 반영 | FR-005(템플릿 패리티) 동반: 규범 주석이 preset 경로에만 없으면 preset으로 쓴 스펙이 규범을 못 본다 |
 | 2026-07-27 | Python 미러 — `group_numbers`(순수 원형)·`fr_numbering_issues` + cmd_fr 1b 배선, Node와 출력·exit 바이트 동일 | SPEC-014 FR-005/006 동반 — 전 게이트 패리티 유지 |
 | 2026-07-27 | Python 미러 — `parse_section` 전 불릿·연속 줄, `split_keys`·`is_placeholder` 신설, `normalize_key` NFC(`unicodedata`). Node와 출력 바이트 동일 | SPEC-001 FR-001/003 개정 동반 — dedup 입력 신뢰성 봉합의 양판 패리티 |
+| 2026-07-28 | Python 미러 — `fr_declarations` 신설(FR 섹션 안 라인 시작 선언 범위) + `cmd_fr`·`cmd_cohesion`·`_collect_specs` 3소비처 배선. 패리티 결함 1건 봉합: R2 missing 목록이 Python만 정렬돼 Node와 갈렸다(Node에 정렬 추가) | SPEC-013 FR-008 동반. 정렬 결함은 킷 스펙이 전부 번호 순 선언이라 자기적용에서 0건 발현, 소비 프로젝트 PM(SPEC-004·SPEC-010 두 줄)에서만 실측 — 양판 바이트 동일을 4코퍼스(킷·PM·PM 수정전·finops) × default/`--strict`로 재확인 |

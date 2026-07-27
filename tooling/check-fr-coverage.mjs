@@ -31,6 +31,7 @@ import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
 import { numberingIssues, frNumberingIssues } from "./numbering-lib.mjs";
+import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 
 const cfg = loadConfig();
@@ -145,6 +146,10 @@ if (prefixErrors.length) {
 }
 
 // 1. Collect declared FRs per spec.
+//    "선언"의 범위는 SPEC-013 frDeclarations 단일 정의 — `## Functional Requirements` 섹션 안의
+//    라인 시작(불릿 유무 무관). 문서 전문 스캔은 Change Log의 이관·흡수 이력(`FR-011→**FR-037**`)을
+//    선언으로 집계해 거짓 "FR 번호 중복" hard를 냈다(PM tool 실측 12건). 문법(cfg.__frDeclRe)은
+//    SPEC-001 FR-009 공유 자산이라 손대지 않는다 — 좁힌 것은 범위뿐.
 const specs = new Map();    // SPEC-ID -> Set(FR-ID)
 const frDecls = new Map();  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
@@ -152,8 +157,7 @@ for (const f of readdirSync(SPEC_DIR)) {
   const id = f.match(SPEC_ID)?.[0];
   if (!id) continue;
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
-  const list = [];
-  for (const m of text.matchAll(FR_DECL)) list.push(m[1]);
+  const list = frDeclarations(text, FR_DECL, cfg.__reqAlt);
   frDecls.set(id, list);
   specs.set(id, new Set(list));
 }
@@ -237,7 +241,9 @@ for (const [spec, frs] of specs) {
     else warnings.push(msg);
     continue;
   }
-  const missing = [...frs].filter((fr) => !cov.has(fr));
+  // 정렬 필수(Python판 sdd_gates.py는 sorted — SPEC-006 패리티). 선언 순서로 두면 FR을 번호 순이
+  // 아니게 선언한 스펙에서 양판 출력이 갈린다(소비 프로젝트 PM SPEC-004·SPEC-010 실측).
+  const missing = [...frs].filter((fr) => !cov.has(fr)).sort();
   if (missing.length) {
     const msg = `${spec}: ${cov.size}/${frs.size} FRs covered — missing ${missing.join(", ")}`;
     if (hard) errors.push(`${label} ${msg}`);

@@ -84,3 +84,4 @@
 |---|---|---|
 | 2026-07-05 | 초안 — 검증 태그 문법·smoke-scan 수집/재생성(--write)/드리프트 검사(Node·Python 동시) | 고도화 3차: 재생성 비교[검증]에서 smoke 실증거 연결만 수동으로 남음 — 증거가 사는 파일을 SSOT로 승격해 수동 연결 제거(B) |
 | 2026-07-27 | FR-001 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — aggregate **smoke-scan**·스캐너 **sdd-smoke-scan.mjs** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 2건이 FR 선언 라인에 흔적이 없던 것을 명시(수집 범위·태그 문법은 불변) |
+| 2026-07-28 | 선언 FR 수집을 SPEC-013 FR-008 단일 범위 판정으로 교체(`frDeclarations`) | 선언 집합이 fr 게이트와 갈리면 smoke 태그 dangling 판정이 게이트와 불일치한다 — 문법(`cfg.__frDeclRe`)만 공유하고 범위는 각자였던 것을 통일(수집 범위 규칙·태그 문법 불변) |

@@ -581,6 +581,8 @@ def cmd_fr(cfg, strict):
         sys.exit(1)
 
     # 1. spec별 선언 FR 수집.
+    #    "선언"의 범위는 fr_declarations 단일 정의(SPEC-013) — FR 섹션 안 라인 시작(불릿 유무 무관).
+    #    전문 스캔은 Change Log의 이관·흡수 이력을 선언으로 집계해 거짓 중복 hard를 냈다(PM 실측 12건).
     specs = {}     # SPEC-ID -> set(FR-ID)
     fr_decls = {}  # SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — set은 중복을 삼킨다)
     for f in spec_names:
@@ -590,7 +592,7 @@ def cmd_fr(cfg, strict):
         if not m:
             continue
         text = read_text(os.path.join(spec_dir, f))
-        lst = cfg["__frDecl"].findall(text)
+        lst = fr_declarations(text, cfg["__frDecl"], cfg["__reqAlt"])
         fr_decls[m.group(0)] = lst
         specs[m.group(0)] = set(lst)
 
@@ -1066,7 +1068,8 @@ def cmd_cohesion(cfg, strict):
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
-        frs = len(set(cfg["__frDecl"].findall(text)))  # 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용 제외
+        # 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용 제외(SPEC-013 fr_declarations가 범위 판정).
+        frs = len(set(fr_declarations(text, cfg["__frDecl"], cfg["__reqAlt"])))
         if frs > max_frs:
             violations.append((spec_id, "FR", frs, max_frs))
         if re.search(r"^##\s+Ownership", text, re.MULTILINE):
@@ -1270,6 +1273,30 @@ def fr_lines_missing_shall(text, fr_decl_re):
     for line in text.split("\n"):
         m = line_re.match(line)
         if m and not re.search(r"\bSHALL\b", line):
+            out.append(m.group(1))
+    return out
+
+
+def fr_declarations(text, fr_decl_re, req_alt="FR"):
+    """FR "선언"의 범위 판정(SPEC-013 FR-008, grammar-lib.mjs frDeclarations 미러).
+
+    선언 = ① `## Functional Requirements` 섹션 안 ② 라인 시작(불릿 유무 무관) ③ 그 라인의 첫 FR 토큰.
+    전문 스캔은 Change Log 표 행의 bold FR 인용(`FR-011→**FR-037**`)을 선언으로 집계해 거짓
+    "FR 번호 중복" hard를 냈다. 표 행은 `|`로 시작해 ②에서 탈락한다. 문법(fr_decl_re)은
+    SPEC-001 FR-009 공유 자산이라 손대지 않는다 — 좁힌 것은 범위뿐.
+    FR 섹션 부재 시 전문 폴백(선언 집합이 통째로 비어 dangling 폭발하는 것을 막는다).
+    반환: 선언 순서 그대로의 리스트(중복 유지 — 중복 판정이 소비).
+    """
+    block = section_block(text, "Functional Requirements")
+    scope = text if block is None else block
+    decl_line = re.compile(rf"^\s*-?\s*\*\*(?:{req_alt})-\d{{3}}[a-z]?\*\*")
+    tok = re.compile(fr_decl_re.pattern)
+    out = []
+    for line in scope.split("\n"):
+        if not decl_line.match(line):
+            continue
+        m = tok.search(line)
+        if m:
             out.append(m.group(1))
     return out
 
@@ -2379,7 +2406,7 @@ _VTAG = "@veri" + "fies"  # 자기 소스가 스캔에 걸리지 않게 분절
 
 
 def _collect_specs(cfg):
-    """spec별 선언 FR 수집(fr 게이트와 동일 문법 파생)."""
+    """spec별 선언 FR 수집(fr 게이트와 동일 문법·동일 범위 파생 — SPEC-013 fr_declarations)."""
     spec_dir = resolve(cfg, cfg["specDir"])
     specs = {}
     try:
@@ -2393,7 +2420,7 @@ def _collect_specs(cfg):
         if not m:
             continue
         text = read_text(os.path.join(spec_dir, f))
-        specs[m.group(0)] = set(cfg["__frDecl"].findall(text))
+        specs[m.group(0)] = set(fr_declarations(text, cfg["__frDecl"], cfg["__reqAlt"]))
     return specs
 
 

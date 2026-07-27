@@ -130,6 +130,47 @@ test("py fr: 접두어별 번호 001 미시작(INFRA-011/013) → Node·Python �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-006/FR-002
+test("py fr: FR을 번호 순이 아니게 선언한 스펙의 missing 목록 정렬 — Node·Python 바이트 동일", skip, () => {
+  // 실측 패리티 결함: Python은 sorted, Node는 선언 순서였다 — 킷 스펙은 번호 순 선언이라
+  // 자기적용에선 발현하지 않고 소비 프로젝트 PM(SPEC-004·SPEC-010)에서만 두 줄이 갈렸다.
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-003** THE SYSTEM SHALL c.\n- **FR-001** THE SYSTEM SHALL a.\n- **FR-002** THE SYSTEM SHALL b.\n",
+    "src/a.test.mjs": TAG + "SPEC-001/FR-003\ntest('x', () => {});\n",
+  };
+  const a = fixture(files), b = fixture(files);
+  try {
+    const py = runPy(a, ["fr"]);
+    const nd = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(py.out, nd.out); // 바이트 동일(패리티)
+    assert.match(nd.out, /missing FR-001, FR-002/); // 선언 순서(003,001,002) 아니라 정렬
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-013/FR-008
+test("py fr: 선언 범위 좁힘(Change Log bold FR = 비선언 / FR 섹션 라인시작 = 선언) → Node·Python 바이트 동일", skip, () => {
+  // 한 픽스처에 세 케이스: (a) Change Log 표 행의 **FR-001**·**FR-002** = 비선언(거짓 중복 없음)
+  // (b) SPEC-002는 불릿 없는 라인시작 **FR-057** 중복 = 진짜 중복 hard.
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-001** THE SYSTEM SHALL a.\n**FR-002** THE SYSTEM SHALL b.\n"
+      + "\n## Change Log\n| 2026-07-27 | SPEC-008 흡수 — FR-011→**FR-001**, FR-012→**FR-002** | 근거 |\n",
+    "sdd/specs/SPEC-002.md": "**Spec**: `SPEC-002`\n\n## Functional Requirements (EARS)\n"
+      + "- **FR-057** THE SYSTEM SHALL a.\n**FR-057** THE SYSTEM SHALL b.\n",
+  };
+  const a = fixture(files), b = fixture(files);
+  try {
+    const py = runPy(a, ["fr"]);
+    const nd = runNode(b, "check-fr-coverage.mjs");
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out); // 바이트 동일(패리티)
+    assert.match(nd.out, /SPEC-002\/FR-057 FR 번호 중복/);
+    assert.doesNotMatch(nd.out, /SPEC-001\/FR-00[12] FR 번호 중복/); // Change Log 인용은 선언 아님
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-014/FR-005
 test("py fr: 한 스펙 FR 번호 중복(FR-023 2회) → Node·Python 둘 다 exit 1 + 출력 바이트 동일 (SPEC-014 FR 패리티)", skip, () => {
   const files = {

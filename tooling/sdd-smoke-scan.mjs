@@ -15,13 +15,14 @@
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { frDeclarations } from "./grammar-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const WRITE = process.argv.includes("--write");
 const TAG_TOKEN = "@veri" + "fies"; // 자기 소스가 스캔에 걸리지 않게 분절
 
-// 1. spec별 선언 FR 수집(키 검증용 — fr 게이트와 동일 문법 파생, SPEC-006).
+// 1. spec별 선언 FR 수집(키 검증용 — fr 게이트와 동일 문법·동일 범위 파생, SPEC-006/SPEC-013).
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const specs = new Map(); // SPEC-ID -> Set(FR-ID)
 let specNames = [];
@@ -31,8 +32,7 @@ for (const f of specNames) {
   const id = f.match(cfg.__specIdRe)?.[0];
   if (!id) continue;
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
-  const frs = new Set();
-  for (const m of text.matchAll(cfg.__frDeclRe)) frs.add(m[1]);
+  const frs = new Set(frDeclarations(text, cfg.__frDeclRe, cfg.__reqAlt));
   specs.set(id, frs);
 }
 

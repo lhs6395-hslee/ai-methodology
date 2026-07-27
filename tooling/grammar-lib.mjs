@@ -3,6 +3,7 @@
 // 선언됐지만 게이트가 없던 항목의 결정적 판정을 문법화한다:
 //   · Module 헤더 존재(STORAGE §2.3 "본문 필수") + 값 단일성(STRUCTURE.md 1 레포 = 1 모듈)
 //   · FR 선언 라인의 SHALL 토큰(EARS 5패턴 공통 필수 — METHODOLOGY EARS 규칙의 기계 신호)
+//   · FR "선언"의 범위(frDeclarations) — FR 섹션 안 라인 시작만. 산문·Change Log의 FR 인용 제외
 //   · Dedup-Review 기록이 참조한 이웃 스펙 ID의 실재(DEDUP.md "존재·형식" 검사의 연장)
 //   · ownershipCategories의 Files 금지(DEDUP.md §3 명시 금지 — 글롭이 dedup 키로 유입 방지)
 // completeness·ownership 게이트가 소비. 질(EARS 어휘·측정가능성·판정 내용)은 리뷰 몫 —
@@ -11,6 +12,7 @@
 
 import { sectionBlock } from "./lifecycle-lib.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
+import { isFrDeclLine } from "./key-anchor-lib.mjs";
 
 // 스펙 헤더의 `**Module**: <name>` 파싱(백틱 유무 무관). 없으면 null.
 export function parseModule(text) {
@@ -28,6 +30,32 @@ export function frLinesMissingShall(text, frDeclSource) {
   for (const line of text.split("\n")) {
     const m = line.match(lineRe);
     if (m && !/\bSHALL\b/.test(line)) out.push(m[1]);
+  }
+  return out;
+}
+
+// FR "선언"의 범위 판정(SPEC-013 FR-008) — 문법(`cfg.__frDeclRe`)이 아니라 **어디를 스캔하는가**를
+// 좁힌다. 문서 전문에서 bold FR 토큰을 긁으면 산문 참조가 선언으로 집계돼, 이관·흡수 이력을 적은
+// Change Log 표 행(`| 2026-07-27 | … **FR-037** … |`)이 거짓 "FR 번호 중복" hard를 낸다(실측:
+// 소비 프로젝트 PM SPEC-003 8건·SPEC-004 4건). 정규식은 SPEC-001 FR-009의 공유 문법이라 손대면
+// cohesion·completeness·spec-sync·retag 전부에 파급되므로 **범위**만 좁히는 것이 옳다.
+// 선언 = ① `## Functional Requirements` 섹션 안이고 ② 라인 시작(`isFrDeclLine` — 불릿 유무 무관.
+// 실측: 소비 프로젝트가 `- **FR-057**`과 `**FR-057**` 두 스타일을 섞어 쓰므로 "불릿만"으로 좁히면
+// 진짜 중복을 놓친다) ③ 그 라인의 **첫** FR 토큰(같은 라인 뒤쪽의 bold 상호참조는 선언이 아님).
+// 표 행은 `|`로 시작해 ②에서 자연히 탈락한다 — Change Log가 FR ID를 굵게 참조하는 정당한 저술이
+// 게이트에 막히지 않는다. FR 섹션이 없으면 전문으로 폴백(라인 규율은 유지 — 다른 섹션 명칭을 쓰는
+// 사이트에서 선언 집합이 통째로 비어 dangling 폭발하는 것을 막는다).
+// 반환: 선언 순서 그대로의 FR-ID 배열(중복 유지 — 중복 판정이 소비. Set은 중복을 삼킨다).
+// frDeclRe: cfg.__frDeclRe(정규식 객체 또는 source 문자열). 순수 함수.
+export function frDeclarations(text, frDeclRe, reqAlt = "FR") {
+  const block = sectionBlock(String(text), "Functional Requirements");
+  const scope = block === null ? String(text) : block;
+  const re = new RegExp(frDeclRe && frDeclRe.source ? frDeclRe.source : String(frDeclRe));
+  const out = [];
+  for (const line of scope.split("\n")) {
+    if (!isFrDeclLine(line, reqAlt)) continue;
+    const m = line.match(re);
+    if (m) out.push(m[1]);
   }
   return out;
 }

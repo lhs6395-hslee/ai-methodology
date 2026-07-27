@@ -94,3 +94,4 @@
 | 2026-07-16 | FR-007 신설(Planned 모순 — Status Planned인데 unit 커버 FR 실재 = fr 게이트 hard) + FR-008 신설(폐기 계획에 inbound 참조 — 타 스펙 구조화 관계·Dedup-Review 언급을 dry-run이 지목, retire-lib `inboundReferences`) | 감사 T2·P1: Active→Planned 한 줄 뒤집기로 strictSpecs·R3를 침묵시키는 회계 침묵기 + 참조된 스펙 폐기 시 dry-run은 침묵하고 --write 후 삭제 커밋이 관계 실재 hard(SPEC-017)에 막히는 dead-end(킷 자신 SPEC-011 dry-run으로 실증 — SPEC-014 관계·Dedup 언급 3건 지목) |
 | 2026-07-27 | `sdd-retire`의 entity 카테고리 해석을 `cfg.__roles.entity`로 전환(자체 이름 폴백 제거) | SPEC-001 FR-010 동반: 역할 판정 단일 소스화 — 폴백 복붙 3곳 중 하나 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 3건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-07-28 | `frsBySpec` 수집을 SPEC-013 FR-008 단일 범위 판정으로 교체 | 코드 주석이 "정의만"이라고 적혀 있었으나 실제로는 전문을 긁어 Change Log의 폐기 이력 인용까지 실재 FR로 셌다 — 폐기 계획이 이미 없는 FR을 대상으로 잡을 수 있던 문서-동작 불일치 봉합 |

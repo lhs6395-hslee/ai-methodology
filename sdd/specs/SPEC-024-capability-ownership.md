@@ -83,3 +83,4 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 | 2026-07-27 | `capabilityCheckActive`·`capabilityInertReasons`가 카테고리 배열 대신 역할(`{entity,surface,capability}`)을 받는다 | SPEC-001 FR-010 동반: 이름 추측 제거 — 카테고리를 개명해도 선언이 있으면 판정이 유지된다 |
 | 2026-07-27 | 킷 자신은 `capabilityOwnershipPolicy` **advisory 유지**(명시적 off로 내리지 않음) | 킷 카테고리엔 capability 역할이 없어 inert지만, off로 내리면 SPEC-027 래칫이 강도 하향으로 정당하게 차단한다(도그푸딩 발견). 매 실행 출력되는 inert 사유 한 줄이 곧 표면화이므로 침묵시킬 이유가 없다 — "정당한 inert는 명시적 off"라는 서술과 래칫의 단조성이 충돌하는 지점은 별도 과제로 이관 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-07-28 | `capability-ownership.test.mjs` 픽스처 복사 목록에 `key-anchor-lib.mjs` 추가 | SPEC-013 FR-008 동반: `grammar-lib.mjs`의 새 import를 픽스처도 복사해야 게이트가 실행된다(배선만, 판정 불변) |

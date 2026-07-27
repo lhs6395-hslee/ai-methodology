@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { frDeclarations } from "./grammar-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -43,8 +44,9 @@ for (const f of specNames) {
   const id = f.match(cfg.__specIdRe)?.[0];
   if (!id) continue;
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
-  const frs = new Set();
-  for (const m of text.matchAll(cfg.__frDeclRe)) frs.add(m[1]);
+  // 선언 범위는 fr 게이트와 동일해야 한다(SPEC-013 frDeclarations) — 아니면 retag가 통과시킨
+  // 대상 키를 fr 게이트 R1이 dangling으로 되쏘는 불일치가 생긴다.
+  const frs = new Set(frDeclarations(text, cfg.__frDeclRe, cfg.__reqAlt));
   specs.set(id, frs);
 }
 for (const [oldKey, newKey] of Object.entries(map)) {

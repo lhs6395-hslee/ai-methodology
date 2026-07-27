@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseModule, frLinesMissingShall, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
+import { parseModule, frLinesMissingShall, frDeclarations, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
 
 const FR_DECL_SRC = "\\*\\*((?:FR)-\\d{3}[a-z]?)\\*\\*";
 const SPEC_ID_RE = /(?:SPEC|INFRA|TEST)-\d{3}/;
@@ -29,6 +29,36 @@ test("parseModule: 백틱·비백틱·부재", () => {
 test("frLinesMissingShall: SHALL 없는 FR 선언 라인만 지목", () => {
   const text = "- **FR-001** (event): WHEN x, THE SYSTEM SHALL y.\n- **FR-002** (event): does y without keyword.\n- **FR-003a** THE SYSTEM SHALL z.\n";
   assert.deepEqual(frLinesMissingShall(text, FR_DECL_SRC), ["FR-002"]);
+});
+
+// @covers SPEC-013/FR-008
+test("frDeclarations: Change Log 표 행의 bold FR ID는 선언 아님 (PM SPEC-003 실측 오탐)", () => {
+  const text = "## Functional Requirements (EARS)\n"
+    + "**FR-037** (optional): WHERE x, THE SYSTEM SHALL render a badge.\n"
+    + "\n## Change Log\n"
+    + "| 2026-07-27 | SPEC-008 흡수 **완성** — FR-011→**FR-037**, FR-012→**FR-038** | 근거 |\n";
+  assert.deepEqual(frDeclarations(text, FR_DECL_SRC), ["FR-037"]);
+});
+
+// @covers SPEC-013/FR-008
+test("frDeclarations: FR 섹션 안 라인 시작 bold는 불릿 유무 무관하게 선언 (PM SPEC-004 실측 혼용)", () => {
+  const text = "## Functional Requirements (EARS)\n"
+    + "- **FR-057** (optional): WHERE a row matches, THE SYSTEM SHALL render a badge.\n"
+    + "**FR-057** (event): WHEN a user accesses the page, THE SYSTEM SHALL fetch own rows.\n"
+    + "  - **FR-058** (event): THE SYSTEM SHALL z.\n";
+  assert.deepEqual(frDeclarations(text, FR_DECL_SRC), ["FR-057", "FR-057", "FR-058"]); // 순서·중복 유지
+});
+
+// @covers SPEC-013/FR-008
+test("frDeclarations: 산문 중간 인용·같은 라인 뒤쪽 상호참조는 선언 아님 / FR 섹션 없으면 전문 폴백", () => {
+  const scoped = "## Functional Requirements (EARS)\n"
+    + "- **FR-001** (event): THE SYSTEM SHALL x — **FR-002**를 확장한다.\n"
+    + "위 **FR-003**은 폐기되었다.\n"
+    + "\n## Assumptions / Clarifications Retained\n- **FR-009** 관련 가정 보존\n";
+  assert.deepEqual(frDeclarations(scoped, FR_DECL_SRC), ["FR-001"]); // 라인 첫 토큰만·다른 섹션 제외
+  // FR 섹션 부재 → 전문 폴백(선언 집합이 통째로 비지 않게), 단 라인 시작 규율은 유지
+  const noSection = "**Spec**: `SPEC-001`\n- **FR-001** (event): THE SYSTEM SHALL x.\n산문 속 **FR-002** 인용\n";
+  assert.deepEqual(frDeclarations(noSection, FR_DECL_SRC), ["FR-001"]);
 });
 
 test("dedupReviewDanglingIds: 실재하지 않는 이웃 ID만 정렬 반환·섹션 없으면 빈 배열", () => {
@@ -147,7 +177,7 @@ function repo() {
   mkdirSync(join(root, "src"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "grammar-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs"])
+  for (const f of ["check-spec-sync.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "grammar-lib.mjs", "key-anchor-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs"])
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");

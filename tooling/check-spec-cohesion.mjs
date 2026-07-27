@@ -16,6 +16,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
+import { frDeclarations } from "./grammar-lib.mjs";
 
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -36,10 +37,10 @@ function specFiles() {
 const ENT_CAT = cfg.__roles.entity || CATEGORIES[0]; // 역할 선언 우선(SPEC-001 FR-010)
 
 // 고유 FR-ID 수 — 문법은 config의 requirementIdPrefixes에서 파생(coverage와 동일 사이트 통일).
+// 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용은 제외(SPEC-013 frDeclarations가 범위를 판정).
+// 전문 스캔은 이력의 FR 인용까지 세어 FR 수를 부풀렸다(maxFRsPerSpec 거짓 초과 신호).
 function countFRs(text) {
-  const ids = new Set();
-  for (const m of text.matchAll(cfg.__frDeclRe)) ids.add(m[1]); // 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용은 제외
-  return ids.size;
+  return new Set(frDeclarations(text, cfg.__frDeclRe, cfg.__reqAlt)).size;
 }
 
 const files = specFiles();

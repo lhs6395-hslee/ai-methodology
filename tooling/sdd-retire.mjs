@@ -10,6 +10,7 @@ import { parseTarget, planRetirement, removeFrFromSpecText, pruneManifest, inbou
 import { parseSection } from "./ownership-keys.mjs";
 import { parseRelationEntry } from "./relation-lib.mjs";
 import { sectionBlock } from "./lifecycle-lib.mjs";
+import { frDeclarations } from "./grammar-lib.mjs";
 
 const cfg = loadConfig();
 const WRITE = process.argv.includes("--write");
@@ -20,13 +21,13 @@ const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const SCAN = cfg.scanDirs.map((d) => resolveFromRoot(cfg, d));
 const IGNORE = new Set(cfg.ignoreDirs);
 
-// 1. 스펙 코퍼스 — frsBySpec(정의만)·specText·경로
+// 1. 스펙 코퍼스 — frsBySpec(정의만 — SPEC-013 frDeclarations: FR 섹션 안 라인 시작)·specText·경로
 const frsBySpec = new Map(), specText = new Map(), specPath = new Map();
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md")) continue;
   const id = f.match(cfg.__specIdRe)?.[0]; if (!id) continue;
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
-  const frs = new Set(); for (const m of text.matchAll(cfg.__frDeclRe)) frs.add(m[1]);
+  const frs = new Set(frDeclarations(text, cfg.__frDeclRe, cfg.__reqAlt));
   frsBySpec.set(id, frs); specText.set(id, text); specPath.set(id, join(SPEC_DIR, f));
 }
 // 2. @covers 인덱스
