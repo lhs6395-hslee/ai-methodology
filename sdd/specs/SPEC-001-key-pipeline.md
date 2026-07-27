@@ -120,3 +120,4 @@
 | 2026-07-27 | FR-001·FR-006 주어를 `THE SYSTEM`에서 실제 소유 심볼(**ownership-keys.mjs**·**sdd-config.mjs**)로 교체 — 소유 surface 키 2건 FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: FR-010의 `ownershipCategoryRoles` 선언으로 킷 자신에게 규칙이 발화 — 익명 주어라 소유 키가 FR 선언 라인에 흔적이 없던 것을 실제 행위자로 명시(동작 불변) |
 | 2026-07-27 | `entityRegistry`의 `spec-id-numbering` 설명을 두 번호 층위(spec-ID·FR)로 갱신 | SPEC-014 FR-005/006 동반: 같은 aggregate가 FR 번호까지 소유하게 되어 config 사전의 entity 서술이 실체와 어긋나던 것을 정합 |
 | 2026-07-27 | dedup 입력 신뢰성 5건 봉합 — `parseSection` 전 불릿·줄바꿈 이어붙이기, 괄호 인식 split(`splitKeys`), 플레이스홀더 정밀화(`isPlaceholder`), 카테고리명 정규식 이스케이프(`escapeRegExp`), `normalizeKey` NFC 정규화. FR-001·FR-003 개정 + Edge Cases 5건, Node·Python 바이트 패리티, 회귀 테스트 6건 | Ownership 감사 #21 C-2·C-3·M-13·M-3·유니코드: dedup은 킷의 **유일한 hard 게이트**인데 그 입력이 조용히 잘려, 두 스펙이 같은 키를 소유해도 "✓ 구조적 중복 없음"이 나왔다(실측 재현 5건). 중복성 판정의 신뢰가 근본에서 깨져 있던 자리 |
+| 2026-07-27 | `entityRegistry`에 `ownership-map` 등록 | SPEC-028 동반: 신규 모듈 entity 어휘 등록(등록 관문 — 킷 자체 게이트가 누락을 hard로 지목) |
