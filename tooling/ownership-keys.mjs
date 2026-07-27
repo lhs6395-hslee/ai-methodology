@@ -26,7 +26,7 @@ export function resolveCategoryRoles(categories, roles) {
 
 // `## <heading>` 섹션을 잘라 카테고리별 키 배열로. 헤더 다음~다음 ## 전까지.
 export function parseSection(text, heading, categories) {
-  const start = text.search(new RegExp(`^##\\s+${heading}\\b`, "m"));
+  const start = text.search(new RegExp(`^##\\s+${escapeRegExp(heading)}\\b`, "m"));
   const out = Object.fromEntries(categories.map((c) => [c, []]));
   if (start === -1) return out;
   const after = text.slice(start);
@@ -34,17 +34,61 @@ export function parseSection(text, heading, categories) {
   const nextSec = body.search(/^##\s/m);
   const block = nextSec === -1 ? body : body.slice(0, nextSec);
   for (const cat of categories) {
-    const line = block.match(new RegExp(`-\\s*\\*\\*${cat}\\*\\*\\s*:\\s*([^\\n]+)`, "i"));
-    out[cat] = line
-      ? line[1].split(",").map((k) => k.trim()).filter((k) => k && k !== "—" && k !== "[…]" && !k.startsWith("["))
-      : [];
+    // 카테고리 불릿을 **전부** 수집한다(과거엔 첫 줄만 — 두 번째 불릿·줄바꿈 뒷부분이 dedup
+    // 대상에서 무음 소실했다). 각 불릿은 다음 불릿(또는 블록 끝)까지 이어붙여 여러 줄에 걸친
+    // 키 목록도 온전히 읽는다. 카테고리명은 정규식 이스케이프(`C++ Symbols` 류에서 Node 크래시
+    // → Python `re.escape` 미러와 패리티).
+    const re = new RegExp(`^[ \t]*-\\s*\\*\\*${escapeRegExp(cat)}\\*\\*\\s*:\\s*([\\s\\S]*?)(?=^[ \t]*-\\s*\\*\\*|\\n[ \t]*\\n|(?![\\s\\S]))`, "gim");
+    const keys = [];
+    for (const m of block.matchAll(re)) {
+      // 줄바꿈으로 이어진 목록을 한 줄로 접는다(들여쓴 연속 줄 = 같은 불릿).
+      const flat = m[1].replace(/\s*\n[ \t]*/g, " ").trim();
+      for (const k of splitKeys(flat)) keys.push(k);
+    }
+    out[cat] = keys;
   }
   return out;
 }
 
+// 정규식 메타문자 이스케이프 — 카테고리·헤딩 이름을 정규식에 보간하기 전에 통과시킨다.
+// Python판은 `re.escape`를 이미 쓰는데 Node판은 비이스케이프였다(미문서화 패리티 파괴 + 크래시).
+export function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// 키 목록 문자열을 쉼표로 나눈다 — 단 **괄호 안 쉼표는 구분자가 아니다**.
+// 실측 결함: `POST /api/x (SPEC-013), ui:y (SPEC-013, 셸)`가
+// ["… (SPEC-013)", "ui:y (SPEC-013", "셸)"]로 쪼개져 앵커 keySet을 쓰레기 토큰으로 오염시켰다.
+// 플레이스홀더(`—`·`-`·`[…]`·`[TBD]` 등 대괄호만으로 둘러싼 토큰)는 키가 아니라 제외하되,
+// `[id]`·`[level]/page.tsx` 같은 **정당한 대괄호 키는 보존**한다(과거엔 `[`로 시작하면 전부 폐기).
+export function splitKeys(raw) {
+  const parts = [];
+  let buf = "";
+  let depth = 0;
+  for (const ch of String(raw)) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    if (ch === "," && depth === 0) { parts.push(buf); buf = ""; continue; }
+    buf += ch;
+  }
+  parts.push(buf);
+  return parts.map((k) => k.trim()).filter((k) => k && !isPlaceholder(k));
+}
+
+// 플레이스홀더 판정 — 값 없음 표기(`—`·`-`)와 "대괄호로만 둘러싼 자리표시"(`[…]`·`[TBD]`·`[미정]`).
+// `[id]/page.tsx`처럼 대괄호 뒤에 실체가 이어지는 것은 플레이스홀더가 아니다(정당한 경로 키).
+export function isPlaceholder(k) {
+  const t = String(k).trim();
+  if (!t || t === "—" || t === "-") return true;
+  return /^\[[^\]]*\]$/.test(t);
+}
+
 // 카테고리별 결정적 정규화(§4 표).
 export function normalizeKey(category, raw, cfg) {
-  const s = String(raw).trim();
+  // 유니코드 정규화(NFC) — 같은 글자의 NFC/NFD 두 표현이 서로 다른 키로 갈리는 것을 막는다.
+  // 실측: macOS(NFD 성향)와 Linux CI를 섞어 쓰거나 클립보드 경유로 붙여넣은 한글 키가 갈리면
+  // 눈으로 동일한 entity를 두 스펙이 소유해도 dedup이 충돌을 놓쳤다(중복 누락).
+  const s = String(raw).normalize("NFC").trim();
   if (category === "Surfaces") {
     const style = (cfg && cfg.surfaceFormat) || "http";
     if (style !== "http") {

@@ -23,6 +23,11 @@
 - `loadConfig`가 `sdd.config.json` JSON 파싱에 실패하면 stderr로 경로·사유를 출력하고 `process.exit(1)`한다(조용한 무시 금지).
 - `validateKey`의 Capability는 점 1개(`entity.verb`)가 아니거나 verb가 `__allVerbs`(CRUD + 등록 verb)에 없으면 위반 사유 문자열을 돌려준다.
 - `__coversRe`의 요구 ID 문법은 접두어(`requirementIdPrefixes` 파생, 기본 `FR`) + 3자리 + 선택적 소문자 서픽스 1자이며 경계까지 요구한다 — 2자 서픽스 토큰은 부분(절단) 캡처 없이 통째로 불인정(절단 오판 금지). (ID 예시를 리터럴로 안 쓰는 이유: 게이트가 예시 토큰을 이 spec의 FR로 집계하기 때문 — SPEC-003과 동일 규칙.)
+- 카테고리 불릿은 **여러 줄·여러 개**일 수 있다 — 같은 카테고리를 두 불릿으로 적거나 목록을 줄바꿈으로 이어도 전부 한 집합으로 읽는다. (과거엔 첫 불릿의 첫 줄만 읽어 나머지가 dedup 대상에서 무음 소실했다 — 두 스펙이 같은 키를 소유해도 "구조적 중복 없음"이 나오던 결함.)
+- 키 구분자 쉼표는 **괄호·대괄호 밖에 있을 때만** 구분자다 — `POST /api/x (SPEC-013), ui:y (SPEC-013, 셸)`는 두 키다(과거엔 세 조각으로 쪼개져 쓰레기 토큰이 앵커 keySet을 오염시켰다).
+- 플레이스홀더는 **대괄호만으로 이뤄진 토큰**(`[…]`·`[TBD]`)과 `—`·`-`뿐이다 — `[level]/page.tsx`·`src/app/[id]/route.ts`처럼 대괄호 뒤에 실체가 이어지는 정당한 경로 키는 보존한다(과거엔 `[`로 시작하면 전부 폐기).
+- 카테고리·헤딩 이름은 정규식에 보간하기 전 이스케이프한다 — `C++ Symbols`·`Jobs (async)` 류 이름에서 Node 판이 크래시하고 Python 판은 통과하던 미문서화 패리티 파괴를 봉합.
+- 유니코드는 NFC로 접는다 — macOS(NFD 성향)와 Linux CI를 섞어 쓰거나 클립보드 경유로 붙여넣은 한글 키가 NFC/NFD로 갈리면 눈으로 같은 entity를 두 스펙이 소유해도 dedup이 충돌을 놓쳤다.
 - 카테고리 역할은 **선언 우선·이름 폴백**이다 — `ownershipCategoryRoles`에 없는 역할만 기존 이름 정규식(`/entit/`·`/surface/`·`/capabilit/`)으로 추측한다. 그래서 기존 프로젝트는 무영향이고, 이름을 바꾼 프로젝트·비-웹 카테고리(킷 `Modules`/`Symbols`)는 선언으로 역할을 확정한다.
 - 역할이 해석되지 않은 카테고리는 **역할 없음**이며 그 역할에 걸린 판정은 inert다 — 조용히 통과하지 않고 소비 게이트가 사유를 표면화한다(SPEC-024·SPEC-026 inert 고지와 같은 계열).
 - 한 역할에는 카테고리 하나만 매핑된다(선언 순 첫 매치) — 두 카테고리에 같은 역할을 주면 뒤엣것은 무시한다. 미지의 역할 문자열은 무시(오타가 판정을 뒤집지 않게).
@@ -33,9 +38,9 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 각 FR은 구현된 동작을 서술한다(발명 금지).
 
-- **FR-001** (event): WHEN `parseSection` receives a heading and category list, THE **ownership-keys.mjs** (S) parser SHALL slice the text from that `## <heading>` line to the next `## ` line and return one comma-split, trimmed key array per category, excluding empty, `—`, and bracket-prefixed placeholder tokens.
+- **FR-001** (event): WHEN `parseSection` receives a heading and category list, THE **ownership-keys.mjs** (S) parser SHALL slice the text from that `## <heading>` line to the next `## ` line and return one trimmed key array per category, collecting every bullet declared for that category (not only the first), joining each bullet's indented continuation lines, splitting on commas that sit outside parentheses and brackets, and excluding only placeholder tokens — empty, `—`, `-`, and tokens consisting solely of a bracketed span.
 - **FR-002** (event): WHERE `surfaceFormat` is `http` (default), WHEN a Surfaces key is normalized, THE SYSTEM SHALL uppercase the METHOD, lowercase the path, rewrite `:id`/`<id>`/`{id}` params to the configured `surfacePathParam` `{name}` form, and strip the trailing slash; WHERE `surfaceFormat` is `path` or `any`, THE SYSTEM SHALL instead lowercase the key and strip the trailing slash without METHOD/param parsing (file-path surfaces).
-- **FR-003** (event): WHEN a non-Surfaces key (Entity or Capability class) is normalized, THE SYSTEM SHALL lowercase it and collapse internal whitespace to single spaces.
+- **FR-003** (event): WHEN any key is normalized, THE SYSTEM SHALL first apply Unicode NFC normalization so that canonically equivalent spellings collapse to one key, and WHERE the key is a non-Surfaces (Entity or Capability class) key THE SYSTEM SHALL additionally lowercase it and collapse internal whitespace to single spaces.
 - **FR-004** (unwanted): IF a Capabilities key is not exactly `entity.verb` (one dot) or its verb is absent from the configured verb set, THEN THE SYSTEM SHALL return a violation reason string instead of null.
 - **FR-005** (unwanted): WHERE `surfaceFormat` is `http` (default), IF a Surfaces key does not match `<METHOD> <path>` or the `event:`/`job:` form, THEN THE SYSTEM SHALL return a violation reason string; WHERE `surfaceFormat` is `path`, IF the key contains whitespace or non-path characters THEN it is a violation; WHERE `surfaceFormat` is `any`, no surface format is enforced.
 - **FR-006** (ubiquitous): THE **sdd-config.mjs** (S) loader SHALL resolve the config by walking upward from the start directory for `sdd.config.json`, merge the parsed user object over `DEFAULTS`, and shallow-merge the `commands` map.
@@ -114,3 +119,4 @@
 | 2026-07-27 | FR-010 신설 — 카테고리 역할 해석(`ownershipCategoryRoles` + `resolveCategoryRoles` → `cfg.__roles`). 판정 코어 3종(capability 귀속·스키마 백킹·키 종류 맵)과 게이트가 이 단일 소스를 소비, Node·Python 미러 | Ownership 감사 #21 근본 원인: 역할을 카테고리 **이름**으로 추측해 (a) 개명 시 판정이 조용히 inert(A-1) (b) 킷 자신(Modules/Symbols)이 규칙 9종을 자기에게 적용 불가(도그푸딩 공백). `ENT_CAT` 폴백이 3개 파일에 복붙(F8)돼 있던 것도 함께 제거 |
 | 2026-07-27 | FR-001·FR-006 주어를 `THE SYSTEM`에서 실제 소유 심볼(**ownership-keys.mjs**·**sdd-config.mjs**)로 교체 — 소유 surface 키 2건 FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: FR-010의 `ownershipCategoryRoles` 선언으로 킷 자신에게 규칙이 발화 — 익명 주어라 소유 키가 FR 선언 라인에 흔적이 없던 것을 실제 행위자로 명시(동작 불변) |
 | 2026-07-27 | `entityRegistry`의 `spec-id-numbering` 설명을 두 번호 층위(spec-ID·FR)로 갱신 | SPEC-014 FR-005/006 동반: 같은 aggregate가 FR 번호까지 소유하게 되어 config 사전의 entity 서술이 실체와 어긋나던 것을 정합 |
+| 2026-07-27 | dedup 입력 신뢰성 5건 봉합 — `parseSection` 전 불릿·줄바꿈 이어붙이기, 괄호 인식 split(`splitKeys`), 플레이스홀더 정밀화(`isPlaceholder`), 카테고리명 정규식 이스케이프(`escapeRegExp`), `normalizeKey` NFC 정규화. FR-001·FR-003 개정 + Edge Cases 5건, Node·Python 바이트 패리티, 회귀 테스트 6건 | Ownership 감사 #21 C-2·C-3·M-13·M-3·유니코드: dedup은 킷의 **유일한 hard 게이트**인데 그 입력이 조용히 잘려, 두 스펙이 같은 키를 소유해도 "✓ 구조적 중복 없음"이 나왔다(실측 재현 5건). 중복성 판정의 신뢰가 근본에서 깨져 있던 자리 |

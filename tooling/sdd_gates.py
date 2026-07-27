@@ -29,6 +29,7 @@
 import json
 import os
 import re
+import unicodedata
 import subprocess
 import sys
 
@@ -259,9 +260,38 @@ def cfg_tag(cfg):
 
 # ── 키 파이프라인 (ownership-keys.mjs 패리티) ─────────────────
 
+def is_placeholder(k):
+    """플레이스홀더 판정 — ownership-keys.mjs isPlaceholder 미러.
+    값 없음 표기(—·-)와 대괄호로만 둘러싼 자리표시([…]·[TBD]). `[id]/page.tsx`는 정당한 키."""
+    t = str(k).strip()
+    if not t or t in ("—", "-"):
+        return True
+    return bool(re.fullmatch(r"\[[^\]]*\]", t))
+
+
+def split_keys(raw):
+    """키 목록을 쉼표로 나눈다 — 괄호 안 쉼표는 구분자 아님(ownership-keys.mjs splitKeys 미러).
+    실측 결함: `POST /api/x (SPEC-013), ui:y (SPEC-013, 셸)`가 쓰레기 토큰으로 쪼개졌다."""
+    parts, buf, depth = [], "", 0
+    for ch in str(raw):
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(0, depth - 1)
+        if ch == "," and depth == 0:
+            parts.append(buf)
+            buf = ""
+            continue
+        buf += ch
+    parts.append(buf)
+    return [k.strip() for k in parts if k.strip() and not is_placeholder(k.strip())]
+
+
 def parse_section(text, heading, categories):
-    """`## <heading>` 섹션을 카테고리별 키 배열로. 헤더 다음~다음 ## 전까지."""
-    m = re.search(rf"^##\s+{heading}\b", text, re.MULTILINE)
+    """`## <heading>` 섹션을 카테고리별 키 배열로 — ownership-keys.mjs parseSection 미러.
+    카테고리 불릿을 **전부** 수집하고(과거엔 첫 줄만 — 두 번째 불릿·줄바꿈 뒷부분 무음 소실),
+    들여쓴 연속 줄을 이어붙이며, 괄호 인식 split을 쓴다."""
+    m = re.search(rf"^##\s+{re.escape(heading)}\b", text, re.MULTILINE)
     out = {c: [] for c in categories}
     if not m:
         return out
@@ -270,17 +300,18 @@ def parse_section(text, heading, categories):
     nxt = re.search(r"^##\s", body, re.MULTILINE)
     block = body[: nxt.start()] if nxt else body
     for cat in categories:
-        line = re.search(rf"-\s*\*\*{re.escape(cat)}\*\*\s*:\s*([^\n]+)", block, re.IGNORECASE)
-        if line:
-            keys = [k.strip() for k in line.group(1).split(",")]
-            out[cat] = [k for k in keys if k and k != "—" and k != "[…]" and not k.startswith("[")]
-        else:
-            out[cat] = []
+        pat = rf"^[ \t]*-\s*\*\*{re.escape(cat)}\*\*\s*:\s*([\s\S]*?)(?=^[ \t]*-\s*\*\*|\n[ \t]*\n|\Z)"
+        keys = []
+        for mm in re.finditer(pat, block, re.IGNORECASE | re.MULTILINE):
+            flat = re.sub(r"\s*\n[ \t]*", " ", mm.group(1)).strip()
+            keys.extend(split_keys(flat))
+        out[cat] = keys
     return out
 
 
 def normalize_key(category, raw, cfg):
-    s = str(raw).strip()
+    # 유니코드 정규화(NFC) — NFC/NFD 두 표현이 다른 키로 갈리는 중복 누락 차단(Node 미러).
+    s = unicodedata.normalize("NFC", str(raw)).strip()
     if category == "Surfaces":
         style = cfg.get("surfaceFormat") or "http"
         if style != "http":

@@ -126,3 +126,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-27 | FR-001·003·004 주어를 `THE SYSTEM`에서 실제 런타임/계약으로 교체 — **sdd_gates.py**·**sdd_gates.sh**·**go-gate**·aggregate **runtime-parity** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 4건이 FR 선언 라인에 흔적이 없던 것을 명시(판정 범위·패리티 요구는 불변) |
 | 2026-07-27 | preset spec-template 재동기(정식 templates/module-spec.md와 바이트 동일) — FR 번호 규범 주석 반영 | FR-005(템플릿 패리티) 동반: 규범 주석이 preset 경로에만 없으면 preset으로 쓴 스펙이 규범을 못 본다 |
 | 2026-07-27 | Python 미러 — `group_numbers`(순수 원형)·`fr_numbering_issues` + cmd_fr 1b 배선, Node와 출력·exit 바이트 동일 | SPEC-014 FR-005/006 동반 — 전 게이트 패리티 유지 |
+| 2026-07-27 | Python 미러 — `parse_section` 전 불릿·연속 줄, `split_keys`·`is_placeholder` 신설, `normalize_key` NFC(`unicodedata`). Node와 출력 바이트 동일 | SPEC-001 FR-001/003 개정 동반 — dedup 입력 신뢰성 봉합의 양판 패리티 |

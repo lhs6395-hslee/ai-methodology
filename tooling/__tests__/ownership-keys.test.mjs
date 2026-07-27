@@ -6,7 +6,7 @@
 // @covers SPEC-001/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSection, normalizeKey, validateKey, resolveCategoryRoles } from "../ownership-keys.mjs";
+import { parseSection, normalizeKey, validateKey, resolveCategoryRoles, splitKeys, isPlaceholder, escapeRegExp } from "../ownership-keys.mjs";
 import { loadConfig } from "../sdd-config.mjs";
 
 const cfg = { ...loadConfig("/nonexistent"), capabilityVerbs: ["recommend"] };
@@ -114,4 +114,49 @@ test("resolveCategoryRoles: 부분 선언은 나머지만 폴백 / 오타·중�
   assert.equal(resolveCategoryRoles(["Modules"], { Nope: "entity" }).entity, null);
   // 대소문자 무관 매칭
   assert.equal(resolveCategoryRoles(["Modules"], { modules: "entity" }).entity, "Modules");
+});
+
+// ── dedup 입력 신뢰성(감사 #21 C-2·C-3·M-13·유니코드) — 조용한 절단/누락 회귀 방지 ──
+// 이 5건은 킷의 **유일한 hard 게이트**인 dedup의 입력이 무음으로 잘리던 결함이다.
+// 두 스펙이 같은 키를 소유해도 "✓ 구조적 중복 없음"이 나왔다.
+
+test("parseSection: 카테고리 불릿이 여러 개면 전부 수집(첫 줄만 읽던 절단)", () => {
+  const t = "## Ownership\n- **Entities**: alpha\n- **Entities**: shared_dup\n\n## Next\n";
+  assert.deepEqual(parseSection(t, "Ownership", ["Entities"]).Entities, ["alpha", "shared_dup"]);
+});
+
+test("parseSection: 줄바꿈으로 이어진 키 목록을 이어붙인다", () => {
+  const t = "## Ownership\n- **Entities**: alpha, beta,\n  shared_dup, delta\n\n## Next\n";
+  assert.deepEqual(parseSection(t, "Ownership", ["Entities"]).Entities,
+    ["alpha", "beta", "shared_dup", "delta"]);
+  // 마지막 섹션(뒤에 ## 없음)도 온전히 읽는다 — m 플래그의 $ 조기종료 회귀 방지
+  assert.deepEqual(parseSection("## Ownership\n- **Entities**: last, one\n", "Ownership", ["Entities"]).Entities,
+    ["last", "one"]);
+});
+
+test("splitKeys: 괄호 안 쉼표는 구분자가 아니다(쓰레기 키 방지)", () => {
+  assert.deepEqual(splitKeys("POST /api/x (SPEC-013), ui:y (SPEC-013, 셸)"),
+    ["POST /api/x (SPEC-013)", "ui:y (SPEC-013, 셸)"]);
+  assert.deepEqual(splitKeys("orders (belongs-to, weak), users"), ["orders (belongs-to, weak)", "users"]);
+});
+
+test("isPlaceholder: 자리표시만 제외하고 정당한 대괄호 키는 보존", () => {
+  for (const p of ["—", "-", "[…]", "[TBD]", "[미정]", "  "]) assert.equal(isPlaceholder(p), true, p);
+  for (const k of ["[level]/page.tsx", "src/app/[id]/route.ts", "[id]/edit"]) assert.equal(isPlaceholder(k), false, k);
+  // 회귀: 과거엔 `[`로 시작하면 전부 폐기해 루트 동적 세그먼트 키가 dedup 대상에서 사라졌다
+  const t = "## Ownership\n- **Surfaces**: [level]/page.tsx, src/app/[id]/route.ts, [TBD], —\n\n## X\n";
+  assert.deepEqual(parseSection(t, "Ownership", ["Surfaces"]).Surfaces,
+    ["[level]/page.tsx", "src/app/[id]/route.ts"]);
+});
+
+test("normalizeKey: NFC 정규화로 NFC/NFD 같은 글자를 같은 키로", () => {
+  const nfc = "상품", nfd = "상품".normalize("NFD");
+  assert.notEqual(nfc.length, nfd.length);                       // 입력은 서로 다른 표현
+  assert.equal(normalizeKey("Entities", nfc, cfg), normalizeKey("Entities", nfd, cfg));
+});
+
+test("escapeRegExp: 카테고리명의 정규식 메타문자가 크래시를 내지 않는다(Python re.escape 패리티)", () => {
+  const t = "## Ownership\n- **C++ Symbols**: a.cpp, b.cpp\n\n## Next\n";
+  assert.deepEqual(parseSection(t, "Ownership", ["C++ Symbols"])["C++ Symbols"], ["a.cpp", "b.cpp"]);
+  assert.equal(escapeRegExp("Jobs (async)"), "Jobs \\(async\\)");
 });
