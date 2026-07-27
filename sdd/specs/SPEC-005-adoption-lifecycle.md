@@ -33,10 +33,10 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (event): WHEN `/sdd-start` runs in a project that has no `sdd/` layout, THE SYSTEM SHALL wire the kit via `sdd-init`, reverse-engineer DRAFT EARS FR specs from the current code, and HALT at a human-approval gate before finalizing any spec.
-- **FR-002** (event): WHEN `/sdd-readopt` runs, THE SYSTEM SHALL first create a `git tag sdd-pre-readopt-<date>` safety snapshot, re-wire via `sdd-init --force`, and clear prior `sdd/specs` without modifying production code, then reverse-engineer DRAFT specs and HALT at the approval gate.
-- **FR-003** (event): WHEN `/sdd-update` runs, THE SYSTEM SHALL surface code↔spec drift through the `/sdd-sync` harness, escalating bug-driven drift to `/speckit.fix`, and keep gates green.
-- **FR-004** (unwanted): IF any adoption lifecycle command would finalize or overwrite a spec or production code without recorded human approval, THEN THE SYSTEM SHALL refuse the action and wait for approval.
+- **FR-001** (event): WHEN `/sdd-start` runs in a project that has no `sdd/` layout, THE **sdd-start.SKILL.md** (S) skill SHALL wire the kit via `sdd-init`, reverse-engineer DRAFT EARS FR specs from the current code, and HALT at a human-approval gate before finalizing any spec.
+- **FR-002** (event): WHEN `/sdd-readopt` runs, THE **sdd-readopt.SKILL.md** (S) skill SHALL first create a `git tag sdd-pre-readopt-<date>` safety snapshot, re-wire via `sdd-init --force`, and clear prior `sdd/specs` without modifying production code, then reverse-engineer DRAFT specs and HALT at the approval gate.
+- **FR-003** (event): WHEN `/sdd-update` runs, THE **sdd-update.SKILL.md** (S) skill SHALL surface code↔spec drift through the `/sdd-sync` harness, escalating bug-driven drift to `/speckit.fix`, and keep gates green.
+- **FR-004** (unwanted): IF any **adoption-lifecycle** (E) command would finalize or overwrite a spec or production code without recorded human approval, THEN THE SYSTEM SHALL refuse the action and wait for approval.
 - **FR-005** (optional): WHERE a `<project-path>` or `<methodology-url>` argument is omitted, THE SYSTEM SHALL default to the current working directory and the canonical methodology repository respectively.
 
 ### Key Entities
@@ -90,3 +90,4 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 | 2026-07-21 | update.md 선택지 제시 규칙 명문화 — 중립 나열 금지: papered-over 감지 시 `/sdd-readopt`를 첫 번째·"(권장)"으로 제시하고, "현행 유지(면제로 충분)"를 UI/흐름 면제의 유효 선택지로 내세우지 않는다("현행 유지"는 실 외부 aggregate 면제에만 정당) | owner: "전면 재수정으로 유도하게 해줘야지". 실측: update 12회차가 '현행 유지'를 1번 선택지로 내세워 papered-over를 co-equal로 제시 |
 | 2026-07-21 | update.md graduation에 '새 체크의 기존 hard 소급 범람' 전이 명문화 — 새 도구가 이미 hard인 knob에 새 규칙을 얹어 대량 위반으로 깨질 때, '미적용/revert 권장'을 금지하고 '적용+임시 advisory 전이+마이그레이션+재hard' 단일 경로로 몰아준다 | 실측(소비 프로젝트): FR-007이 128건을 내며 frKeyAnchorPolicy=hard에 바로 물리자 에이전트가 '지금은 미적용(권장)'을 제시 — 회피를 권장으로 내세운 것(owner: '미처리가 권장으로 뜨는 이유?'). advisory는 경유지·hard가 종착지 원칙 재확인 |
 | 2026-07-21 | update.md 실행 경로/불변 규칙 개정 — 백로그가 있으면 표면화에서 멈추지 말고 **같은 세션에서 migrate/readopt 절차로 이어 스펙을 실제 편집**한다. 사람 승인 관문은 '각 스펙 편집'에 걸리지 'migrate 시작' 여부가 아니다. 불변식을 '스펙 편집 금지'에서 '각 스펙 편집은 사람 승인 경유(작성=LLM·확정=사람)'로 정정 — 승인 없는 자동 덮어쓰기·빅뱅 재작성만 금지 | owner 반복 확정: "update해도 스펙 바꾸기로 했잖아". 실측: 소비 프로젝트가 update 후에도 스펙 무변경(에이전트가 '표면화까지가 범위'로 종결). 한계: 이 변경은 update.md 프롬프트 정정이며 하위 세션 준수를 기계적으로 강제하진 못함(하네스 영역) |
+| 2026-07-27 | FR-001~004 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — 스킬 소스 3종(**sdd-start.SKILL.md**·**sdd-readopt.SKILL.md**·**sdd-update.SKILL.md**)과 aggregate **adoption-lifecycle** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 4건이 FR 선언 라인에 흔적이 없던 것을 명시(동작 불변) |
