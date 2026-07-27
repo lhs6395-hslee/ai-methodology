@@ -149,7 +149,7 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `ignoreDirs` | 순회 제외 폴더명 | 언어별 빌드/의존 폴더 다수 |
 | `testFileRegex` | 테스트 **파일명** 매칭 정규식(소스 문자열) 배열 | JS/TS |
 | `ownershipCategories` | 구조적 중복 키 종류 | `Entities/Surfaces/Capabilities` |
-| `capabilityVerbs` | Capability 키 `<verb> <noun>`의 verb 어휘를 CRUD(create/read/update/delete)에 더할 도메인 동사(SPEC-001). 채우면 미등록 verb 소유는 ownership 키 검증이 거부 | `[]` |
+| `capabilityVerbs` | Capability 키 `<entity>.<verb>`(정본 형식 — SPEC-024·DEDUP §정규화)의 verb 어휘를 CRUD 기본(create/read/update/delete/**list**)에 더할 도메인 동사(SPEC-001). 어휘는 비어 있어도 항상 닫혀 있다(CRUD ∪ `capabilityVerbs`) — 미등록 verb는 `validateKey`가 형식 위반으로 지목하되 **기본 ⚠ warn·exit 0**이고 `check-ownership --strict`에서 exit 1(권장 종착지 = hard) | `[]` |
 | `surfaceFormat` | Surface 키 형식(SPEC-001) — `"http"`(`<METHOD> <path>`·`event:`·`job:`)·`"path"`(Next.js 등 파일 라우팅·IaC의 파일경로 표면)·`"any"`(형식검증 생략). normalizeKey/validateKey가 이 값으로 분기 | `"http"` |
 | `surfacePathParam` | Surface path param 표준 표기(SPEC-001) — 키 정규화 시 경로 파라미터를 이 토큰으로 환원해 비교(`/users/{name}` 형태) | `"{name}"` |
 | `maxKeysPerCategoryPerSpec` | spec 입도(cohesion) 임계 — 한 spec이 한 카테고리에서 이 수를 초과 소유하면 under-fragmentation 신호로 분할 권고(advisory, check-ownership dedup의 거울상) | `4` |
