@@ -885,6 +885,11 @@ test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·�
     [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard", policyRatchetExceptions: ["frKeyAnchorPolicy"] }, "main"],
     [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard" }, "no-such-ref"],
     [{ frKeyAnchorPolicy: "hard" }, { frKeyAnchorPolicy: "hard", policyRatchetPolicy: "strict" }, "main"],
+    // 자기포함(A-2): base hard인데 워킹트리 off 한 줄 → base 시점 강도로 판정(양판 동일해야 한다)
+    [{ frKeyAnchorPolicy: "hard", policyRatchetPolicy: "hard" }, { frKeyAnchorPolicy: "off", policyRatchetPolicy: "off" }, "main"],
+    [{ policyRatchetPolicy: "hard" }, { policyRatchetPolicy: "off", policyRatchetExceptions: ["policyRatchetPolicy"] }, "main"],
+    [{ frKeyAnchorPolicy: "hard", policyRatchetPolicy: "off" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "off" }, "main"],
+    [{ frKeyAnchorPolicy: "hard", policyRatchetPolicy: "off" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "hard" }, "main"],
   ];
   for (const [baseCfg, curCfg, base] of scen) {
     const root = mkdtempSync(join(tmpdir(), "sdd-py-ratchet-"));

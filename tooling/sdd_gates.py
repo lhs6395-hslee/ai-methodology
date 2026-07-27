@@ -104,7 +104,9 @@ STANDARD_PREFIXES = {"SPEC", "INFRA", "TEST", "CICD"}
 
 # 정책 래칫(SPEC-027) — policy-ratchet-lib.mjs 미러. 강도 순위·대상 knob은 byte-parity.
 POLICY_RANK = {"off": 0, "silent": 0, "advisory": 1, "warn": 1, "hard": 2, "error": 2}
+# 자기포함: policyRatchetPolicy가 목록 선두 — 래칫 자신이 감시 밖이면 off 한 줄로 자폭(감사 A-2).
 RATCHETED_POLICIES = [
+    "policyRatchetPolicy",
     "specSyncUnownedPolicy", "draftBlockPolicy", "semanticDriftPolicy",
     "capabilityOwnershipPolicy", "frKeyAnchorPolicy", "runTestsPolicy",
     "migrationStatePolicy", "entitySchemaBackingPolicy",
@@ -113,6 +115,15 @@ RATCHETED_POLICIES = [
 
 def rank_of(v):
     return POLICY_RANK.get(str(v))
+
+
+def effective_ratchet_policy(base_policy, cur_policy):
+    """래칫 자신의 강도 — base 시점과 현재 중 강한 쪽(policy-ratchet-lib effectiveRatchetPolicy 미러).
+    하향은 base가 심판(워킹트리 한 줄로 판정을 끄지 못한다), 상향은 즉시 반영."""
+    b, c = rank_of(base_policy), rank_of(cur_policy)
+    if b is None or c is None:
+        return cur_policy
+    return base_policy if b > c else cur_policy
 
 
 def classify_ratchet(base_cfg, cur_cfg, exceptions=None):
@@ -2526,26 +2537,41 @@ USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consiste
 
 
 def cmd_ratchet(cfg, base_arg):
-    policy = cfg.get("policyRatchetPolicy") or "advisory"
-    if policy not in ("off", "advisory", "hard"):
-        print(f'✗ policyRatchetPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+    cur_policy = cfg.get("policyRatchetPolicy") or "advisory"
+    if cur_policy not in ("off", "advisory", "hard"):
+        print(f'✗ policyRatchetPolicy 값 위반 "{cur_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
               file=sys.stderr)
         sys.exit(1)
-    if policy == "off":
-        print("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)")
-        sys.exit(0)
-    hard = policy == "hard"
     base = base_arg or os.environ.get("SDD_DIFF_BASE") or cfg.get("specSyncBase") or "origin/main"
+
+    def off_notice():
+        print("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)")
+
+    # base config를 off 단락보다 먼저 읽는다 — 래칫 자신의 강도도 base 시점 값으로 판정(감사 A-2).
     cfg_rel = (_git(cfg, ["ls-files", "--full-name", "--", "sdd.config.json"]) or "").strip().split("\n")[0]
     if not cfg_rel:
         cfg_rel = os.path.relpath(cfg["__path"], cfg["__root"]) if cfg.get("__path") else "sdd.config.json"
     base_raw = _git(cfg, ["show", f"{base}:{cfg_rel}"])
     if base_raw is None:
+        if cur_policy == "off":
+            off_notice()
+            sys.exit(0)
         print(f"정책 래칫 게이트 — base({base}) config 조회 불가(git 없음·최초 채택) — 건너뜀")
         sys.exit(0)
     base_cfg = config_from_string(base_raw, cfg["__root"])
     if not base_cfg:
+        if cur_policy == "off":
+            off_notice()
+            sys.exit(0)
         print(f"정책 래칫 게이트 — base({base}) config 파싱 실패 — 건너뜀")
+        sys.exit(0)
+    policy = effective_ratchet_policy(base_cfg.get("policyRatchetPolicy"), cur_policy)
+    hard = policy == "hard"
+    if policy != cur_policy:
+        print(f"· 정책 래칫: policyRatchetPolicy {cur_policy}(현재)가 base({base})의 "
+              f"{base_cfg.get('policyRatchetPolicy')}보다 약함 — base 시점 강도로 판정(자기약화 방지, SPEC-027)")
+    if policy == "off":
+        off_notice()
         sys.exit(0)
     violations, allowed = classify_ratchet(base_cfg, cfg, cfg.get("policyRatchetExceptions") or [])
     print(f"정책 래칫 게이트 — base:{base} mode:{policy} violations:{len(violations)} allowed-downgrades:{len(allowed)}")

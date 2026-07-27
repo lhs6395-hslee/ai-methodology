@@ -8,8 +8,13 @@
 //   off/silent(0, 비활성) < advisory/warn(1, 경고) < hard/error(2, 차단).
 export const POLICY_RANK = { off: 0, silent: 0, advisory: 1, warn: 1, hard: 2, error: 2 };
 
-// 래칫 대상 정책 knob — 강제 강도를 갖는 8종(sdd-config.mjs DEFAULTS 기준).
+// 래칫 대상 정책 knob — 강제 강도를 갖는 9종(sdd-config.mjs DEFAULTS 기준).
+// **자기포함**(`policyRatchetPolicy`가 목록의 첫 항목): 래칫 자신의 강도가 감시 밖이면
+// `policyRatchetPolicy:"off"` 한 줄로 래칫 전체가 자폭한다 — 게이트가 워킹트리 config로 자기
+// 정책을 읽고 off면 base 비교 전에 exit 0하기 때문(감사 A-2 실측: 대상 knob 하향 + 이 한 줄을
+// 같은 커밋에 넣으면 "판정 안 함 exit 0"). 자기 하향을 먼저 지목하도록 목록 선두에 둔다.
 export const RATCHETED_POLICIES = [
+  "policyRatchetPolicy",
   "specSyncUnownedPolicy",
   "draftBlockPolicy",
   "semanticDriftPolicy",
@@ -25,10 +30,24 @@ export function rankOf(v) {
   return r === undefined ? null : r;
 }
 
+// 이 실행을 심판할 래칫 자신의 강도 — base 시점과 현재 중 **강한 쪽**.
+// 하향(자기약화)은 base가 심판하고(워킹트리 한 줄로 판정을 끄지 못한다), 상향은 즉시 반영한다
+// (전진은 막지 않는다). check-spec-sync가 staged 판정을 HEAD 시점 config로 내리는 것과 동형의
+// 반사성 봉합이되, 대상이 "래칫 자신의 강도"다. base가 미지의 값이면 판정 밖 → 현재 값 사용
+// (게이트의 enum 검증이 담당). base·현재 모두 off인 프로젝트는 무영향(하위호환).
+export function effectiveRatchetPolicy(basePolicy, curPolicy) {
+  const b = rankOf(basePolicy), c = rankOf(curPolicy);
+  if (b === null || c === null) return curPolicy;
+  return b > c ? basePolicy : curPolicy;
+}
+
 // base config 대비 current config에서 강도가 낮아진 knob을 분류한다.
 //   violations       — 예외 선언 없이 하향된 knob(차단 대상).
 //   allowedDowngrades — policyRatchetExceptions에 선언돼 허용된 하향(부채로 표면화 — 남용 방지).
-// base에 없는 knob(최초 채택 전)·미지의 값은 판정 밖(null 취급, 건너뜀) — 하위호환.
+// base에 없는 knob·미지의 값은 판정 밖(null 취급, 건너뜀) — 하위호환. 단 소비 게이트는 base
+// config를 DEFAULTS 병합으로 구성하므로(configFromString) 게이트 경로에서 knob은 항상 존재한다:
+// base config에 안 적힌 knob은 "부재"가 아니라 **그 시점 DEFAULTS 값**과 대조된다(기본값 아래로
+// 내리는 것도 하향). knob 부재 분기는 raw dict를 직접 넘기는 호출자(단위 테스트)용 안전망.
 export function classifyRatchet(baseCfg, curCfg, exceptions = []) {
   const ex = new Set(exceptions || []);
   const violations = [];
