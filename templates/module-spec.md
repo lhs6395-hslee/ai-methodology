@@ -8,6 +8,11 @@
 **Module**: `[MODULE-ID]`  **Spec**: `SPEC-NNN`  **Created**: [YYYY-MM-DD]  **Status**: Draft | Reviewed | Approved | Active | Deprecated | Removed (택1 — 수명주기 enum, completeness 게이트가 검증)
 <!-- (선택) **Lifecycle**: removable | permanent — Status와 직교. TEST/삭제예정 비제품 도구는 `removable`, 영속 제품 스펙은 생략(또는 `permanent`). SPEC-008 FR-006, SPEC-015가 TEST 도메인에서 소비. -->
 <!-- FR 번호: 기본 `**FR-NNN**`. 버그픽스가 기존 FR을 쪼개 착지하면 레터 서픽스 `**FR-NNNa**`(예 FR-003a) 허용 — 전 게이트·@covers·retag가 지원. -->
+<!-- FR 번호 규범(STORAGE §2-4 정본, SPEC-014 강제): **이 스펙 안에서 001부터 연번**. 완전 식별자가
+  `<SPEC-ID>/FR-NNN`이고 스펙 ID가 네임스페이스라 번호는 스펙 안에서만 유일하면 된다 — 전역 연번 금지
+  (가독성 손해). 다른 스펙에 같은 번호가 있어도 무관. 한 스펙 안 중복 = hard(exit 1),
+  001 미시작·중간 결번 = advisory(폐기 흔적일 수 있음 — SPEC-018). 스펙 간 FR 이동은 재번호이므로
+  새 번호를 받고 `sdd-retag`로 @covers·smokeManifest를 함께 이행한다(손 재태깅 금지 — SPEC-011). -->
 <!-- Dependencies 관계: `Entity (relation-type)`에서 config `relationTypes`가 비어있지 않으면 등록된 어휘만 허용(capabilityVerbs 동형 관문, SPEC-017). -->
 
 <!-- 수명주기(상태 순서 강제 — SPEC-008): Draft(작성 중 — 소유 코드 변경을 spec-sync가 차단) →
