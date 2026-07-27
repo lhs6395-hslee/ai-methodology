@@ -11,18 +11,34 @@
 **REF(자기참조):** 이 파일을 raw URL로 받았다면 그 URL의 `<ref>` 세그먼트를 REF로, 로컬 키트로 실행 중이면 REF=`main`으로 간주한다(아래 `--branch`/pull에 사용).
 
 ## 실행 순서
-1. **키트 최신화(전체 clone 없이).** 로컬 키트가 있으면 `git -C "$KIT" pull` 로 최신화하고, 없으면 partial+sparse로 확보한다(뒤처졌으면 알린다):
+1. **키트 최신화(전체 clone 없이) — 단, 그 클론은 남의 작업 공간일 수 있다.** 로컬 키트가 있으면 최신화하고 없으면 partial+sparse로 확보한다(뒤처졌으면 알린다). ⚠ **`pull`은 클론이 깨끗할 때만이다** — 다른 세션(사람·에이전트)이 그 클론을 쓰는 중이면 **읽기 전용 고정 ref 모드**로 전환한다:
    ```sh
    KIT="${SDD_KIT:-$HOME/Documents/claude/sdd}"           # 로컬 키트 캐시 위치(관례)
    REF="main"                          # update.md를 받은 ref (정본 main; 자기참조 — 브랜치에서 받으면 그 ref)
    if [ -d "$KIT/.git" ]; then
-     git -C "$KIT" fetch origin "$REF" && git -C "$KIT" pull --ff-only origin "$REF"
+     git -C "$KIT" fetch origin "$REF"                     # fetch는 항상 안전(워킹트리 무변경)
+     if [ -z "$(git -C "$KIT" status --porcelain)" ] && \
+        [ "$(git -C "$KIT" rev-parse --abbrev-ref HEAD)" = "$REF" ]; then
+       git -C "$KIT" pull --ff-only origin "$REF"           # 깨끗함 → 워킹트리 최신화 가능
+       SRC="worktree"
+     else
+       SRC="ref"                                           # ⚠ 남의 WIP 상주 → 쓰기 금지, blob에서 읽는다
+       echo "⚠ 킷 클론이 clean/$REF 아님 — 읽기 전용 모드: origin/$REF blob에서 읽음(pull·checkout·stash 금지)"
+     fi
    else                                                    # partial+sparse — 전체 clone 아님
      git clone --filter=blob:none --sparse --branch "$REF" \
        https://github.com/lhs6395-hslee/ai-methodology "$KIT"
      git -C "$KIT" sparse-checkout set tooling templates prompts
+     SRC="worktree"
    fi
+   # 정본 읽기(양 모드 공통) — SRC=ref면 반드시 이 경로로만 읽는다.
+   kitcat() { if [ "$SRC" = ref ]; then git -C "$KIT" show "origin/$REF:$1"; else cat "$KIT/$1"; fi; }
+   #   예) kitcat tooling/check-ownership.mjs > scripts/check-ownership.mjs
    ```
+   - **쓰기 금지 판정(필수):** `git -C "$KIT" status --porcelain`이 비어 있지 않거나 HEAD 브랜치가 `$REF`가 아니면 다른 세션이 그 클론을 쓰는 중이다. 이때 `pull`·`checkout`·`stash`·`reset`으로 남의 트리를 건드리지 않는다(그 세션의 작업이 사라진다).
+   - **⚠ 읽기 전용 모드에서는 워킹트리가 정본이 아니다 — `origin/$REF` blob에서 읽는다.** 워킹트리에서 복사하면 **남의 미완성 WIP를 소비 프로젝트에 삼켜 배포**한다(실측: finops 라운드가 킷 클론에 타 세션 WIP가 상주한 것을 발견하고 이 판단을 절차 없이 스스로 해야 했다 — 절차에 길이 없었다).
+   - `fetch`조차 실패하면(권한·락·오프라인) 남의 클론을 재사용하지 말고 **별도 경로에 임시 클론**을 뜬다: `git clone --filter=blob:none --sparse --branch "$REF" … "$TMPKIT"` 후 `KIT=$TMPKIT`·`SRC=worktree`.
+   - 2·3단계 diff·복사의 **정본은 `kitcat`이 주는 바이트**다. 리포트에 **어느 모드로 읽었는지(worktree/ref)와 읽은 커밋(`git -C "$KIT" rev-parse origin/$REF`)** 을 남긴다 — "킷 최신화했음"만 쓰면 무엇을 소비했는지 추적할 수 없다.
 2. **diff.** 이 프로젝트에 설치된 것(`scripts/`의 `*.mjs` 게이트 · `.git/hooks` · `.claude/skills` · `sdd/templates`)을 키트(`$KIT/tooling`·`$KIT/templates`)와 비교한다.
 3. **승인 후 반영.** 바뀐 파일만 목록으로 보여주고, **사용자 승인을 받은 뒤에만** 반영한다 — 자동 덮어쓰기 금지. (`sdd-init`를 `--force` 없이 재실행하면 신규만 추가되고 기존은 보존. 게이트 코드 갱신은 diff 확인 후 명시적으로 복사.)
 4. **새 config knob·규범 인스턴스화 (고도화 자동 전파 — 이 단계가 빠지면 도구만 새롭고 방법론 고도화는 프로젝트에 도달하지 않는다).**
@@ -34,28 +50,52 @@
        - ⚠ **`entitySchemaExemptEntities`로 백로그를 대량 면제하지 말 것(실측 악용):** 스윕이 유령 entity를 내면 **면제가 아니라 원인별로 해소**한다 — (a) UI/흐름 개념(`wizard`·`project_list`·`dashboard`·`detail`, FR이 실 테이블을 조작)은 **Surface 강등 + capability 재키**(migrate/readopt), (b) 인프라·proto entity(`vpc`·`eks` 등)는 그 구조 SSOT(terraform·`.proto`)를 **`entitySchemaSources`에 소스로 추가**해 스키마 백킹, (c) 면제는 이 둘 다 아닌 "스키마 밖 실 외부 aggregate"에만 소수. 면제는 게이트가 매 실행 부채로 표면화하므로 조용한 '완료'가 되지 않는다. **대량 면제(수십 건)는 entity를 개념 단위로 쪼갠 신호 → readopt 대상**이지 면제 대상이 아니다.
      - *기본값으로 충분한 knob* → 그대로 둔다(하위호환).
    - **새 규범 반영:** 이번 최신화로 들어온 새 규범(예: 완료 루프 close-out — `speckit-fix` 스킬 단계·`METHODOLOGY.md`)이 프로젝트 관례(`CLAUDE.md`) 기입을 요구하면 사용자 확인 후 반영한다.
+   - **⚠ `sdd-init` 설치 목록에 없는 새 킷 파일의 채택 판정(절차 공백 — 실측):** 킷 `tooling/`에 새 파일이 있는데 `sdd-init.sh` 복사 목록·훅·`sdd-sync` 규칙표 어디에도 배선이 없으면, "새 규범" 판정만으로는 그게 **소비 프로젝트 산출물**인지 **킷 내부 도그푸딩 전용**인지 결정할 수 없다. 추론하지 말고 아래 순서로 판정한다:
+     1. **소유 스펙을 찾는다** — 킷 `sdd/specs/`에서 그 파일 경로를 `## Ownership`의 `Files`에 가진 스펙(`grep -rl "<파일명>" $KIT/sdd/specs/`).
+     2. **그 스펙의 `Artifacts`를 본다** — 산출물 경로가 **소비 프로젝트 경로**(`sdd/…`·`.claude/…`·`scripts/…`)면 **소비 프로젝트 산출물**이다. 킷 자신의 CI·릴리스 경로(`.github/…`, CICD-* 소유)만 내면 **킷 내부 전용**이다.
+     3. **동인을 본다** — 그 스펙의 `Input`·`Change Log` 근거가 **소비 프로젝트/owner의 실측 문제**에서 왔으면 소비 프로젝트 산출물, **킷 자체의 개발 편의·도그푸딩**에서 왔으면 킷 내부 전용이다.
+     4. **판정이 "소비 프로젝트 산출물"인데 배선이 없으면 그건 채택 판단 사항이 아니라 킷의 배포 누락이다** — 그 라운드에서 (a) 소비 프로젝트에는 킷에서 직접 복사해 배선하고, (b) 킷에 `sdd-init` 복사 목록 추가를 제안한다(킷 접근권이 없으면 이슈로 남긴다). "설치 목록에 없으니 대상 아님"으로 넘기지 마라 — 그게 방법론 고도화가 프로젝트에 도달하지 못하는 경로다.
+     5. **킷 내부 전용이면** 복사하지 않고 **사유를 리포트에 명시**한다(조용히 넘기지 않는다 — 다음 라운드가 같은 추론을 반복하지 않게).
+     - 실측: `gen-ownership-map.mjs`(SPEC-028 — 소유 키별 보증 맵)가 킷 `tooling/`에 있는데 복사 목록에 없어 finops 라운드가 **브리핑에서 추론**해야 했다. 위 규칙을 적용하면 판정은 기계적이다 — 소유 스펙의 Artifacts가 `sdd/OWNERSHIP_MAP.md`(소비 프로젝트 경로)이고 동인이 owner의 "GitLab에서 키 보증 확인이 힘들다"이므로 **소비 프로젝트 산출물**이고, 킷 복사 목록 누락은 배포 누락이었다(킷에서 봉합됨).
    - 원칙: 이 단계는 **어떤 미래 knob에도** 동작하도록 generic이다 — 특정 knob명을 하드코딩하지 않고 "DEFAULTS엔 있는데 프로젝트에 없는 것"을 기준으로 판단한다.
 5. **새 스펙 문법 마이그레이션 백로그 (스펙은 승인 전 안 건드림 — 이 단계가 빠지면 새 문법이 도구로만 도착하고 기존 스펙엔 영원히 미적용된다).**
    - **⚠ 이 단계는 이번 라운드 도구 diff 여부와 무관하게 항상 실행한다.** 새 스펙 문법은 **이전** update 라운드에 이미 도착했을 수 있다(도구는 최신인데 기존 스펙은 구문법 그대로 — diff가 없어도 마이그레이션 대상은 남아 있다). **"도구 변경 없음 = 할 일 없음"으로 종료하는 것은 오류다**(실측 결함: 소비 프로젝트 update가 diff 0을 보고 게이트 스윕 없이 "이미 최신"으로 끝냄 — 백로그가 영원히 표면화되지 않음). diff가 0이어도 반드시 아래 게이트 스윕을 돌린다.
    - **왜:** 고도화가 **스펙 본문 문법**을 확장하면(예: SPEC-017 Entity 관계 — 복수 `Ownership.Entities` → aggregate root 1개 + `## Dependencies`의 `EntityName (relation-type)`; SPEC-023 키 앵커 — FR bold를 키 앵커로; SPEC-024 capability 귀속 — entity 없는 capability 스펙 금지), 도구·knob는 위 1~4로 오지만 **기존 스펙은 불변 규칙 때문에 자동 재구성되지 않는다**(실측: 소비 프로젝트가 update 후에도 스펙마다 entity 복수 소유 그대로).
-   - **탐지(기계):** 반영 후 게이트를 일괄 실행(`node scripts/sdd-sync.mjs` 또는 개별 게이트)해 **새 문법 유래 advisory**를 수집한다 — cohesion의 "aggregate 삼킴 의심"(Entities > `maxAggregateRootsPerSpec`), ownership의 관계 미구조화(괄호 없는 자유참조)·**capability 귀속 위반**(entity 없는 capability 스펙·남의 entity 위 capability — SPEC-024, 해소=능력을 entity 소유 스펙으로 이관)·**entity 스키마 백킹 위반**(소유 entity가 구조 SSOT에 없는 유령 entity — SPEC-026, `entitySchemaBackingPolicy` advisory + `entitySchemaSources` 설정 시; 해소=실 테이블이면 스키마 존재/면제, UI 개념이면 Surface 강등+실 entity 재키), consistency의 키 앵커 미매치·**카테고리 마커 위반**(굵은 키에 종류 마커 누락·불일치 — entity `(E)`·surface `(S)`·capability `(C)`, SPEC-023 FR-005, `frKeyAnchorPolicy` advisory) 등. **전제:** 4단계에서 마이그레이션 표면화 knob(`frKeyAnchorPolicy` 등)을 `advisory`로 켰어야 이 스윕이 백로그를 낸다 — 아직 `off`면 이 단계에서 켜고 다시 돌린다. 스윕이 0건이면 그때 "마이그레이션 대상 없음"으로 보고한다(게이트를 실제로 돌린 근거와 함께).
+   - **탐지(기계):** 반영 후 게이트를 일괄 실행(`node scripts/sdd-sync.mjs` 또는 개별 게이트)해 **새 문법 유래 advisory**를 수집한다 — cohesion의 "aggregate 삼킴 의심"(Entities > `maxAggregateRootsPerSpec`), ownership의 관계 미구조화(괄호 없는 자유참조)·**capability 귀속 위반**(entity 없는 capability 스펙·남의 entity 위 capability — SPEC-024, 해소=능력을 entity 소유 스펙으로 이관)·**entity 스키마 백킹 위반**(소유 entity가 구조 SSOT에 없는 유령 entity — SPEC-026, `entitySchemaBackingPolicy` advisory + `entitySchemaSources` 설정 시; 해소=실 테이블이면 스키마 존재/면제, UI 개념이면 Surface 강등+실 entity 재키), consistency의 키 앵커 미매치·**카테고리 마커 위반**(굵은 키에 종류 마커 누락·불일치 — entity `(E)`·surface `(S)`·capability `(C)`, SPEC-023 FR-005, `frKeyAnchorPolicy` advisory) 등. **전제:** 4단계에서 마이그레이션 표면화 knob(`frKeyAnchorPolicy` 등)을 `advisory`로 켰어야 이 스윕이 백로그를 낸다 — 아직 `off`면 이 단계에서 켜고 다시 돌린다. 스윕이 0건이면 그때 "마이그레이션 대상 없음"으로 보고한다(게이트를 실제로 돌린 근거와 함께). ⚠ **단 "0건"을 보고하기 전에 그 게이트가 판정 가능한 상태였는지 확인한다** — 소스·역할·매니페스트가 없어 inert면 0건은 "깨끗함"이 아니라 "아무것도 보지 않음"이고(6단계 inert 전제조건), 게이트가 한 줄도 출력하지 않았다면 애초에 돌지 않은 것이다(7단계). **"게이트를 돌렸다"의 근거는 exit 코드가 아니라 판정 출력이다.**
    - **제시(사람 승인 관문):** 수집 결과를 **스펙별 마이그레이션 백로그**로 사용자에게 제시한다 — "SPEC-005: Entities 7개 → root 1(`orders`) + 6개는 Dependencies 관계로" 식. 절차 정본: 킷 `APPLYING.md` §마이그레이션 노트("복수 Entity → aggregate root + 관계").
    - **수행(같은 실행에서 이어 편집):** 표면화 직후, 아래 실행 경로대로 **이 세션에서 migrate/readopt 절차를 이어 수행해 승인된 항목을 실제로 편집한다**(작성=LLM·확정=사람 — 편집은 스펙별 승인 경유). "표면화까지가 범위"로 끝내지 않는다. 사용자가 특정 항목을 미승인하면 그 항목만 advisory로 남아 다음 라운드에 재표면화(조용한 소실 없음).
    - **면제 부채도 백로그다 (사용자는 정상/비정상을 못 가린다 — update가 판정·유도한다):** 게이트가 `entitySchemaExemptEntities` 면제를 부채로 표면화하면(SPEC-026 FR-005), 그걸 "게이트 green이니 괜찮음"으로 넘기지 마라. **면제가 대량(수십 건)이거나 목록에 UI/흐름 이름(`wizard`·`project_list`·`dashboard`·`detail` 등)이 있으면, 이는 이전 라운드가 유령 entity를 재구성 대신 면제로 덮은 "papered-over" 상태다 — 정상이 아니다.** 사용자에게 "게이트는 green이지만 이건 완료가 아니라 지난 라운드의 우회입니다"라고 **명확히 판정**해 알리고 전면 재수정 경로로 **유도**한다.
      - **선택지 제시 규칙(중요 — 중립 나열 금지):** 사용자에게 물을 때 **권장안은 `/sdd-readopt`(UI/흐름 면제가 있거나 대량이면)이고 이를 첫 번째·"(권장)" 표시로 제시**한다. 국소가 정말 소수면 `/sdd-migrate`가 차선. **"현행 유지(면제로 충분)"를 UI/흐름 개념 면제의 유효한 선택지로 내세우지 마라** — 그건 방법론이 명시적으로 거부하는 papered-over다(선택지로 올리더라도 "권장 아님·papered-over"로 명시). "현행 유지"가 정당한 것은 오직 **실 외부 aggregate 면제**(외부 API 자원 등)뿐이다. "면제라 통과했으니 done"이라고 보고하는 것은 금지(실측 오류: update 11회차가 40건 일괄 면제 후 '완료' 선언; 12회차는 '현행 유지'를 1번 선택지로 내세움 — 둘 다 papered-over 유도).
-   - **실행 경로(중요) — 표면화에서 멈추지 말고 같은 실행에서 이어 편집한다:** 백로그가 있으면 "목록만 내고 '/sdd-migrate 실행할까요?'로 대기"하지 마라 — 그건 합의 위반이다(owner 반복 확정: **"update해도 스펙 바꾸기로 했잖아"**). 규모를 판정해 **곧바로 실행기(migrate/readopt) 절차를 이 세션에서 이어 수행하고, 스펙을 실제로 편집한다**. 사람 승인 관문은 **각 스펙 편집**에 걸리지("이 변경을 확정?"), "migrate를 시작할까?"에 거는 게 아니다. 즉 **update 한 줄 = (편집 승인하며) 스펙이 바뀜**으로 끝나야 한다. 규모로 경로가 갈린다(백로그에는 위 면제 부채도 포함):
+   - **실행 경로(중요) — 표면화에서 멈추지 말고 같은 실행에서 이어 편집한다:** 백로그가 있으면 "목록만 내고 '/sdd-migrate 실행할까요?'로 대기"하지 마라 — 그건 합의 위반이다(owner 반복 확정: **"update해도 스펙 바꾸기로 했잖아"**). 규모를 판정해 **곧바로 실행기(migrate/readopt) 절차를 이 세션에서 이어 수행하고, 스펙을 실제로 편집한다**. 사람 승인 관문은 **각 스펙 편집**에 걸리지("이 변경을 확정?"), "migrate를 시작할까?"에 거는 게 아니다. **물어볼 사람이 없는 실행(에이전트·CI·cron)이면** 이 문단을 그대로 적용할 수 없으니 §불변 규칙 첫 항목(비대화형 실행의 승인 관문 이관)을 따른다 — 임의 편집도, 표면화에서 멈추는 것도 아니다. 즉 **update 한 줄 = (편집 승인하며) 스펙이 바뀜**으로 끝나야 한다. 규모로 경로가 갈린다(백로그에는 위 면제 부채도 포함):
      - *증분(대다수)* → 이어서 `prompts/migrate.md` 절차를 수행. 스펙별 국소 위반(약칭 개명·수사적 bold 강등·마커/앵커 정리·한 스펙의 aggregate 분리)을 **스펙별 사람 승인 경유 원자 커밋**으로 실제 소진(빈 목록으로 끝내지 않는다).
      - *전면 재수정* → `/sdd-readopt`(정본 `prompts/readopt.md`). 백로그가 **구조적·전반적**이면(예: 다수 스펙이 entity 입도부터 어긋남 — "엔진/wizard" 류 기술계층 스펙이 즐비, capability 귀속 위반이 스펙 경계 자체의 오류에서 나옴, **또는 대량 면제 부채 — 이전 라운드가 유령 entity 수십 건을 면제로 덮은 상태**, 구 문법으로 통째 작성돼 스펙별 국소 편집으로는 수렴이 안 됨) 증분 migrate로 스펙을 짜깁기하지 말고 **백지 재도출(readopt)** 을 권장한다 — 코드는 보존한 채 `sdd/` 산출물만 현 문법으로 처음부터 다시 세운다(안전망 태그 → 인간 절 이월 → 9종 소스 재도출 → 다회 수렴). "국소 편집 반복 vs 전면 재저술" 판단은 사용자에게 규모 근거와 함께 제시하고 결정을 맡긴다(추정 확정 금지).
 6. **정책 강도 승격 권장 (graduation — advisory는 종착점이 아니라 경유지).**
    - **원칙:** 강제 knob의 목표 상태는 **strict(`hard`/`error`)**다. `off`·`advisory`·`warn`은 **마이그레이션 중 임시 상태**이지 영구 안착지가 아니다 — advisory에 방치하면 위반이 계속 "미채택 권장"으로 재등장할 뿐 강제되지 않는다. 그래서 update는 knob을 낮은 강도에 두는 것을 권하지 않고, **깨끗해지면 `hard`로 올리는 것을 권장**한다.
-   - **판정(기계·generic):** 강도가 계단인 knob(`frKeyAnchorPolicy`·`capabilityOwnershipPolicy`·`entitySchemaBackingPolicy`·`draftBlockPolicy`·`semanticDriftPolicy`·`runTestsPolicy`·`migrationStatePolicy` → `hard`; `specSyncUnownedPolicy` → `error`; `requireAccounting`/`strictSpecs` → 전수)마다: 그 knob의 백로그(5단계 스윕 결과)가 **0건이면 `hard`(strict)로 승격을 권장**하고 사용자 승인 시 config에 반영한다. 백로그가 남아 있으면 "정리(migrate) 후 hard"를 목표로 제시한다 — 이때도 권장 종착지는 advisory가 아니라 hard다.
+   - **판정(기계·generic):** 강도가 계단인 knob(`frKeyAnchorPolicy`·`capabilityOwnershipPolicy`·`entitySchemaBackingPolicy`·`draftBlockPolicy`·`semanticDriftPolicy`·`runTestsPolicy`·`migrationStatePolicy` → `hard`; `specSyncUnownedPolicy` → `error`; `requireAccounting`/`strictSpecs` → 전수)마다: 그 knob의 백로그(5단계 스윕 결과)가 **0건이고 아래 inert 전제조건을 통과하면 `hard`(strict)로 승격을 권장**하고 사용자 승인 시 config에 반영한다. 백로그가 남아 있으면 "정리(migrate) 후 hard"를 목표로 제시한다 — 이때도 권장 종착지는 advisory가 아니라 hard다.
+   - **⚠ 승격의 inert 전제조건 — "판정 불가능한 knob은 승격 대상이 아니다":** 백로그 0을 근거로 승격을 권하기 전에, 그 게이트가 **이 프로젝트에서 실제로 판정 가능한 상태**인지 먼저 확인한다. 판정 입력이 없으면 백로그 0은 "깨끗함"이 아니라 **"아무것도 보지 않음"**이고, 그 위에 올린 `hard`는 킷이 다른 knob에서 이미 차단하는 **"hard 선언 + 무판정 = 거짓 안전"** 과 같은 것이다(실측 위반: `schemaDriftManifest`가 null인데 `migrationStatePolicy: hard`).
+     - **판정 가능 최소 입력(knob별 — 하나라도 없으면 inert):** `entitySchemaBackingPolicy` → `entitySchemaSources` 비어 있지 않음; `capabilityOwnershipPolicy` → `ownershipCategoryRoles`로 entity·capability 역할이 해석됨(이름 폴백 실패도 inert); `migrationStatePolicy`(=`check-schema-drift`) → `schemaDriftManifest`가 null이 아니고 expected/deployed 조회가 실제로 성공; `runTestsPolicy` → `commands.test` 선언 + 게이트가 판정 한 줄을 **실제로 출력**(7단계); `frKeyAnchorPolicy` → 스펙의 FR 선언 라인이 스윕에 잡힘(스펙 0건이면 inert); `specSyncUnownedPolicy`(=`error`) → CI range 모드 spec-sync 배선; `draftBlockPolicy` → 같은 CI 강제 지점.
+     - **확인 방법(기계):** `node scripts/gen-ownership-map.mjs`(SPEC-028)의 **가드 포스처 표·미판정 수**를 본다 — 어떤 가드가 왜 발화하지 않는지(정책 off·소스 없음·역할 미해석)를 그 가드 자신의 inert-사유 코어가 말해준다. 미판정으로 뜬 가드의 knob은 **승격 후보에서 제외**한다. 게이트 자신이 내는 `· … 판정 불가(inert) — <사유>` 한 줄도 같은 근거다.
+     - **미충족이면 승격을 권하지 말고 "판정 가능하게 만들기"를 선행 과제로 제시한다** — 소스·매니페스트·역할·명령을 인스턴스화하는 것이 먼저다(=4단계로의 회귀). 그 상태로 `hard`를 권하는 것은 금지이며, "백로그 0이라 승격 권장"이라고 보고하는 것도 금지다. 보고 문구는 **"백로그 0 — 단 이 게이트는 이 프로젝트에서 inert(사유: …)라 승격 대상 아님, 선행 과제: …"** 다.
+     - 이미 `hard`인데 inert인 knob을 발견하면 **강도를 내리지 말고**(래칫 위반) 판정 가능하게 만드는 쪽으로 해소한다 — 내리는 것은 `policyRatchetExceptions`로 부채를 표면화하는 정당한 롤백일 때만이다(SPEC-027).
    - **면제로 위장된 '백로그 0' 경계(SPEC-026):** `entitySchemaBackingPolicy`의 백로그가 0이어도 그게 **대량 `entitySchemaExemptEntities` 면제로 만든 0**이면 hard 승격은 '완료'가 아니다 — 게이트가 면제를 부채로 표면화하므로, 승격 전 면제 목록을 검토해 UI/흐름은 Surface(migrate/readopt)·인프라/proto는 소스 추가로 실제 해소하고, 남는 면제가 "실 외부 aggregate 소수"일 때만 hard가 참 종착지다. 수십 건 면제 위에 올린 hard는 거짓 완료(실측).
    - **⚠ 새 체크가 기존 `hard` knob을 소급 범람시킬 때(전이 — "미적용/revert"는 권장 아님):** 이번 최신화가 이미 `hard`인 knob에 **새 규칙**(예: FR-007 소유 키 앵커 강제)을 얹어 그 프로젝트가 예전에 hard로 올렸던 것이 **갑자기 대량 위반으로 깨지는** 경우가 있다. 이때 **도구를 안 받거나(revert) 되돌리는 것을 권장으로 내세우지 마라** — 그건 방법론이 거부하는 회피(papered-over)이고, 고도화가 프로젝트에 도달하지 못한다. 올바른 전이는 graduation 사다리 그대로다: (1) 새 도구는 **반드시 반영**하고, (2) 범람하는 knob을 **임시로 `advisory`로 내려**(전이 상태 — 기존에 hard로 지키던 것도 잠시 advisory, 이미 clean한 규칙은 손실 없음) 128건 백로그를 표면화한 뒤, (3) `/sdd-migrate`(또는 규모가 크면 `/sdd-readopt`)로 **0까지 정리**하고, (4) **다시 `hard`로 재승격**한다. 즉 선택지는 "미적용 vs hard로 깨짐"의 이분법이 아니라 "**적용 + 임시 advisory 전이 + 마이그레이션 + 재hard**" 단일 경로다. "지금은 미적용(권장)" 같은 제시는 금지 — 권장은 언제나 적용·전이·강제다.
    - **강제 지점 동반:** `draftBlockPolicy: hard` 등 서버측 병합까지 막는 knob은 CI(range 모드 spec-sync)가 걸려 있어야 실효 — 없으면 `ci-examples.md`/`sdd-gates.yml`로 함께 안내.
    - **미승격 시:** 사용자가 hard 승격을 미루면 그 사유를 남기고(다음 update에서 다시 권장), 조용히 advisory로 방치하지 않는다.
-7. **확인.** 반영 후 게이트를 돌려 green 확인하고, 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그·**강도 승격 권장/반영**) 요약한다.
+7. **확인 — "exit 0"이 아니라 "판정했음"을 확인한다.** 반영 후 게이트를 돌리고, **게이트별로 판정 출력이 실제로 나왔는지** 대조한 뒤에만 green을 주장한다.
+   - **⚠ `exit 0` ≠ "판정함"(실측 결함 — 이번 라운드 결함이 여러 라운드를 살아남은 직접 원인):** 게이트가 **한 줄도 출력하지 않고** exit 0으로 끝나면 그건 통과가 아니라 **무음 미실행(no-op)** 이고, exit 코드만 보는 확인은 그걸 초록으로 읽는다. 실측: 경로에 한글이 든 소비 프로젝트에서 `import.meta.url`이 퍼센트 인코딩돼 엔트리(main-guard) 판정이 불일치 → `check-test-run`이 아무 판정도 없이 exit 0 → **`runTestsPolicy: hard`가 여러 라운드 동안 아무것도 단정하지 않은 채 거짓 green**이었고 하네스 요약도 clean으로 읽었다(킷 `afc4715`에서 엔트리 판정을 realpath 비교로 교정).
+   - **요구(이 순서대로 실행):**
+     1. `node scripts/sdd-sync.mjs` 리포트에서 **모든 게이트 줄에 내용이 있는지** 확인한다 — `[게이트명]` 뒤가 비었거나 `(출력 없음 …)`·`(없음: …)`이면 그 규칙은 clean이 아니라 **미판정**이다(킷 최신판 하네스는 이 둘을 ⚠로 표면화한다 — 기계 백스톱. 구버전 하네스를 쓰는 프로젝트라면 사람 눈으로 대조해야 하므로 하네스부터 갱신한다).
+     2. 강도가 `hard`인 knob의 게이트는 **단독으로도 돌려** 출력과 exit 코드를 함께 기록한다: `node scripts/<gate>.mjs; echo "exit=$?"`. 출력 0줄 + exit 0이면 **결함이다** — 원인을 규명한다(엔트리 판정 실패·조건 분기 누락·설치 결손).
+     3. 판정 대상이 없어 발화하지 않는 게이트는 `off`/`no-op`/`skip`/`판정 불가(inert)`를 **명시한 한 줄**이 나와야 한다. **침묵은 근거가 아니다.**
+   - **보고 형식(필수):** "게이트 N종 exit 0"이 아니라 **"게이트 N종 = 판정 출력 M종 · 명시적 off/no-op/inert K종 · 미판정 0종"** 으로 적는다. 미판정이 1종이라도 있으면 green으로 보고하지 않고, 그 게이트가 무엇을 단정하지 못하고 있는지와 원인(정책 off·소스 미설정·역할 미해석·엔트리 판정 실패)을 함께 낸다. `hard` knob이 미판정이면 그건 **거짓 안전**이므로 최우선 항목으로 올린다(6단계 inert 전제조건과 같은 사실).
+   - 그리고 무엇이 바뀌었는지(도구·knob·규범·마이그레이션 백로그·**강도 승격 권장/반영**·**킷 읽기 모드와 커밋**)를 요약한다.
 
 ## 불변 규칙
+- **비대화형 실행(사람이 없는 세션 — 에이전트·CI·cron)의 승인 관문 이관:** 아래 두 불변식("표면화에서 멈추지 말고 같은 세션에서 편집" + "각 스펙 편집은 사람 승인 경유")은 **대화 상대가 있을 때**의 규칙이다. 물어볼 사람이 없으면 두 불변식은 **동시에 성립할 수 없다** — 편집하면 승인이 없고, 승인을 기다리면 표면화에서 멈춘다. 그 경우 다음 규칙을 따른다(실측: finops 라운드가 실제로 택한 해법이고 그 결과가 MR !26으로 병합됐다):
+  1. **기계적으로 강제된 수정만 편집한다** — 게이트가 `hard`로 **막는** 항목, 즉 선택지가 없는 수정(해소 방식이 하나뿐이라 사람 판단이 개입할 여지가 없는 것). 이것만 스펙별 원자 커밋으로 편집하고, 커밋 메시지에 **근거 게이트와 그 판정 줄**을 인용해 남긴다.
+  2. **판단이 개입하는 항목은 편집하지 않는다** — advisory 백로그, entity 재구성/Surface 강등, 면제 여부, 강도 승격, "국소 migrate vs 전면 readopt" 선택. 이건 스펙별 백로그로 **남겨** 다음 라운드에 재표면화한다(조용한 소실 없음 — advisory로 남기면 게이트가 계속 낸다).
+  3. **승인 관문을 코드 리뷰로 이관한다** — 1의 편집을 브랜치에 올려 MR/PR로 제출하고, **병합 승인이 그 라운드의 "사람 확정"** 이다. 즉 관문은 **사라지지 않고 위치가 옮겨진다**. ⚠ 비대화형이라는 이유로 기본 브랜치에 직접 push하는 것은 금지 — 그건 관문 소멸이지 이관이 아니다(레포 관례가 브랜치 금지라면, 편집을 하지 말고 백로그만 내는 쪽을 택한다).
+  4. **모드와 분류를 리포트에 명시한다** — "비대화형 모드로 실행 · 기계 강제 N건 편집(MR 관문) · 판단 M건 백로그 이월". "사람 승인 경유했음"이라고 쓰지 않는다(관문이 MR에 있다는 사실을 밝혀야 리뷰어가 자기 역할을 안다).
 - update는 백로그를 표면화한 뒤 **같은 세션에서 migrate/readopt 실행기 절차로 이어 스펙을 편집한다** — "표면화만 하고 별도 작업으로 미룸"이 아니다(owner 합의: **update 한 줄이 승인 경유 스펙 변경으로 끝난다**; 표면화에서 멈추면 "돌려도 그대로"가 반복될 뿐). 불변식은 **"각 스펙 편집은 사람 승인 경유"(작성=LLM·확정=사람)** 이지 "스펙 편집 금지"가 아니다 — 승인 없는 자동 덮어쓰기·빅뱅 재작성만 금지(편집은 스펙별 원자 커밋·Change Log 동반).
 - 기존 config 값은 보존한다 — 새 knob만 추가/인스턴스화(기존 값 덮어쓰기 금지).
 - 자동 덮어쓰기 금지, 사람 승인 필수. 값이 프로젝트별인 knob은 추정하지 말고 CLAUDE.md 관례 또는 사용자에게 확인.
