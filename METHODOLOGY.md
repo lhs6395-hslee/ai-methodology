@@ -124,9 +124,9 @@ EARS 문장으로 쓴 FR은 구체적인 Ownership 키로 이어진다. 아래 �
 
 **verb 집합:**
 - **CRUD 기본 (코드 고정)**: `create · read · update · delete · list`
-- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반.
+- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반 — **기본 강도는 ⚠ warn(exit 0)**, `check-ownership --strict`에서 exit 1(설치 훅·CI 기본 호출엔 `--strict` 없음). 따라서 현재 실효 관문은 차단이 아니라 위 config 리뷰이며, **권장 종착지는 hard**(`--strict` 없이도 차단). `APPLYING.md`의 `⚠ 미등록 verb` 행이 이 강도의 정본 표기다.
 
-**키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}**, THE SYSTEM SHALL **staff.recommend** using **pjt_projects**`). 리터럴 인용은 백틱(`` `...` ``, 앵커 아님). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. 앵커는 선택("bold면 키여야 한다"만 강제 — 모든 FR이 키를 언급하진 않음).
+**키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}** (S), THE SYSTEM SHALL **staff.recommend** (C) using **pjt_projects** (E)` — 굵은 키마다 카테고리 마커 `(E)`/`(S)`/`(C)`, FR-005·`frAnchorMarkers`). 리터럴 인용은 백틱(`` `...` ``, 앵커 아님). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. **앵커는 더 이상 선택이 아니다**(2026-07-21 개정): 굵은 것은 키여야 하고(FR-003) 마커를 달아야 하며(FR-005), 선언 키를 백틱에 두면 위반이고(FR-006), **소유 키는 각각 어느 FR엔가 최소 1회 굵게 앵커돼야 한다**(FR-007 — 산문·백틱만은 불충분). 여전히 선택인 것은 *어느* FR에 다는지와 같은 키의 반복 언급을 매번 굵게 하는지(키당 1회면 충족)뿐 — 그 판단은 리뷰 경계다.
 
 **Spec Kit 기본 골조 vs 우리가 덧댄 것:** User Story·Acceptance(GWT)·FR·Key Entities·SC는 **Spec Kit 기본**(`/speckit.specify`가 생성). 이 방법론은 그 위에 **① `## Ownership` + `## Dependencies` 절을 추가**(dedup·cohesion 게이트의 입력 — Spec Kit 네이티브 아님) **② FR을 EARS로 정형화**(preset, 비공식 #1356) **③ 위 키 생성 절차로 Ownership 키를 결정론적으로 도출**한다. NFR(비기능=품질 제약: 성능·보안·가용성)·Infrastructure Prerequisites는 우리 템플릿이 명시. ← FR이 "기능", NFR이 "그 기능이 어떤 품질로 도는가", SC가 "성공했다고 볼 측정 결과".
 
@@ -187,7 +187,8 @@ converge는 **갭을 task로 표면화만** 한다(spec 자동 재작성 ✗). �
 | 16 | 리네임/소유 이동 후 FR 본문이 새 코드 *의미*를 서술하는가(semantic drift) | 소유 파일 리네임 감지 시 FR 선언 라인 변경 ∨ `Spec-Impact` 강제(`semanticDriftPolicy`, SPEC-019) | "본문이 새 이름·목적과 맞나" — 스펙 리뷰(트리거가 리뷰를 강제) |
 | 17 | 테스트 스위트 실행 결과(green)인가 — 커버리지 회계 ≠ 실행 | `runTestsPolicy`로 `commands.test` 실제 실행·exit 0 요구(opt-in, `check-test-run`, SPEC-021) | 완료 주장 전 스위트 실행+결과 확인·"문서화된 skip이 정당한가" — 실행기 규범(`speckit-fix` 단계)·리뷰 |
 | 18 | 배포된 DB 스키마가 코드 기대와 일치하나(R2′) — spec↔code green ≠ 배포 안전 | 배포 preflight에서 코드 기대 vs 배포 실측 스키마 diff(opt-in `schemaDriftManifest`/`migrationStatePolicy`, `check-schema-drift`, SPEC-022) | migrate-on-deploy 파이프라인 설계·brownfield baseline 절차의 타당성 — 배포 엔지니어링 리뷰 |
-| 19 | 키 앵커의 의미 적정성("이 FR에 앵커를 달았어야 하나 / 안 단 것이 정당한가") | FR 라인의 bold ↔ 소유·참조 키 대조(`frKeyAnchorPolicy`, SPEC-023 — 단 bold는 키여야 함) | 앵커 누락·과잉의 판단 — 스펙 리뷰(앵커는 선택이라 게이트가 요구하지 않음) |
+| 19 | 앵커의 **위치·문장** 적정성("이 키를 *어느* FR에 앵커했어야 하나 — 그 FR이 정말 그 키를 성립시키는 문장인가") | 양방향 강제(`frKeyAnchorPolicy`, SPEC-023): bold는 키여야 하고(FR-003) 마커 필수(FR-005), 선언 키를 백틱에 두면 위반(FR-006), **소유 키는 어느 FR엔가 최소 1회 굵게 앵커돼야 함**(FR-007, 2026-07-21 — 산문·백틱만은 불충분) | 게이트는 "키당 최소 1회 앵커됐는가"만 센다 — **어느** FR에 달렸는지·그 문장이 그 키의 성립 근거인지는 스펙 리뷰. (앵커 자체는 더 이상 선택이 아니다) |
+| 20 | Surface(라우트·파일 표면) 키의 **실재**("선언한 표면이 진짜 코드에 있나") | **없음** — entity에는 스키마 백킹(SPEC-026)이 있으나 surface 실재를 보는 게이트는 없다. 인접 신호는 역방향뿐(`surfaceGlobs` orphan = 코드에 있는데 미선언, SPEC-003)이고 형식 검증(`surfaceFormat`)은 모양만 본다 | 선언된 Surface가 실재하는지 — 스펙 리뷰. 결정적 신호(라우트 매니페스트·파일 라우팅 트리·OpenAPI)를 어댑터로 주입할 수 있으면 게이트 신설이 옳다 — `ROADMAP.md` 보류 항목 "Surface 실재 검증 축(`surfaceSources`)" |
 
 이 표 밖에서 "게이트가 안 잡는" 규범을 발견하면 그것은 **버그다** — (a) 결정적 신호가 있으면 게이트를 추가하고, (b) 없으면 이 표에 행을 추가해 경계를 선언한다(둘 다 아닌 상태로 두지 않는다).
 

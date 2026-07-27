@@ -118,3 +118,4 @@
 | 2026-07-21 | sdd-init 수명주기 스킬 목록에 `sdd-migrate` 추가(4종 설치) | SPEC-025 동반: 스펙 마이그레이션 실행기 스킬을 소비 프로젝트에 배선 |
 | 2026-07-21 | sdd-init Node 클로저에 `schema-backing-lib.mjs` 추가 | SPEC-026 동반: check-ownership 의존 lib을 소비 프로젝트에 배선(폐포 유지 — 미포함 시 ERR_MODULE_NOT_FOUND) |
 | 2026-07-21 | sdd-sync RULES에 R6(정책 래칫) 추가 + sdd-init 매니페스트에 `policy-ratchet-lib.mjs`·`check-policy-ratchet.mjs` 배선 | SPEC-027 동반: 강도 단조 게이트를 detector 스윕·소비 프로젝트 설치에 편입(미포함 시 게이트 누락) |
+| 2026-07-27 | `pre-commit`·`self-hooks-install.sh`의 `check-ownership` 주석을 실제 강도로 정정(주석만, 동작 무변) — exit 1 = 중복소유·관계 실재·entityRegistry·정책 enum(+귀속/백킹 hard일 때), 키 형식·블록 부재는 ⚠ warn | 문서–코드 드리프트 감사: 주석이 "형식…(exit 1)"이라 서술했으나 형식 위반은 `check-ownership.mjs:181-184`에서 `--strict` 없이 ⚠ 출력·`:287-291`에서만 exit 1이고 두 훅 다 `--strict`를 붙이지 않는다 — 훅이 형식을 차단한다는 오해 제거 |

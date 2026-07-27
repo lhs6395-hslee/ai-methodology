@@ -201,11 +201,16 @@
 [Surfaces] <span class="b">"GET /api/staff/{id}/"</span>  → <span class="g">"GET /api/staff/{id}"</span>
 [Surfaces] <span class="b">"Get /API/staff/&lt;id&gt;"</span>   → <span class="g">"GET /api/staff/{id}"</span></pre>
 
-<h2><span class="n">05</span>멈춤(STOP) 가드 — 수렴 못 할 애매함은 통과 못 한다</h2>
-<p>수렴시킬 수 있는 것(대소문자·표기)은 자동으로 수렴시키고, <strong>수렴 못 할 애매함</strong>(유사어·형식 위반)은 <code>validateKey</code>가 통과 자체를 막는다. 그래서 사람·LLM이 임의로 갈라진 키를 만들 길이 없다(실측).</p>
-<pre>[Capabilities] <span class="b">"staff.suggest"</span>   → <span class="r">✗ STOP</span>  미등록 verb "suggest" (recommend의 유사어)
-[Capabilities] <span class="b">"staff.recommend"</span> → <span class="r">✗ STOP</span>  미등록 verb "recommend" — capabilityVerbs 등록[리뷰] 후 진행
-[Surfaces]     <span class="b">"recommend/{id}"</span>  → <span class="r">✗ STOP</span>  메서드 없음 — "&lt;METHOD&gt; &lt;path&gt;" 형식 위반</pre>
+<h2><span class="n">05</span>멈춤(STOP) 가드 — 수렴 못 할 애매함을 표면화한다</h2>
+<p>수렴시킬 수 있는 것(대소문자·표기)은 자동으로 수렴시키고, <strong>수렴 못 할 애매함</strong>(유사어·형식 위반)은 <code>validateKey</code>가 <strong>지목</strong>한다. 그래서 사람·LLM이 임의로 갈라진 키를 만들면 매 실행 리포트에 남는다(실측).</p>
+<pre>[Capabilities] <span class="b">"staff.suggest"</span>   → <span class="r">⚠ / --strict ✗</span>  미등록 verb "suggest" (recommend의 유사어)
+[Capabilities] <span class="b">"staff.recommend"</span> → <span class="r">⚠ / --strict ✗</span>  미등록 verb "recommend" — capabilityVerbs 등록[리뷰] 후 진행
+[Surfaces]     <span class="b">"recommend/{id}"</span>  → <span class="r">⚠ / --strict ✗</span>  메서드 없음 — "&lt;METHOD&gt; &lt;path&gt;" 형식 위반</pre>
+<div class="box honest">
+  <span class="tag">정직: 형식 위반의 기본 강도는 warn이다</span>
+  <p><code>validateKey</code>의 형식 위반(미등록 verb·점 개수·Surface 형식)은 <strong>기본적으로 <code>⚠</code> 경고이고 exit 0</strong>이다 — <code>check-ownership --strict</code>에서만 <code>exit 1</code>이며, 설치 훅(<code>tooling/harness/pre-commit</code>)·CI 기본 호출엔 <code>--strict</code>가 없다. 즉 <em>커밋을 막는 것</em>은 중복 소유(dedup)·관계 실재·<code>entityRegistry</code>이고, 어휘 일관성의 실효 관문은 <strong>config 리뷰</strong>다.</p>
+  <p><strong>권장 종착지 = hard</strong>(<code>--strict</code> 없이도 미등록 verb 차단). 그때까지 어휘를 실제로 닫아두려면 CI에 <code>check-ownership --strict</code>를 배선한다.</p>
+</div>
 <div class="box honest">
   <span class="tag">임의 동의어 우회 금지</span>
   <p><code>recommend</code>·<code>suggest</code> 같은 변종이 키를 분산시키지 않도록, 도메인 verb는 <code>capabilityVerbs</code>에 <strong>등록해야만</strong> 통과한다(CRUD 기본 <code>create/read/update/delete/list</code>은 항상 허용). 등록은 <code>specIdPrefixes</code>와 같은 <strong>config 리뷰 관문</strong> — 새 verb를 몰래 늘리는 대신 리뷰에 노출한다.</p>
