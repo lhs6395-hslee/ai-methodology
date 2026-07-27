@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the scan runs, THE SYSTEM SHALL collect verification tags from every file under `smokeScanDirs` (defaulting to `scanDirs`) using the config-derived spec/requirement key grammar, comment style agnostic, mapping a deferred method's body to reason and any other method's body to evidence.
+- **FR-001** (event): WHEN the **smoke-scan** (E) runs, THE **sdd-smoke-scan.mjs** (S) scanner SHALL collect verification tags from every file under `smokeScanDirs` (defaulting to `scanDirs`) using the config-derived spec/requirement key grammar, comment style agnostic, mapping a deferred method's body to reason and any other method's body to evidence.
 - **FR-002** (unwanted): IF a tag references a nonexistent FR, is malformed after a valid key, mixes conflicting methods for one FR, or tags exist while `smokeManifest` is unset, THEN THE SYSTEM SHALL report it and exit non-zero (no silent skip).
 - **FR-003** (event): WHEN run with `--write`, THE SYSTEM SHALL regenerate the manifest deterministically — tag-derived entries with path-provenance evidence joined in sorted order, manual entries (keys without tags) preserved verbatim, keys sorted.
 - **FR-004** (event): WHEN run in check mode, THE SYSTEM SHALL exit non-zero if any tag-derived entry is missing from or differs from the manifest (the manifest is a regenerable artifact — no silent drift).
@@ -83,3 +83,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-05 | 초안 — 검증 태그 문법·smoke-scan 수집/재생성(--write)/드리프트 검사(Node·Python 동시) | 고도화 3차: 재생성 비교[검증]에서 smoke 실증거 연결만 수동으로 남음 — 증거가 사는 파일을 SSOT로 승격해 수동 연결 제거(B) |
+| 2026-07-27 | FR-001 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — aggregate **smoke-scan**·스캐너 **sdd-smoke-scan.mjs** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 2건이 FR 선언 라인에 흔적이 없던 것을 명시(수집 범위·태그 문법은 불변) |
