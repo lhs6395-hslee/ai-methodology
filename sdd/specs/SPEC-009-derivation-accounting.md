@@ -31,9 +31,9 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN `derivationManifest` is configured, THE SYSTEM SHALL load the JSON file and exit non-zero for a missing file, a parse failure, or a non-object top level.
-- **FR-002** (ubiquitous): THE SYSTEM SHALL define the derivation source domain as the fixed nine-class enum (code, iac, ci, ops-docs, build-evidence, vcs-history, prior-traceability, prior-intent, human-intent) and SHALL report an unknown class key or an unaccounted class as an error — no undefined exceptions, no silent non-ingestion.
-- **FR-003** (event): WHEN a class entry is validated, THE SYSTEM SHALL require status mapped, none, or deferred; a mapped entry SHALL carry non-empty evidence and a none or deferred entry SHALL carry a non-empty reason (existence only — quality is review's job).
+- **FR-001** (event): WHEN `derivationManifest` is configured, THE **check-derivation.mjs** (S) gate SHALL load the JSON file and exit non-zero for a missing file, a parse failure, or a non-object top level.
+- **FR-002** (ubiquitous): THE **derivation-accounting** (E) aggregate SHALL define its source domain as the fixed nine-class enum (code, iac, ci, ops-docs, build-evidence, vcs-history, prior-traceability, prior-intent, human-intent) and SHALL report an unknown class key or an unaccounted class as an error — no undefined exceptions, no silent non-ingestion.
+- **FR-003** (event): WHEN a class entry is validated, THE **derivation-lib.mjs** (S) core SHALL require status mapped, none, or deferred; a mapped entry SHALL carry non-empty evidence and a none or deferred entry SHALL carry a non-empty reason (existence only — quality is review's job).
 - **FR-004** (event): WHEN a class is repo-detectable (glob classes via `derivationClassGlobs`, code via scanDirs files, prior traceability via existing coverage tags), THE SYSTEM SHALL exit non-zero if matching artifacts exist while the class is declared none, and SHALL warn (not fail) when a mapped class has zero in-repo matches so out-of-repo reality remains declarable.
 - **FR-005** (state): WHILE `derivationManifest` is unset, THE SYSTEM SHALL keep the gate a no-op with current behavior unchanged (backward compatible adoption).
 - **FR-006** (event): WHEN the completeness gate reads a spec's Change Log, THE SYSTEM SHALL flag any really-dated row whose rationale cell is empty (advisory; non-zero under `--strict`) — authored-time capture of intent that cannot be re-derived later.
@@ -86,3 +86,4 @@
 |---|---|---|
 | 2026-07-05 | 초안 — 소스 클래스 9종 enum·derivationManifest 회계·검출 교차검사·Change Log 근거 선제 캡처(Node·Python 동시) | 고도화 3차: 재생성 비교[검증]에서 초기 재도출이 비-src 소스를 조용히 누락 + 순수 인간 의도는 사후 복원 불가 — 회계·선제 캡처로 문법화(정의되지 않은 예외 제거) |
 | 2026-07-06 | 검출 글롭 기본값 보정을 D3 회귀로 고정 — .dockerignore(iac 동반)·composite action(ci 구성요소)이 실재하는데 none 선언이면 exit 1 | B안: 인프라 동반·보조 파일이 검출 밖이면 "스캔함 — 없음" 선언이 거짓 green — 분류 원칙(정의+동반 파일)을 테스트로 고정 |
+| 2026-07-27 | FR-001·002·003 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — 게이트 **check-derivation.mjs**·판정 코어 **derivation-lib.mjs**·aggregate **derivation-accounting** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 3건이 FR 선언 라인에 흔적이 없던 것을 명시(9클래스 enum·상태 규칙은 불변) |
