@@ -88,7 +88,7 @@ DEFAULTS = {
     "semanticDriftPolicy": "advisory",
     "capabilityOwnershipPolicy": "advisory",
     "frKeyAnchorPolicy": "off",
-    "frAnchorMarkers": {"entity": "E", "surface": "R", "capability": "C"},
+    "frAnchorMarkers": {"entity": "E", "surface": "S", "capability": "C"},
     "runTestsPolicy": "off",
     "schemaDriftManifest": None,
     "migrationStatePolicy": "advisory",
@@ -1487,7 +1487,7 @@ def cmd_consistency(cfg, strict):
         print(f'✗ frKeyAnchorPolicy 값 위반 "{anchor_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
               file=sys.stderr)
         sys.exit(1)
-    markers = cfg.get("frAnchorMarkers") or {"entity": "E", "surface": "R", "capability": "C"}
+    markers = cfg.get("frAnchorMarkers") or {"entity": "E", "surface": "S", "capability": "C"}
     files = spec_md_files(cfg, missing_fatal=False)
     findings = []
     anchor_matched = 0
@@ -1509,7 +1509,7 @@ def cmd_consistency(cfg, strict):
             mt, un = _anchor_findings(lines, key_set, cfg["__reqAlt"])
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
-            # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (R)·capability (C).
+            # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (S)·capability (C).
             kind_map = _build_key_kind_map(own, deps)
             miss, wr = _category_marker_findings(lines, kind_map, markers, cfg["__reqAlt"])
             marker_missing.extend((spec_id, fr, tok, exp) for fr, tok, exp in miss)
@@ -1541,7 +1541,7 @@ def cmd_consistency(cfg, strict):
         print(f"키 앵커(frKeyAnchorPolicy={anchor_policy}): 매치 {anchor_matched} · 미매치 {len(anchor_unmatched)} · 카테고리 마커 위반 {marker_count}")
         for spec_id, fr, tok in anchor_unmatched:
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 소유·참조 키 아님: 수사적 강조면 백틱/평문으로, 키면 Ownership/Dependencies에 선언')
-        # 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (R)·capability (C).
+        # 카테고리 마커(SPEC-023 확장) — 굵은 키마다 종류 표기: entity (E)·surface (S)·capability (C).
         for spec_id, fr, tok, exp in marker_missing:
             print(f'  {tag} [{spec_id}] {fr} bold "{tok}" — 카테고리 마커 없음: **{tok}** ({exp})로 표기(굵은 키의 종류 명시)')
         for spec_id, fr, tok, exp, got in marker_wrong:

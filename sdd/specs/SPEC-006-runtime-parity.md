@@ -118,3 +118,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-21 | Python 미러 — `_extract_code_spans`·`_backtick_key_findings` + cmd_consistency FR-006 배선, Node와 출력 바이트 동일 | SPEC-023 FR-006 동반 — 전 게이트 패리티 유지 |
 | 2026-07-21 | Python 미러 — `_unanchored_owned_key_findings` + cmd_consistency FR-007 배선, Node와 출력 바이트 동일 | SPEC-023 FR-007 동반 — 전 게이트 패리티 유지 |
 | 2026-07-21 | Python 미러 — `POLICY_RANK`·`RATCHETED_POLICIES`·`classify_ratchet`·`cmd_ratchet` + DEFAULTS에 `policyRatchetPolicy`/`policyRatchetExceptions`, `ratchet` 서브커맨드. Node `check-policy-ratchet.mjs`와 출력·exit 바이트 동일 | SPEC-027 동반 — 정책 래칫 게이트의 양판 패리티 유지 |
+| 2026-07-27 | Python 미러 — `frAnchorMarkers` DEFAULTS·cmd_consistency fallback의 surface 글자 `"R"`→`"S"`, Node와 출력 바이트 동일 | SPEC-023 Change Log 동반 — 마커 기본값 변경의 양판 패리티 유지 |

@@ -29,7 +29,7 @@ export function isFrDeclLine(line, reqAlt = "FR") {
 }
 
 // FR 선언 라인에서 앵커+카테고리 마커 추출 — 코드 스팬 제거 후 평문 bold 토큰과 그 뒤 "(X)" 마커.
-// 굵은 키마다 그게 무슨 종류인지 표기한다(owner 요구): entity `(E)`·surface/route `(R)`·capability `(C)`.
+// 굵은 키마다 그게 무슨 종류인지 표기한다(owner 요구): entity `(E)`·surface `(S)`·capability `(C)`.
 // 반환: [{token(정규화 트림·소문자), marker(대문자 1글자 or null)}] (등장 순), FR-ID 제외.
 export function extractAnchorsWithMarkers(line, reqAlt = "FR") {
   const idRe = new RegExp(`^(?:${reqAlt})-\\d{3}[a-z]?$`);
