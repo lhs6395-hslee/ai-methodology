@@ -16,7 +16,7 @@ cat > .git/hooks/pre-commit <<'HOOK'
 DIR=$(git rev-parse --show-toplevel) || exit 1
 cd "$DIR"
 node tooling/check-fr-coverage.mjs || exit 1   # incremental(미커버 warn), PREFIX·번호·Planned모순 exit 1
-node tooling/check-ownership.mjs   || exit 1   # dedup·정규화·형식·관계 실재
+node tooling/check-ownership.mjs   || exit 1   # exit 1 = 중복소유(dedup)·관계 실재·entityRegistry·정책 enum (+귀속/백킹이 hard일 때); 키 형식·블록 부재는 ⚠ warn(--strict 미사용)
 # change_log.html 자동 갱신 — 방법론이 커밋(=push)될 때마다 변경 로그가 따라오게(사람이 말 안 해도).
 # git 이력에서 재생성(직전 커밋까지 반영; 자기 커밋 항목은 다음 커밋에 등장 — 자동 changelog의 본질적 1-커밋 지연).
 if [ -f tooling/gen-changelog.mjs ]; then
