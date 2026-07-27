@@ -24,6 +24,7 @@
 - `commands.test`가 green이면 exit 0, 실패면 `hard`=exit 1·`advisory`=exit 0(경고).
 - 이 게이트는 **로컬 안전 tier(`commands.test`)만** 실행한다 — 인프라(`commands.smoke`)는 대상 아님(SPEC-015 tier 경계). env-gated 테스트는 의존성 부재 시 error가 아니라 사유 포함 skip이라 스위트 결과가 error 0으로 명확해진다(관례: METHODOLOGY 검증 tier).
 - 이 게이트는 실행이 느려 pre-commit에 배선하지 않는다 — 완료 시점·CI·pre-push(opt-in)에서 돈다.
+- 게이트의 **stdout은 판정 줄 하나가 정본**이다 — 실행한 테스트 러너의 출력은 stdout이 아니라 stderr로 보낸다(fd 2 리다이렉트). 러너 텍스트가 stdout에 섞이면 하네스(`sdd-sync`)가 게이트 stdout을 ⚠/✗로 스캔하다 **green인 게이트를 "확인 필요"로 오독**한다(실측: 킷 자신의 테스트 *이름*에 ⚠·✗가 31줄 들어 있어 R5가 항상 ⚠). 리다이렉트라 실시간 출력·진단 가치는 유지되고 `maxBuffer` 제약도 없다.
 - skip률 임계 advisory(태그된 테스트가 조용히 전부 skip → 커버리지 허구)는 러너별 출력 파싱이 필요해 이 증분 밖(향후).
 
 ---
@@ -32,7 +33,7 @@
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
 - **FR-001** (state): WHILE `runTestsPolicy` is `off` (default), the **test-execution** (E) gate **check-test-run.mjs** (S) SHALL not execute any command and SHALL exit zero, noting that the suite should be run manually before claiming completion (coverage accounting is not execution result).
-- **FR-002** (event): WHEN `runTestsPolicy` is `advisory` or `hard` and `commands.test` is declared, THE SYSTEM SHALL execute that command and report its result, exiting non-zero on failure WHILE `hard` and warning without failing WHILE `advisory`.
+- **FR-002** (event): WHEN `runTestsPolicy` is `advisory` or `hard` and `commands.test` is declared, THE SYSTEM SHALL execute that command and report its result, exiting non-zero on failure WHILE `hard` and warning without failing WHILE `advisory`, and SHALL route the executed runner's own output to standard error so that the gate's standard output carries the verdict line alone (a harness scanning gate output cannot mistake runner text for a verdict).
 - **FR-003** (unwanted): IF `runTestsPolicy` is `advisory` or `hard` but `commands.test` is not declared, THEN THE SYSTEM SHALL report that execution cannot be verified — exiting non-zero WHILE `hard`, warning WHILE `advisory`.
 - **FR-004** (unwanted): IF `runTestsPolicy` holds a value outside `off|advisory|hard`, THEN THE SYSTEM SHALL report it and exit non-zero (no undefined value).
 
@@ -85,4 +86,5 @@
 | 2026-07-16 | 초안 — `runTestsPolicy`(off|advisory|hard) + `check-test-run` 게이트(`commands.test` 실제 실행·exit 판정) + 판정 코어 `testRunVerdict`, Node·Python 패리티 | 도그푸딩(소비 프로젝트 B): sync 전부 green인데 단위 스위트 3-error — 커버리지 회계 ≠ 실행 결과라는 구조적 오인, "완료 주장 전 실행+결과 확인"을 문법화 |
 | 2026-07-16 | 발동 지점 배선 — sdd-sync 규칙표에 R5(check-test-run) 추가(pre-push 경유) + 킷 자신 CI(.github/workflows, CICD-001)가 동일 스위트를 push/PR마다 실행 | 감사 M1: 스펙 본문이 "CI·pre-push에서 돈다"고 선언했으나 훅·sdd-sync·CI 샘플 어디에도 호출처 0곳 — knob(runTestsPolicy=hard)만 있고 발동 지점이 없던 스펙↔배선 드리프트 봉합 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-07-28 | FR-002 확장 — 러너 출력을 stdout `inherit`에서 **stderr(fd 2) 리다이렉트**로: 게이트 stdout = 판정 줄만(회귀 테스트 1건) | 감사 #21 M-8: `sdd-sync`가 게이트 stdout을 `/[⚠✗]/`로 스캔하는데 러너 출력이 stdout으로 흘러 **green인 R5가 항상 ⚠로 읽혔다**(킷 자신의 테스트 이름에 ⚠·✗ 31줄 — 실측). 이는 SPEC-021의 거짓 green(afc4715)의 거울상이다: 초록이 경고로 읽히면 사람이 ⚠를 무시하는 습관을 들여 진짜 경고를 놓친다. 하네스 정규식이 아니라 **게이트 stdout 계약**을 고친 이유는 판정이 게이트에 있고 하네스는 오케스트레이션만 한다는 SPEC-004 불변(판정 신규 0) — 하네스가 출력을 구조 파싱하기 시작하면 그 자체로 판정을 새로 만든다 |
 | 2026-07-28 | 엔트리 판정을 realpath 비교(`isMainEntry`)로 — `file://${argv[1]}` 문자열 비교가 비-ASCII 경로·심볼릭 링크에서 불일치해 main 블록이 조용히 미실행 | 실측(소비 프로젝트 finops, 한글 경로): 게이트가 한 줄도 출력하지 않고 exit 0 → `runTestsPolicy: hard`가 여러 라운드 동안 **거짓 green**이었고 sdd-sync는 clean으로 읽었다. 킷은 sdd-sync.mjs(ab5eb1a)에서 이미 같은 교정을 했는데 이 파일에 원본 비교가 남아 있었다 |

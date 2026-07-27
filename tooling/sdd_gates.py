@@ -2757,7 +2757,10 @@ def cmd_testrun(cfg):
     cmd = (cfg.get("commands") or {}).get("test")
     exit_code = None
     if policy in ("advisory", "hard") and cmd:
-        exit_code = subprocess.run(cmd, shell=True, cwd=cfg["__root"]).returncode
+        # 러너 stdout을 부모 stderr로 보낸다(check-test-run.mjs 미러 — 감사 M-8): 이 게이트의
+        # stdout은 판정 줄 하나가 정본이고, 러너 텍스트가 stdout에 섞이면 하네스가 게이트 stdout을
+        # ⚠/✗로 스캔하다 green을 "확인 필요"로 읽는다. 리다이렉트라 실시간 출력은 그대로.
+        exit_code = subprocess.run(cmd, shell=True, cwd=cfg["__root"], stdout=sys.stderr).returncode
     valid, code, line = test_run_verdict(policy, bool(cmd), exit_code)
     print(line, file=(sys.stdout if valid else sys.stderr))
     sys.exit(code)

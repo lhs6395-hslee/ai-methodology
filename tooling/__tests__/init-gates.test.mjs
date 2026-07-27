@@ -105,6 +105,23 @@ test("init-then-execute: sdd-init 후 check-spec-cohesion.mjs 실행 — ERR_MOD
   }
 });
 
+// gen-ownership-map은 소비 프로젝트 산출물(`sdd/OWNERSHIP_MAP.md`)을 내는 생성기라 배포 대상이다
+// (SPEC-028) — 킷 `tooling/`에만 있고 복사 목록에 없어 소비 프로젝트가 못 받던 배포 누락 봉합.
+test("init-then-execute: gen-ownership-map.mjs가 설치되고 임포트 클로저만으로 실행된다", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-map-"));
+  try {
+    runInit(root);
+    assert.ok(existsSync(join(root, "scripts/gen-ownership-map.mjs")), "gen-ownership-map.mjs가 scripts/에 설치되어야 함");
+    const result = spawnSync("node", ["scripts/gen-ownership-map.mjs", "--check"], { cwd: root, encoding: "utf8" });
+    assert.ok(
+      !/ERR_MODULE_NOT_FOUND/.test(result.stderr || ""),
+      `설치된 파일만으로 실행되어야 함(임포트 클로저 결손).\nstderr: ${result.stderr}`
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("init-then-execute: sdd-init이 ownership-keys.mjs·check-spec-consistency.mjs를 설치", () => {
   const root = mkdtempSync(join(tmpdir(), "sdd-init-files-"));
   try {

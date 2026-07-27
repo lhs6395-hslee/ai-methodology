@@ -10,7 +10,7 @@
 
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const STRICT = process.argv.includes("--strict");
@@ -31,45 +31,74 @@ const RULES = [
   { rule: "R6 정책 래칫(강도 단조)", gates: ["check-policy-ratchet.mjs"] },
 ];
 
+const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
+
+// 순수 판정: 게이트 실행 결과(부재·크래시·stdout) → {flagged, summary}.
+// **게이트의 stdout이 판정의 정본**이라는 계약 위에 서 있다 — 게이트는 자기 판정 줄만 stdout에
+// 쓰고, 하위 프로세스 출력을 stdout으로 흘리지 않는다(그러면 여기 스캔이 러너 텍스트에 걸려
+// green을 ⚠로 읽는다 — 감사 M-8, check-test-run.mjs가 fd 2로 리다이렉트해 지키는 규약).
+// ⚠ **출력 0줄은 clean이 아니라 미판정이다:** exit 0과 "판정했음"은 다른 사실이다. 무음 미실행
+// (엔트리 판정 실패·조건 분기 누락)은 exit 0으로 끝나므로, 출력 코드만 보면 거짓 green이 된다
+// (실측: 비-ASCII 경로에서 check-test-run이 한 줄도 내지 않고 exit 0 → `runTestsPolicy: hard`가
+// 여러 라운드 거짓 green). 판정 대상이 없어 발화하지 않는 게이트도 "off/no-op/skip" 한 줄을 낸다.
+export function gateOutcome({ file, missing = false, crashed = false, stdout = "", stderr = "" }) {
+  if (missing) return { flagged: true, summary: `(없음: ${file}) — detector 미설치라 이 규칙은 판정 없음(sdd-init/update로 배선 갱신 필요)` };
+  if (crashed) return { flagged: true, summary: lastLine(stdout) || lastLine(stderr) || "(비정상 종료)" };
+  if (!stdout.trim()) return { flagged: true, summary: `(출력 없음 — 게이트가 한 줄도 판정하지 않음: 무음 미실행 의심, exit 0 ≠ 판정함)` };
+  return { flagged: /[⚠✗]/.test(stdout), summary: lastLine(stdout) };
+}
+
 function runGate(file) {
   const path = join(HERE, file);
-  if (!existsSync(path)) return { flagged: false, last: `(없음: ${file})` };
+  if (!existsSync(path)) return gateOutcome({ file, missing: true });
   try {
     // stdio: stderr를 캡처(부모로 inherit 금지) — 게이트가 크래시해도 누출 없이 리포트에 담는다.
     const out = execFileSync("node", [path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    return { flagged: /[⚠✗]/.test(out), last: out.trim().split("\n").pop() || "" };
+    return gateOutcome({ file, stdout: out });
   } catch (e) {
-    const out = (e.stdout || "") + (e.stderr || "");
-    return { flagged: true, last: out.trim().split("\n").pop() || "(비정상 종료)" };
+    return gateOutcome({ file, crashed: true, stdout: e.stdout || "", stderr: e.stderr || "" });
   }
 }
 
 // 규칙별 detector 실행 → 데이터 모델(사람/JSON 공통). rule id는 안정 계약(R1/R2/R3).
-const rules = RULES.map(({ rule, gates }) => {
-  const sp = rule.indexOf(" ");
-  const id = rule.slice(0, sp); // "R1"
-  const title = rule.slice(sp + 1); // "spec→code"
-  const gateResults = gates.map((g) => {
-    const r = runGate(g);
-    return { gate: g, flagged: r.flagged, summary: r.last };
+function collect() {
+  return RULES.map(({ rule, gates }) => {
+    const sp = rule.indexOf(" ");
+    const id = rule.slice(0, sp); // "R1"
+    const title = rule.slice(sp + 1); // "spec→code"
+    const gateResults = gates.map((g) => {
+      const r = runGate(g);
+      return { gate: g, flagged: r.flagged, summary: r.summary };
+    });
+    return { id, title, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
   });
-  return { id, title, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
-});
-const flaggedRules = rules.filter((r) => r.flagged).map((r) => r.id);
-const clean = flaggedRules.length === 0;
-
-if (JSON_OUT) {
-  process.stdout.write(JSON.stringify({ schemaVersion: 1, clean, flaggedRules, rules }, null, 2) + "\n");
-} else {
-  console.log("SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)");
-  for (const r of rules) {
-    console.log(`\n● ${r.id} ${r.title}: ${r.flagged ? "⚠ 확인 필요" : "✓ clean"}`);
-    for (const g of r.gates) console.log(`    [${g.gate}] ${g.summary}`);
-  }
-  console.log(
-    clean
-      ? `\n요약: 전부 sync ✓`
-      : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → node scripts/sdd-sync.mjs 리포트로 의사결정(Claude Code: /sdd-sync)`
-  );
 }
-if (STRICT && !clean) process.exit(1);
+
+// 엔트리 판정은 realpath 비교다 — `file://${argv[1]}` 문자열 비교는 비-ASCII 경로(%-인코딩)·
+// 심볼릭 링크(/var↔/private/var)에서 갈려 main 블록이 **조용히 미실행**된다(SPEC-021 실측 결함).
+function isMainEntry(metaUrl) {
+  try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(process.argv[1]); }
+  catch { return false; }
+}
+
+if (isMainEntry(import.meta.url)) {
+  const rules = collect();
+  const flaggedRules = rules.filter((r) => r.flagged).map((r) => r.id);
+  const clean = flaggedRules.length === 0;
+
+  if (JSON_OUT) {
+    process.stdout.write(JSON.stringify({ schemaVersion: 1, clean, flaggedRules, rules }, null, 2) + "\n");
+  } else {
+    console.log("SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)");
+    for (const r of rules) {
+      console.log(`\n● ${r.id} ${r.title}: ${r.flagged ? "⚠ 확인 필요" : "✓ clean"}`);
+      for (const g of r.gates) console.log(`    [${g.gate}] ${g.summary}`);
+    }
+    console.log(
+      clean
+        ? `\n요약: 전부 sync ✓`
+        : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → node scripts/sdd-sync.mjs 리포트로 의사결정(Claude Code: /sdd-sync)`
+    );
+  }
+  if (STRICT && !clean) process.exit(1);
+}

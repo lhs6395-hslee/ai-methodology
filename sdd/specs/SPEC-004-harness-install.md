@@ -18,6 +18,9 @@
 - **Acceptance (GWT)**: 1. **Given** a fresh project with `.git`, **When** `sdd-init.sh --gate=node` runs, **Then** `.git/hooks/pre-commit` calls the installed script and the gate suite executes without a missing-module error.
 
 ### Edge Cases
+- **게이트 stdout이 판정의 정본이다(하네스 계약):** 하네스는 게이트 stdout을 `⚠`/`✗`로 스캔해 flagged를 정한다 — 그래서 게이트는 자기 판정 줄만 stdout에 쓰고 하위 프로세스 출력을 stdout으로 흘리지 않는다(흘리면 green이 ⚠로 오독된다 — SPEC-021이 fd 2 리다이렉트로 지키는 규약).
+- **출력 0줄은 clean이 아니라 미판정이다:** 게이트가 한 줄도 출력하지 않고 exit 0으로 끝나면(엔트리 판정 실패·조건 분기 누락 등 무음 미실행) 하네스는 그것을 flagged-미판정으로 표면화한다 — `exit 0`과 "판정했음"은 다른 사실이라서다(실측: 비-ASCII 경로에서 `check-test-run`이 무음 exit 0이라 `runTestsPolicy: hard`가 여러 라운드 거짓 green). 판정 대상이 없는 게이트는 "off/no-op/skip" 한 줄을 내므로 이 규칙에 걸리지 않는다.
+- **detector 파일 부재도 미판정이다:** 규칙표가 선언한 게이트가 설치돼 있지 않으면 그 규칙은 clean이 아니라 flagged로 보고하고 배선 갱신(`sdd-init`/update)을 요구한다.
 - `.claude/settings.json`이 이미 있고 `jq`가 없으면 기존 파일을 보존하고 hook 병합을 스킵한다(데이터 손실 방지) — `jq` 있으면 기존 SDD 항목을 걷어낸 뒤 재추가해 idempotency를 보장한다.
 - `sdd-init.sh`를 키트 디렉토리 안에서 실행하면 거부한다(대상 프로젝트 루트에서만).
 - `pre-commit` 훅은 스테이징에 spec 또는 코드 경로가 있을 때만 게이트를 돌린다(문서-only 커밋은 통과).
@@ -30,7 +33,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (ubiquitous): THE **sdd-sync.mjs** (S) harness SHALL run the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean, exiting non-zero under `--strict` only when a rule is flagged.
+- **FR-001** (ubiquitous): THE **sdd-sync.mjs** (S) harness SHALL run the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean — treating a gate that produced no standard-output verdict, or a gate file that is absent, as flagged-unjudged rather than clean — and exiting non-zero under `--strict` only when a rule is flagged.
 - **FR-002** (event): WHEN **sdd-init.sh** (S) runs with `--gate=node` in a target project, THE **harness-install** (E) installer SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically.
 - **FR-003** (event): WHEN **sdd-init.sh** (S) wires session hooks, THE SYSTEM SHALL merge SessionStart and PreToolUse entries into `.claude/settings.json` and install the **sdd-session-context.sh** (S) and **sdd-edit-check.sh** (S) scripts plus the `/sdd-sync`, `/speckit.fix`, `/sdd-start`, `/sdd-readopt`, and `/sdd-update` skills into `.claude/skills/`.
 - **FR-004** (unwanted): IF `.claude/settings.json` already exists and `jq` is unavailable, THEN THE SYSTEM SHALL preserve the existing file and skip hook merging rather than clobber it; WHERE `jq` is available, THE SYSTEM SHALL strip prior SDD entries before re-adding them so re-runs are idempotent.
@@ -120,4 +123,6 @@
 | 2026-07-21 | sdd-sync RULES에 R6(정책 래칫) 추가 + sdd-init 매니페스트에 `policy-ratchet-lib.mjs`·`check-policy-ratchet.mjs` 배선 | SPEC-027 동반: 강도 단조 게이트를 detector 스윕·소비 프로젝트 설치에 편입(미포함 시 게이트 누락) |
 | 2026-07-27 | `pre-commit`·`self-hooks-install.sh`의 `check-ownership` 주석을 실제 강도로 정정(주석만, 동작 무변) — exit 1 = 중복소유·관계 실재·entityRegistry·정책 enum(+귀속/백킹 hard일 때), 키 형식·블록 부재는 ⚠ warn | 문서–코드 드리프트 감사: 주석이 "형식…(exit 1)"이라 서술했으나 형식 위반은 `check-ownership.mjs:181-184`에서 `--strict` 없이 ⚠ 출력·`:287-291`에서만 exit 1이고 두 훅 다 `--strict`를 붙이지 않는다 — 훅이 형식을 차단한다는 오해 제거 |
 | 2026-07-27 | FR-001~003·005~010의 익명 주어·백틱 인용을 실제 주체 앵커로 교체해 소유 키 8종을 앵커(FR-001 sdd-sync.mjs·FR-002 sdd-init.sh+harness-install(E)·FR-003 sdd-session-context.sh·sdd-edit-check.sh·FR-005 pre-commit·FR-006 pre-push·FR-008 sdd-run.mjs) — 백틱 인용 10건 앵커 승격, 판정 내용 무변 | SPEC-001 FR-010으로 역할 선언이 들어오며 SPEC-023 키 앵커(FR-005·006·007)가 킷 자신에게 처음 발화 — 자기적용 마이그레이션(감사 이슈 #21) |
+| 2026-07-28 | FR-001 확장 + `gateOutcome` 순수 코어 추출(오케스트레이션은 `isMainEntry` 가드 아래로) — 게이트 stdout 0줄·detector 부재를 clean이 아니라 **flagged-미판정**으로, 크래시 요약은 stdout 판정 줄 우선. 회귀 5건 | 감사 #21 M-8 계열의 양면 봉합: (a) green이 ⚠로 읽히던 오독은 게이트 stdout 계약(SPEC-021)으로 고치고, (b) 그 거울상인 **"출력 0줄 = clean"** 을 하네스에서 기계화. 실측 결함(한글 경로 → 무음 미실행 → `runTestsPolicy: hard`가 여러 라운드 거짓 green)이 여러 라운드 살아남은 직접 원인이 "exit 0을 판정했음으로 읽는 확인"이었다 — `prompts/update.md` 7단계의 사람 절차만으로는 재발하므로 하네스가 매 실행 표면화한다 |
+| 2026-07-28 | `sdd-init` Node 클로저에 `gen-ownership-map.mjs` 추가(+ 설치·실행 회귀 1건) | SPEC-028 배포 누락: 생성기가 킷 `tooling/`에만 있고 복사 목록·훅·규칙표 어디에도 배선이 없어 소비 프로젝트가 키 보증 맵을 받지 못했다. 소유 스펙의 Artifacts가 `sdd/OWNERSHIP_MAP.md`(소비 프로젝트 경로)이고 동인이 owner의 "GitLab에서 키 보증 확인이 힘들다"라 **소비 프로젝트 산출물**이 맞다(판정 규칙은 `prompts/update.md` 4단계에 규범화) |
 | 2026-07-28 | `pre-commit.test.mjs` 픽스처 복사 목록에 `key-anchor-lib.mjs` 추가 | SPEC-013 FR-008 동반: `grammar-lib.mjs`가 선언 라인 판정(`isFrDeclLine`)을 재사용하며 새 import가 생겨 픽스처도 복사해야 ERR_MODULE_NOT_FOUND 없이 게이트 실행(배선만, 판정 불변). 설치 스크립트는 이미 이 파일을 배포 중 |

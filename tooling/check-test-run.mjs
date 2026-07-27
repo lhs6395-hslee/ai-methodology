@@ -51,7 +51,13 @@ if (isMainEntry(import.meta.url)) {
   const cmd = (cfg.commands || {}).test;
   let exitCode = null;
   if (RUN_TESTS_ENUM.includes(policy) && policy !== "off" && cmd) {
-    try { execSync(cmd, { cwd: cfg.__root, stdio: "inherit" }); exitCode = 0; }
+    // stdio: 자식(테스트 러너)의 stdout을 **부모 stderr(fd 2)로** 보낸다 — `"inherit"`가 아니다.
+    // 이유(감사 M-8): 이 게이트의 stdout은 판정 줄 하나가 정본인데(위 `line`), 러너 출력을
+    // stdout으로 흘리면 하네스(sdd-sync)가 게이트 stdout 전체를 ⚠/✗로 스캔하다 **러너 텍스트에
+    // 걸려** green인 게이트를 "확인 필요"로 읽는다(실측: 킷 자신의 테스트 *이름*에 ⚠·✗가 31줄
+    // 들어 있어 R5가 항상 ⚠ — 초록이 경고로 읽히면 사람이 ⚠를 무시하는 습관이 생겨 진짜 경고를
+    // 놓친다). fd 2 리다이렉트라 버퍼링·maxBuffer 없이 실시간 출력·진단 가치는 그대로 보존된다.
+    try { execSync(cmd, { cwd: cfg.__root, stdio: ["ignore", 2, 2] }); exitCode = 0; }
     catch (e) { exitCode = typeof e.status === "number" ? e.status : 1; }
   }
   const v = testRunVerdict(policy, !!cmd, exitCode);

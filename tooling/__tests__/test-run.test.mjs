@@ -4,7 +4,7 @@
 // @covers SPEC-021/FR-004
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -74,4 +74,24 @@ test("게이트 e2e: off(기본) → 실행 안 함 exit 0", () => {
   const r = runGate({ commands: { test: "false" } }); // off라 false여도 안 돌림
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /off/);
+});
+
+// 회귀(감사 M-8): 게이트 stdout = 판정 줄만. 러너 출력이 stdout에 섞이면 하네스(sdd-sync)가
+// stdout 전체를 ⚠/✗로 스캔하다 green인 게이트를 "확인 필요"로 읽는다(킷 자신의 테스트 이름에
+// ⚠·✗가 들어 있어 R5가 항상 ⚠였던 실측). 러너 출력은 stderr로 보존(진단 가치 유지).
+test("게이트 e2e: 러너 출력은 stdout이 아니라 stderr로 — 판정 줄만 stdout(M-8 회귀)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-testrun-io-"));
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({
+    specDir: "sdd/specs", runTestsPolicy: "hard",
+    commands: { test: "printf '⚠ 러너가 낸 경고 텍스트\\n✗ 러너가 낸 실패 텍스트\\n'" },
+  }));
+  try {
+    const r = spawnSync("node", [join(process.cwd(), "tooling/check-test-run.mjs")],
+      { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(r.stdout.trim().split("\n").length, 1, `stdout은 판정 한 줄이어야 함: ${JSON.stringify(r.stdout)}`);
+    assert.match(r.stdout, /green/);
+    assert.ok(!/[⚠✗]/.test(r.stdout), `green 판정의 stdout에 ⚠/✗가 새면 하네스가 오독한다: ${JSON.stringify(r.stdout)}`);
+    assert.match(r.stderr, /러너가 낸 경고 텍스트/); // 진단은 stderr에 보존
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

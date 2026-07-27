@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { gateOutcome } from "../sdd-sync.mjs";
 
 const SYNC = new URL("../sdd-sync.mjs", import.meta.url).pathname;
 
@@ -49,6 +50,53 @@ test("R2에 check-spec-sync(range)가 배선됨", () => {
   });
   const r = run(dir);
   assert.match(r.out, /check-spec-sync\.mjs/);
+});
+
+// ── 게이트 결과 판정 코어(감사 M-8 + 무음 미실행) ──
+// @covers SPEC-004/FR-001
+test("gateOutcome: 판정 줄만 있는 green stdout → flagged 아님(러너 텍스트 오독 금지)", () => {
+  const o = gateOutcome({ file: "check-test-run.mjs", stdout: "테스트 실행 게이트 — commands.test green (runTestsPolicy:hard)\n" });
+  assert.equal(o.flagged, false);
+  assert.match(o.summary, /green/);
+});
+
+// @covers SPEC-004/FR-001
+test("gateOutcome: 출력 0줄 → clean 아니라 flagged(무음 미실행 — exit 0 ≠ 판정함)", () => {
+  for (const stdout of ["", "   \n\n"]) {
+    const o = gateOutcome({ file: "check-test-run.mjs", stdout });
+    assert.equal(o.flagged, true, `빈 출력은 미판정으로 표면화돼야 함: ${JSON.stringify(stdout)}`);
+    assert.match(o.summary, /출력 없음|미판정|무음/);
+  }
+});
+
+// @covers SPEC-004/FR-001
+test("gateOutcome: detector 부재 → flagged(판정 없음 — 배선 갱신 요구)", () => {
+  const o = gateOutcome({ file: "check-policy-ratchet.mjs", missing: true });
+  assert.equal(o.flagged, true);
+  assert.match(o.summary, /없음: check-policy-ratchet\.mjs/);
+});
+
+// @covers SPEC-004/FR-001
+test("gateOutcome: ⚠/✗ 있는 stdout → flagged / 크래시는 stdout 판정 줄 우선", () => {
+  assert.equal(gateOutcome({ file: "g.mjs", stdout: "⚠ 위반 1건\n요약 줄\n" }).flagged, true);
+  const crashed = gateOutcome({ file: "g.mjs", crashed: true, stdout: "✗ 위반 요약\n", stderr: "Error: boom\n" });
+  assert.equal(crashed.flagged, true);
+  assert.match(crashed.summary, /✗ 위반 요약/);
+  assert.match(gateOutcome({ file: "g.mjs", crashed: true, stdout: "", stderr: "Error: boom\n" }).summary, /boom/);
+});
+
+// 회귀(감사 M-8): green인 R5가 ⚠로 읽히던 것 — 게이트 stdout에 러너 텍스트가 섞이면 재발한다.
+// @covers SPEC-004/FR-001
+test("R5 e2e: 러너가 ⚠/✗를 출력해도 green이면 R5는 clean(초록이 경고로 읽히지 않음)", () => {
+  const dir = fixture({});
+  writeFileSync(join(dir, "sdd.config.json"), JSON.stringify({
+    specDir: "sdd/specs", scanDirs: ["src"], runTestsPolicy: "hard",
+    commands: { test: "printf '⚠ 러너 경고 텍스트\\n✗ 러너 실패 텍스트\\n'" },
+  }));
+  const rep = JSON.parse(run(dir, ["--json"]).out);
+  const r5 = rep.rules.find((x) => x.id === "R5");
+  assert.equal(r5.flagged, false, `R5가 러너 텍스트에 걸려 flagged됨: ${JSON.stringify(r5)}`);
+  assert.match(r5.gates[0].summary, /green/);
 });
 
 // @covers SPEC-004/FR-009
