@@ -32,7 +32,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates spec prefixes, THE SYSTEM SHALL match each spec's owned repo files (Ownership Files globs, non-test, ignoreDirs excluded) against the infra source classes and SHALL exit non-zero when a spec whose owned files are entirely infra-class does not use the canonical prefix of the present class(es) — iac→INFRA, ci→CICD (iac+ci mix accepts either) — naming the file count and an example file.
+- **FR-001** (event): WHEN the coverage gate evaluates spec prefixes, the **prefix-class-consistency** (E) judgment in **prefix-class-lib.mjs** (S) SHALL match each spec's owned repo files (Ownership Files globs, non-test, ignoreDirs excluded) against the infra source classes and SHALL exit non-zero when a spec whose owned files are entirely infra-class does not use the canonical prefix of the present class(es) — iac→INFRA, ci→CICD (iac+ci mix accepts either) — naming the file count and an example file.
 - **FR-002** (unwanted): IF a spec owns at least one non-infra, non-test file, THEN THE SYSTEM SHALL NOT flag that spec — the threshold is totality, so incidental infra ownership by a feature spec never over-fires.
 - **FR-003** (event): WHEN `prefixClassExemptions` declares a spec, THE SYSTEM SHALL require an existing spec ID and a non-empty rationale (error otherwise), SHALL skip the INFRA-prefix requirement for that spec, and SHALL warn when the exemption is currently unused.
 - **FR-004** (state): WHILE a spec uses the INFRA prefix but none of its owned files matches an infra class, THE SYSTEM SHALL warn without failing so out-of-repo infrastructure remains declarable.
@@ -89,3 +89,4 @@
 | 2026-07-06 | prefix-class.test.mjs fixture INFRA-002→INFRA-001 정규화 | SPEC-014(접두어별 번호 001 시작 강제) 신설로 기존 INFRA-002 fixture가 번호 게이트에 걸림 — 테스트 의도(prefix-class warn) 보존하며 규칙 준수 |
 | 2026-07-06 | 클래스→접두어 일반화 — 단일 INFRA_SOURCE_CLASSES→INFRA에서 `CLASS_PREFIX{iac:INFRA, ci:CICD}`로. 전부 ci면 CICD 강제·전부 iac면 INFRA·iac+ci 혼합은 둘 다 허용, warn·에러 메시지가 기대 접두어 지목. FR-001 갱신 | CICD 표준 접두어 신설 동반 — CI/CD가 INFRA에 얹혀 경계 흐려짐, ci 파일→CICD 스펙 귀속 강제(Node·Python 패리티) |
 | 2026-07-06 | prefixClassFinding에 TEST 면제(`prefix !== "TEST"`) — TEST 스펙의 iac/ci 전용 소유는 위반 아님 | SPEC-015 신설 동반 — TEST는 자기 인프라 소유(격리는 SPEC-015 testInfraGlobs가 별도 강제) |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

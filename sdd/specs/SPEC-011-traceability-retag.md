@@ -29,7 +29,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (unwanted): IF the migration map is unloadable or non-object, a key or value violates the derived key grammar, or a non-null target FR does not exist in current specs, THEN THE SYSTEM SHALL report it and exit non-zero without modifying any file (all-or-nothing).
+- **FR-001** (unwanted): IF the migration map is unloadable or non-object, a key or value violates the derived key grammar, or a non-null target FR does not exist in current specs, THEN the **retag** (E) planner in **sdd-retag.mjs** (S) SHALL report it and exit non-zero without modifying any file (all-or-nothing).
 - **FR-002** (event): WHEN run without `--write`, THE SYSTEM SHALL report each planned rewrite with file and line, manifest key renames, null-mapped keys as manual-removal targets, and zero-reference old keys as warnings — modifying nothing.
 - **FR-003** (event): WHEN run with `--write`, THE SYSTEM SHALL apply boundary-enforced replacement of coverage and verification tags across `scanDirs` and `smokeScanDirs` and rename matching smokeManifest keys, idempotently (a rerun finds zero references).
 - **FR-004** (ubiquitous): THE SYSTEM SHALL never truncation-match a suffixed key — a base key's migration SHALL NOT touch a suffixed sibling's tags, and null-mapped tags SHALL be reported rather than machine-deleted (residuals remain caught by the coverage gate).
@@ -81,3 +81,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-05 | 초안 — 마이그레이션 맵 문법·retag dry-run/write·경계 강제·null 비삭제(Node·Python 동시) | 고도화 3차: 재생성 비교[검증]에서 @covers 재연결 비용이 재생성 주저의 원인 — 키 보존 기본 + 기계 이행으로 비용 제거(C) |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |

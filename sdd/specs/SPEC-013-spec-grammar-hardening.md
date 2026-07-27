@@ -34,7 +34,7 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the completeness gate reads a spec, THE SYSTEM SHALL flag a missing Module header (advisory; non-zero under `--strict`) — the header STORAGE §2.3 declares mandatory.
+- **FR-001** (event): WHEN the completeness gate reads a spec, the **spec-grammar-hardening** (E) judgment in **grammar-lib.mjs** (S) SHALL flag a missing Module header (advisory; non-zero under `--strict`) — the header STORAGE §2.3 declares mandatory.
 - **FR-002** (event): WHEN specs declare more than one distinct Module value, THE SYSTEM SHALL flag the divergence listing the values (advisory) — one repo is one module, more modules mean more repos.
 - **FR-003** (event): WHEN a spec's FR declaration line lacks the SHALL token, THE SYSTEM SHALL flag that FR id (advisory) — every EARS pattern carries SHALL; wording quality stays review's job.
 - **FR-004** (event): WHEN a spec's Dedup-Review section references a spec ID that does not exist in the spec directory, THE SYSTEM SHALL flag the dangling reference (advisory) — extending the existence-and-form check to referential integrity.
@@ -92,3 +92,4 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 | 2026-07-16 | `grammar-hardening.test.mjs`의 check-spec-sync 임포트 클로저 복사 목록에 `drift-lib.mjs` 추가 | SPEC-019 동반: check-spec-sync의 새 import(drift-lib)를 테스트 하네스도 복사해야 ERR_MODULE_NOT_FOUND 없이 게이트 실행(픽스처 배선만, 판정 불변) |
 | 2026-07-16 | 같은 복사 목록에 `cross-spec-lib.mjs` 추가 | SPEC-020 동반: check-spec-sync의 새 import(cross-spec-lib) 픽스처 배선(판정 불변) |
 | 2026-07-27 | FR-007 신설 — `specSyncExemptGlobs` 무결성(config 자기면제·전면 면제 금지, 실제 매치 기준). `exemptGlobFindings` + check-ownership 배선, Node·Python 바이트 패리티. `scripts/**`는 의도적 제외(하네스 소유 처방 부재) | Ownership 감사 #21 A-4: `presets.md`·`METHODOLOGY.md`가 **프로즈로만** 금지하던 것을 게이트로 승격 — 실측 소비 프로젝트가 `sdd.config.json`을 실제로 등재해 config 변경이 무흔적 통과, 정책 하향·면제 확대·상한 상향이 전부 영속 흔적 0으로 실행되던 상태 |
+| 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
