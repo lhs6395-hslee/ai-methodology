@@ -84,3 +84,4 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 |---|---|---|
 | 2026-07-16 | 초안 — `schemaDriftManifest`{expected,deployed} + `migrationStatePolicy`(advisory|hard) + `check-schema-drift` 게이트(코드 기대 vs 배포 실측 diff) + 순수 코어 `schemaDriftVerdict`, Node·Python 패리티 | 도그푸딩(소비 프로젝트 B): spec↔code green인데 배포 DB 컬럼 미적용으로 42703 500이 3회 반복 — 드리프트 철학을 배포 경계(R2′)까지 확장, migrate-on-deploy/preflight 규범 동반 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 3건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-07-28 | 엔트리 판정을 realpath 비교(`isMainEntry`)로 | SPEC-021과 동일 결함 — 비-ASCII 경로에서 게이트 무음 미실행(거짓 green). 이 게이트는 배포 preflight라 무음 통과가 배포 사고로 직결된다 |

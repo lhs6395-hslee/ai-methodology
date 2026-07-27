@@ -9,6 +9,8 @@
 import { execSync } from "node:child_process";
 import { loadConfig } from "./sdd-config.mjs";
 import { schemaDriftVerdict, MIGRATION_ENUM } from "./schema-drift-lib.mjs";
+import { fileURLToPath } from "node:url";
+import { realpathSync } from "node:fs";
 
 export { schemaDriftVerdict, MIGRATION_ENUM };
 
@@ -18,7 +20,20 @@ function runLines(cmd, root) {
   return out.split("\n").map((x) => x.trim()).filter(Boolean);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+
+// 이 파일이 직접 실행된 엔트리인가 — 경로 표현 차이(퍼센트 인코딩·심볼릭 링크)에 강건한 판정.
+function isMainEntry(metaUrl) {
+  try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(process.argv[1]); }
+  catch { return false; }
+}
+
+// 엔트리 판정은 realpath 비교다 — `file://${argv[1]}` 문자열 비교는 (a) 경로에 비-ASCII가 있으면
+// import.meta.url이 퍼센트 인코딩돼 불일치하고 (b) macOS /var↔/private/var 심볼릭 링크에서도
+// 갈린다. 그러면 main 블록이 **조용히 실행되지 않아** 게이트가 아무 판정도 없이 exit 0 —
+// 실측: 한글 경로 소비 프로젝트에서 `runTestsPolicy: hard`가 여러 라운드 동안 거짓 green이었다
+// (게이트가 한 줄도 출력하지 않는데 sdd-sync는 clean으로 읽음). 킷은 sdd-sync.mjs(ab5eb1a)에서
+// 이미 fileURLToPath로 옮겼는데 이 파일들에 원본 비교가 남아 있었다.
+if (isMainEntry(import.meta.url)) {
   const cfg = loadConfig();
   const m = cfg.schemaDriftManifest; // null | {expected, deployed}
   if (!m || !m.expected || !m.deployed) {
