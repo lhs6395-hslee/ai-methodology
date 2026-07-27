@@ -31,8 +31,8 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 
 - **FR-001** (event): WHEN a spec ID is listed in `strictSpecs`, THE SYSTEM SHALL apply strict R2 coverage to that spec even without `--strict` — every declared FR must be unit-covered, zero-coverage fails, and smoke/deferred manifest entries SHALL NOT substitute for unit coverage.
 - **FR-002** (unwanted): IF `strictSpecs` contains a spec ID that does not exist in the spec directory, THEN THE SYSTEM SHALL report it and exit non-zero (no silent skip).
-- **FR-003** (state): WHILE `requireAccounting` is true, THE SYSTEM SHALL require every declared FR to be unit-covered, smoke-verified, or deferred, and SHALL report each remaining FR as an R3 unaccounted error with non-zero exit.
-- **FR-004** (event): WHEN `smokeManifest` is configured, THE SYSTEM SHALL load the JSON file and exit non-zero for a missing or unparsable file, a key that does not match the derived spec/requirement ID grammar or references a nonexistent FR, an entry without a non-empty method, a deferred entry without a non-empty reason, or a non-deferred entry without non-empty evidence.
+- **FR-003** (state): WHILE `requireAccounting` is true, THE **verification-accounting** (E) ledger SHALL require every declared FR to be unit-covered, smoke-verified, or deferred, and SHALL report each remaining FR as an R3 unaccounted error with non-zero exit.
+- **FR-004** (event): WHEN `smokeManifest` is configured, THE **verification-accounting.mjs** (S) core SHALL load the JSON file and exit non-zero for a missing or unparsable file, a key that does not match the derived spec/requirement ID grammar or references a nonexistent FR, an entry without a non-empty method, a deferred entry without a non-empty reason, or a non-deferred entry without non-empty evidence.
 - **FR-005** (event): WHEN accounting is active (manifest configured or `requireAccounting` true), THE SYSTEM SHALL append the accounted counts (unit/smoke/deferred/unaccounted) to the gate summary line, classifying an FR that is both unit-covered and manifest-listed as unit.
 
 ### Key Entities
@@ -84,3 +84,4 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 | 2026-07-05 | 매니페스트의 비-unit 엔트리에 자동 채움 경로 연결 — 검증 태그 수집·재생성·드리프트 검사는 SPEC-010(smoke-scan) 소유, 이 spec의 문법·검증 규칙은 불변 | SPEC-010 신설 동반: 수동 연결 제거 — 수동 선언 경로(deferred 백로그 등)는 그대로 유효 |
 | 2026-07-15 | `classify`에 `plannedSpecs` 인자·`planned` 클래스 추가(회계 = unit/smoke/deferred/planned/unaccounted), Node·Python | SPEC-018 FR-005 동반: Planned 스펙 미커버 FR을 회계 코어가 planned로 분류(R3 미검증 아님) — 회계 계층은 이 spec 소유 |
 | 2026-07-16 | 소유 테스트(fr-accounting.test.mjs)에 Planned↔커버리지 모순 케이스 추가(@covers SPEC-018/FR-007) — 회계 분류 자체는 불변 | 감사 T2 동반: planned 분류(SPEC-018 FR-005)가 커버리지와 공존하면 모순임을 회계 테스트 계층에서 고정 |
+| 2026-07-27 | FR-003·004 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — aggregate **verification-accounting**·심볼 **verification-accounting.mjs** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 2건이 FR 선언 라인에 흔적이 없던 것을 명시(회계 규칙·에러 조건은 불변) |
