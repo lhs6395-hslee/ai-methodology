@@ -65,6 +65,7 @@
 | 하네스: R3 임베딩 의미리뷰 | reworded(의미적) 중복이 **실제 고통이 될 때** (현재는 같은 Entity 이웃 LLM 리뷰로 충분) |
 | 강화·cohesion·하네스 게이트의 **Go·셸** 포팅 + 셸/Go ownership 키 정규화·형식검증 | Python도 Node도 없는 프로젝트가 그 게이트를 강제해야 할 때 (**Python 포팅은 2026-07-05 완료** — 전 게이트 패리티, SPEC-006 · `ci-examples.md` 매트릭스) |
 | Go판 실행 패리티 재검증(2026-07-05 문법 정렬분) | Go 툴체인이 있는 CI에서 — 현재는 소스 계약 테스트만(`runtime-contract.test.mjs`, REALITY_CHECK 미확인 라벨) |
+| **Surface 실재 검증 축**(`surfaceSources` 어댑터 — 선언된 Surface 키가 라우트 매니페스트·파일 라우팅 트리·OpenAPI에 실재하는지 대조; entity의 SPEC-026 스키마 백킹과 대칭) | 선언 Surface와 실제 표면의 어긋남이 **실제 고통이 될 때**. 그때까지는 리뷰 경계로 선언됨(`METHODOLOGY.md` §리뷰 경계 20행) — 현재 인접 신호는 역방향 orphan(`surfaceGlobs`, SPEC-003)뿐 |
 
 ## 🔬 권장 다음 단계 (아직 미착수)
 - **소비 프로젝트 정본 갱신 반영**: 소비 프로젝트 A·소비 프로젝트 B에 이번 고도화(수명주기·회계·정책)를 재채택 절차로 반영 — 이번 작업 범위 밖(다음 단계).
