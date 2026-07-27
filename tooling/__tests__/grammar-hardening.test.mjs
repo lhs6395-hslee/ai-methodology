@@ -13,7 +13,8 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseModule, frLinesMissingShall, frDeclarations, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
+// @covers SPEC-013/FR-009
+import { parseModule, frLinesMissingShall, frDeclarations, frDeclStyleFindings, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
 
 const FR_DECL_SRC = "\\*\\*((?:FR)-\\d{3}[a-z]?)\\*\\*";
 const SPEC_ID_RE = /(?:SPEC|INFRA|TEST)-\d{3}/;
@@ -80,6 +81,57 @@ test("frDeclarations: 산문 중간 인용·같은 라인 뒤쪽 상호참조는
   // FR 섹션 부재 → 전문 폴백(선언 집합이 통째로 비지 않게), 단 라인 시작 규율은 유지
   const noSection = "**Spec**: `SPEC-001`\n- **FR-001** (event): THE SYSTEM SHALL x.\n산문 속 **FR-002** 인용\n";
   assert.deepEqual(frDeclarations(noSection, FR_DECL_SRC), ["FR-001"]);
+});
+
+// @covers SPEC-013/FR-009
+// 혼용 자체가 신호: 탐지(FR-008)·SHALL(FR-003)은 불릿 유무 무관이라 기계는 통과하지만, 한쪽 문법만
+// 보는 grep·리뷰는 반대쪽을 통째로 놓친다(PM SPEC-004 실측: 진짜 번호 중복 FR-057 1건이 그렇게 숨었다).
+test("frDeclStyleFindings: 한 스펙이 불릿·무불릿을 섞으면 1건 — 건수와 예시 ID를 지목", () => {
+  const text = "## Functional Requirements (EARS)\n"
+    + "- **FR-001** (event): THE SYSTEM SHALL x.\n"
+    + "**FR-002** (event): THE SYSTEM SHALL y.\n"
+    + "**FR-003** (event): THE SYSTEM SHALL z.\n";
+  const f = frDeclStyleFindings(text, FR_DECL_SRC);
+  assert.equal(f.length, 1);
+  assert.match(f[0], /혼용/);
+  assert.match(f[0], /불릿 1건\(예 FR-001\)/);
+  assert.match(f[0], /무불릿 2건\(예 FR-002\)/);
+});
+
+// @covers SPEC-013/FR-009
+test("frDeclStyleFindings: 한쪽 문법만이면 빈 배열 — 저장소 전체 통일을 강요하지 않는다", () => {
+  const head = "## Functional Requirements (EARS)\n";
+  const bulleted = head + "- **FR-001** (event): THE SYSTEM SHALL x.\n  - **FR-002** (event): THE SYSTEM SHALL y.\n";
+  const plain = head + "**FR-001** (event): THE SYSTEM SHALL x.\n**FR-002** (event): THE SYSTEM SHALL y.\n";
+  assert.deepEqual(frDeclStyleFindings(bulleted, FR_DECL_SRC), []);
+  assert.deepEqual(frDeclStyleFindings(plain, FR_DECL_SRC), []);
+  assert.deepEqual(frDeclStyleFindings(head, FR_DECL_SRC), []);  // 선언 0건도 혼용 아님
+});
+
+// @covers SPEC-013/FR-009
+// 범위는 FR-008과 같은 규율(FR 섹션 안·라인 시작)이되 **폴백은 없다** — 다른 절은 요구 ID를 불릿으로
+// 정당하게 인용하므로(Assumptions·Change Log) 전문 폴백을 켜면 그 인용이 "불릿 쪽"으로 집계돼 거짓
+// 혼용이 난다. 판정 유보가 안전한 방향이다(advisory 신호일 뿐 커버리지 입력이 아니라서).
+test("frDeclStyleFindings: 표 행·산문 인용은 무관 / FR 섹션 없으면 판정 유보(폴백 없음)", () => {
+  const withNoise = "## Functional Requirements (EARS)\n"
+    + "- **FR-001** (event): THE SYSTEM SHALL x.\n"
+    + "산문 속 **FR-002** 인용은 선언이 아니다.\n"
+    + "\n## Assumptions / Clarifications Retained\n- **FR-003** 관련 가정 보존\n"
+    + "\n## Change Log\n| 2026-07-27 | 흡수 — FR-011→**FR-037** | 근거 |\n";
+  assert.deepEqual(frDeclStyleFindings(withNoise, FR_DECL_SRC), []);
+  // FR 섹션 부재: 전문 폴백을 하면 Assumptions의 불릿 인용과 무불릿 선언이 섞여 거짓 혼용이 된다
+  const noSection = "**Spec**: `SPEC-001`\n**FR-001** (event): THE SYSTEM SHALL x.\n- **FR-002** 관련 가정\n";
+  assert.deepEqual(frDeclStyleFindings(noSection, FR_DECL_SRC), []);
+});
+
+// @covers SPEC-013/FR-009
+test("frDeclStyleFindings: reqAlt를 넘기면 다중 접두어 선언도 같은 라인 규율로 본다", () => {
+  const src = "\\*\\*((?:FR|INFRA)-\\d{3}[a-z]?)\\*\\*";
+  const text = "## Functional Requirements (EARS)\n"
+    + "- **INFRA-001** (event): THE SYSTEM SHALL provision x.\n"
+    + "**INFRA-002** (event): THE SYSTEM SHALL provision y.\n";
+  assert.equal(frDeclStyleFindings(text, src, "FR|INFRA").length, 1);
+  assert.deepEqual(frDeclStyleFindings(text, src), []);  // reqAlt 생략 = INFRA가 라인 규율에서 탈락
 });
 
 test("dedupReviewDanglingIds: 실재하지 않는 이웃 ID만 정렬 반환·섹션 없으면 빈 배열", () => {
@@ -156,6 +208,32 @@ test("completeness: 정합 스펙(Module 단일·SHALL·실재 이웃)은 신규
   });
   assert.equal(r.code, 0, r.out);
   for (const re of [/Module 헤더 없음/, /1 레포 = 1 모듈/, /SHALL 없음/, /존재하지 않는 스펙/]) assert.doesNotMatch(r.out, re);
+});
+
+// FR 섹션 헤딩이 있는 픽스처 — 문법 혼용 판정은 섹션 안만 보므로(폴백 없음) FULL로는 발화하지 않는다.
+const FRSEC = (id, module, fr) =>
+  `# ${id}\n**Module**: \`${module}\`  **Spec**: \`${id}\`  **Status**: Draft\n\n`
+  + `## Functional Requirements (EARS)\n${fr}\n\n## Success Criteria\n- **SC-001**: 측정.\n\n`
+  + `Acceptance: Given x.\n\n## Ownership\n- **Entities**: thing${id.slice(-1)}\n`;
+
+// @covers SPEC-013/FR-009
+test("completeness: FR 선언 문법 혼용 → warn, --strict → exit 1", () => {
+  const spec = FRSEC("SPEC-001", "m",
+    "- **FR-001** (event): THE SYSTEM SHALL x.\n**FR-002** (event): THE SYSTEM SHALL y.");
+  const soft = runGate("check-spec-completeness.mjs", { "sdd/specs/SPEC-001.md": spec });
+  assert.equal(soft.code, 0, soft.out);
+  assert.match(soft.out, /FR 선언 문법 혼용/);
+  assert.equal(runGate("check-spec-completeness.mjs", { "sdd/specs/SPEC-001.md": spec }, {}, ["--strict"]).code, 1);
+});
+
+// @covers SPEC-013/FR-009
+test("completeness: 문법이 한쪽으로 통일된 스펙은 혼용 warn 0 (스펙별 판정 — 저장소 통일 강요 없음)", () => {
+  const r = runGate("check-spec-completeness.mjs", {
+    "sdd/specs/SPEC-001.md": FRSEC("SPEC-001", "m", "- **FR-001** (event): THE SYSTEM SHALL x."),
+    "sdd/specs/SPEC-002.md": FRSEC("SPEC-002", "m", "**FR-001** (event): THE SYSTEM SHALL y."),
+  });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /문법 혼용/);
 });
 
 // ── ownership 게이트 통합(Files 카테고리 금지) ──

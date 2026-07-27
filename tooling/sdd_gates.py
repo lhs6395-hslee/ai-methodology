@@ -1311,6 +1311,41 @@ def fr_declarations(text, fr_decl_re, req_alt="FR"):
     return out
 
 
+def fr_decl_style_findings(text, fr_decl_re, req_alt="FR"):
+    """FR 선언 문법의 스펙 내 일관성(SPEC-013 FR-009, grammar-lib.mjs frDeclStyleFindings 미러).
+
+    한 스펙이 불릿(`- **FR-001**`)과 무불릿(`**FR-001**`)을 섞으면 advisory 1건. 탐지(FR-008)와
+    SHALL(FR-003)은 의도적으로 불릿 유무 무관이라 기계는 혼용을 통과시킨다 — 남는 피해는 사람과
+    임시 도구 쪽이다(실측 PM SPEC-004: 불릿 57 + 무불릿 112 공존으로 진짜 FR 번호 중복 1건이 한쪽
+    문법 스캔의 거짓 음성으로 숨었다).
+    판정 단위는 스펙 하나 — 저장소 전체 통일은 요구하지 않는다(템플릿 규범 문장은 토큰 형태를
+    규정하고 불릿은 예시에만 나오므로 "불릿 필수"는 문서에 없는 새 의견이 된다). 한 파일 안의 혼용은
+    대개 스펙 흡수·병합의 이음매로 생긴, 저술 의도가 아닌 잡음이다.
+    범위는 FR-008과 같은 규율이되 **전문 폴백 없음** — 다른 절(Assumptions·Change Log)이 요구 ID를
+    불릿으로 정당하게 인용하므로 폴백을 켜면 거짓 혼용이 난다. advisory 신호라 판정 유보가 안전하다.
+    req_alt는 호출부가 반드시 넘긴다(FR-003·FR-008과 동형 함정).
+    """
+    block = section_block(text, "Functional Requirements")
+    if block is None:
+        return []
+    tok = re.compile(fr_decl_re.pattern)
+    bulleted, plain = [], []
+    for line in block.split("\n"):
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = tok.search(line)
+        if not m:
+            continue
+        (bulleted if re.match(r"^\s*-", line) else plain).append(m.group(1))
+    if not bulleted or not plain:
+        return []
+    return [
+        f"FR 선언 문법 혼용 — 불릿 {len(bulleted)}건(예 {bulleted[0]})과 무불릿 {len(plain)}건"
+        f"(예 {plain[0]})이 한 스펙에 공존: 한쪽으로 통일하라(게이트의 선언 탐지는 불릿 유무 무관이라"
+        f" 통과하지만, 한쪽 문법만 보는 grep·리뷰가 반대쪽을 놓친다)"
+    ]
+
+
 def dedup_review_dangling_ids(text, spec_id_re, known_ids):
     block = section_block(text, "Dedup-Review")
     if block is None:
@@ -1522,6 +1557,10 @@ def cmd_completeness(cfg, strict):
         # __reqAlt를 반드시 넘긴다 — 생략하면 기본값 "FR"이 걸려 다중 접두어 사이트의 INFRA 선언이 무검사.
         for fr in fr_lines_missing_shall(text, cfg["__frDecl"], cfg["__reqAlt"]):
             findings.append((spec_id, f"{fr} 선언 라인에 SHALL 없음 — EARS 5패턴 공통 필수 토큰(다중행 서술이면 선언 라인에 SHALL 포함)"))
+        # FR 선언 문법의 스펙 내 일관성(SPEC-013 FR-009) — 한 스펙 안에서 불릿/무불릿 혼용만 신호.
+        # 저장소 전체 통일은 요구하지 않는다(템플릿 규범은 토큰 형태까지 — 불릿은 예시).
+        for m in fr_decl_style_findings(text, cfg["__frDecl"], cfg["__reqAlt"]):
+            findings.append((spec_id, m))
 
     # 1 레포 = 1 모듈(SPEC-013, STRUCTURE.md): Module 값이 갈라지면 레포 분할 신호.
     if len(module_values) > 1:

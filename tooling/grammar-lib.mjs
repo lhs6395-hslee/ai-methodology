@@ -70,6 +70,37 @@ export function frDeclarations(text, frDeclRe, reqAlt = "FR") {
   return out;
 }
 
+// FR 선언 문법의 **스펙 내 일관성**(SPEC-013 FR-009) — 한 스펙이 불릿(`- **FR-001**`)과
+// 무불릿(`**FR-001**`)을 섞어 쓰면 advisory로 표면화한다. 탐지(FR-008)와 SHALL 판정(FR-003)은
+// 의도적으로 불릿 유무 무관이라(소비 프로젝트가 실제로 섞어 쓰므로 좁히면 거짓 음성) 기계는 혼용을
+// 그냥 통과시킨다 — 남는 피해는 **사람과 임시 도구** 쪽이다: 한쪽 문법만 보는 grep이 반대쪽을 통째로
+// 놓친다(실측 PM SPEC-004: 불릿 57 + 무불릿 112가 공존해 진짜 FR 번호 중복 1건이 한쪽 문법 스캔의
+// 거짓 음성으로 일주일 넘게 숨었다 — 킷 dup 게이트가 잡기 전까지).
+// 판정 단위는 **스펙 하나**다. 저장소 전체를 한 문법으로 통일하라고 요구하지 않는다 — 템플릿의 규범
+// 문장은 토큰 형태(`**FR-NNN** (패턴): 문장`)를 규정하고 불릿은 예시에만 나오므로, "불릿 필수"는
+// 문서에 없는 새 의견이 된다(SPEC-013은 문서에 있는 규범만 게이트화한다). 반면 한 파일 안의 혼용은
+// 실제로 사고를 낸, 저술 의도가 아닌 잡음이다 — 대개 스펙 흡수·병합의 이음매로 생긴다.
+// 범위는 FR-008과 같은 규율(FR 섹션 안·라인 시작·라인의 첫 토큰)이되 **전문 폴백은 없다**:
+// Assumptions·Change Log 같은 다른 절은 요구 ID를 불릿으로 정당하게 인용하므로, 폴백을 켜면 그
+// 인용이 "불릿 쪽"으로 집계돼 거짓 혼용이 난다. 여기선 판정 유보가 안전한 방향이다(advisory 신호일
+// 뿐 커버리지 입력이 아니라서 — 집합이 비면 dangling이 폭발하는 FR-008과 상황이 다르다).
+// reqAlt는 호출부가 반드시 넘긴다(FR-003·FR-008과 동형 함정 — 생략하면 다중 접두어 사이트의
+// `**INFRA-001**` 선언이 라인 규율에서 탈락해 판정이 조용히 사라진다). 순수 함수.
+export function frDeclStyleFindings(text, frDeclRe, reqAlt = "FR") {
+  const block = sectionBlock(String(text), "Functional Requirements");
+  if (block === null) return [];
+  const re = new RegExp(frDeclRe && frDeclRe.source ? frDeclRe.source : String(frDeclRe));
+  const bulleted = [], plain = [];
+  for (const line of block.split("\n")) {
+    if (!isFrDeclLine(line, reqAlt)) continue;
+    const m = line.match(re);                     // isFrDeclLine이 라인 시작을 보장 → 첫 토큰이 선언
+    if (!m) continue;
+    (/^\s*-/.test(line) ? bulleted : plain).push(m[1]);
+  }
+  if (!bulleted.length || !plain.length) return [];
+  return [`FR 선언 문법 혼용 — 불릿 ${bulleted.length}건(예 ${bulleted[0]})과 무불릿 ${plain.length}건(예 ${plain[0]})이 한 스펙에 공존: 한쪽으로 통일하라(게이트의 선언 탐지는 불릿 유무 무관이라 통과하지만, 한쪽 문법만 보는 grep·리뷰가 반대쪽을 놓친다)`];
+}
+
 // Dedup-Review 섹션이 언급한 스펙 ID 중 실재하지 않는 것(오타·삭제 잔재) — 정렬 반환.
 // 삭제된 이웃의 이력은 "이웃 없음(삭제됨)" 등 ID 없는 서술로 갱신한다(이력 자체는 보존).
 export function dedupReviewDanglingIds(text, specIdRe, knownIds) {

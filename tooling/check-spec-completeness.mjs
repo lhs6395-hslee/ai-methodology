@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupReview, LIFECYCLE_ENUM, parseLifecycle } from "./lifecycle-lib.mjs";
 import { changeLogRationaleFindings } from "./derivation-lib.mjs";
-import { parseModule, frLinesMissingShall, dedupReviewDanglingIds } from "./grammar-lib.mjs";
+import { parseModule, frLinesMissingShall, frDeclStyleFindings, dedupReviewDanglingIds } from "./grammar-lib.mjs";
 import { objectStorageFindings } from "./object-storage-lib.mjs";
 
 const cfg = loadConfig();
@@ -81,6 +81,10 @@ for (const { text, specId } of texts) {
   // __reqAlt를 반드시 넘긴다 — 생략하면 기본값 "FR"이 걸려 다중 접두어 사이트의 INFRA 선언이 무검사.
   for (const fr of frLinesMissingShall(text, cfg.__frDeclRe.source, cfg.__reqAlt))
     findings.push({ specId, miss: `${fr} 선언 라인에 SHALL 없음 — EARS 5패턴 공통 필수 토큰(다중행 서술이면 선언 라인에 SHALL 포함)` });
+  // FR 선언 문법의 스펙 내 일관성(SPEC-013 FR-009) — 한 스펙 안에서 불릿/무불릿 혼용만 신호.
+  // 저장소 전체 통일은 요구하지 않는다(템플릿 규범은 토큰 형태까지 — 불릿은 예시).
+  for (const m of frDeclStyleFindings(text, cfg.__frDeclRe.source, cfg.__reqAlt))
+    findings.push({ specId, miss: m });
 }
 // 1 레포 = 1 모듈(SPEC-013, STRUCTURE.md): Module 값이 갈라지면 레포 분할 신호.
 if (moduleValues.size > 1) {
