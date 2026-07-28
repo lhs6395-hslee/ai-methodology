@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the **smoke-scan** (E) runs, THE **sdd-smoke-scan.mjs** (S) scanner SHALL collect verification tags from every file under `smokeScanDirs` (defaulting to `scanDirs`) using the config-derived spec/requirement key grammar, comment style agnostic, mapping a deferred method's body to reason and any other method's body to evidence.
+- **FR-001** (event): WHEN the **smoke-scan** (E) runs, THE **sdd-smoke-scan.mjs** (S) scanner SHALL collect verification tags from every file under `smokeScanDirs` (defaulting to `scanDirs`) using the config-derived spec/requirement key grammar, comment style agnostic, mapping a deferred method's body to reason and any other method's body to evidence. — capability: **smoke-scan.scan** (C).
 - **FR-002** (unwanted): IF a tag references a nonexistent FR, is malformed after a valid key, mixes conflicting methods for one FR, or tags exist while `smokeManifest` is unset, THEN THE SYSTEM SHALL report it and exit non-zero (no silent skip).
 - **FR-003** (event): WHEN run with `--write`, THE SYSTEM SHALL regenerate the manifest deterministically — tag-derived entries with path-provenance evidence joined in sorted order, manual entries (keys without tags) preserved verbatim, keys sorted.
 - **FR-004** (event): WHEN run in check mode, THE SYSTEM SHALL exit non-zero if any tag-derived entry is missing from or differs from the manifest (the manifest is a regenerable artifact — no silent drift).
@@ -43,10 +43,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: smoke-scan
 - **Symbols**: sdd-smoke-scan.mjs
 - **Artifacts**: —
+- **Capabilities**: smoke-scan.scan
 - **Files**: tooling/sdd-smoke-scan.mjs, tooling/__tests__/smoke-scan.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

@@ -29,7 +29,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a spec declares a `Status` header, THE **spec-lifecycle** (E) grammar SHALL accept only the lifecycle enum Draft, Reviewed, Approved, Active, Deprecated, Removed, and the completeness gate SHALL flag an out-of-enum value or a missing header (advisory; hard under `--strict`).
+- **FR-001** (event): WHEN a spec declares a `Status` header, THE **spec-lifecycle** (E) grammar SHALL accept only the lifecycle enum Draft, Reviewed, Approved, Active, Deprecated, Removed, and the completeness gate SHALL flag an out-of-enum value or a missing header (advisory; hard under `--strict`). — capability: **spec-lifecycle.judge** (C).
 - **FR-002** (state): WHILE a spec's Status is Reviewed, Approved, or Active, THE **lifecycle-lib.mjs** (S) core SHALL require at least one `## Review Log` entry with a real date, actor, and verdict, flagged by the completeness gate when absent.
 - **FR-003** (state): WHILE a spec's Status is Reviewed, Approved, or Active, THE SYSTEM SHALL require a `## Dedup-Review` record naming at least one reviewed neighbor spec ID (or an explicit no-neighbor statement), flagged by the completeness gate when absent.
 - **FR-004** (unwanted): IF a changed code file is owned by a spec whose declared Status is below Reviewed — Draft, Planned, or any out-of-enum value, judged by whitelist rather than by matching the literal `Draft` — THEN the spec-sync gate SHALL report a violation naming that status regardless of accompanying spec edits — hard in staged mode, advisory in range mode — escapable only via the `Spec-Impact: none` trailer with a reason; specs without a Status header remain legacy pass-through (FR-005).
@@ -44,10 +44,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-lifecycle
 - **Symbols**: lifecycle-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: spec-lifecycle.judge
 - **Files**: tooling/lifecycle-lib.mjs, tooling/__tests__/spec-lifecycle.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

@@ -32,7 +32,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `runTestsPolicy` is `off` (default), the **test-execution** (E) gate **check-test-run.mjs** (S) SHALL not execute any command and SHALL exit zero, noting that the suite should be run manually before claiming completion (coverage accounting is not execution result).
+- **FR-001** (state): WHILE `runTestsPolicy` is `off` (default), the **test-execution** (E) gate **check-test-run.mjs** (S) SHALL not execute any command and SHALL exit zero, noting that the suite should be run manually before claiming completion (coverage accounting is not execution result). — capability: **test-execution.run** (C).
 - **FR-002** (event): WHEN `runTestsPolicy` is `advisory` or `hard` and `commands.test` is declared, THE SYSTEM SHALL execute that command and report its result, exiting non-zero on failure WHILE `hard` and warning without failing WHILE `advisory`, and SHALL route the executed runner's own output to standard error so that the gate's standard output carries the verdict line alone (a harness scanning gate output cannot mistake runner text for a verdict).
 - **FR-003** (unwanted): IF `runTestsPolicy` is `advisory` or `hard` but `commands.test` is not declared, THEN THE SYSTEM SHALL report that execution cannot be verified — exiting non-zero WHILE `hard`, warning WHILE `advisory`.
 - **FR-004** (unwanted): IF `runTestsPolicy` holds a value outside `off|advisory|hard`, THEN THE SYSTEM SHALL report it and exit non-zero (no undefined value).
@@ -44,10 +44,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: test-execution
 - **Symbols**: check-test-run.mjs
 - **Artifacts**: —
+- **Capabilities**: test-execution.run
 - **Files**: tooling/check-test-run.mjs, tooling/__tests__/test-run.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

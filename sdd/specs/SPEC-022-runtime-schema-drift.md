@@ -31,7 +31,7 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `schemaDriftManifest` is absent or lacks an `expected` or `deployed` command (default), the **runtime-schema-drift** (E) gate **check-schema-drift.mjs** (S) SHALL not execute any command and SHALL exit zero, noting the gate is inactive.
+- **FR-001** (state): WHILE `schemaDriftManifest` is absent or lacks an `expected` or `deployed` command (default), the **runtime-schema-drift** (E) gate **check-schema-drift.mjs** (S) SHALL not execute any command and SHALL exit zero, noting the gate is inactive. — capability: **runtime-schema-drift.judge** (C).
 - **FR-002** (event): WHEN `schemaDriftManifest` declares both commands, THE SYSTEM SHALL run each and **schema-drift-lib.mjs** (S) SHALL compute the schema identifiers present in the expected set but absent from the deployed set, and report them as drift — exiting non-zero WHILE `migrationStatePolicy` is `hard` and warning without failing WHILE `advisory`.
 - **FR-003** (unwanted): IF either declared command fails to run, THEN THE SYSTEM SHALL report that drift cannot be determined and SHALL NOT pass silently — exiting non-zero WHILE `hard`, warning WHILE `advisory`.
 - **FR-004** (unwanted): IF `migrationStatePolicy` holds a value outside `advisory|hard`, THEN THE SYSTEM SHALL report it and exit non-zero.
@@ -43,10 +43,11 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: runtime-schema-drift
 - **Symbols**: check-schema-drift.mjs, schema-drift-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: runtime-schema-drift.judge
 - **Files**: tooling/check-schema-drift.mjs, tooling/schema-drift-lib.mjs, tooling/__tests__/schema-drift.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (event): WHEN a changed code file matches a spec's `Ownership.Files` glob, THE **spec-sync** (E) enforcement SHALL require a meaningful change to that spec in the same changeset (staged ∪ base...HEAD), where meaningful = an added/removed FR line or an added bullet/table row under Edge Cases or Change Log.
+- **FR-001** (event): WHEN a changed code file matches a spec's `Ownership.Files` glob, THE **spec-sync** (E) enforcement SHALL require a meaningful change to that spec in the same changeset (staged ∪ base...HEAD), where meaningful = an added/removed FR line or an added bullet/table row under Edge Cases or Change Log. — capability: **spec-sync.enforce** (C).
 - **FR-002** (state): WHILE running with `--staged --message-file`, THE **check-spec-sync.mjs** (S) gate SHALL judge under the HEAD-committed `sdd.config.json` whenever the staged config differs from it — so a commit that weakens the config is judged by the pre-change rules — and SHALL treat violations as hard errors exiting non-zero; WHILE running in range mode (a base ref only), THE SYSTEM SHALL treat violations as non-blocking advisories and exit zero.
 - **FR-003** (unwanted): IF the commit message contains `Spec-Impact: none` without a trailing reason, THEN THE SYSTEM SHALL exit non-zero; WHERE a non-empty reason is present, THE SYSTEM SHALL waive only the accompaniment requirement and the status block, recording the persisted trailer — the Files glob-syntax check and the unowned-file policy SHALL remain enforced.
 - **FR-004** (event): WHEN the git `commit-msg` hook detects `MERGE_HEAD`, THE SYSTEM SHALL skip the spec-sync check for the merge commit and rely on the range advisory as backstop.
@@ -48,10 +48,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-sync
 - **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs, check-converge-drift.mjs, check-orphan-surfaces.mjs
 - **Artifacts**: .git/hooks/commit-msg
+- **Capabilities**: spec-sync.enforce
 - **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/check-converge-drift.mjs, tooling/check-orphan-surfaces.mjs, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs, tooling/__tests__/check-converge-drift.test.mjs, tooling/__tests__/check-orphan-surfaces.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

@@ -32,7 +32,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates spec prefixes, the **prefix-class-consistency** (E) judgment in **prefix-class-lib.mjs** (S) SHALL match each spec's owned repo files (Ownership Files globs, non-test, ignoreDirs excluded) against the infra source classes and SHALL exit non-zero when a spec whose owned files are entirely infra-class does not use the canonical prefix of the present class(es) — iac→INFRA, ci→CICD (iac+ci mix accepts either) — naming the file count and an example file.
+- **FR-001** (event): WHEN the coverage gate evaluates spec prefixes, the **prefix-class-consistency** (E) judgment in **prefix-class-lib.mjs** (S) SHALL match each spec's owned repo files (Ownership Files globs, non-test, ignoreDirs excluded) against the infra source classes and SHALL exit non-zero when a spec whose owned files are entirely infra-class does not use the canonical prefix of the present class(es) — iac→INFRA, ci→CICD (iac+ci mix accepts either) — naming the file count and an example file. — capability: **prefix-class-consistency.judge** (C).
 - **FR-002** (unwanted): IF a spec owns at least one non-infra, non-test file, THEN THE SYSTEM SHALL NOT flag that spec — the threshold is totality, so incidental infra ownership by a feature spec never over-fires.
 - **FR-003** (event): WHEN `prefixClassExemptions` declares a spec, THE SYSTEM SHALL require an existing spec ID and a non-empty rationale (error otherwise), SHALL skip the INFRA-prefix requirement for that spec, and SHALL warn when the exemption is currently unused.
 - **FR-004** (state): WHILE a spec uses the INFRA prefix but none of its owned files matches an infra class, THE SYSTEM SHALL warn without failing so out-of-repo infrastructure remains declarable.
@@ -45,10 +45,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: prefix-class-consistency
 - **Symbols**: prefix-class-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: prefix-class-consistency.judge
 - **Files**: tooling/prefix-class-lib.mjs, tooling/__tests__/prefix-class.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

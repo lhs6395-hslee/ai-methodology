@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the changeset renames a file owned by a spec (git rename status), the **semantic-drift** (E) judgment in **drift-lib.mjs** (S) SHALL require that spec to have either a changed FR declaration line or a `Spec-Impact` trailer in the changeset, and SHALL report a drift-escalation violation for that spec otherwise.
+- **FR-001** (event): WHEN the changeset renames a file owned by a spec (git rename status), the **semantic-drift** (E) judgment in **drift-lib.mjs** (S) SHALL require that spec to have either a changed FR declaration line or a `Spec-Impact` trailer in the changeset, and SHALL report a drift-escalation violation for that spec otherwise. — capability: **semantic-drift.judge** (C).
 - **FR-002** (event): WHEN a changed file's owning spec set differs from its pre-change ownership (ownership move), THE SYSTEM SHALL apply the same escalation as a rename — deferred to a later increment pending two-revision ownership diffing.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL consider the escalation satisfied only by a changed FR declaration line in the owning spec or a `Spec-Impact` trailer, and SHALL NOT judge whether the FR body semantically matches the new code — that match is a review checkpoint, not a gate.
 - **FR-004** (state): WHILE no owned file in the changeset is renamed or ownership-moved, THE SYSTEM SHALL leave the existing spec-sync requirement unchanged, adding no escalation on ordinary edits.
@@ -44,10 +44,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: semantic-drift
 - **Symbols**: drift-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: semantic-drift.judge
 - **Files**: tooling/drift-lib.mjs, tooling/__tests__/drift.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

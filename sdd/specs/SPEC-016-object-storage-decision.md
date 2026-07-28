@@ -32,7 +32,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the completeness gate scans a spec whose body matches a configured object-storage marker, the **object-storage-decision** (E) judgment in **object-storage-lib.mjs** (S) SHALL require an Object Storage Decision section and SHALL warn — hard under `--strict` — when that section is absent.
+- **FR-001** (event): WHEN the completeness gate scans a spec whose body matches a configured object-storage marker, the **object-storage-decision** (E) judgment in **object-storage-lib.mjs** (S) SHALL require an Object Storage Decision section and SHALL warn — hard under `--strict` — when that section is absent. — capability: **object-storage-decision.judge** (C).
 - **FR-002** (state): WHILE a spec carries an Object Storage Decision section, THE SYSTEM SHALL warn when it lacks the Bucket or the Consolidation label, so the bucket-selection and consolidation choices are recorded.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL read the marker set from `objectStorageMarkers` config (default list, empty list disables the check), keeping detection portable and stack-agnostic.
 
@@ -42,10 +42,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: object-storage-decision
 - **Symbols**: object-storage-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: object-storage-decision.judge
 - **Files**: tooling/object-storage-lib.mjs, tooling/__tests__/object-storage.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

@@ -29,7 +29,7 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a spec ID is listed in `strictSpecs`, THE SYSTEM SHALL apply strict R2 coverage to that spec even without `--strict` — every declared FR must be unit-covered, zero-coverage fails, and smoke/deferred manifest entries SHALL NOT substitute for unit coverage.
+- **FR-001** (event): WHEN a spec ID is listed in `strictSpecs`, THE SYSTEM SHALL apply strict R2 coverage to that spec even without `--strict` — every declared FR must be unit-covered, zero-coverage fails, and smoke/deferred manifest entries SHALL NOT substitute for unit coverage. — capability: **verification-accounting.account** (C).
 - **FR-002** (unwanted): IF `strictSpecs` contains a spec ID that does not exist in the spec directory, THEN THE SYSTEM SHALL report it and exit non-zero (no silent skip).
 - **FR-003** (state): WHILE `requireAccounting` is true, THE **verification-accounting** (E) ledger SHALL require every declared FR to be unit-covered, smoke-verified, or deferred, and SHALL report each remaining FR as an R3 unaccounted error with non-zero exit.
 - **FR-004** (event): WHEN `smokeManifest` is configured, THE **verification-accounting.mjs** (S) core SHALL load the JSON file and exit non-zero for a missing or unparsable file, a key that does not match the derived spec/requirement ID grammar or references a nonexistent FR, an entry without a non-empty method, a deferred entry without a non-empty reason, or a non-deferred entry without non-empty evidence.
@@ -42,10 +42,11 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: verification-accounting
 - **Symbols**: verification-accounting.mjs
 - **Artifacts**: sdd/smoke-manifest.json
+- **Capabilities**: verification-accounting.account
 - **Files**: tooling/verification-accounting.mjs, tooling/__tests__/fr-accounting.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

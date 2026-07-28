@@ -9,11 +9,13 @@
   "ownershipCategories": [
     "Modules",
     "Symbols",
-    "Artifacts"
+    "Artifacts",
+    "Capabilities"
   ],
   "ownershipCategoryRoles": {
     "Modules": "entity",
-    "Symbols": "surface"
+    "Symbols": "surface",
+    "Capabilities": "capability"
   },
   "ignoreDirs": [
     "node_modules",
@@ -136,5 +138,22 @@
     "tooling",
     "prompts"
   ],
-  "symbolRealityPolicy": "hard"
+  "symbolRealityPolicy": "hard",
+  "capabilityVerbs": [
+    "account",
+    "adopt",
+    "enforce",
+    "gate",
+    "generate",
+    "install",
+    "judge",
+    "migrate",
+    "mirror",
+    "parse",
+    "resolve",
+    "retire",
+    "run",
+    "scan"
+  ],
+  "capabilityOwnershipPolicy": "hard"
 }

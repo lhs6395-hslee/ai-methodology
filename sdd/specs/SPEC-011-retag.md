@@ -29,7 +29,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (unwanted): IF the migration map is unloadable or non-object, a key or value violates the derived key grammar, or a non-null target FR does not exist in current specs, THEN the **retag** (E) planner in **sdd-retag.mjs** (S) SHALL report it and exit non-zero without modifying any file (all-or-nothing).
+- **FR-001** (unwanted): IF the migration map is unloadable or non-object, a key or value violates the derived key grammar, or a non-null target FR does not exist in current specs, THEN the **retag** (E) planner in **sdd-retag.mjs** (S) SHALL report it and exit non-zero without modifying any file (all-or-nothing). — capability: **retag.migrate** (C).
 - **FR-002** (event): WHEN run without `--write`, THE SYSTEM SHALL report each planned rewrite with file and line, manifest key renames, null-mapped keys as manual-removal targets, and zero-reference old keys as warnings — modifying nothing.
 - **FR-003** (event): WHEN run with `--write`, THE SYSTEM SHALL apply boundary-enforced replacement of coverage and verification tags across `scanDirs` and `smokeScanDirs` and rename matching smokeManifest keys, idempotently (a rerun finds zero references).
 - **FR-004** (ubiquitous): THE SYSTEM SHALL never truncation-match a suffixed key — a base key's migration SHALL NOT touch a suffixed sibling's tags, and null-mapped tags SHALL be reported rather than machine-deleted (residuals remain caught by the coverage gate).
@@ -41,10 +41,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: retag
 - **Symbols**: sdd-retag.mjs
 - **Artifacts**: —
+- **Capabilities**: retag.migrate
 - **Files**: tooling/sdd-retag.mjs, tooling/__tests__/retag.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

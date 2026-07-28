@@ -10,12 +10,10 @@
 |---|---|---|---|
 | 구조적 중복(dedup) | **발화** | hard(정책 없음) | — |
 | FR 키 앵커(SPEC-023) | **발화** | advisory | — |
-| capability 귀속(SPEC-024) | **미판정** | advisory | capability 역할 카테고리 미해석(ownershipCategoryRoles에 capability 선언 없음 + 이름 폴백 실패) |
+| capability 귀속(SPEC-024) | **발화** | hard | — |
 | entity 실재(SPEC-026) | **발화** | hard | — |
 | surface 실재(orphan, SPEC-003) | **발화** | advisory | — |
 | entity 등록제(entityRegistry) | **발화** | hard(채우면) | — |
-
-> ⚠ **1개 가드가 미판정입니다** — capability 귀속(SPEC-024). 아래 표의 해당 칸은 "검증됨"이 아니라 "아무도 안 봤음"을 뜻합니다.
 
 ## 카테고리 → 역할
 
@@ -24,6 +22,7 @@
 | Modules | entity |
 | Symbols | surface |
 | Artifacts | —(역할 없음) |
+| Capabilities | capability |
 
 ## Entity 키 (aggregate root) — 30건
 
@@ -118,6 +117,41 @@
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 
+## Capability 키 — 30건
+
+| 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
+|---|---|---|---|---|
+| `adoption-lifecycle.adopt` | SPEC-005 | ✓ | ✓ | ✓ |
+| `capability-ownership.judge` | SPEC-024 | ✓ | ✓ | ✓ |
+| `cross-spec-change.judge` | SPEC-020 | ✓ | ✓ | ✓ |
+| `derivation-accounting.account` | SPEC-009 | ✓ | ✓ | ✓ |
+| `entity-relations.resolve` | SPEC-017 | ✓ | ✓ | ✓ |
+| `entity-schema-backing.judge` | SPEC-026 | ✓ | ✓ | ✓ |
+| `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
+| `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
+| `key-pipeline.parse` | SPEC-001 | ✓ | ✓ | ✓ |
+| `kit-ci.gate` | CICD-001 | ✓ | ✓ | ✓ |
+| `object-storage-decision.judge` | SPEC-016 | ✓ | ✓ | ✓ |
+| `ownership-map.generate` | SPEC-028 | ✓ | ✓ | ✓ |
+| `ownership-reality.judge` | SPEC-029 | ✓ | ✓ | ✓ |
+| `policy-ratchet.judge` | SPEC-027 | ✓ | ✓ | ✓ |
+| `prefix-class-consistency.judge` | SPEC-012 | ✓ | ✓ | ✓ |
+| `retag.migrate` | SPEC-011 | ✓ | ✓ | ✓ |
+| `runtime-parity.mirror` | SPEC-006 | ✓ | ✓ | ✓ |
+| `runtime-schema-drift.judge` | SPEC-022 | ✓ | ✓ | ✓ |
+| `semantic-drift.judge` | SPEC-019 | ✓ | ✓ | ✓ |
+| `smoke-scan.scan` | SPEC-010 | ✓ | ✓ | ✓ |
+| `spec-grammar-hardening.judge` | SPEC-013 | ✓ | ✓ | ✓ |
+| `spec-id-numbering.judge` | SPEC-014 | ✓ | ✓ | ✓ |
+| `spec-lifecycle.judge` | SPEC-008 | ✓ | ✓ | ✓ |
+| `spec-migration.migrate` | SPEC-025 | ✓ | ✓ | ✓ |
+| `spec-quality-gates.judge` | SPEC-002 | ✓ | ✓ | ✓ |
+| `spec-retirement.retire` | SPEC-018 | ✓ | ✓ | ✓ |
+| `spec-sync.enforce` | SPEC-003 | ✓ | ✓ | ✓ |
+| `test-domain.judge` | SPEC-015 | ✓ | ✓ | ✓ |
+| `test-execution.run` | SPEC-021 | ✓ | ✓ | ✓ |
+| `verification-accounting.account` | SPEC-007 | ✓ | ✓ | ✓ |
+
 ## 역할 없는 카테고리 키 — 16건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
@@ -141,7 +175,7 @@
 
 ## 집계
 
-- 소유 키 총 **99건** (entity 30 · surface 53 · capability 0 · 역할없음 16)
+- 소유 키 총 **129건** (entity 30 · surface 53 · capability 30 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

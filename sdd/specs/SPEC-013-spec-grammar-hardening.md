@@ -41,7 +41,7 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the completeness gate reads a spec, the **spec-grammar-hardening** (E) judgment in **grammar-lib.mjs** (S) SHALL flag a missing Module header (advisory; non-zero under `--strict`) — the header STORAGE §2.3 declares mandatory.
+- **FR-001** (event): WHEN the completeness gate reads a spec, the **spec-grammar-hardening** (E) judgment in **grammar-lib.mjs** (S) SHALL flag a missing Module header (advisory; non-zero under `--strict`) — the header STORAGE §2.3 declares mandatory. — capability: **spec-grammar-hardening.judge** (C).
 - **FR-002** (event): WHEN specs declare more than one distinct Module value, THE SYSTEM SHALL flag the divergence listing the values (advisory) — one repo is one module, more modules mean more repos.
 - **FR-003** (event): WHEN a spec's FR declaration line lacks the SHALL token, THE SYSTEM SHALL flag that FR id (advisory) — every EARS pattern carries SHALL; wording quality stays review's job.
 - **FR-004** (event): WHEN a spec's Dedup-Review section references a spec ID that does not exist in the spec directory, THE SYSTEM SHALL flag the dangling reference (advisory) — extending the existence-and-form check to referential integrity.
@@ -59,10 +59,11 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-grammar-hardening
 - **Symbols**: grammar-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: spec-grammar-hardening.judge
 - **Files**: tooling/grammar-lib.mjs, tooling/__tests__/grammar-hardening.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

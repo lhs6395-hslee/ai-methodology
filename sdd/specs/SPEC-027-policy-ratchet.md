@@ -28,7 +28,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE the effective ratchet strength — the stronger of the base ref's and the current `policyRatchetPolicy` — is off, **check-policy-ratchet.mjs** (S) SHALL perform no ratchet evaluation and exit zero.
+- **FR-001** (state): WHILE the effective ratchet strength — the stronger of the base ref's and the current `policyRatchetPolicy` — is off, **check-policy-ratchet.mjs** (S) SHALL perform no ratchet evaluation and exit zero. — capability: **policy-ratchet.judge** (C).
 - **FR-002** (state): WHILE the base ref's config cannot be read or parsed (no git, first adoption, malformed), THE SYSTEM SHALL skip the evaluation and exit zero rather than block, reporting that it skipped.
 - **FR-003** (event): WHEN the policy is advisory or hard and the base config is available, the **policy-ratchet** (E) judgment in **policy-ratchet-lib.mjs** (S) SHALL compare each ratcheted policy knob's strength rank against the base and collect every knob whose current rank is lower than the base rank, excluding knobs named in `policyRatchetExceptions`.
 - **FR-004** (unwanted): IF one or more non-excepted downgrades exist, THEN THE SYSTEM SHALL name each with its from→to value and SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
@@ -42,10 +42,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: policy-ratchet
 - **Symbols**: policy-ratchet-lib.mjs, check-policy-ratchet.mjs
 - **Artifacts**: —
+- **Capabilities**: policy-ratchet.judge
 - **Files**: tooling/policy-ratchet-lib.mjs, tooling/check-policy-ratchet.mjs, tooling/__tests__/policy-ratchet.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

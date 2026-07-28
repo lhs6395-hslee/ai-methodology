@@ -28,7 +28,7 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `entitySchemaBackingPolicy` is off, THE SYSTEM SHALL perform no schema-backing evaluation and keep the ownership gate's output unchanged.
+- **FR-001** (state): WHILE `entitySchemaBackingPolicy` is off, THE SYSTEM SHALL perform no schema-backing evaluation and keep the ownership gate's output unchanged. — capability: **entity-schema-backing.judge** (C).
 - **FR-002** (event): WHEN the policy is advisory or hard, the **entity-schema-backing** (E) core in **schema-backing-lib.mjs** (S) SHALL extract the set of real entity identifiers from the files matched by each source's globs using that source's capture patterns, and require every owned entity key — trimmed and lowercased — to be present in that set or in `entitySchemaExemptEntities`, reporting each violation with the spec id and entity.
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, or an `entitySchemaExemptEntities` entry has an empty rationale, or an `entitySchemaSources` pattern is not a valid regular expression, THEN THE SYSTEM SHALL report it clearly and exit non-zero (without leaking a runtime stack trace).
@@ -41,10 +41,11 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: entity-schema-backing
 - **Symbols**: schema-backing-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: entity-schema-backing.judge
 - **Files**: tooling/schema-backing-lib.mjs, tooling/__tests__/schema-backing.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

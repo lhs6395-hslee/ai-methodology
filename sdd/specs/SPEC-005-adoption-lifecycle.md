@@ -33,7 +33,7 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (event): WHEN `/sdd-start` runs in a project that has no `sdd/` layout, THE **sdd-start.SKILL.md** (S) skill SHALL wire the kit via `sdd-init`, reverse-engineer DRAFT EARS FR specs from the current code, and HALT at a human-approval gate before finalizing any spec.
+- **FR-001** (event): WHEN `/sdd-start` runs in a project that has no `sdd/` layout, THE **sdd-start.SKILL.md** (S) skill SHALL wire the kit via `sdd-init`, reverse-engineer DRAFT EARS FR specs from the current code, and HALT at a human-approval gate before finalizing any spec. — capability: **adoption-lifecycle.adopt** (C).
 - **FR-002** (event): WHEN `/sdd-readopt` runs, THE **sdd-readopt.SKILL.md** (S) skill SHALL first create a `git tag sdd-pre-readopt-<date>` safety snapshot, re-wire via `sdd-init --force`, and clear prior `sdd/specs` without modifying production code, then reverse-engineer DRAFT specs and HALT at the approval gate.
 - **FR-003** (event): WHEN `/sdd-update` runs, THE **sdd-update.SKILL.md** (S) skill SHALL surface code↔spec drift through the `/sdd-sync` harness, escalating bug-driven drift to `/speckit.fix`, and keep gates green.
 - **FR-004** (unwanted): IF any **adoption-lifecycle** (E) command would finalize or overwrite a spec or production code without recorded human approval, THEN THE SYSTEM SHALL refuse the action and wait for approval.
@@ -46,10 +46,11 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts). Symbols = 스킬 소스(SKILL.md 진입점), Artifacts = 설치 산출물(`.claude/skills/*`).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities). Symbols = 스킬 소스(SKILL.md 진입점), Artifacts = 설치 산출물(`.claude/skills/*`).
 - **Modules**: adoption-lifecycle
 - **Symbols**: sdd-start.SKILL.md, sdd-readopt.SKILL.md, sdd-update.SKILL.md
 - **Artifacts**: .claude/skills/sdd-start/SKILL.md, .claude/skills/sdd-readopt/SKILL.md, .claude/skills/sdd-update/SKILL.md
+- **Capabilities**: adoption-lifecycle.adopt
 - **Files**: tooling/harness/sdd-start.SKILL.md, tooling/harness/sdd-readopt.SKILL.md, tooling/harness/sdd-update.SKILL.md, tooling/__tests__/lifecycle-skills.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

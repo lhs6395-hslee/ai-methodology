@@ -27,7 +27,7 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a commit is pushed to the default branch or a pull request is opened or updated, THE **kit-ci** (E) pipeline SHALL run the unit suite, the quality gates, and the smoke-evidence drift check, failing the workflow on any non-zero exit.
+- **FR-001** (event): WHEN a commit is pushed to the default branch or a pull request is opened or updated, THE **kit-ci** (E) pipeline SHALL run the unit suite, the quality gates, and the smoke-evidence drift check, failing the workflow on any non-zero exit. — capability: **kit-ci.gate** (C).
 - **FR-002** (event): WHEN a pull request is evaluated, THE SYSTEM SHALL additionally run the spec-sync gate in range mode against the merge base, so that server-side merges cannot bypass the locally-hooked enforcement.
 
 ### Key Entities
@@ -36,10 +36,11 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: kit-ci
 - **Symbols**: —
 - **Artifacts**: .github/workflows/sdd-gates.yml
+- **Capabilities**: kit-ci.gate
 - **Files**: .github/**
 
 ## Dependencies (참조 — dedup 제외)

@@ -33,7 +33,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (ubiquitous): THE **sdd-sync.mjs** (S) harness SHALL run the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean — treating a gate that produced no standard-output verdict, or a gate file that is absent, as flagged-unjudged rather than clean — and exiting non-zero under `--strict` only when a rule is flagged.
+- **FR-001** (ubiquitous): THE **sdd-sync.mjs** (S) harness SHALL run the detector gates grouped as R1/R2/R3 and report each rule as flagged or clean — treating a gate that produced no standard-output verdict, or a gate file that is absent, as flagged-unjudged rather than clean — and exiting non-zero under `--strict` only when a rule is flagged. — capability: **harness-install.install** (C).
 - **FR-002** (event): WHEN **sdd-init.sh** (S) runs with `--gate=node` in a target project, THE **harness-install** (E) installer SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically.
 - **FR-003** (event): WHEN **sdd-init.sh** (S) wires session hooks, THE SYSTEM SHALL merge SessionStart and PreToolUse entries into `.claude/settings.json` and install the **sdd-session-context.sh** (S) and **sdd-edit-check.sh** (S) scripts plus the `/sdd-sync`, `/speckit.fix`, `/sdd-start`, `/sdd-readopt`, and `/sdd-update` skills into `.claude/skills/`.
 - **FR-004** (unwanted): IF `.claude/settings.json` already exists and `jq` is unavailable, THEN THE SYSTEM SHALL preserve the existing file and skip hook merging rather than clobber it; WHERE `jq` is available, THE SYSTEM SHALL strip prior SDD entries before re-adding them so re-runs are idempotent.
@@ -52,10 +52,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts). Symbols = 소스 진입점, Artifacts = 설치 산출물.
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities). Symbols = 소스 진입점, Artifacts = 설치 산출물.
 - **Modules**: harness-install
 - **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh, sdd-run.mjs
 - **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md, .kiro/steering/sdd.md, AGENTS.md
+- **Capabilities**: harness-install.install
 - **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

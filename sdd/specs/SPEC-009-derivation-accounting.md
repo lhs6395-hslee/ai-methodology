@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN `derivationManifest` is configured, THE **check-derivation.mjs** (S) gate SHALL load the JSON file and exit non-zero for a missing file, a parse failure, or a non-object top level.
+- **FR-001** (event): WHEN `derivationManifest` is configured, THE **check-derivation.mjs** (S) gate SHALL load the JSON file and exit non-zero for a missing file, a parse failure, or a non-object top level. — capability: **derivation-accounting.account** (C).
 - **FR-002** (ubiquitous): THE **derivation-accounting** (E) aggregate SHALL define its source domain as the fixed nine-class enum (code, iac, ci, ops-docs, build-evidence, vcs-history, prior-traceability, prior-intent, human-intent) and SHALL report an unknown class key or an unaccounted class as an error — no undefined exceptions, no silent non-ingestion.
 - **FR-003** (event): WHEN a class entry is validated, THE **derivation-lib.mjs** (S) core SHALL require status mapped, none, or deferred; a mapped entry SHALL carry non-empty evidence and a none or deferred entry SHALL carry a non-empty reason (existence only — quality is review's job).
 - **FR-004** (event): WHEN a class is repo-detectable (glob classes via `derivationClassGlobs`, code via scanDirs files, prior traceability via existing coverage tags), THE SYSTEM SHALL exit non-zero if matching artifacts exist while the class is declared none, and SHALL warn (not fail) when a mapped class has zero in-repo matches so out-of-repo reality remains declarable.
@@ -45,10 +45,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: derivation-accounting
 - **Symbols**: check-derivation.mjs, derivation-lib.mjs
 - **Artifacts**: sdd/derivation.json
+- **Capabilities**: derivation-accounting.account
 - **Files**: tooling/check-derivation.mjs, tooling/derivation-lib.mjs, tooling/__tests__/derivation.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

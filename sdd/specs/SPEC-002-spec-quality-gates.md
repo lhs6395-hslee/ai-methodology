@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 게이트당 1 FR + PREFIX 1 FR 원칙.
 
-- **FR-001** (event): WHEN a test file carries an `@covers <SPEC-ID>/FR-NNN` tag referencing a FR that does not exist in that spec, THE SYSTEM SHALL report an R1 dangling-reference error and exit non-zero; a spec with zero covering tests SHALL only warn (incremental adoption).
+- **FR-001** (event): WHEN a test file carries an `@covers <SPEC-ID>/FR-NNN` tag referencing a FR that does not exist in that spec, THE SYSTEM SHALL report an R1 dangling-reference error and exit non-zero; a spec with zero covering tests SHALL only warn (incremental adoption). — capability: **spec-quality-gates.judge** (C).
 - **FR-002** (unwanted): IF two or more specs own the same normalized key within one ownership category, THEN **check-ownership.mjs** (S) SHALL report a structural-duplicate conflict and exit non-zero, while Dependencies-section keys are excluded from the duplicate check.
 - **FR-003** (event): WHEN a spec owns more keys per category than `maxKeysPerCategoryPerSpec`, or declares more aggregate-root-category keys than `maxAggregateRootsPerSpec` (default 1), or exceeds `maxFRsPerSpec` FRs, THE **check-spec-cohesion.mjs** (S) gate SHALL emit an under-fragmentation (cohesion) split advisory.
 - **FR-004** (unwanted): IF a spec declares at least one FR but has no `SC-NNN` success criterion or no acceptance clause (Given/Acceptance/수용 기준), THEN **check-spec-completeness.mjs** (S) SHALL warn that the spec is incomplete.
@@ -48,10 +48,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-quality-gates
 - **Symbols**: check-fr-coverage.mjs, check-ownership.mjs, check-spec-cohesion.mjs, check-spec-completeness.mjs, check-spec-consistency.mjs, check-test-adequacy.mjs
 - **Artifacts**: —
+- **Capabilities**: spec-quality-gates.judge
 - **Files**: tooling/check-fr-coverage.mjs, tooling/check-ownership.mjs, tooling/check-spec-cohesion.mjs, tooling/check-spec-completeness.mjs, tooling/check-spec-consistency.mjs, tooling/check-test-adequacy.mjs, tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs, tooling/__tests__/check-req-prefix.test.mjs, tooling/__tests__/check-spec-cohesion.test.mjs, tooling/__tests__/check-spec-completeness.test.mjs, tooling/__tests__/check-spec-consistency.test.mjs, tooling/__tests__/check-test-adequacy.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

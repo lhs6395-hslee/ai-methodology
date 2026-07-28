@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the **ownership-map** (E) generator **gen-ownership-map.mjs** (S) runs, THE SYSTEM SHALL read every spec's owned declaration for the configured categories and emit one markdown row per owned key carrying the key, its owning spec, and one cell per guard.
+- **FR-001** (event): WHEN the **ownership-map** (E) generator **gen-ownership-map.mjs** (S) runs, THE SYSTEM SHALL read every spec's owned declaration for the configured categories and emit one markdown row per owned key carrying the key, its owning spec, and one cell per guard. — capability: **ownership-map.generate** (C).
 - **FR-002** (event): WHEN a guard does not fire in this repo — policy off, adapter sources empty, role unresolved, or globs unset — THE SYSTEM SHALL render that guard's cells as an explicit unjudged marker rather than a pass mark, and SHALL list the guard in a posture table together with the reason reported by that guard's own inert-reason core.
 - **FR-003** (event): WHEN one or more guards are unjudged, THE SYSTEM SHALL emit a warning line above the key tables stating how many guards are unjudged and naming them, so a reader cannot mistake a green summary for full verification.
 - **FR-004** (event): WHEN an owned entity is permitted by the exemption registry, THE SYSTEM SHALL render its reality cell as an exemption carrying the recorded reason, distinct from a pass mark.
@@ -45,10 +45,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: ownership-map
 - **Symbols**: gen-ownership-map.mjs
 - **Artifacts**: sdd/OWNERSHIP_MAP.md
+- **Capabilities**: ownership-map.generate
 - **Files**: tooling/gen-ownership-map.mjs, tooling/__tests__/ownership-map.test.mjs, sdd/OWNERSHIP_MAP.md
 
 ## Dependencies (참조 — dedup 제외)

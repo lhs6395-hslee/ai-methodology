@@ -27,7 +27,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `capabilityOwnershipPolicy` is off, THE SYSTEM SHALL perform no capability-ownership evaluation and keep the ownership gate's output unchanged.
+- **FR-001** (state): WHILE `capabilityOwnershipPolicy` is off, THE SYSTEM SHALL perform no capability-ownership evaluation and keep the ownership gate's output unchanged. — capability: **capability-ownership.judge** (C).
 - **FR-002** (event): WHEN the policy is advisory or hard, the **capability-ownership** (E) core in **capability-ownership-lib.mjs** (S) SHALL require, for each owned capability key, that its entity segment — the token before the first dot, compared after trimming and lowercasing — be among the spec's own owned entity keys, reporting each violation with the spec id, capability, and entity segment.
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
@@ -39,10 +39,11 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: capability-ownership
 - **Symbols**: capability-ownership-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: capability-ownership.judge
 - **Files**: tooling/capability-ownership-lib.mjs, tooling/__tests__/capability-ownership.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
@@ -85,3 +86,4 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
 | 2026-07-28 | `capability-ownership.test.mjs` 픽스처 복사 목록에 `key-anchor-lib.mjs` 추가 | SPEC-013 FR-008 동반: `grammar-lib.mjs`의 새 import를 픽스처도 복사해야 게이트가 실행된다(배선만, 판정 불변) |
 | 2026-07-28 | `capability-ownership.test.mjs` 픽스처 lib 목록에 `ownership-reality-lib.mjs` 추가 | `check-ownership.mjs`가 새 lib을 임포트하게 되어 이 테스트의 임시 픽스처가 모듈 해석에 실패했다 — 판정 내용 무변경, 픽스처 배선만 |
+| 2026-07-28 | `capabilityOwnershipPolicy` off→**hard** 승격. 킷 30개 스펙이 `<슬러그>.<verb>` capability를 소유하게 되어 판정이 처음 발화한다 — 귀속 위반 0건 | capability entity가 곧 그 스펙의 모듈 키(=파일명 슬러그, SPEC-029 ①)이므로 귀속이 구조적으로 성립한다. 미판정 가드 1종 → 0종 |

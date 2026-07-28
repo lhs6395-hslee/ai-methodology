@@ -25,7 +25,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the **spec-migration** (E) executor **sdd-migrate.SKILL.md** (S) — whose canonical procedure is **migrate.md** (S) — runs, THE SYSTEM SHALL collect the open migration backlog by running the gate sweep and triage each violation — capability-ownership (rename / cross-aggregate / ghost-entity), key-anchor (rhetorical demotion / key promotion), and cohesion (aggregate-root + relation) — attaching a proposed fix.
+- **FR-001** (event): WHEN the **spec-migration** (E) executor **sdd-migrate.SKILL.md** (S) — whose canonical procedure is **migrate.md** (S) — runs, THE SYSTEM SHALL collect the open migration backlog by running the gate sweep and triage each violation — capability-ownership (rename / cross-aggregate / ghost-entity), key-anchor (rhetorical demotion / key promotion), and cohesion (aggregate-root + relation) — attaching a proposed fix. — capability: **spec-migration.migrate** (C).
 - **FR-002** (event): WHEN a spec restructuring proposal is ready, THE SYSTEM SHALL halt at a human-approval gate before editing any spec, and SHALL ask rather than assume for judgment items — whether a noun is a real table, which entity is the aggregate root, and — for a cross-aggregate capability — whether to move it to the owning spec or to declare that entity as this spec's own (a `Dependencies` reference is not a resolution).
 - **FR-003** (event): WHEN the user approves items, THE SYSTEM SHALL apply them as spec-first edits with an accompanying Change Log row, one spec per commit (never a big-bang rewrite), and re-run the gates to confirm.
 - **FR-004** (unwanted): IF `/sdd-migrate` would finalize or overwrite a spec or production code without recorded approval, or would invent a domain fact, THEN THE SYSTEM SHALL refuse and wait for approval.
@@ -37,10 +37,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts). Symbols = 스킬 소스, Artifacts = 설치 산출물.
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities). Symbols = 스킬 소스, Artifacts = 설치 산출물.
 - **Modules**: spec-migration
 - **Symbols**: sdd-migrate.SKILL.md, migrate.md
 - **Artifacts**: .claude/skills/sdd-migrate/SKILL.md
+- **Capabilities**: spec-migration.migrate
 - **Files**: tooling/harness/sdd-migrate.SKILL.md, prompts/migrate.md, tooling/__tests__/migrate-skill.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

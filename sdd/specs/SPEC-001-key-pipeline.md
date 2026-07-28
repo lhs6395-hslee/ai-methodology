@@ -38,7 +38,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 각 FR은 구현된 동작을 서술한다(발명 금지).
 
-- **FR-001** (event): WHEN `parseSection` receives a heading and category list, THE **ownership-keys.mjs** (S) parser SHALL slice the text from that `## <heading>` line to the next `## ` line and return one trimmed key array per category, collecting every bullet declared for that category (not only the first), joining each bullet's indented continuation lines, splitting on commas that sit outside parentheses and brackets, and excluding only placeholder tokens — empty, `—`, `-`, and tokens consisting solely of a bracketed span.
+- **FR-001** (event): WHEN `parseSection` receives a heading and category list, THE **ownership-keys.mjs** (S) parser SHALL slice the text from that `## <heading>` line to the next `## ` line and return one trimmed key array per category, collecting every bullet declared for that category (not only the first), joining each bullet's indented continuation lines, splitting on commas that sit outside parentheses and brackets, and excluding only placeholder tokens — empty, `—`, `-`, and tokens consisting solely of a bracketed span. — capability: **key-pipeline.parse** (C).
 - **FR-002** (event): WHERE `surfaceFormat` is `http` (default), WHEN a Surfaces key is normalized, THE SYSTEM SHALL uppercase the METHOD, lowercase the path, rewrite `:id`/`<id>`/`{id}` params to the configured `surfacePathParam` `{name}` form, and strip the trailing slash; WHERE `surfaceFormat` is `path` or `any`, THE SYSTEM SHALL instead lowercase the key and strip the trailing slash without METHOD/param parsing (file-path surfaces).
 - **FR-003** (event): WHEN any key is normalized, THE SYSTEM SHALL first apply Unicode NFC normalization so that canonically equivalent spellings collapse to one key, and WHERE the key is a non-Surfaces (Entity or Capability class) key THE SYSTEM SHALL additionally lowercase it and collapse internal whitespace to single spaces.
 - **FR-004** (unwanted): IF a Capabilities key is not exactly `entity.verb` (one dot) or its verb is absent from the configured verb set, THEN THE SYSTEM SHALL return a violation reason string instead of null.
@@ -60,6 +60,7 @@
 - **Modules**: key-pipeline
 - **Symbols**: ownership-keys.mjs, sdd-config.mjs
 - **Artifacts**: —
+- **Capabilities**: key-pipeline.parse
 - **Files**: tooling/ownership-keys.mjs, tooling/sdd-config.mjs, sdd.config.json, tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
@@ -122,3 +123,4 @@
 | 2026-07-27 | dedup 입력 신뢰성 5건 봉합 — `parseSection` 전 불릿·줄바꿈 이어붙이기, 괄호 인식 split(`splitKeys`), 플레이스홀더 정밀화(`isPlaceholder`), 카테고리명 정규식 이스케이프(`escapeRegExp`), `normalizeKey` NFC 정규화. FR-001·FR-003 개정 + Edge Cases 5건, Node·Python 바이트 패리티, 회귀 테스트 6건 | Ownership 감사 #21 C-2·C-3·M-13·M-3·유니코드: dedup은 킷의 **유일한 hard 게이트**인데 그 입력이 조용히 잘려, 두 스펙이 같은 키를 소유해도 "✓ 구조적 중복 없음"이 나왔다(실측 재현 5건). 중복성 판정의 신뢰가 근본에서 깨져 있던 자리 |
 | 2026-07-27 | `entityRegistry`에 `ownership-map` 등록 | SPEC-028 동반: 신규 모듈 entity 어휘 등록(등록 관문 — 킷 자체 게이트가 누락을 hard로 지목) |
 | 2026-07-28 | `ownershipSourceRoots`·`symbolRealityPolicy` 2종 knob 추가 선언 + `entitySchemaSources`에 `{kind:"spec-slug"}` 소스 종류 채택. 킷 자신을 두 문법 `hard`로 전환하고 `entityRegistry`에 `ownership-reality` 등록 | SPEC-029 신설 — 실재 판정을 어댑터 위임에서 문법으로. config가 판정의 SSOT라는 원칙대로 소스 루트·강도를 여기서 선언한다 |
+| 2026-07-28 | `ownershipCategories`에 `Capabilities` 추가 + `ownershipCategoryRoles`에 capability 역할 선언 + `capabilityVerbs` 14종 등록(account adopt enforce gate generate install judge migrate mirror parse resolve retire run scan) | 킷의 마지막 미판정 가드가 capability였다 — 카테고리가 없어 SPEC-024 판정이 inert였다. owner 결정: 정책을 off로 명시하는 대신 카테고리를 도입해 킷이 그 가드를 자기에게도 적용한다 |

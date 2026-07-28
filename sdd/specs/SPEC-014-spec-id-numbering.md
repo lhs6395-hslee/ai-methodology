@@ -44,7 +44,7 @@ FR 식별자는 `<SPEC-ID>/FR-NNN`이고 스펙 ID가 네임스페이스라 번�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates the spec-file id set, the **spec-id-numbering** (E) judgment in **numbering-lib.mjs** (S) SHALL group ids by prefix and SHALL exit non-zero when any prefix contains a duplicate number or its lowest number is not one, naming the offending id — except that a lowest number above one is accepted when every preceding number of that prefix is recorded in `retiredIds` (retiring the lowest-numbered spec is a legitimate gap, not a renumbering trigger).
+- **FR-001** (event): WHEN the coverage gate evaluates the spec-file id set, the **spec-id-numbering** (E) judgment in **numbering-lib.mjs** (S) SHALL group ids by prefix and SHALL exit non-zero when any prefix contains a duplicate number or its lowest number is not one, naming the offending id — except that a lowest number above one is accepted when every preceding number of that prefix is recorded in `retiredIds` (retiring the lowest-numbered spec is a legitimate gap, not a renumbering trigger). — capability: **spec-id-numbering.judge** (C).
 - **FR-002** (state): WHILE a prefix's numbers span from its lowest to its highest with interior holes, THE SYSTEM SHALL report each missing number as an advisory warning and SHALL promote it to a hard failure only under `--strict`, so removals and retags may legitimately leave gaps.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL derive the numbering judgment purely from the id set (prefix plus zero-padded number), performing no filesystem walk or spec-body inspection.
 - **FR-004** (unwanted): IF a present spec id is also recorded in `retiredIds`, THEN THE SYSTEM SHALL exit non-zero naming the reused id — a retired id resurrected by a new spec silently aliases every historical reference (Change Log rows, `@verifies` evidence, vcs history) to a semantically different spec.
@@ -58,10 +58,11 @@ FR 식별자는 `<SPEC-ID>/FR-NNN`이고 스펙 ID가 네임스페이스라 번�
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-id-numbering
 - **Symbols**: numbering-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: spec-id-numbering.judge
 - **Files**: tooling/numbering-lib.mjs, tooling/__tests__/numbering.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

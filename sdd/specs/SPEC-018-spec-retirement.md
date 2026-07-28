@@ -30,7 +30,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN **sdd-retire.mjs** (S) is invoked with a spec ID or a spec/requirement ID, the **spec-retirement** (E) planner in **retire-lib.mjs** (S) SHALL compute a retirement plan — the declarations to remove, the dangling `@covers` tags, the smoke-manifest keys to drop, and the resulting numbering gap — and print it, exiting zero in dry-run (default) mode.
+- **FR-001** (event): WHEN **sdd-retire.mjs** (S) is invoked with a spec ID or a spec/requirement ID, the **spec-retirement** (E) planner in **retire-lib.mjs** (S) SHALL compute a retirement plan — the declarations to remove, the dangling `@covers` tags, the smoke-manifest keys to drop, and the resulting numbering gap — and print it, exiting zero in dry-run (default) mode. — capability: **spec-retirement.retire** (C).
 - **FR-002** (event): WHEN invoked with `--write`, THE SYSTEM SHALL apply the plan atomically (remove the requirement line or mark the spec removed, drop matching manifest and deferred entries), making no change if the plan fails validation.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL report `@covers` tags that reference the retired requirement as dangling for human-driven atomic deletion, and SHALL NOT modify test source files.
 - **FR-004** (unwanted): IF the retirement target does not exist in the spec corpus, THEN THE SYSTEM SHALL make no change and exit non-zero.
@@ -46,10 +46,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-retirement
 - **Symbols**: sdd-retire.mjs, retire-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: spec-retirement.retire
 - **Files**: tooling/sdd-retire.mjs, tooling/retire-lib.mjs, tooling/__tests__/retire.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

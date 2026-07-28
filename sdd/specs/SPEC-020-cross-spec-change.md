@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a commit message carries one or more `Change-Driver: <spec-id> <reason>` trailers, the **cross-spec-change** (E) parser in **cross-spec-lib.mjs** (S) SHALL parse each into a driver spec id and reason, discarding any entry whose reason is empty.
+- **FR-001** (event): WHEN a commit message carries one or more `Change-Driver: <spec-id> <reason>` trailers, the **cross-spec-change** (E) parser in **cross-spec-lib.mjs** (S) SHALL parse each into a driver spec id and reason, discarding any entry whose reason is empty. — capability: **cross-spec-change.judge** (C).
 - **FR-002** (event): WHEN a changed file's owning spec has no meaningful change of its own but a parsed Change-Driver names a different spec that is meaningfully changed in the same changeset, THE SYSTEM SHALL treat the owning spec's requirement as satisfied by reference and SHALL NOT report it as a spec-first violation.
 - **FR-003** (unwanted): IF a Change-Driver names a spec that does not exist or is not meaningfully changed in the changeset, THEN THE SYSTEM SHALL NOT relax the owning spec's requirement on its behalf, keeping the violation.
 - **FR-004** (ubiquitous): THE SYSTEM SHALL surface a relaxed owner as a reference note naming its driver rather than a forced Change Log entry, and SHALL NOT fabricate semantic ownership for the driven change — the boundary-reconsideration advisory for chronically shared surfaces is deferred pending cross-commit history.
@@ -44,10 +44,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: cross-spec-change
 - **Symbols**: cross-spec-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: cross-spec-change.judge
 - **Files**: tooling/cross-spec-lib.mjs, tooling/__tests__/cross-spec.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

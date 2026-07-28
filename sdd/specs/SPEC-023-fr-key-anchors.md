@@ -28,7 +28,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (state): WHILE `frKeyAnchorPolicy` is off (default), THE SYSTEM SHALL perform no anchor evaluation and keep the consistency gate's output unchanged.
+- **FR-001** (state): WHILE `frKeyAnchorPolicy` is off (default), THE SYSTEM SHALL perform no anchor evaluation and keep the consistency gate's output unchanged. — capability: **fr-key-anchors.judge** (C).
 - **FR-002** (event): WHEN the policy is advisory or hard, the **fr-key-anchors** (E) core in **key-anchor-lib.mjs** (S) SHALL extract plain-bold tokens from each FR declaration line — excluding the requirement id and any code-span content — and match each, case-insensitively after trimming, against the spec's declared Ownership and Dependencies keys with relation-type suffixes stripped, reporting matched and unmatched counts.
 - **FR-003** (unwanted): IF a bold token matches no declared key, THEN THE SYSTEM SHALL name the spec, requirement id, and token — warning under advisory and exiting non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
@@ -42,10 +42,11 @@
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: fr-key-anchors
 - **Symbols**: key-anchor-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: fr-key-anchors.judge
 - **Files**: tooling/key-anchor-lib.mjs, tooling/__tests__/key-anchor.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

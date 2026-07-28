@@ -31,7 +31,7 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN the coverage gate evaluates owned files, the **test-domain** (E) judgment in **test-domain-lib.mjs** (S) SHALL exit non-zero when a file matching `testInfraGlobs` is owned by a non-TEST spec, naming an example file, so test infrastructure stays isolated to the TEST domain.
+- **FR-001** (event): WHEN the coverage gate evaluates owned files, the **test-domain** (E) judgment in **test-domain-lib.mjs** (S) SHALL exit non-zero when a file matching `testInfraGlobs` is owned by a non-TEST spec, naming an example file, so test infrastructure stays isolated to the TEST domain. — capability: **test-domain.judge** (C).
 - **FR-002** (state): WHILE a spec uses the TEST prefix, THE SYSTEM SHALL exempt it from the prefix-class infra requirement so a TEST spec may own its own runtime and infrastructure (iac/ci) files.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL read `testInfraGlobs` from config (empty list disables the isolation check), keeping the test-infra namespace convention portable and stack-agnostic.
 
@@ -41,10 +41,11 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: test-domain
 - **Symbols**: test-domain-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: test-domain.judge
 - **Files**: tooling/test-domain-lib.mjs, tooling/__tests__/test-domain.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

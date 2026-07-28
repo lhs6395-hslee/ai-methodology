@@ -13,7 +13,7 @@
 
 ## Functional Requirements (EARS)
 
-- **FR-001** (event): WHEN `entitySchemaSources`에 `{kind:"spec-slug"}`가 선언되면, THE **ownership-reality** (E) judgment in **ownership-reality-lib.mjs** (S) SHALL treat each spec's filename slug as a reality witness for that spec's own entity keys, comparing per spec rather than against a global set, so that two specs swapping each other's slugs is a violation even though key uniqueness holds.
+- **FR-001** (event): WHEN `entitySchemaSources`에 `{kind:"spec-slug"}`가 선언되면, THE **ownership-reality** (E) judgment in **ownership-reality-lib.mjs** (S) SHALL treat each spec's filename slug as a reality witness for that spec's own entity keys, comparing per spec rather than against a global set, so that two specs swapping each other's slugs is a violation even though key uniqueness holds. — capability: **ownership-reality.judge** (C).
 - **FR-002** (event): WHEN a spec filename matches `<PREFIX>-NNN[a]-<slug>.md`, **ownership-reality-lib.mjs** (S) SHALL derive the slug as the remainder after the numbered prefix, lowercased and trimmed; WHERE the filename carries no numbered prefix, THE SYSTEM SHALL use the basename without extension.
 - **FR-003** (state): WHILE `symbolRealityPolicy` is not `off`, **check-ownership.mjs** (S) SHALL report each owned file-like surface key that names no file or directory under any declared `ownershipSourceRoots` entry, naming the spec, the key, and the roots searched — advisory prints a warning and exits zero, `hard` exits non-zero.
 - **FR-004** (unwanted): IF a surface key is not file-like — it contains whitespace (`POST /api/x`), carries a scheme prefix (`event:`·`job:`), or starts with `/` — THEN **ownership-reality-lib.mjs** (S) SHALL exclude it from the symbol grammar, so that HTTP-surface repositories are never mis-flagged.
@@ -29,10 +29,11 @@
 - **SC-004**: `symbolRealityPolicy: off`(기본)인 레포의 게이트 출력·exit는 도입 전과 바이트 동일.
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: ownership-reality
 - **Symbols**: ownership-reality-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: ownership-reality.judge
 - **Files**: tooling/ownership-reality-lib.mjs, tooling/__tests__/ownership-reality.test.mjs
 
 ## Dependencies

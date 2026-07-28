@@ -32,7 +32,7 @@ spec A가 B를 참조하고 B가 다시 A를 참조하면(구조화 관계 기�
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (event): WHEN a `Dependencies.Entities` line item matches `EntityName (relation-type)` where relation-type is a single lowercase-kebab token, the **entity-relations** (E) parser in **relation-lib.mjs** (S) SHALL treat it as a structured relation; an item without that bracket form SHALL remain an unchecked legacy free-text reference.
+- **FR-001** (event): WHEN a `Dependencies.Entities` line item matches `EntityName (relation-type)` where relation-type is a single lowercase-kebab token, the **entity-relations** (E) parser in **relation-lib.mjs** (S) SHALL treat it as a structured relation; an item without that bracket form SHALL remain an unchecked legacy free-text reference. — capability: **entity-relations.resolve** (C).
 - **FR-002** (unwanted): IF a structured relation's target entity name matches no spec's owned `Entities` key, THEN THE SYSTEM SHALL report a missing-target violation naming the referencing spec, the entity, and the relation-type, and exit non-zero.
 - **FR-003** (event): WHEN `relationTypes` is non-empty and a structured relation's type is absent from it, THE SYSTEM SHALL exit non-zero for an unregistered relation-type; WHERE `relationTypes` is empty (default), THE SYSTEM SHALL accept any well-formed token.
 - **FR-004** (event): WHEN the resolved structured-relation graph (spec → owning spec of each referenced entity) contains a cycle, THE SYSTEM SHALL print an advisory naming the cycle's spec sequence without failing the gate.
@@ -44,10 +44,11 @@ spec A가 B를 참조하고 B가 다시 A를 참조하면(구조화 관계 기�
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: entity-relations
 - **Symbols**: relation-lib.mjs
 - **Artifacts**: —
+- **Capabilities**: entity-relations.resolve
 - **Files**: tooling/relation-lib.mjs, tooling/__tests__/relation.test.mjs
 
 ## Dependencies (참조 — dedup 제외)

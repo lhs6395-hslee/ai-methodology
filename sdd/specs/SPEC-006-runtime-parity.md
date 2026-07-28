@@ -29,7 +29,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (ubiquitous): THE **sdd_gates.py** (S) runtime SHALL provide behavior parity with the full Node gate suite — coverage with prefix governance, ownership with key normalization and format validation, cohesion, completeness, consistency, adequacy, orphan surfaces, converge drift, spec-sync, and the stage runner — reading the same `sdd.config.json`.
+- **FR-001** (ubiquitous): THE **sdd_gates.py** (S) runtime SHALL provide behavior parity with the full Node gate suite — coverage with prefix governance, ownership with key normalization and format validation, cohesion, completeness, consistency, adequacy, orphan surfaces, converge drift, spec-sync, and the stage runner — reading the same `sdd.config.json`. — capability: **runtime-parity.mirror** (C).
 - **FR-002** (event): WHEN any runtime parses requirement IDs at any site (declaration, aggregation, exemption, covers tag, spec-sync line judgment), THE SYSTEM SHALL derive the grammar from `requirementIdPrefixes` (three digits plus an optional single lowercase-letter suffix, boundary enforced) so that no site keeps a hardcoded prefix.
 - **FR-003** (event): WHEN the same fixture is evaluated by the Node gate and the Python gate, THE **runtime-parity** (E) contract SHALL require an identical exit code and identical report output.
 - **FR-004** (ubiquitous): THE **sdd_gates.sh** (S) and **go-gate** (S) runtimes SHALL keep their core commands (coverage with prefix governance, ownership, runner) on the same ID grammar and the same defaults as the Node canonical DEFAULTS.
@@ -42,10 +42,11 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 ---
 
 ## Ownership (중복 방지 — 강제됨)
-> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts).
+> 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: runtime-parity
 - **Symbols**: sdd_gates.py, sdd_gates.sh, go-gate
 - **Artifacts**: —
+- **Capabilities**: runtime-parity.mirror
 - **Files**: tooling/sdd_gates.py, tooling/sdd_gates.sh, tooling/go-gate/main.go, tooling/ears-preset/templates/spec-template.md, tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs, tooling/__tests__/template-parity.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
