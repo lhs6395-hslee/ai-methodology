@@ -150,11 +150,20 @@ test("extractCodeSpans / backtickKeyFindings: 백틱에 든 선언 키만 앵커
   const lines = [
     "- **FR-001** WHEN `POST /api/x` hits, THE SYSTEM SHALL create a `pjt_projects` row with `project_category`.",
   ];
-  // 선언 키(pjt_projects·post /api/x)만 → 백틱 위반; project_category(비키·필드)는 무시
+  // surface 키만 위반. entity 키(pjt_projects)는 백틱이 **정본 표기**라 위반이 아니고
+  // (owner 결정 2026-07-28: 백틱 = entity 키 혹은 그 종속), 비키 필드(project_category)도 무시.
   assert.deepEqual(backtickKeyFindings(lines, km, M), [
     { fr: "FR-001", token: "post /api/x", expected: "S" },
-    { fr: "FR-001", token: "pjt_projects", expected: "E" },
   ]);
+  // capability 키도 백틱 금지 — 정본은 볼드+(C)뿐
+  const kmCap = new Map([["thing.create", "capability"], ["thing", "entity"]]);
+  assert.deepEqual(
+    backtickKeyFindings(["- **FR-001** THE SYSTEM SHALL `thing.create` a `thing` row."], kmCap, M),
+    [{ fr: "FR-001", token: "thing.create", expected: "C" }],
+  );
+  // entity만 백틱에 든 라인은 위반 0건(회귀 고정)
+  assert.deepEqual(
+    backtickKeyFindings(["- **FR-001** THE SYSTEM SHALL read `thing` rows."], kmCap, M), []);
   // keyKindMap 비면 inert
   assert.deepEqual(backtickKeyFindings(lines, new Map(), M), []);
 });
@@ -190,15 +199,17 @@ test("게이트: 소유 키가 FR에 앵커 안 됨 → advisory ⚠ / hard ✗ 
 });
 
 test("게이트: 백틱에 든 선언 키 → 앵커 승격 위반(굵게 ⟺ 키, FR-006)", () => {
-  // pjt_projects(entity)를 백틱으로 → 위반. project_category(비키)는 백틱 유지 OK.
-  const bt = "- **FR-001** THE SYSTEM SHALL insert a `pjt_projects` row with `project_category`.";
+  // capability 키를 백틱으로 → 위반(정본은 볼드+(C)). entity 키는 백틱이 정본이라 위반 아님
+  // (owner 결정 2026-07-28). project_category(비키 필드)도 백틱 유지 OK.
+  const bt = "- **FR-001** THE SYSTEM SHALL `pjt_projects.create` a `pjt_projects` row with `project_category`.";
   for (const [policy, wantCode] of [["advisory", 0], ["hard", 1]]) {
     const root = fixture(policy, bt);
     try {
       const r = run(root);
       assert.equal(r.code, wantCode, `${policy}: ${r.out}`);
-      assert.match(r.out, /백틱 "pjt_projects" — 선언 키는 백틱\(리터럴\)이 아니라 앵커: \*\*pjt_projects\*\* \(E\)/);
-      assert.doesNotMatch(r.out, /project_category/); // 비키 필드는 백틱 유지(무관)
+      assert.match(r.out, /백틱 "pjt_projects\.create" — 선언 키는 백틱\(리터럴\)이 아니라 앵커: \*\*pjt_projects\.create\*\* \(C\)/);
+      assert.doesNotMatch(r.out, /백틱 "pjt_projects" —/);  // entity는 백틱이 정본
+      assert.doesNotMatch(r.out, /project_category/);        // 비키 필드는 백틱 유지(무관)
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

@@ -136,6 +136,11 @@ export function backtickKeyFindings(frLines, keyKindMap, markers, reqAlt = "FR")
       seen.add(tok);
       const kind = keyKindMap.get(tok);
       if (!kind) continue;
+      // entity 키는 백틱이 **정본 표기**다(owner 결정 2026-07-28) — 백틱의 뜻이 "entity 키 혹은
+      // 그 종속(컬럼·필드·enum 값)"으로 좁혀졌고, 그래서 entity를 백틱에 둔 것은 위반이 아니다.
+      // surface·capability 키는 여전히 위반이다 — 그쪽 정본은 볼드+마커 앵커뿐이다. 결과적으로
+      // **서식이 키의 종류를 말한다**: 백틱 = 데이터 모델 / 볼드+마커 = 앵커.
+      if (kind === "entity") continue;
       const expected = (markers && markers[kind]) ? String(markers[kind]).toUpperCase() : null;
       if (!expected) continue;
       out.push({ fr, token: tok, expected });

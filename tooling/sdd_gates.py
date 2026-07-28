@@ -1822,6 +1822,10 @@ def _backtick_key_findings(fr_lines, key_kind_map, markers, req_alt="FR"):
             kind = key_kind_map.get(tok)
             if not kind:
                 continue
+            # entity 키는 백틱이 정본 표기다(owner 결정 2026-07-28) — 백틱의 뜻이 "entity 키
+            # 혹은 그 종속"으로 좁혀졌다. surface·capability는 여전히 볼드+마커만 정본.
+            if kind == "entity":
+                continue
             expected = str(markers[kind]).upper() if markers and markers.get(kind) else None
             if not expected:
                 continue
