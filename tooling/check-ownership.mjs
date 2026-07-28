@@ -351,22 +351,29 @@ if (SR_INERT.length) {
 }
 let srFindings = [];
 if (SR_ACTIVE) {
-  // 소스 루트 아래 파일·디렉토리 basename 집합(재귀, ignoreDirs 제외). 디렉토리도 표면일 수
-  // 있으므로(`go-gate` 실측) 둘 다 넣는다.
+  // 소스 루트 아래 실재 집합(재귀, ignoreDirs 제외). 세 형태를 담는다:
+  //   ① basename(`lib.mjs`) — 디렉토리도 표면일 수 있어 함께 넣는다(`go-gate` 실측)
+  //   ② 루트 기준 상대경로(`cli/x.py`)
+  //   ③ 확장자 없는 상대경로(`cli/x`) — **점 표기 모듈 경로 해석에 필요**하다
+  //      (`src.cli.x` → 후보 `src/cli/x`; 소비 프로젝트 finops 실측)
+  // ③이 없으면 점 표기 키는 어떤 소스 루트 설정으로도 매치하지 않는다(오탐률 100%).
   const IGNORE2 = new Set(cfg.ignoreDirs);
   const realSet = new Set();
   for (const root of SR_ROOTS) {
-    (function walk(dir) {
+    (function walk(dir, rel) {
       let entries;
       try { entries = readdirSync(dir).sort(); } catch { return; }
       for (const name of entries) {
         const p = join(dir, name);
         let st;
         try { st = statSync(p); } catch { continue; }
+        const r = rel ? `${rel}/${name}` : name;
         realSet.add(name.toLowerCase());
-        if (st.isDirectory() && !IGNORE2.has(name)) walk(p);
+        realSet.add(r.toLowerCase());
+        realSet.add(r.replace(/\.[^./]+$/, "").toLowerCase());
+        if (st.isDirectory() && !IGNORE2.has(name)) walk(p, r);
       }
-    })(join(ROOT, root));
+    })(join(ROOT, root), root);
   }
   srFindings = symbolRealityFindings(srOwned, realSet);
 }

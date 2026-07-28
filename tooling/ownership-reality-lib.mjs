@@ -62,16 +62,43 @@ export function symbolRealityInertReasons(policy, roots, roles) {
 //
 // ⚠ 형식 표면(`POST /api/x`·`event:`·`job:`)은 파일이 아니므로 이 문법의 대상이 아니다 —
 // 소비 게이트가 `surfaceFormat`으로 분기해 파일형 키만 넘긴다(웹 레포에 오발동 금지).
+// realSet은 두 형태를 담는다 — basename(`lib.mjs`)과 **확장자 없는 상대경로**(`src/cli/x`).
+// 후자가 있어야 점 표기 모듈 경로를 해석할 수 있다(아래 symbolCandidates 참조).
 export function symbolRealityFindings(ownedBySpec, realSet) {
   const findings = [];
   for (const { specId, surfaces } of ownedBySpec || []) {
     for (const raw of surfaces || []) {
       const key = String(raw).trim().toLowerCase();
       if (!key || key === "—" || key === "-") continue;
-      if (!realSet.has(key)) findings.push({ specId, symbol: key });
+      if (!symbolCandidates(key).some((c) => realSet.has(c))) findings.push({ specId, symbol: key });
     }
   }
   return findings;
+}
+
+// 한 심볼 키가 실재로 인정될 수 있는 후보 표기들 — 결정적 변환만, 추측 없음.
+//
+// 왜 필요한가(실측): 소비 프로젝트 finops는 표면을 **점 표기 모듈 경로**로 키한다
+// (`src.cli.finops_ticket_chat`). 파일은 `src/cli/finops_ticket_chat.py`로 실재하는데
+// basename 대조만 하면 영원히 매치하지 않아 **오탐률 100%**였고, 어떤 소스 루트 설정으로도
+// 해결되지 않았다. 점을 경로 구분자로 읽는 것은 Python·Java 등의 표준 모듈 문법이므로
+// 휴리스틱이 아니라 문법이다.
+//
+// 후보: ① 원문 그대로(basename·경로 모두) ② 점을 `/`로 바꾼 경로. ②는 점이 있고 `/`가
+// 없을 때만 만든다 — 이미 경로면 변환할 것이 없고, `lib.mjs`처럼 확장자만 점인 경우도
+// ①이 이미 잡는다(②는 `lib/mjs`가 되어 무해하게 실패).
+//
+// ⚠ "경로의 마지막 조각"은 후보로 넣지 않는다 — `src.cli.chat`에서 `chat`을 뽑으면 아무
+// 위치의 `chat`이나 매치해 **틀린 키를 통과**시킨다. realSet이 소스 루트 접두어를 포함한
+// 상대경로를 담으므로 ②만으로 실제 사례가 닫힌다(느슨한 후보를 의도적으로 뺀다).
+export function symbolCandidates(key) {
+  const k = String(key || "").trim().toLowerCase();
+  if (!k) return [];
+  const out = [k];
+  if (k.includes(".") && !k.includes("/")) {
+    out.push(k.split(".").join("/"));
+  }
+  return out;
 }
 
 // 파일형 표면 키인가 — 파일/디렉토리 이름으로 볼 수 있는 토큰만 심볼 문법에 넣는다.

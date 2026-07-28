@@ -7,6 +7,7 @@
 // @covers SPEC-029/FR-005
 // @covers SPEC-029/FR-006
 // @covers SPEC-029/FR-007
+// @covers SPEC-029/FR-008
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -15,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   specSlug, specSlugSourceDeclared, symbolRealityActive,
-  symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface,
+  symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface, symbolCandidates,
 } from "../ownership-reality-lib.mjs";
 import { schemaBackingFindings } from "../schema-backing-lib.mjs";
 
@@ -209,4 +210,34 @@ test("FR-006: 맵의 surface 실재 칸이 게이트와 같은 판정을 낸다"
     assert.match(row, /✗ 소스 루트에 없음/);
     assert.doesNotMatch(map, /미판정 \*\*[1-9]/);   // surface 가드가 살아 있으므로
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("FR-003: 점 표기 모듈 경로도 실재로 해석 — 결정적 변환(경로·basename)", () => {
+  assert.deepEqual(symbolCandidates("lib.mjs"), ["lib.mjs", "lib/mjs"]);
+  assert.deepEqual(symbolCandidates("src.cli.chat"), ["src.cli.chat", "src/cli/chat"]);
+  // 마지막 조각(`chat`)은 후보가 아니다 — 아무 위치의 chat이나 매치해 틀린 키를 통과시킨다
+  assert.ok(!symbolCandidates("src.cli.chat").includes("chat"));
+  assert.deepEqual(symbolCandidates("go-gate"), ["go-gate"]);        // 점 없음 → 변환 없음
+  assert.deepEqual(symbolCandidates("a/b.py"), ["a/b.py"]);          // 이미 경로 → 변환 없음
+  // 확장자 없는 상대경로가 realSet에 있으면 점 표기가 매치한다
+  const real = new Set(["src/cli/chat", "chat.py", "lib.mjs"]);
+  assert.deepEqual(symbolRealityFindings([{ specId: "S1", surfaces: ["src.cli.chat"] }], real), []);
+  assert.deepEqual(symbolRealityFindings([{ specId: "S1", surfaces: ["src.cli.ghost"] }], real),
+    [{ specId: "S1", symbol: "src.cli.ghost" }]);
+});
+
+test("게이트 FR-003: 점 표기 키(소비 프로젝트 실측 형태)가 통과하고 유령은 차단", () => {
+  const mk = (sym) => repo({
+    config: { symbolRealityPolicy: "hard", ownershipSourceRoots: ["src"], surfaceFormat: "any" },
+    specs: { "SPEC-001-thing.md": SPEC("SPEC-001", { sym }) },
+    srcFiles: { "src/cli/finops_ticket_chat.py": "#\n" },
+  });
+  const ok = mk("src.cli.finops_ticket_chat");
+  const bad = mk("src.cli.ghost_module");
+  try {
+    assert.equal(gate(ok).code, 0, "점 표기 실재 키는 통과해야 한다");
+    const r = gate(bad);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /src\.cli\.ghost_module/);
+  } finally { rmSync(ok, { recursive: true, force: true }); rmSync(bad, { recursive: true, force: true }); }
 });

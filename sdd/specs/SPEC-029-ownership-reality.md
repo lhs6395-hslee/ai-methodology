@@ -20,12 +20,14 @@
 - **FR-005** (event): WHEN `symbolRealityPolicy` is `hard` but the judgment cannot be established — `ownershipSourceRoots` empty or the surface role category unresolved — **check-ownership.mjs** (S) SHALL print the inert reasons and exit non-zero, because a `hard` declaration that asserts nothing is false safety.
 - **FR-006** (event): WHEN the ownership map is generated, **gen-ownership-map.mjs** (S) SHALL fill each surface key's reality cell from the same symbol-grammar findings the gate uses, distinguishing forward per-key judgment from the reverse-only orphan gate and from `미판정`.
 - **FR-007** (unwanted): IF `symbolRealityPolicy` holds a value outside `off|advisory|hard`, THEN **check-ownership.mjs** (S) SHALL exit non-zero naming the offending value, matching the enum discipline of every other strength knob.
+- **FR-008** (event): WHEN a file-like surface key contains a dot and no slash, **ownership-reality-lib.mjs** (S) SHALL also accept it as real when the key with dots replaced by slashes matches a path under a declared source root, so that repositories keying surfaces as dotted module paths (`src.cli.chat` for `src/cli/chat.py`) are judged rather than uniformly flagged; THE SYSTEM SHALL NOT accept the trailing segment alone, because that would match a same-named file at any location.
 
 ## Success Criteria (측정형)
 
 - **SC-001**: 킷 자기적용에서 모듈 문법 29/29 · 심볼 문법 52/52 성립, **예외 0**.
 - **SC-002**: `sdd/OWNERSHIP_MAP.md`의 실재 칸 `미판정` 수가 0(도입 전 79).
 - **SC-003**: 키를 실재하지 않는 이름으로 바꾸면 두 문법 각각 exit 1 — 침묵하지 않는다.
+- **SC-005**: 점 표기 모듈 경로 키(`src.cli.finops_ticket_chat`)가 실재 파일(`src/cli/finops_ticket_chat.py`)에 매치하고, 없는 모듈은 여전히 exit 1 — 소비 프로젝트 finops 실측 형태로 고정.
 - **SC-004**: `symbolRealityPolicy: off`(기본)인 레포의 게이트 출력·exit는 도입 전과 바이트 동일.
 
 ## Ownership (중복 방지 — 강제됨)
@@ -65,3 +67,4 @@ Acceptance: Given 킷 자신의 스펙 29개, When `check-ownership.mjs`를 `ent
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-28 | 신설 — 모듈 문법·심볼 문법 + `ownershipSourceRoots`·`symbolRealityPolicy`. 킷 자기적용 hard 채택(실측 29/29·52/52·예외 0), 맵 실재 미판정 79→0 | owner: "방법론에 입각해서 하드하게 보고 업데이트 / 문법이어야하는거애 / 예외조건은 최소로해야해". 어댑터 위임의 실측 우회 4경로 + surface 정방향 판정 부재(감사 M-2)를 문법으로 닫는다. 데이터 교정 4건(스펙 파일명 2건 rename, 소스 루트 선언, 디렉토리 인정)으로 예외 0 달성 |
+| 2026-07-28 | FR-008 신설 — **점 표기 모듈 경로**를 심볼 문법이 해석한다(`src.cli.chat` → `src/cli/chat`). 게이트의 실재 집합에 basename·상대경로·**확장자 없는 상대경로** 3형태를 담게 확장. 마지막 조각 단독 매치는 의도적으로 제외 | 실측(소비 프로젝트 finops): 파일형 surface 키 5건이 전부 점 표기 Python 모듈 경로였고 파일은 실재하는데 basename 대조만 해서 **오탐률 100%**였다 — 어떤 `ownershipSourceRoots` 설정으로도 해결 불가라 finops가 이 knob을 켜지 못했다. 점을 경로 구분자로 읽는 것은 Python·Java의 표준 모듈 문법이라 휴리스틱이 아니다. `chat` 같은 마지막 조각을 후보에 넣으면 아무 위치의 동명 파일이나 매치해 틀린 키를 통과시키므로 빼고, 소스 루트 접두어를 포함한 경로 후보만 인정한다 |

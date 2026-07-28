@@ -857,6 +857,21 @@ def is_file_like_surface(key):
     return not s.startswith("/")
 
 
+def symbol_candidates(key):
+    """심볼 키가 실재로 인정될 수 있는 후보 표기(결정적 변환만) — Node판 미러.
+
+    점 표기 모듈 경로(`src.cli.x`)를 경로(`src/cli/x`)와 basename(`x`)으로도 본다.
+    Python·Java의 표준 모듈 문법이라 휴리스틱이 아니다(실측: finops 오탐률 100% 원인).
+    """
+    k = str(key or "").strip().lower()
+    if not k:
+        return []
+    out = [k]
+    if "." in k and "/" not in k:
+        out.append(k.replace(".", "/"))
+    return out
+
+
 def symbol_reality_findings(owned_by_spec, real_set):
     findings = []
     for spec_id, surfaces in owned_by_spec or []:
@@ -864,7 +879,7 @@ def symbol_reality_findings(owned_by_spec, real_set):
             key = str(raw).strip().lower()
             if not key or key in ("—", "-"):
                 continue
-            if key not in real_set:
+            if not any(c in real_set for c in symbol_candidates(key)):
                 findings.append((spec_id, key))
     return findings
 
@@ -1128,19 +1143,24 @@ def cmd_ownership(cfg, strict):
         ignore_sr = set(cfg["ignoreDirs"])
         real_set = set()
 
-        def _walk_sr(d):
+        def _walk_sr(d, rel):
+            # basename · 상대경로 · 확장자 없는 상대경로 세 형태를 담는다(Node판 미러).
+            # 세 번째가 없으면 점 표기 모듈 경로가 어떤 설정으로도 매치하지 않는다.
             try:
                 names = sorted(os.listdir(d))
             except OSError:
                 return
             for n in names:
+                r = f"{rel}/{n}" if rel else n
                 real_set.add(n.lower())
+                real_set.add(r.lower())
+                real_set.add(re.sub(r"\.[^./]+$", "", r).lower())
                 p = os.path.join(d, n)
                 if os.path.isdir(p) and n not in ignore_sr:
-                    _walk_sr(p)
+                    _walk_sr(p, r)
 
         for root in sr_roots:
-            _walk_sr(os.path.join(cfg["__root"], root))
+            _walk_sr(os.path.join(cfg["__root"], root), root)
         sr_findings = symbol_reality_findings(sr_owned, real_set)
     sr_hard = sr_policy == "hard" and len(sr_findings) > 0
     if sr_active and sr_findings:

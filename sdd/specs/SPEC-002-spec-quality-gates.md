@@ -125,3 +125,4 @@
 | 2026-07-28 | consistency 게이트의 백틱 키 판정이 entity를 제외하도록 코어 변경을 소비 — 출력 문구·강도 불변 | SPEC-023 FR-006 축소 반영. 게이트 본체는 이 spec 소유이므로 배선 이력을 남긴다 |
 | 2026-07-28 | cohesion의 aggregate root 초과 처방을 교정 — "capability별 분할 검토" → "root 1개만 남기고 나머지는 Dependencies의 `이름 (relation-type)`으로 이관(SPEC-017), 그래도 남으면 분할". ownership 게이트에 관계 침묵 표면화 배선 | 처방이 틀렸다. aggregate root가 여러 개인 스펙의 정답은 대개 분할이 아니라 **relation 이관**인데 게이트가 그 경로를 지목하지 않아, 읽는 사람이 유일한 해법을 분할로 오해했다(실측: PM SPEC-005 root 7개). ENT_CAT 주석의 낡은 서술(이름 정규식 우선)도 역할 선언 우선으로 교정 — 코드는 이미 맞았고 주석만 틀렸다 |
 | 2026-07-28 | `check-ownership.mjs`의 관계 이름 정규화 배선 — 소유자 색인과 같은 `normalizeKey`를 거치게 | SPEC-017 결함 수정의 소비. 게이트 본체는 이 spec 소유이므로 배선 이력을 남긴다. 판정 강도·출력 문구 불변 |
+| 2026-07-28 | `check-ownership.mjs`의 심볼 실재 집합을 3형태(basename·상대경로·확장자 없는 상대경로)로 확장 | SPEC-029 FR-008 소비. 게이트 본체는 이 spec 소유. 판정 강도·출력 문구 불변 |
