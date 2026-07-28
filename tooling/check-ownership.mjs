@@ -166,7 +166,13 @@ for (const file of files) {
   // `EntityName (relation-type)` 항목만 구조화 관계로 뽑아 SPEC-017 판정에 넘긴다 — 괄호 없는
   // 레거시 자유참조는 여기서도 관여하지 않는다(하위호환, 관여 없음 = 무해).
   const deps = parseSection(text, "Dependencies", CATEGORIES);
-  const relParsed = (deps[ENT_CAT] || []).map(parseRelationEntry);
+  // ⚠ 관계 대상 이름은 **소유자 색인과 같은 정규화**를 거쳐야 한다. `owners`는
+  // `normalizeKey`로 채워지는데(위) 여기서 원문을 그대로 쓰면 대소문자만 달라도
+  // 조회가 실패해 hard `missing-target` 오차단이 난다 — 스펙이 소유 키를 글자 그대로
+  // 베껴 써도 막힌다(실측: 소비 프로젝트 finops의 `IacActionRun`). 킷 자기적용으로는
+  // 영구히 안 보였다 — 킷의 entity 키(`retag`·`key-anchor`)가 이미 소문자라서다.
+  const relParsed = (deps[ENT_CAT] || []).map(parseRelationEntry)
+    .map((e) => (e.type ? { ...e, name: normalizeKey(ENT_CAT, e.name, cfg) } : e));
   const relEntities = relParsed.filter((e) => e.type);
   if (relEntities.length) specDeps.push({ specId, entities: relEntities });
   // 자유참조(타입 없는 항목) 집계 — 관계 판정(SPEC-017)은 구조화 관계에만 발화하므로,

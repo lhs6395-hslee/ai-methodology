@@ -5,6 +5,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "../relation-lib.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // ── parseRelationEntry ──
 
@@ -95,4 +99,66 @@ test("3-노드 순환(A→B→C→A) 탐지", () => {
   const cycles = findCycles(edges);
   assert.equal(cycles.length, 1);
   for (const n of ["A", "B", "C"]) assert.ok(cycles[0].includes(n));
+});
+
+// ── 게이트 e2e: 관계 대상 이름의 정규화 ───────────────────────────────────
+// 이 결함은 **호출부**에 있었으므로 위의 순수 코어 테스트로는 잡히지 않는다 —
+// `owners`는 normalizeKey로 채워지는데 관계 이름은 원문으로 조회해, 스펙이 소유 키를
+// 글자 그대로 베껴 써도(`IacActionRun`) hard missing-target 오차단이 났다.
+// 킷 자기적용으로는 영구히 안 보인다(킷 entity 키가 이미 소문자다) → e2e로 고정한다.
+const REL_LIBS = ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs",
+  "key-anchor-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs",
+  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs"];
+
+function relRepo(ownedEntity, depEntry) {
+  const root = mkdtempSync(join(tmpdir(), "sdd-rel-"));
+  mkdirSync(join(root, "sdd/specs"), { recursive: true });
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src/x.ts"), "//\n");
+  for (const f of REL_LIBS) cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({
+    specDir: "sdd/specs", scanDirs: ["src"],
+    ownershipCategories: ["Entities", "Surfaces", "Capabilities"],
+    ownershipCategoryRoles: { Entities: "entity", Surfaces: "surface", Capabilities: "capability" },
+  }));
+  const spec = (id, ent, deps) =>
+    `# ${id}\n**Module**: \`m\`  **Spec**: \`${id}\`  **Status**: Active\n\n` +
+    `## Functional Requirements (EARS)\n- **FR-001** (ubiquitous): THE SYSTEM SHALL keep **${ent}** (E) rows.\n\n` +
+    `## Ownership\n- **Entities**: ${ent}\n- **Surfaces**: —\n- **Capabilities**: —\n- **Files**: src/x.ts\n\n` +
+    `## Dependencies\n- **Entities**: ${deps}\n\n` +
+    `## Success Criteria\n- **SC-001**: 측정.\n\nAcceptance: Given x.\n`;
+  writeFileSync(join(root, "sdd/specs/SPEC-001.md"), spec("SPEC-001", ownedEntity, "—"));
+  writeFileSync(join(root, "sdd/specs/SPEC-002.md"), spec("SPEC-002", "OtherThing", depEntry));
+  return root;
+}
+function relGate(root) {
+  try {
+    return { code: 0, out: execFileSync("node", [join(root, "scripts/check-ownership.mjs")],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) };
+  } catch (e) { return { code: e.status, out: (e.stdout || "") + (e.stderr || "") }; }
+}
+
+test("게이트 FR-002: 소유 키를 글자 그대로 베낀 참조는 통과 — 정규화 불일치 오차단 회귀", () => {
+  const root = relRepo("IacActionRun", "IacActionRun (references)");
+  try {
+    const r = relGate(root);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, /관계 대상 Entity/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 FR-002: 정규화가 같아지는 표기 차이도 통과(대소문자)", () => {
+  const root = relRepo("IacActionRun", "iacactionrun (references)");
+  try { assert.equal(relGate(root).code, 0); }
+  finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 FR-002: 진짜 유령 참조는 여전히 hard로 차단(느슨해지지 않았다)", () => {
+  const root = relRepo("IacActionRun", "GhostThing (references)");
+  try {
+    const r = relGate(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /관계 대상 Entity "ghostthing"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

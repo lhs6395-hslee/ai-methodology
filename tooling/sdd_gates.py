@@ -969,8 +969,11 @@ def cmd_ownership(cfg, strict):
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
         # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
         deps = parse_section(text, "Dependencies", categories)
+        # ⚠ 관계 대상 이름은 소유자 색인과 **같은 정규화**를 거쳐야 한다(Node판 미러).
+        # owners는 normalize_key로 채워지므로 원문 조회는 대소문자 차이만으로도 hard
+        # missing-target 오차단을 낸다(실측: 소비 프로젝트의 `IacActionRun`).
         rel_parsed = [parse_relation_entry(raw) for raw in deps.get(ent_cat, [])]
-        rel_entities = [(e["name"], e["type"]) for e in rel_parsed if e["type"]]
+        rel_entities = [(normalize_key(ent_cat, e["name"], cfg), e["type"]) for e in rel_parsed if e["type"]]
         if rel_entities:
             spec_deps.append((spec_id, rel_entities))
         # 관계 판정 발화량 — 전부 자유참조면 SPEC-017이 아무것도 보지 않는다(침묵 표면화).

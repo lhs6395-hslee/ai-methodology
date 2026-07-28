@@ -135,3 +135,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-28 | Python 포트에 두 문법 미러 — `spec_slug`·`spec_slug_source_declared`·`symbol_reality_*`·`is_file_like_surface` 추가, `schema_backing_findings`에 `slug_by_spec` 파라미터, `cmd_ownership`에 심볼 실재 판정 배선 | SPEC-029 도입에 따른 패리티 유지(SPEC-006 계약). 검증: `check-ownership` stdout·stderr·exit 바이트 동일 |
 | 2026-07-28 | Python 포트 `_backtick_key_findings`에 entity 제외 미러 | SPEC-023 FR-006 축소에 따른 패리티 유지(SPEC-006 계약). consistency stdout 바이트 동일 확인 |
 | 2026-07-28 | Python 포트에 관계 침묵 표면화 + cohesion 처방 문구 미러 | 패리티 유지(SPEC-006 계약) — ownership·cohesion stdout 바이트 동일 확인 |
+| 2026-07-28 | Python 포트 `cmd_ownership`의 관계 이름에 `normalize_key` 미러 | 패리티 유지(SPEC-006 계약) — ownership stdout 바이트 동일 확인 |
