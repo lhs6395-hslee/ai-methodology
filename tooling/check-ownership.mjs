@@ -36,6 +36,7 @@ import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles }
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
+import { specSlug, specSlugSourceDeclared, symbolRealityActive, symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface } from "./ownership-reality-lib.mjs";
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -69,7 +70,20 @@ if (!["off", "advisory", "hard"].includes(SB_POLICY)) {
 const SB_SOURCES = cfg.entitySchemaSources || [];
 const SB_ACTIVE = schemaBackingActive(SB_POLICY, SB_SOURCES, ROLES);
 const SB_INERT = schemaBackingInertReasons(SB_POLICY, SB_SOURCES, ROLES);
-const sbOwned = []; // {specId, entities:[raw...]}
+const sbOwned = []; // {specId, entities:[raw...], slug}
+
+// 심볼 실재(SPEC-029 ②) — 선언된 소스 루트 아래 실재하는 파일/디렉토리 basename과 대조.
+// surface 실재의 **정방향** 판정이다(orphan-surface는 역방향만 봐서 감사 M-2로 남아 있었다).
+const SR_POLICY = String(cfg.symbolRealityPolicy ?? "off");
+if (!["off", "advisory", "hard"].includes(SR_POLICY)) {
+  console.error(`✗ symbolRealityPolicy 값 위반 "${SR_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+const SR_ROOTS = cfg.ownershipSourceRoots || [];
+const SR_ACTIVE = symbolRealityActive(SR_POLICY, SR_ROOTS, ROLES);
+const SR_INERT = symbolRealityInertReasons(SR_POLICY, SR_ROOTS, ROLES);
+const SUR_CAT = ROLES && ROLES.surface;
+const srOwned = []; // {specId, surfaces:[raw...]}
 
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
 // 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -138,7 +152,14 @@ for (const file of files) {
   }
 
   // Entity 스키마 백킹(SPEC-026): 소유 entity 수집 — 아래에서 구조 SSOT 실재 집합과 대조.
-  if (SB_ACTIVE && (own[ENT_CAT] || []).length) sbOwned.push({ specId, entities: own[ENT_CAT] });
+  if (SB_ACTIVE && (own[ENT_CAT] || []).length) sbOwned.push({ specId, entities: own[ENT_CAT], slug: specSlug(file) });
+
+  // 심볼 실재(SPEC-029 ②): 소유 surface 중 **파일형 키만** 수집 — HTTP·이벤트·잡·경로
+  // 표면은 파일이 아니므로 이 문법의 대상이 아니다(웹 레포 오발동 금지).
+  if (SR_ACTIVE && (own[SUR_CAT] || []).length) {
+    const fileLike = own[SUR_CAT].filter(isFileLikeSurface);
+    if (fileLike.length) srOwned.push({ specId, surfaces: fileLike });
+  }
 
   // Parse Dependencies section — do NOT add to owners (not a dedup target).
   // `EntityName (relation-type)` 항목만 구조화 관계로 뽑아 SPEC-017 판정에 넘긴다 — 괄호 없는
@@ -280,7 +301,12 @@ if (SB_ACTIVE) {
       try { units.push({ text: readFileSync(join(ROOT, rel), "utf8"), patterns }); } catch { /* skip */ }
     }
   }
-  sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet);
+  // 모듈 문법(SPEC-029 ①) — `{kind:"spec-slug"}` 소스가 선언되면 스펙 파일명 슬러그도
+  // 실재 근거가 된다. 스펙별 대조이므로 slugBySpec 맵으로 넘긴다(전역 집합 아님).
+  const slugBySpec = specSlugSourceDeclared(SB_SOURCES)
+    ? Object.fromEntries(sbOwned.map((o) => [o.specId, o.slug]))
+    : null;
+  sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet, slugBySpec);
   sbExemptUsed = [...exemptSet].filter((e) => owners[ENT_CAT].has(e)).sort();
 }
 const sbHard = SB_POLICY === "hard" && sbFindings.length > 0;
@@ -303,6 +329,48 @@ if (sbErrors.length) {
 }
 if (sbHard) {
   console.error(`\n✗ entitySchemaBackingPolicy=hard: 소유 entity는 구조 SSOT에 실재해야 한다 — 유령 entity(지어낸 개념)에 capability를 얹지 말고 실 entity로 재구성하라(SPEC-026).`);
+  process.exit(1);
+}
+
+// ── 심볼 실재(SPEC-029 ②) ─────────────────────────────────────────────
+// inert는 백킹과 동형으로 매 실행 표면화한다 — "hard 선언 + 무판정"은 거짓 안전이다.
+if (SR_INERT.length) {
+  console.log(`· 심볼 실재(symbolRealityPolicy=${SR_POLICY}): 판정 불가(inert) — ${SR_INERT.join(" / ")}`);
+}
+let srFindings = [];
+if (SR_ACTIVE) {
+  // 소스 루트 아래 파일·디렉토리 basename 집합(재귀, ignoreDirs 제외). 디렉토리도 표면일 수
+  // 있으므로(`go-gate` 실측) 둘 다 넣는다.
+  const IGNORE2 = new Set(cfg.ignoreDirs);
+  const realSet = new Set();
+  for (const root of SR_ROOTS) {
+    (function walk(dir) {
+      let entries;
+      try { entries = readdirSync(dir).sort(); } catch { return; }
+      for (const name of entries) {
+        const p = join(dir, name);
+        let st;
+        try { st = statSync(p); } catch { continue; }
+        realSet.add(name.toLowerCase());
+        if (st.isDirectory() && !IGNORE2.has(name)) walk(p);
+      }
+    })(join(ROOT, root));
+  }
+  srFindings = symbolRealityFindings(srOwned, realSet);
+}
+const srHard = SR_POLICY === "hard" && srFindings.length > 0;
+if (SR_ACTIVE && srFindings.length) {
+  console.log(`심볼 실재(symbolRealityPolicy=${SR_POLICY}): 위반 ${srFindings.length}건 — 소유 surface가 소스 루트에 실재하지 않음`);
+  for (const f of srFindings) {
+    console.log(`  ${srHard ? "✗" : "⚠"} [${f.specId}] Surfaces "${f.symbol}" — ${SR_ROOTS.join("·")} 아래에 그 이름의 파일·디렉토리가 없음: 실제 파일이면 키를 실물 이름에 맞추고(또는 파일을 만들고), 다른 루트에 있으면 ownershipSourceRoots에 선언하라(SPEC-029)`);
+  }
+}
+if (srHard) {
+  console.error(`\n✗ symbolRealityPolicy=hard: 소유 surface(파일형 키)는 선언된 소스 루트 아래 실재해야 한다 — 면제 목록이 아니라 데이터 교정으로 닫아라(SPEC-029).`);
+  process.exit(1);
+}
+if (SR_POLICY === "hard" && SR_INERT.length) {
+  console.error(`\n✗ symbolRealityPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. ownershipSourceRoots를 선언하고 surface류 카테고리를 두어 판정을 성립시키거나, 정책을 off로 명시하라(SPEC-029).`);
   process.exit(1);
 }
 

@@ -101,7 +101,8 @@
     "capability-ownership": "Capability 귀속 — capability x.verb는 entity x 소유 스펙만(스펙 경계=entity 기준, SPEC-024)",
     "entity-schema-backing": "Entity 스키마 백킹 — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단, capability 귀속 우회로 봉합, SPEC-026)",
     "policy-ratchet": "정책 래칫 — 강제 정책 knob의 강도 단조성(하향 회피 차단, advisory 경유지·hard 종착지의 기계화, SPEC-027)",
-    "ownership-map": "Ownership 보증 맵 — 소유 키별로 어느 가드가 실제 판정했는지 생성·가시화(미판정을 키마다 드러냄, SPEC-028)"
+    "ownership-map": "Ownership 보증 맵 — 소유 키별로 어느 가드가 실제 판정했는지 생성·가시화(미판정을 키마다 드러냄, SPEC-028)",
+    "ownership-reality": "소유 키 실재 판정의 두 문법(모듈 문법·심볼 문법) 코어 — SPEC-029. 어댑터(정규식) 위임의 퇴화·surface 정방향 판정 부재를 문법으로 닫는다"
   },
   "relationTypes": [
     "references"
@@ -124,5 +125,16 @@
   "commands": {
     "test": "node --test tooling/__tests__/*.mjs"
   },
-  "runTestsPolicy": "hard"
+  "runTestsPolicy": "hard",
+  "entitySchemaSources": [
+    {
+      "kind": "spec-slug"
+    }
+  ],
+  "entitySchemaBackingPolicy": "hard",
+  "ownershipSourceRoots": [
+    "tooling",
+    "prompts"
+  ],
+  "symbolRealityPolicy": "hard"
 }

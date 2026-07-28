@@ -70,15 +70,23 @@ export function extractSchemaEntities(units) {
 
 // 스펙별 소유 entity가 스키마 집합(∪ 면제)에 없으면 위반. 소유 entity는 raw(여기서 정규화).
 // ownedBySpec: [{specId, entities:[raw...]}]. 반환 [{specId, entity}] (선언 순 — 결정적).
-export function schemaBackingFindings(ownedBySpec, schemaSet, exemptSet) {
+//
+// slugBySpec(선택): specId → 그 스펙 파일명의 슬러그. **모듈 문법**(SPEC-029 ①)이 선언된
+// 레포에서 쓴다 — entity가 DB 테이블이 아니라 코드 모듈인 경우, 실재의 정본은 스키마가 아니라
+// **그 스펙의 파일명**이다. 전역 집합이 아니라 **스펙별** 대조라는 점이 중요하다: 전역이면
+// SPEC-010이 SPEC-011의 슬러그를 소유해도 통과한다(키 유일성만으론 뒤바뀜을 못 잡는다).
+// 미전달(null)이면 종전과 완전히 동일하게 동작한다 — 기존 사이트 출력 바이트 불변.
+export function schemaBackingFindings(ownedBySpec, schemaSet, exemptSet, slugBySpec) {
   const findings = [];
   for (const { specId, entities } of ownedBySpec || []) {
+    const slug = slugBySpec ? slugBySpec[specId] : undefined;
     for (const raw of entities || []) {
       const ent = String(raw).trim().toLowerCase();
       if (!ent || ent === "—" || ent === "-") continue;
-      if (!schemaSet.has(ent) && !(exemptSet && exemptSet.has(ent))) {
-        findings.push({ specId, entity: ent });
-      }
+      if (schemaSet.has(ent)) continue;
+      if (exemptSet && exemptSet.has(ent)) continue;
+      if (slug && ent === slug) continue;                       // 모듈 문법으로 실재 확인
+      findings.push({ specId, entity: ent });
     }
   }
   return findings;

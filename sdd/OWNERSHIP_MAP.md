@@ -11,11 +11,11 @@
 | 구조적 중복(dedup) | **발화** | hard(정책 없음) | — |
 | FR 키 앵커(SPEC-023) | **발화** | advisory | — |
 | capability 귀속(SPEC-024) | **미판정** | advisory | capability 역할 카테고리 미해석(ownershipCategoryRoles에 capability 선언 없음 + 이름 폴백 실패) |
-| entity 실재(SPEC-026) | **미판정** | off | — |
-| surface 실재(orphan, SPEC-003) | **미판정** | advisory | surfaceGlobs 미설정 — orphan-surface no-op |
+| entity 실재(SPEC-026) | **발화** | hard | — |
+| surface 실재(orphan, SPEC-003) | **발화** | advisory | — |
 | entity 등록제(entityRegistry) | **발화** | hard(채우면) | — |
 
-> ⚠ **3개 가드가 미판정입니다** — capability 귀속(SPEC-024) · entity 실재(SPEC-026) · surface 실재(orphan, SPEC-003). 아래 표의 해당 칸은 "검증됨"이 아니라 "아무도 안 봤음"을 뜻합니다.
+> ⚠ **1개 가드가 미판정입니다** — capability 귀속(SPEC-024). 아래 표의 해당 칸은 "검증됨"이 아니라 "아무도 안 봤음"을 뜻합니다.
 
 ## 카테고리 → 역할
 
@@ -25,96 +25,98 @@
 | Symbols | surface |
 | Artifacts | —(역할 없음) |
 
-## Entity 키 (aggregate root) — 29건
+## Entity 키 (aggregate root) — 30건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
-| `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | 미판정 |
-| `capability-ownership` | SPEC-024 | ✓ | ✓ | 미판정 |
-| `cross-spec-change` | SPEC-020 | ✓ | ✓ | 미판정 |
-| `derivation-accounting` | SPEC-009 | ✓ | ✓ | 미판정 |
-| `entity-relations` | SPEC-017 | ✓ | ✓ | 미판정 |
-| `entity-schema-backing` | SPEC-026 | ✓ | ✓ | 미판정 |
-| `fr-key-anchors` | SPEC-023 | ✓ | ✓ | 미판정 |
-| `harness-install` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `key-pipeline` | SPEC-001 | ✓ | ✓ | 미판정 |
-| `kit-ci` | CICD-001 | ✓ | ✓ | 미판정 |
-| `object-storage-decision` | SPEC-016 | ✓ | ✓ | 미판정 |
-| `ownership-map` | SPEC-028 | ✓ | ✓ | 미판정 |
-| `policy-ratchet` | SPEC-027 | ✓ | ✓ | 미판정 |
-| `prefix-class-consistency` | SPEC-012 | ✓ | ✓ | 미판정 |
-| `retag` | SPEC-011 | ✓ | ✓ | 미판정 |
-| `runtime-parity` | SPEC-006 | ✓ | ✓ | 미판정 |
-| `runtime-schema-drift` | SPEC-022 | ✓ | ✓ | 미판정 |
-| `semantic-drift` | SPEC-019 | ✓ | ✓ | 미판정 |
-| `smoke-scan` | SPEC-010 | ✓ | ✓ | 미판정 |
-| `spec-grammar-hardening` | SPEC-013 | ✓ | ✓ | 미판정 |
-| `spec-id-numbering` | SPEC-014 | ✓ | ✓ | 미판정 |
-| `spec-lifecycle` | SPEC-008 | ✓ | ✓ | 미판정 |
-| `spec-migration` | SPEC-025 | ✓ | ✓ | 미판정 |
-| `spec-quality-gates` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `spec-retirement` | SPEC-018 | ✓ | ✓ | 미판정 |
-| `spec-sync` | SPEC-003 | ✓ | ✓ | 미판정 |
-| `test-domain` | SPEC-015 | ✓ | ✓ | 미판정 |
-| `test-execution` | SPEC-021 | ✓ | ✓ | 미판정 |
-| `verification-accounting` | SPEC-007 | ✓ | ✓ | 미판정 |
+| `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | ✓ |
+| `capability-ownership` | SPEC-024 | ✓ | ✓ | ✓ |
+| `cross-spec-change` | SPEC-020 | ✓ | ✓ | ✓ |
+| `derivation-accounting` | SPEC-009 | ✓ | ✓ | ✓ |
+| `entity-relations` | SPEC-017 | ✓ | ✓ | ✓ |
+| `entity-schema-backing` | SPEC-026 | ✓ | ✓ | ✓ |
+| `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
+| `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
+| `key-pipeline` | SPEC-001 | ✓ | ✓ | ✓ |
+| `kit-ci` | CICD-001 | ✓ | ✓ | ✓ |
+| `object-storage-decision` | SPEC-016 | ✓ | ✓ | ✓ |
+| `ownership-map` | SPEC-028 | ✓ | ✓ | ✓ |
+| `ownership-reality` | SPEC-029 | ✓ | ✓ | ✓ |
+| `policy-ratchet` | SPEC-027 | ✓ | ✓ | ✓ |
+| `prefix-class-consistency` | SPEC-012 | ✓ | ✓ | ✓ |
+| `retag` | SPEC-011 | ✓ | ✓ | ✓ |
+| `runtime-parity` | SPEC-006 | ✓ | ✓ | ✓ |
+| `runtime-schema-drift` | SPEC-022 | ✓ | ✓ | ✓ |
+| `semantic-drift` | SPEC-019 | ✓ | ✓ | ✓ |
+| `smoke-scan` | SPEC-010 | ✓ | ✓ | ✓ |
+| `spec-grammar-hardening` | SPEC-013 | ✓ | ✓ | ✓ |
+| `spec-id-numbering` | SPEC-014 | ✓ | ✓ | ✓ |
+| `spec-lifecycle` | SPEC-008 | ✓ | ✓ | ✓ |
+| `spec-migration` | SPEC-025 | ✓ | ✓ | ✓ |
+| `spec-quality-gates` | SPEC-002 | ✓ | ✓ | ✓ |
+| `spec-retirement` | SPEC-018 | ✓ | ✓ | ✓ |
+| `spec-sync` | SPEC-003 | ✓ | ✓ | ✓ |
+| `test-domain` | SPEC-015 | ✓ | ✓ | ✓ |
+| `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
+| `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 52건
+## Surface 키 — 53건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
-| `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | 미판정 |
-| `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | 미판정 |
-| `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | 미판정 |
-| `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-orphan-surfaces.mjs` | SPEC-003 | ✓ | ✓ | 미판정 |
-| `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | 미판정 |
-| `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | 미판정 |
-| `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-spec-completeness.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-spec-consistency.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-spec-sync.mjs` | SPEC-003 | ✓ | ✓ | 미판정 |
-| `check-test-adequacy.mjs` | SPEC-002 | ✓ | ✓ | 미판정 |
-| `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | 미판정 |
-| `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | 미판정 |
-| `derivation-lib.mjs` | SPEC-009 | ✓ | ✓ | 미판정 |
-| `drift-lib.mjs` | SPEC-019 | ✓ | ✓ | 미판정 |
-| `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | 미판정 |
-| `go-gate` | SPEC-006 | ✓ | ✓ | 미판정 |
-| `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | 미판정 |
-| `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | 미판정 |
-| `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | 미판정 |
-| `migrate.md` | SPEC-025 | ✓ | ✓ | 미판정 |
-| `numbering-lib.mjs` | SPEC-014 | ✓ | ✓ | 미판정 |
-| `object-storage-lib.mjs` | SPEC-016 | ✓ | ✓ | 미판정 |
-| `ownership-keys.mjs` | SPEC-001 | ✓ | ✓ | 미판정 |
-| `policy-ratchet-lib.mjs` | SPEC-027 | ✓ | ✓ | 미판정 |
-| `pre-commit` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `pre-push` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `prefix-class-lib.mjs` | SPEC-012 | ✓ | ✓ | 미판정 |
-| `relation-lib.mjs` | SPEC-017 | ✓ | ✓ | 미판정 |
-| `retire-lib.mjs` | SPEC-018 | ✓ | ✓ | 미판정 |
-| `schema-backing-lib.mjs` | SPEC-026 | ✓ | ✓ | 미판정 |
-| `schema-drift-lib.mjs` | SPEC-022 | ✓ | ✓ | 미판정 |
-| `sdd_gates.py` | SPEC-006 | ✓ | ✓ | 미판정 |
-| `sdd_gates.sh` | SPEC-006 | ✓ | ✓ | 미판정 |
-| `sdd-config.mjs` | SPEC-001 | ✓ | ✓ | 미판정 |
-| `sdd-edit-check.sh` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `sdd-init.sh` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `sdd-migrate.skill.md` | SPEC-025 | ✓ | ✓ | 미판정 |
-| `sdd-readopt.skill.md` | SPEC-005 | ✓ | ✓ | 미판정 |
-| `sdd-retag.mjs` | SPEC-011 | ✓ | ✓ | 미판정 |
-| `sdd-retire.mjs` | SPEC-018 | ✓ | ✓ | 미판정 |
-| `sdd-run.mjs` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `sdd-session-context.sh` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `sdd-smoke-scan.mjs` | SPEC-010 | ✓ | ✓ | 미판정 |
-| `sdd-start.skill.md` | SPEC-005 | ✓ | ✓ | 미판정 |
-| `sdd-sync.mjs` | SPEC-004 | ✓ | ✓ | 미판정 |
-| `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | 미판정 |
-| `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | 미판정 |
-| `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | 미판정 |
-| `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | 미판정 |
+| `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | ✓ |
+| `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
+| `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-orphan-surfaces.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
+| `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
+| `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-spec-completeness.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-spec-consistency.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-spec-sync.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-test-adequacy.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | ✓ |
+| `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
+| `derivation-lib.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
+| `drift-lib.mjs` | SPEC-019 | ✓ | ✓ | ✓ |
+| `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
+| `go-gate` | SPEC-006 | ✓ | ✓ | ✓ |
+| `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
+| `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | ✓ |
+| `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | ✓ |
+| `migrate.md` | SPEC-025 | ✓ | ✓ | ✓ |
+| `numbering-lib.mjs` | SPEC-014 | ✓ | ✓ | ✓ |
+| `object-storage-lib.mjs` | SPEC-016 | ✓ | ✓ | ✓ |
+| `ownership-keys.mjs` | SPEC-001 | ✓ | ✓ | ✓ |
+| `ownership-reality-lib.mjs` | SPEC-029 | ✓ | ✓ | ✓ |
+| `policy-ratchet-lib.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
+| `pre-commit` | SPEC-004 | ✓ | ✓ | ✓ |
+| `pre-push` | SPEC-004 | ✓ | ✓ | ✓ |
+| `prefix-class-lib.mjs` | SPEC-012 | ✓ | ✓ | ✓ |
+| `relation-lib.mjs` | SPEC-017 | ✓ | ✓ | ✓ |
+| `retire-lib.mjs` | SPEC-018 | ✓ | ✓ | ✓ |
+| `schema-backing-lib.mjs` | SPEC-026 | ✓ | ✓ | ✓ |
+| `schema-drift-lib.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
+| `sdd_gates.py` | SPEC-006 | ✓ | ✓ | ✓ |
+| `sdd_gates.sh` | SPEC-006 | ✓ | ✓ | ✓ |
+| `sdd-config.mjs` | SPEC-001 | ✓ | ✓ | ✓ |
+| `sdd-edit-check.sh` | SPEC-004 | ✓ | ✓ | ✓ |
+| `sdd-init.sh` | SPEC-004 | ✓ | ✓ | ✓ |
+| `sdd-migrate.skill.md` | SPEC-025 | ✓ | ✓ | ✓ |
+| `sdd-readopt.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
+| `sdd-retag.mjs` | SPEC-011 | ✓ | ✓ | ✓ |
+| `sdd-retire.mjs` | SPEC-018 | ✓ | ✓ | ✓ |
+| `sdd-run.mjs` | SPEC-004 | ✓ | ✓ | ✓ |
+| `sdd-session-context.sh` | SPEC-004 | ✓ | ✓ | ✓ |
+| `sdd-smoke-scan.mjs` | SPEC-010 | ✓ | ✓ | ✓ |
+| `sdd-start.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
+| `sdd-sync.mjs` | SPEC-004 | ✓ | ✓ | ✓ |
+| `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
+| `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
+| `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 
 ## 역할 없는 카테고리 키 — 16건
 
@@ -139,8 +141,8 @@
 
 ## 집계
 
-- 소유 키 총 **97건** (entity 29 · surface 52 · capability 0 · 역할없음 16)
+- 소유 키 총 **99건** (entity 30 · surface 53 · capability 0 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
-- 실재 위반 **0건** / 면제 0건 / 미판정 81건
+- 실재 위반 **0건** / 면제 0건 / 미판정 0건
 

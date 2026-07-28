@@ -795,16 +795,77 @@ def extract_schema_entities(units):
     return out
 
 
-def schema_backing_findings(owned_by_spec, schema_set, exempt_set):
-    """소유 entity가 스키마 집합(∪ 면제)에 없으면 위반. 반환 [(spec_id, entity)] (선언 순)."""
+def schema_backing_findings(owned_by_spec, schema_set, exempt_set, slug_by_spec=None):
+    """소유 entity가 스키마 집합(∪ 면제 ∪ 모듈 문법)에 없으면 위반. 반환 [(spec_id, entity)] (선언 순).
+
+    slug_by_spec: spec_id → 스펙 파일명 슬러그. 모듈 문법(SPEC-029 ①)이 선언된 레포에서
+    쓴다 — 전역 집합이 아니라 **스펙별** 대조라야 슬러그 뒤바뀜을 잡는다. None이면 종전 동일.
+    """
     findings = []
     for spec_id, entities in owned_by_spec or []:
+        slug = (slug_by_spec or {}).get(spec_id)
         for raw in entities or []:
             ent = str(raw).strip().lower()
             if not ent or ent in ("—", "-"):
                 continue
-            if ent not in schema_set and not (exempt_set and ent in exempt_set):
-                findings.append((spec_id, ent))
+            if ent in schema_set:
+                continue
+            if exempt_set and ent in exempt_set:
+                continue
+            if slug and ent == slug:
+                continue
+            findings.append((spec_id, ent))
+    return findings
+
+
+# ─── 소유 키 실재 판정의 두 문법 (SPEC-029) — Node판 ownership-reality-lib.mjs 미러 ───
+def spec_slug(filename):
+    """`<PREFIX>-NNN[a]-<slug>.md` → `<slug>`(소문자). 접두어 없으면 확장자만 제거."""
+    base = re.sub(r"^.*[/\\]", "", str(filename or ""))
+    base = re.sub(r"\.md$", "", base, flags=re.I)
+    m = re.match(r"^[A-Za-z]+-\d{3}[a-z]?-(.+)$", base)
+    return (m.group(1) if m else base).strip().lower()
+
+
+def spec_slug_source_declared(sources):
+    return any(str((s or {}).get("kind", "")) == "spec-slug" for s in (sources or []))
+
+
+def symbol_reality_active(policy, roots, roles):
+    return policy != "off" and bool(roots) and bool((roles or {}).get("surface"))
+
+
+def symbol_reality_inert_reasons(policy, roots, roles):
+    if policy == "off":
+        return []
+    reasons = []
+    if not roots:
+        reasons.append("ownershipSourceRoots 비어 있음(소스 루트 미선언 — 대조할 실재 집합이 없음)")
+    if not (roles or {}).get("surface"):
+        reasons.append("surface 역할 카테고리 미해석(ownershipCategoryRoles에 surface 선언 없음 + 이름 폴백 실패)")
+    return reasons
+
+
+def is_file_like_surface(key):
+    s = str(key or "").strip()
+    if not s or s in ("—", "-"):
+        return False
+    if re.search(r"\s", s):
+        return False
+    if re.match(r"^[a-z]+:", s, flags=re.I):
+        return False
+    return not s.startswith("/")
+
+
+def symbol_reality_findings(owned_by_spec, real_set):
+    findings = []
+    for spec_id, surfaces in owned_by_spec or []:
+        for raw in surfaces or []:
+            key = str(raw).strip().lower()
+            if not key or key in ("—", "-"):
+                continue
+            if key not in real_set:
+                findings.append((spec_id, key))
     return findings
 
 
@@ -834,6 +895,19 @@ def cmd_ownership(cfg, strict):
     sb_active = schema_backing_active(sb_policy, sb_sources, roles)
     sb_inert = schema_backing_inert_reasons(sb_policy, sb_sources, roles)
     sb_owned = []  # (spec_id, [raw...])
+    sb_slugs = []  # (spec_id, slug) — 모듈 문법용(SPEC-029 ①)
+
+    # 심볼 실재(SPEC-029 ②) — 선언된 소스 루트 아래 실재하는 파일/디렉토리 basename과 대조.
+    sr_policy = str(cfg.get("symbolRealityPolicy", "off") or "off")
+    if sr_policy not in ("off", "advisory", "hard"):
+        print(f'✗ symbolRealityPolicy 값 위반 "{sr_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    sr_roots = cfg.get("ownershipSourceRoots") or []
+    sr_active = symbol_reality_active(sr_policy, sr_roots, roles)
+    sr_inert = symbol_reality_inert_reasons(sr_policy, sr_roots, roles)
+    sur_cat = roles["surface"]
+    sr_owned = []  # (spec_id, [raw...])
 
     # ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
     # 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
@@ -885,6 +959,12 @@ def cmd_ownership(cfg, strict):
         # Entity 스키마 백킹(SPEC-026): 소유 entity 수집 — 아래에서 구조 SSOT 실재 집합과 대조.
         if sb_active and own.get(ent_cat):
             sb_owned.append((spec_id, own[ent_cat]))
+            sb_slugs.append((spec_id, spec_slug(file)))
+        # 심볼 실재(SPEC-029 ②): 파일형 표면 키만 수집 — HTTP·이벤트·잡·경로는 대상 아님.
+        if sr_active and sur_cat and own.get(sur_cat):
+            file_like = [k for k in own[sur_cat] if is_file_like_surface(k)]
+            if file_like:
+                sr_owned.append((spec_id, file_like))
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
         # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
         deps = parse_section(text, "Dependencies", categories)
@@ -1011,7 +1091,9 @@ def cmd_ownership(cfg, strict):
                         units.append({"text": fh.read(), "patterns": patterns})
                 except OSError:
                     pass
-        sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set)
+        # 모듈 문법(SPEC-029 ①) — 스펙별 슬러그 맵(전역 집합 아님).
+        slug_by_spec = ({sid: slug for sid, slug in sb_slugs} if spec_slug_source_declared(sb_sources) else None)
+        sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set, slug_by_spec)
         sb_exempt_used = sorted(e for e in exempt_set if e in owners[ent_cat])
     sb_hard = sb_policy == "hard" and len(sb_findings) > 0
     if sb_active and sb_findings:
@@ -1031,6 +1113,43 @@ def cmd_ownership(cfg, strict):
         print("\n✗ entitySchemaBackingPolicy=hard: 소유 entity는 구조 SSOT에 실재해야 한다 — 유령 entity(지어낸 개념)에 capability를 얹지 말고 실 entity로 재구성하라(SPEC-026).",
               file=sys.stderr)
         sys.exit(1)
+    # ── 심볼 실재(SPEC-029 ②) — Node판과 출력 순서·문구 동일 ──
+    if sr_inert:
+        print(f'· 심볼 실재(symbolRealityPolicy={sr_policy}): 판정 불가(inert) — {" / ".join(sr_inert)}')
+    sr_findings = []
+    if sr_active:
+        ignore_sr = set(cfg["ignoreDirs"])
+        real_set = set()
+
+        def _walk_sr(d):
+            try:
+                names = sorted(os.listdir(d))
+            except OSError:
+                return
+            for n in names:
+                real_set.add(n.lower())
+                p = os.path.join(d, n)
+                if os.path.isdir(p) and n not in ignore_sr:
+                    _walk_sr(p)
+
+        for root in sr_roots:
+            _walk_sr(os.path.join(cfg["__root"], root))
+        sr_findings = symbol_reality_findings(sr_owned, real_set)
+    sr_hard = sr_policy == "hard" and len(sr_findings) > 0
+    if sr_active and sr_findings:
+        print(f"심볼 실재(symbolRealityPolicy={sr_policy}): 위반 {len(sr_findings)}건 — 소유 surface가 소스 루트에 실재하지 않음")
+        for spec_id, symbol in sr_findings:
+            tag = "✗" if sr_hard else "⚠"
+            print(f'  {tag} [{spec_id}] Surfaces "{symbol}" — {"·".join(sr_roots)} 아래에 그 이름의 파일·디렉토리가 없음: 실제 파일이면 키를 실물 이름에 맞추고(또는 파일을 만들고), 다른 루트에 있으면 ownershipSourceRoots에 선언하라(SPEC-029)')
+    if sr_hard:
+        print("\n✗ symbolRealityPolicy=hard: 소유 surface(파일형 키)는 선언된 소스 루트 아래 실재해야 한다 — 면제 목록이 아니라 데이터 교정으로 닫아라(SPEC-029).",
+              file=sys.stderr)
+        sys.exit(1)
+    if sr_policy == "hard" and sr_inert:
+        print("\n✗ symbolRealityPolicy=hard인데 판정이 성립하지 않는다(위 사유) — hard 선언 + 무판정은 거짓 안전이다. ownershipSourceRoots를 선언하고 surface류 카테고리를 두어 판정을 성립시키거나, 정책을 off로 명시하라(SPEC-029).",
+              file=sys.stderr)
+        sys.exit(1)
+
     for c in relation_cycles:
         print(f"⚠ 관계 순환 참조: {' → '.join(c)} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)")
     if relation_errors:
