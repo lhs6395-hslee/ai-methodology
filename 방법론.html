@@ -423,6 +423,27 @@
   <p>두 장치로 닫는다. ① <strong><code>exit 0</code> ≠ "판정했음"</strong> — 게이트가 한 줄도 출력하지 않으면 clean이 아니라 <strong>미판정</strong>으로 집계한다. 판정 대상이 없어 발화하지 않는 게이트는 "off/no-op/skip"이라고 <strong>명시한 한 줄</strong>을 내야 한다(침묵은 근거가 아니다). ② <strong>Ownership 보증 맵</strong>(<code>sdd/OWNERSHIP_MAP.md</code>, 생성물) — 가드별 발화 여부와 inert 사유를 표로 적고, 소유 키마다 유일성·앵커·실재 칸을 <code>✓</code> / <code>✗</code> / <code>면제 — 사유</code> / <strong><code>미판정</code></strong>으로 채운다. <code>미판정</code> 칸은 "검증됨"이 아니라 <strong>"아무도 안 봤음"</strong>을 뜻하고, 하나라도 있으면 맵 머리에 경고가 뜬다.</p>
   <p class="note">실측 사례: 어떤 프로젝트의 저장소 경로에 한글이 있었는데, 게이트의 진입 판정이 문자열 비교라 퍼센트 인코딩 때문에 <strong>항상 불일치</strong> → 본체가 실행되지 않고 한 줄도 출력하지 않은 채 <code>exit 0</code>. 테스트 실행 정책을 <code>hard</code>로 켜 둔 상태로 여러 라운드 동안 아무것도 검증되지 않았고, 집계기는 그 침묵을 "clean"으로 읽었다. 킷 자신의 경로는 ASCII라 <strong>자기 검증으로는 영구히 보이지 않는 결함</strong>이었다 — 그래서 규범을 하나 세울 때마다 성격이 다른 여러 저장소에서 실측한다.</p>
 
+  <h3>"선언한 게 진짜 있나" — 어댑터 대신 문법으로</h3>
+  <p>스펙이 <em>"나는 <code>pjt_projects</code>를 소유한다"</em>고 적었을 때, 그게 실제로 있는 테이블인지 지어낸 개념인지 누가 보나? 처음엔 <strong>정규식 어댑터</strong>에 맡겼다 — 프로젝트가 "우리 스키마는 여기 있고 이 패턴으로 읽으면 된다"고 알려주는 방식이다. 유연하지만 <strong>느슨하게 쓰면 조용히 퇴화한다</strong>: 임포트문을 스키마 선언으로 세거나, 주석 처리된 옛 DDL을 읽거나, 스펙이 자기 자신을 소스로 가리키거나, 소스 목록을 비워 판정을 없애버려도 게이트는 초록이다. 그리고 표면(surface) 쪽은 정방향 판정이 <strong>아예 없었다</strong> — "코드에 있는데 선언 안 됨"은 봤지만 "선언했는데 코드에 없음"은 아무도 안 봤다.</p>
+  <p>그래서 어댑터를 <strong>문법</strong>으로 보강했다. 문법은 저장소의 사실에 직접 대응해서 흉내 낼 수가 없다.</p>
+  <div class="tblwrap"><table>
+    <tr><th>문법</th><th>규칙</th><th>왜 우회 불가인가</th></tr>
+    <tr><td>모듈 문법</td><td>entity 키 = <strong>그 스펙 파일명의 슬러그</strong></td><td>파일명은 저장소 사실이다. 정규식으로 만들어낼 수 없다. <strong>스펙별</strong>로 대조하므로 두 스펙이 서로의 이름을 바꿔 가져도 잡힌다 — 키 유일성만으로는 못 잡는 뒤바뀜이다</td></tr>
+    <tr><td>심볼 문법</td><td>표면 키 = <strong>선언된 소스 루트 아래 실재하는 파일·디렉토리</strong></td><td>파일이 있거나 없거나 둘 중 하나다. 디렉토리도 인정한다(디렉토리 자체가 표면인 경우가 실제로 있다)</td></tr>
+  </table></div>
+  <p><strong>예외 목록을 만들지 않았다.</strong> 이게 핵심이다 — 불일치가 나오면 면제로 덮는 대신 <strong>데이터를 고친다</strong>: 파일명을 키에 맞추거나, 키를 실물 이름에 맞추거나, 소스 루트를 선언한다. 킷 자신에 적용한 결과 모듈 29/29 · 심볼 52/52 · <strong>예외 0</strong>이었고, 어긋난 4건은 전부 데이터 교정으로 닫혔다(스펙 파일 2개 이름 변경 + 루트 선언 + 디렉토리 인정).</p>
+  <p class="note">두 문법 모두 <strong>옵트인</strong>이다 — 켜지 않은 프로젝트의 출력은 한 바이트도 달라지지 않는다. 대신 <code>hard</code>로 켜 놓고 판정 입력을 안 준 상태(소스 루트 미선언 등)는 <strong>거짓 안전</strong>이라 차단한다. HTTP 라우트(<code>POST /api/x</code>)는 파일이 아니므로 이 문법의 대상이 아니고 자동으로 빠진다 — 웹 프로젝트에 오발동하지 않는다.</p>
+
+  <h3>서식이 키의 종류를 말한다</h3>
+  <p>FR 문장 안의 서식 두 개는 장식이 아니라 <strong>기계 신호</strong>다. 각각 뜻이 정해져 있고, 어긴 것은 게이트가 잡는다.</p>
+  <div class="tblwrap"><table>
+    <tr><th>서식</th><th>뜻</th><th>예</th></tr>
+    <tr><td><code>백틱</code></td><td><strong>entity 키, 또는 그것에 종속된 것</strong> — 컬럼·필드·enum 값. 한마디로 <strong>데이터 모델</strong></td><td><code>pjt_projects</code> · <code>automation_mode</code> · <code>MANUAL_REVIEW</code></td></tr>
+    <tr><td><strong>볼드</strong> + (E)/(S)/(C)</td><td><strong>앵커</strong> — 이 단어가 선언된 키의 원천이다. 마커는 카테고리 머리글자</td><td><strong>pjt_projects</strong> (E) · <strong>POST /api/x</strong> (S) · <strong>staff.recommend</strong> (C)</td></tr>
+  </table></div>
+  <p>그래서 <strong>entity 키를 백틱에 쓰는 것은 정본</strong>이고, 반대로 <strong>표면·기능 키를 백틱에 두면 위반</strong>이다 — 그쪽 정본은 앵커뿐이기 때문이다. CLI 플래그(<code>--strict</code>)·강도 값(<code>advisory</code>)·태그 문법(<code>@covers</code>)은 키가 아니므로 백틱을 그대로 쓴다.</p>
+  <p class="note">원래 요구는 <em>"굵은 글씨가 왜 굵은지 알 수 있어야 한다"</em>였다. 규칙을 양방향으로 닫으면 그 질문에 답이 생긴다 — 남는 굵은 것은 전부 마커 달린 선언 키이고, 소유한 키는 전부 어느 FR엔가 굵게 드러나며, 그 외는 백틱이거나 평문이다.</p>
+
   <h3>dedup ↔ cohesion = 거울상 (핵심 통찰)</h3>
   <p><strong>방법론의 최대 빈칸이 여기 있었다.</strong> "이 spec이 기존과 중복인가?"를 판정할 <em>규칙</em>이 없어 사람·LLM 판단에 맡겨 뒀고 — LLM은 누락을 낸다(→ 거짓 green). 그래서 각 spec이 자기가 <strong>소유하는 키</strong>를 선언하게 하고, <strong>"하나의 키는 정확히 한 spec만 소유"</strong>라는 <strong>집합 규칙</strong>으로 바꿨다. 판정이 "감"이 아니라 "집합 조회"가 된다. (출처: 논문이 아니라 소프트웨어공학 1차 원칙 — DDD <em>bounded context</em>·SSOT·집합 유일성. 1차 원칙이라 결정적이고, 그래서 CI에서 <code>exit 1</code>로 강제할 수 있다.)</p>
   <p class="note gate"><strong>그래서 Ownership만 필수다 (SC·NFR은 선택).</strong> 이 판정은 <em>모든 spec이 키를 선언해야</em> 성립한다 — 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(<strong>미선언 1개 = 보장에 뚫린 구멍</strong>). SC·NFR 누락은 <em>그 기능 하나</em>의 로컬 약점이지만, Ownership 누락은 <strong>시스템 전체</strong> 중복 보장을 깬다. 비유하면 Ownership은 그 spec이 점유한 땅의 <strong>등기</strong> — 등기가 없으면 두 spec이 같은 땅에 건물을 올려도(중복) 아무도 모른다. (게이트는 미선언을 warn으로 두고 <code>--strict</code>로 완전 강제 — 점진 도입.)</p>

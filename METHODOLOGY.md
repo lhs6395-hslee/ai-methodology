@@ -128,7 +128,16 @@ EARS 문장으로 쓴 FR은 구체적인 Ownership 키로 이어진다. 아래 �
 - **CRUD 기본 (코드 고정)**: `create · read · update · delete · list`
 - **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반 — **기본 강도는 ⚠ warn(exit 0)**, `check-ownership --strict`에서 exit 1(설치 훅·CI 기본 호출엔 `--strict` 없음). 따라서 현재 실효 관문은 차단이 아니라 위 config 리뷰이며, **권장 종착지는 hard**(`--strict` 없이도 차단). `APPLYING.md`의 `⚠ 미등록 verb` 행이 이 강도의 정본 표기다.
 
-**키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}** (S), THE SYSTEM SHALL **staff.recommend** (C) using **pjt_projects** (E)` — 굵은 키마다 카테고리 마커 `(E)`/`(S)`/`(C)`, FR-005·`frAnchorMarkers`). 리터럴 인용은 백틱(`` `...` ``, 앵커 아님). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. **앵커는 더 이상 선택이 아니다**(2026-07-21 개정): 굵은 것은 키여야 하고(FR-003) 마커를 달아야 하며(FR-005), 선언 키를 백틱에 두면 위반이고(FR-006), **소유 키는 각각 어느 FR엔가 최소 1회 굵게 앵커돼야 한다**(FR-007 — 산문·백틱만은 불충분). 여전히 선택인 것은 *어느* FR에 다는지와 같은 키의 반복 언급을 매번 굵게 하는지(키당 1회면 충족)뿐 — 그 판단은 리뷰 경계다.
+**키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}** (S), THE SYSTEM SHALL **staff.recommend** (C) using **pjt_projects** (E)` — 굵은 키마다 카테고리 마커 `(E)`/`(S)`/`(C)`, FR-005·`frAnchorMarkers`). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. **앵커는 더 이상 선택이 아니다**(2026-07-21 개정): 굵은 것은 키여야 하고(FR-003) 마커를 달아야 하며(FR-005), surface·capability 키를 백틱에 두면 위반이고(FR-006), **소유 키는 각각 어느 FR엔가 최소 1회 굵게 앵커돼야 한다**(FR-007 — 산문만은 불충분). 여전히 선택인 것은 *어느* FR에 다는지와 같은 키의 반복 언급을 매번 굵게 하는지(키당 1회면 충족)뿐 — 그 판단은 리뷰 경계다.
+
+**서식이 키의 종류를 말한다(2026-07-28 개정).** 두 서식은 각각 뜻이 정해져 있다:
+
+| 서식 | 뜻 |
+|---|---|
+| `` `백틱` `` | **entity 키, 또는 그것에 종속된 것** — 컬럼·필드·enum 값. 즉 **데이터 모델** |
+| `**볼드** + (E)/(S)/(C)` | **앵커** — 이 단어가 선언된 키의 원천이다 |
+
+그래서 entity 키를 백틱에 쓰는 것은 위반이 아니라 **정본**이다(예: `` `automation_mode` `` 필드와 그 enum 값 `` `MANUAL_REVIEW` `` — 둘 다 `pjt_projects` entity에 종속). 반대로 surface·capability 키는 백틱이 금지다 — 그쪽 정본은 앵커뿐이다(FR-006). CLI 플래그(`--strict`)·정책 강도 값(`advisory`)·태그 문법(`@covers`)은 키가 아니므로 백틱을 그대로 쓴다.
 
 **Spec Kit 기본 골조 vs 우리가 덧댄 것:** User Story·Acceptance(GWT)·FR·Key Entities·SC는 **Spec Kit 기본**(`/speckit.specify`가 생성). 이 방법론은 그 위에 **① `## Ownership` + `## Dependencies` 절을 추가**(dedup·cohesion 게이트의 입력 — Spec Kit 네이티브 아님) **② FR을 EARS로 정형화**(preset, 비공식 #1356) **③ 위 키 생성 절차로 Ownership 키를 결정론적으로 도출**한다. NFR(비기능=품질 제약: 성능·보안·가용성)·Infrastructure Prerequisites는 우리 템플릿이 명시. ← FR이 "기능", NFR이 "그 기능이 어떤 품질로 도는가", SC가 "성공했다고 볼 측정 결과".
 
@@ -170,6 +179,17 @@ converge는 **갭을 task로 표면화만** 한다(spec 자동 재작성 ✗). �
 
 > 이 맵이 답하는 실제 질문: *"엔티티와 각각의 키들의 보증이 잘 되어 있는지 확인이 너무 힘들다."* 스펙을 하나씩 열어 대조하는 대신 한 파일에서 본다. ⚠ 현재 이 맵의 드리프트에는 강제점이 없다(`--check`가 훅·CI에 배선되지 않음 — 사람이 재생성을 기억해야 한다).
 
+**소유 키의 실재는 어댑터가 아니라 문법으로 판정한다(SPEC-029).** 선언한 키가 저장소에 진짜로 있는지 보는 축이 둘 있다. 종전에는 entity 쪽만 있었고 그것도 **정규식 어댑터**(`entitySchemaSources`)에 판정을 위임했다 — 어댑터는 프로젝트가 자유롭게 쓰는 신뢰 경계라 느슨하게 쓰면 조용히 퇴화한다(실측 우회 4경로: 임포트문을 스키마 선언으로 셈 · 주석 처리된 DDL 채택 · 스펙 자기참조 · 소스를 비워 inert화). surface 쪽은 정방향 판정이 아예 없었다. 그래서 어댑터를 **문법**으로 보강한다 — 문법은 저장소 사실에 직접 대응해 어댑터로 흉내 낼 수 없다:
+
+| 문법 | 규칙 | 켜는 법 |
+|---|---|---|
+| **모듈 문법** | entity 역할 키 = **그 스펙 파일명의 슬러그** (`1 spec = 1 모듈` 레포) | `entitySchemaSources`에 `{kind:"spec-slug"}` |
+| **심볼 문법** | surface 역할 키 = **선언된 소스 루트 아래 실재하는 파일 또는 디렉토리** (재귀·basename) | `ownershipSourceRoots` + `symbolRealityPolicy` |
+
+모듈 문법은 **스펙별** 대조다(전역 집합이 아니다) — 두 스펙이 서로의 슬러그를 바꿔 가져도 위반이다. 키 유일성만으로는 그 뒤바뀜을 잡지 못한다. 심볼 문법이 디렉토리를 인정하는 것은 디렉토리 자체가 표면인 경우가 실재하기 때문이고(킷의 `go-gate`), 파일형이 아닌 표면(`POST /api/x`·`event:`·`job:`·`/path`)은 자동으로 대상에서 빠져 HTTP 표면 레포에 오발동하지 않는다.
+
+**예외 목록을 두지 않는다.** 불일치는 면제 등록이 아니라 **데이터 교정**으로 닫는다 — 파일명을 키에 맞추거나, 키를 실물 이름에 맞추거나, 소스 루트를 선언한다. 킷 자기적용 실측: 모듈 29/29 · 심볼 52/52 · 예외 0(불일치 4건은 스펙 파일 2건 rename + 소스 루트 선언 + 디렉토리 인정으로 닫았다). 두 문법 모두 옵트인이라 미선언 사이트의 출력은 바이트 불변이고, `hard`인데 판정 입력이 없으면(소스 루트 미선언 등) 거짓 안전이므로 exit 1이다.
+
 ## 리뷰 경계 선언 — 게이트가 판정하지 않는 것(정의된 경계, 예외 아님)
 > 원칙: **결정적 기계 신호가 있는 규범은 전부 게이트가 강제한다**(위 게이트군 + SPEC-012 이상 게이트 계열 — 아래 표 참조). 남는 것은 순수 의미 판정뿐이며, 이는 "정의되지 않은 예외"가 아니라 **여기 선언된 리뷰 경계**다 — 각 항목은 게이트가 지키는 기계 신호(하한)와 리뷰가 지키는 의미(상한)로 나뉜다. 억지 게이트로 의미 판정을 흉내 내지 않는다(오판 = 신뢰 붕괴).
 
@@ -194,7 +214,7 @@ converge는 **갭을 task로 표면화만** 한다(spec 자동 재작성 ✗). �
 | 17 | 테스트 스위트 실행 결과(green)인가 — 커버리지 회계 ≠ 실행 | `runTestsPolicy`로 `commands.test` 실제 실행·exit 0 요구(opt-in, `check-test-run`, SPEC-021) | 완료 주장 전 스위트 실행+결과 확인·"문서화된 skip이 정당한가" — 실행기 규범(`speckit-fix` 단계)·리뷰 |
 | 18 | 배포된 DB 스키마가 코드 기대와 일치하나(R2′) — spec↔code green ≠ 배포 안전 | 배포 preflight에서 코드 기대 vs 배포 실측 스키마 diff(opt-in `schemaDriftManifest`/`migrationStatePolicy`, `check-schema-drift`, SPEC-022) | migrate-on-deploy 파이프라인 설계·brownfield baseline 절차의 타당성 — 배포 엔지니어링 리뷰 |
 | 19 | 앵커의 **위치·문장** 적정성("이 키를 *어느* FR에 앵커했어야 하나 — 그 FR이 정말 그 키를 성립시키는 문장인가") | 양방향 강제(`frKeyAnchorPolicy`, SPEC-023): bold는 키여야 하고(FR-003) 마커 필수(FR-005), 선언 키를 백틱에 두면 위반(FR-006), **소유 키는 어느 FR엔가 최소 1회 굵게 앵커돼야 함**(FR-007, 2026-07-21 — 산문·백틱만은 불충분) | 게이트는 "키당 최소 1회 앵커됐는가"만 센다 — **어느** FR에 달렸는지·그 문장이 그 키의 성립 근거인지는 스펙 리뷰. (앵커 자체는 더 이상 선택이 아니다) |
-| 20 | Surface(라우트·파일 표면) 키의 **실재**("선언한 표면이 진짜 코드에 있나") | **없음** — entity에는 스키마 백킹(SPEC-026)이 있으나 surface 실재를 보는 게이트는 없다. 인접 신호는 역방향뿐(`surfaceGlobs` orphan = 코드에 있는데 미선언, SPEC-003)이고 형식 검증(`surfaceFormat`)은 모양만 본다 | 선언된 Surface가 실재하는지 — 스펙 리뷰. 결정적 신호(라우트 매니페스트·파일 라우팅 트리·OpenAPI)를 어댑터로 주입할 수 있으면 게이트 신설이 옳다 — `ROADMAP.md` 보류 항목 "Surface 실재 검증 축(`surfaceSources`)" |
+| 20 | Surface 키가 가리키는 표면이 **맞는 표면인가**(파일은 실재하지만 그 FR의 표면이 아닌 경우) | **심볼 문법**(SPEC-029 ②, `ownershipSourceRoots`+`symbolRealityPolicy`): 파일형 surface 키는 선언된 소스 루트 **아래 실재하는 파일 또는 디렉토리**여야 한다(재귀·basename). 역방향 orphan(SPEC-003)과 짝을 이뤄 양방향이 닫힌다. 형식 표면(`POST /api/x`·`event:`·`job:`)은 파일이 아니므로 대상 밖 | 실재하는 파일 중 **어느 것이 이 FR의 표면인가** — 스펙 리뷰. 기계는 "그 이름의 파일이 있는가"만 센다. HTTP 라우트의 실재(라우트 매니페스트·OpenAPI 대조)는 아직 축이 없다 — 필요 증명 시 어댑터 신설 |
 
 이 표 밖에서 "게이트가 안 잡는" 규범을 발견하면 그것은 **버그다** — (a) 결정적 신호가 있으면 게이트를 추가하고, (b) 없으면 이 표에 행을 추가해 경계를 선언한다(둘 다 아닌 상태로 두지 않는다).
 
