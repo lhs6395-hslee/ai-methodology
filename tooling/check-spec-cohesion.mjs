@@ -33,7 +33,8 @@ function specFiles() {
   return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
 }
 
-// aggregate root 카테고리: /entit/i 패턴에 맞는 첫 카테고리, 없으면 첫 번째.
+// aggregate root 카테고리: config의 **역할 선언**(ownershipCategoryRoles)이 정본이고,
+// 미선언이면 이름 정규식 폴백(`__roles`가 이미 수행) → 그것도 실패하면 첫 카테고리.
 const ENT_CAT = cfg.__roles.entity || CATEGORIES[0]; // 역할 선언 우선(SPEC-001 FR-010)
 
 // 고유 FR-ID 수 — 문법은 config의 requirementIdPrefixes에서 파생(coverage와 동일 사이트 통일).
@@ -73,7 +74,7 @@ if (violations.length) {
   console.log(`${tag} 과대 spec(분할 권고) ${violations.length}건:`);
   for (const v of violations) {
     if (v.kind.includes("aggregate"))
-      console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} — 여러 aggregate 삼킴 의심 → capability별 분할 검토`);
+      console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 \`이름 (relation-type)\`으로 이관(SPEC-017), 그래도 남으면 분할 검토`);
     else
       console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} → capability별 분할 검토`);
   }

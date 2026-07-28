@@ -120,6 +120,7 @@ const files = specFiles();
 const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
 const missing = [], formatIssues = [];
 const specDeps = []; // {specId, entities:[{name,type}]} — 관계 판정용(SPEC-017)
+let relStructCount = 0, relFreeCount = 0; // 관계 판정 발화량(침묵 표면화용)
 let declaredCount = 0;
 
 for (const file of files) {
@@ -165,8 +166,13 @@ for (const file of files) {
   // `EntityName (relation-type)` 항목만 구조화 관계로 뽑아 SPEC-017 판정에 넘긴다 — 괄호 없는
   // 레거시 자유참조는 여기서도 관여하지 않는다(하위호환, 관여 없음 = 무해).
   const deps = parseSection(text, "Dependencies", CATEGORIES);
-  const relEntities = (deps[ENT_CAT] || []).map(parseRelationEntry).filter((e) => e.type);
+  const relParsed = (deps[ENT_CAT] || []).map(parseRelationEntry);
+  const relEntities = relParsed.filter((e) => e.type);
   if (relEntities.length) specDeps.push({ specId, entities: relEntities });
+  // 자유참조(타입 없는 항목) 집계 — 관계 판정(SPEC-017)은 구조화 관계에만 발화하므로,
+  // 전부 자유참조인 레포에서는 대상 실재 검증이 **한 번도 돌지 않는다**. 그 침묵을 표면화한다.
+  relFreeCount += relParsed.length - relEntities.length;
+  relStructCount += relEntities.length;
 }
 
 // 충돌(같은 키를 2+ spec이 소유) 수집
@@ -374,6 +380,12 @@ if (SR_POLICY === "hard" && SR_INERT.length) {
   process.exit(1);
 }
 
+// 관계 판정이 한 번도 발화하지 않은 상태를 표면화 — Dependencies는 쓰는데 전부 자유참조면
+// SPEC-017의 대상 실재 검증(FR-002)·순환 탐지가 **아무것도 보지 않는다**(실측: 소비 프로젝트
+// 두 곳이 구조화 0건 · 자유참조 101건). 침묵은 근거가 아니므로 수치로 적는다.
+if (relStructCount === 0 && relFreeCount > 0) {
+  console.log(`· Entity 관계(SPEC-017): 판정 0건 — Dependencies 참조 ${relFreeCount}건이 전부 자유참조(타입 없음)라 대상 실재 검증·순환 탐지가 발화하지 않았다. \`이름 (relation-type)\` 형식으로 적으면 판정 대상이 된다`);
+}
 for (const c of relationCycles) console.log(`⚠ 관계 순환 참조: ${c.join(" → ")} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)`);
 if (relationErrors.length) {
   console.error(`\n✗ Entity 관계(SPEC-017) 위반 ${relationErrors.length}건:`);

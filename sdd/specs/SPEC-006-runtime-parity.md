@@ -134,3 +134,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-28 | Python 미러 — `cmd_testrun`이 러너 stdout을 부모 stderr로 리다이렉트(`stdout=sys.stderr`), 판정 줄만 stdout. 실측 대조: 러너가 `⚠`를 내도 Node·Python 양판 stdout이 판정 한 줄로 바이트 동일 | SPEC-021 FR-002 동반(감사 #21 M-8) — 게이트 stdout이 판정의 정본이라는 하네스 계약을 양판 모두 지켜야 한다. 한쪽만 고치면 `--gate=py` 프로젝트에서 green이 계속 ⚠로 읽힌다 |
 | 2026-07-28 | Python 포트에 두 문법 미러 — `spec_slug`·`spec_slug_source_declared`·`symbol_reality_*`·`is_file_like_surface` 추가, `schema_backing_findings`에 `slug_by_spec` 파라미터, `cmd_ownership`에 심볼 실재 판정 배선 | SPEC-029 도입에 따른 패리티 유지(SPEC-006 계약). 검증: `check-ownership` stdout·stderr·exit 바이트 동일 |
 | 2026-07-28 | Python 포트 `_backtick_key_findings`에 entity 제외 미러 | SPEC-023 FR-006 축소에 따른 패리티 유지(SPEC-006 계약). consistency stdout 바이트 동일 확인 |
+| 2026-07-28 | Python 포트에 관계 침묵 표면화 + cohesion 처방 문구 미러 | 패리티 유지(SPEC-006 계약) — ownership·cohesion stdout 바이트 동일 확인 |

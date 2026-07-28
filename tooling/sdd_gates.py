@@ -935,6 +935,7 @@ def cmd_ownership(cfg, strict):
     owners = {c: {} for c in categories}
     missing, format_issues = [], []
     spec_deps = []  # (spec_id, [(name, type), ...]) — 관계 판정용(SPEC-017)
+    rel_struct_count = rel_free_count = 0  # 관계 판정 발화량(침묵 표면화용)
     declared = 0
     for file in files:
         text = read_text(file)
@@ -968,10 +969,13 @@ def cmd_ownership(cfg, strict):
         # Dependencies 섹션은 참조일 뿐 dedup 대상이 아님(파싱만, 거짓양성 방지).
         # `Name (relation-type)` 항목만 구조화 관계로 뽑는다 — 레거시 자유참조는 관여 안 함.
         deps = parse_section(text, "Dependencies", categories)
-        rel_entities = [parse_relation_entry(raw) for raw in deps.get(ent_cat, [])]
-        rel_entities = [(e["name"], e["type"]) for e in rel_entities if e["type"]]
+        rel_parsed = [parse_relation_entry(raw) for raw in deps.get(ent_cat, [])]
+        rel_entities = [(e["name"], e["type"]) for e in rel_parsed if e["type"]]
         if rel_entities:
             spec_deps.append((spec_id, rel_entities))
+        # 관계 판정 발화량 — 전부 자유참조면 SPEC-017이 아무것도 보지 않는다(침묵 표면화).
+        rel_struct_count += len(rel_entities)
+        rel_free_count += len(rel_parsed) - len(rel_entities)
 
     conflicts = []
     for cat in categories:
@@ -1150,6 +1154,9 @@ def cmd_ownership(cfg, strict):
               file=sys.stderr)
         sys.exit(1)
 
+    # 관계 판정이 한 번도 발화하지 않은 상태를 표면화(Node판 미러) — 침묵은 근거가 아니다.
+    if rel_struct_count == 0 and rel_free_count > 0:
+        print(f"· Entity 관계(SPEC-017): 판정 0건 — Dependencies 참조 {rel_free_count}건이 전부 자유참조(타입 없음)라 대상 실재 검증·순환 탐지가 발화하지 않았다. `이름 (relation-type)` 형식으로 적으면 판정 대상이 된다")
     for c in relation_cycles:
         print(f"⚠ 관계 순환 참조: {' → '.join(c)} — aggregate 간 참조는 한 방향이어야 한다(설계 검토)")
     if relation_errors:
@@ -1205,7 +1212,7 @@ def cmd_cohesion(cfg, strict):
         print(f"{tag} 과대 spec(분할 권고) {len(violations)}건:")
         for spec_id, kind, n, mx in violations:
             if "aggregate" in kind:
-                print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} — 여러 aggregate 삼킴 의심 → capability별 분할 검토")
+                print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 `이름 (relation-type)`으로 이관(SPEC-017), 그래도 남으면 분할 검토")
             else:
                 print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} → capability별 분할 검토")
         if strict:
