@@ -4,10 +4,11 @@
 // 같은 changeset(브랜치=staged ∪ base...HEAD, §5.8)에 있어야 한다.
 // 모드: --staged --message-file <p> = hard(exit 1, commit-msg 훅) / [base] = range advisory(exit 0).
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { loadConfig, configFromString } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
-import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange } from "./spec-sync-lib.mjs";
+import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange, filesLineMissingPaths } from "./spec-sync-lib.mjs";
 import { parseStatus, canLeadCode } from "./lifecycle-lib.mjs";
 import { escalations } from "./drift-lib.mjs";
 import { parseDrivers, relaxingDrivers } from "./cross-spec-lib.mjs";
@@ -80,6 +81,7 @@ const specPaths = new Set([
 ].filter((p) => p.endsWith(".md")));
 const specs = []; // {id, path, globs[], deletedInIndex}
 const warnedGlobSpec = new Set(); // track warned spec ids to dedupe per-spec
+let filesMissingHard = false;   // Files 리터럴 경로 부재(staged=hard)
 for (const p of specPaths) {
   const idx = shOk(`git show :${p}`);
   const head = shOk(`git show HEAD:${p}`);
@@ -101,6 +103,17 @@ for (const p of specPaths) {
     parseSection(src, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).forEach((g) => globs.add(g));
   }
   specs.push({ id, path: p, globs: [...globs].map((g) => ({ g, re: compileGlob(g) })), deletedInIndex: idx === null && head !== null, status: parseStatus(text) });
+
+  // Files의 리터럴 경로 실재(SPEC-013) — 없는 경로는 아무 변경 파일과도 매치하지 않아
+  // **소유가 조용히 사라진다**. 글롭 문법 위반과 같은 계열이라 같은 강도로 다룬다
+  // (staged=✗ hard / range=⚠). 삭제 중 스펙은 제외(수명 종료 경로).
+  if (!(idx === null && head !== null)) {
+    const missing = filesLineMissingPaths([...globs], (rel) => existsSync(join(cfg.__root, rel)));
+    if (missing.length) {
+      console.log(`${STAGED ? "✗" : "⚠"} [${id}] Files 리터럴 경로 부재 ${missing.join(" ")} — 그 경로는 어떤 변경 파일과도 매치하지 않으므로 이 스펙의 소유가 조용히 사라진다(리네임됐으면 스펙을 실물 이름에 맞춰라)`);
+      if (STAGED) filesMissingHard = true;
+    }
+  }
 }
 
 // ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
@@ -228,6 +241,11 @@ if (unownedHard && !violations.length) {
 const globHard = STAGED && warnedGlobSpec.size > 0;
 if (globHard && !violations.length) {
   console.error(`\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).`);
+  process.exit(1);
+}
+// Files 리터럴 경로 부재도 같은 계열의 "소유가 조용히 풀림"이라 같은 강도로 차단한다.
+if (filesMissingHard && !violations.length) {
+  console.error(`\n✗ Files 리터럴 경로 부재: 존재하지 않는 경로는 어떤 변경 파일과도 매치하지 않는다 — 스펙을 실물 경로에 맞추거나(리네임 반영) 그 항목을 지워라.`);
   process.exit(1);
 }
 // semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.

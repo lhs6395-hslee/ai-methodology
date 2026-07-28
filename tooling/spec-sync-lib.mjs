@@ -14,6 +14,29 @@ export function compileGlob(glob) {
   return new RegExp(`^${re}$`);
 }
 
+// `Ownership.Files`의 **리터럴 경로**(글롭 메타문자 없음)는 실재해야 한다 — 순수 코어.
+//
+// 왜: 존재하지 않는 경로는 어떤 변경 파일과도 매치하지 않으므로 **그 스펙의 소유가 조용히
+// 사라진다.** spec-first 강제가 그 파일에 발화하지 않고 게이트 출력에 신호도 없다.
+// 실측(소비 프로젝트 finops): SPEC-015가 `iac_action/audit_store.py`를 소유 선언했는데 실제
+// 모듈은 `store.py`였다 — 리네임 후 스펙만 안 따라온 드리프트가 소유권 상실로 조용히 남았다.
+// `symbolRealityPolicy`(SPEC-029)는 `Surfaces`의 파일형 키만 보므로 `Files`는 사각지대였다.
+//
+// 글롭(`*`·`?`·`{}` 포함)은 대상에서 뺀다 — 오늘 0건 매치가 정당할 수 있다(아직 안 만든
+// 디렉토리). 리터럴 경로엔 그런 정당성이 없다: 지금 없으면 지금 틀린 것이다.
+// exists: (relPath) => boolean 를 주입받는다(파일 IO는 소비 게이트가 한다).
+export function filesLineMissingPaths(tokens, exists) {
+  const out = [];
+  for (const raw of tokens || []) {
+    const t = String(raw || "").trim();
+    if (!t || t === "—" || t === "-") continue;
+    if (/[*?{}]/.test(t)) continue;              // 글롭·패턴은 실재 판정 대상 아님
+    if (t.startsWith("[")) continue;             // placeholder 토큰
+    if (!exists(t)) out.push(t);
+  }
+  return out;
+}
+
 // §4.1: 원시 `- **Files**:` 라인에서 미지원 문법 스캔 — parseSection이 `[` 토큰을
 // placeholder로 조용히 버리기 전에 경고해야 하므로 반드시 원시 라인 기준.
 export function scanFilesLineIssues(rawLine) {

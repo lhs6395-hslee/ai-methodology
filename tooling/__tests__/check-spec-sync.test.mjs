@@ -128,6 +128,43 @@ test("exempt glob·미선언 파일: exempt → PASS+기록 / Files 미매치 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("Files 리터럴 경로 부재 → 소유가 조용히 풀리는 것을 차단(글롭은 대상 아님)", () => {
+  const { root, g } = repo();
+  try {
+    // 리터럴 경로 2개 중 1개만 실재 + 글롭 1개(0건 매치라도 정당)
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/parse.ts, src/lib/pdf/gone.ts, src/nope/**"));
+    mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.match(r.out, /Files 리터럴 경로 부재 src\/lib\/pdf\/gone\.ts/);
+    assert.doesNotMatch(r.out, /src\/nope/);       // 글롭은 실재 판정 대상 아님
+    assert.doesNotMatch(r.out, /parse\.ts.*부재/);  // 실재하는 리터럴은 지목 안 됨
+    assert.equal(r.code, 1);                        // staged=hard
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Files 리터럴 경로가 전부 실재하면 조용하다(오발동 없음)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts, src/lib/pdf/**"));
+    mkdirSync(join(root, "src/lib/pdf"), { recursive: true });
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "2\n");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/parse.ts, src/lib/pdf/**") + "\n| 2026-07-28 | x | y |\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.doesNotMatch(r.out, /리터럴 경로 부재/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("exempt가 소유를 덮으면 그 사실을 적는다 — 침묵 금지(소유권 무효화 가시화)", () => {
   const { root, g } = repo();
   try {
