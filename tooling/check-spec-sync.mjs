@@ -154,7 +154,20 @@ const matchGlob = (g, file) => {
 };
 for (const f of changed) {
   if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;      // 스펙 자신은 코드 아님
-  if (exempt.some((re) => re.test(f))) { console.log(`· exempt: ${f} (specSyncExemptGlobs — 영속 흔적 없음)`); continue; }
+  // exempt는 소유 판정보다 **먼저** 적용된다 — 이것은 의도된 기능이다: 소유 글롭이 과포함한
+  // 생성물·락파일을 좁히는 용도(`src/lib/pdf/**` 소유 + `src/lib/pdf/generated/**` 면제).
+  // 그러나 그 결과 **선언된 소유권이 조용히 무효화**될 수 있다 — 어느 스펙이 Files로 소유를
+  // 선언했는데 exempt가 덮으면, 그 스펙의 spec-first 강제가 그 파일에 대해 발화하지 않는다.
+  // 실측(소비 프로젝트 PM): `**/__tests__/**`가 면제돼 TEST-001이 26 FR로 소유한 테스트 37건 등
+  // 총 76건의 소유권이 무효였고, 게이트 출력만 보면 알 수 없었다.
+  // 침묵을 없앤다 — 덮는 것이 정당한지는 config 리뷰가 판단하고, 기계는 사실을 적는다.
+  if (exempt.some((re) => re.test(f))) {
+    const shadowed = specs.filter((s) => s.globs.some(({ re }) => re.test(f))).map((s) => s.id);
+    console.log(shadowed.length
+      ? `· exempt: ${f} (specSyncExemptGlobs) — ⚠ ${shadowed.join("+")}의 Files 소유를 덮는다: 그 스펙의 spec-first 강제가 이 파일에 발화하지 않는다(과포함 좁히기면 정당, 아니면 면제 목록에서 빼라)`
+      : `· exempt: ${f} (specSyncExemptGlobs — 미소유 파일의 선언된 탈출구)`);
+    continue;
+  }
   let owned = false;
   for (const s of specs) {
     if (!s.globs.some(({ re }) => re.test(f))) continue;

@@ -128,6 +128,31 @@ test("exempt glob·미선언 파일: exempt → PASS+기록 / Files 미매치 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("exempt가 소유를 덮으면 그 사실을 적는다 — 침묵 금지(소유권 무효화 가시화)", () => {
+  const { root, g } = repo();
+  try {
+    // 소유 글롭 src/lib/pdf/** 안의 generated/**를 면제 — 정당한 과포함 좁히기지만,
+    // 그 결과 SPEC-001의 소유가 그 파일에 대해 발화하지 않는다는 사실이 보여야 한다.
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncExemptGlobs: ["src/lib/pdf/generated/**", "unrelated/**"] }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    mkdirSync(join(root, "src/lib/pdf/generated"), { recursive: true });
+    mkdirSync(join(root, "unrelated"), { recursive: true });
+    writeFileSync(join(root, "src/lib/pdf/generated/out.ts"), "1\n");
+    writeFileSync(join(root, "unrelated/x.ts"), "1\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    writeFileSync(join(root, "src/lib/pdf/generated/out.ts"), "2\n");
+    writeFileSync(join(root, "unrelated/x.ts"), "2\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);                       // 강도 불변 — 여전히 통과
+    assert.match(r.out, /generated\/out\.ts.*SPEC-001의 Files 소유를 덮는다/);
+    // 소유하지 않는 면제 파일은 종전 문구(덮는 것이 없으므로 경고 없음)
+    assert.match(r.out, /unrelated\/x\.ts \(specSyncExemptGlobs — 미소유 파일의 선언된 탈출구\)/);
+    assert.doesNotMatch(r.out, /unrelated\/x\.ts.*덮는다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("스펙 삭제+소유 코드 변경 → 시끄럽게 PASS(HEAD∪index) / 다중 소유 AND", () => {
   const { root, g } = repo();
   try {
