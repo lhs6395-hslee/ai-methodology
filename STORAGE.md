@@ -24,6 +24,8 @@
 │  ├─ MODULE_MAP.md             # │  이 레포 단일 모듈 매니페스트(정체성+spec 인덱스)
 │  ├─ smoke-manifest.json       # │  (선택) FR 검증 회계 매니페스트 — requireAccounting/smoke-scan이 소비(SPEC-007/010)
 │  ├─ derivation.json           # │  (선택) 재도출 소스 회계 매니페스트 — readopt 시 9클래스 회계(SPEC-009)
+│  ├─ OWNERSHIP_MAP.md          # │  (생성물·손으로 고치지 않음) 소유 키별 보증 표 — 유일성·앵커·실재 칸을
+│  │                            # │  ✓/✗/면제/미판정으로. `gen-ownership-map.mjs`가 생성, `--check`로 드리프트 판정(SPEC-028)
 │  └─ specs/                    # │  spec = EARS FR + ## Ownership (1 spec = 1 파일)
 │     ├─ SPEC-001.md            # │
 │     └─ <PREFIX>-NNN.md        # │  다른 접두어는 config 등록 필수(§2.2)
@@ -101,7 +103,7 @@ sdd/specs/SPEC-001.md  ──(FR-001 선언)──►  tests/…  @covers SPEC-0
 | | 항목 |
 |---|---|
 | **레포에 저장 — 설계 문서(선택, 비정본)** | `docs/design/*.md`(브레인스토밍·설계 산출물 — 승인 후 `sdd/specs/`로 착지, 게이트 스캔 대상 아님, §2.7) |
-| **레포에 저장 — SDD 구역** | `sdd/specs/*` · `sdd/MODULE_MAP.md` · `.specify/…/constitution.md` · (회계 켜면) `sdd/smoke-manifest.json` · (readopt 시) `sdd/derivation.json` |
+| **레포에 저장 — SDD 구역** | `sdd/specs/*` · `sdd/MODULE_MAP.md` · `.specify/…/constitution.md` · (회계 켜면) `sdd/smoke-manifest.json` · (readopt 시) `sdd/derivation.json` · (생성물) `sdd/OWNERSHIP_MAP.md` |
 | **레포에 저장 — TDD 구역** | `src/*`(코드) · `tests/*`(테스트, `@covers`로 FR 연결) — 언어 관례 위치 |
 | **레포에 저장 — 배선** | `sdd.config.json` · 게이트 1판(`scripts/`) · CI/CD 설정 |
 | **키트에서 참조**(복사 X) | METHODOLOGY · STRUCTURE · SSOT · DEDUP · SPEC_REVIEW · principles · REALITY_CHECK · STORAGE |
