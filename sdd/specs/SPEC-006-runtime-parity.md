@@ -137,3 +137,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-28 | Python 포트에 관계 침묵 표면화 + cohesion 처방 문구 미러 | 패리티 유지(SPEC-006 계약) — ownership·cohesion stdout 바이트 동일 확인 |
 | 2026-07-28 | Python 포트 `cmd_ownership`의 관계 이름에 `normalize_key` 미러 | 패리티 유지(SPEC-006 계약) — ownership stdout 바이트 동일 확인 |
 | 2026-07-28 | Python 포트에 `symbol_candidates` 신설 + 실재 집합 3형태 미러 | 패리티 유지(SPEC-006 계약) — ownership stdout 바이트 동일 확인 |
+| 2026-07-28 | Python 포트 `_bare_key` 신설 + `_build_key_kind_map` 배선 | SPEC-023 키 추출 교정의 패리티 유지 — consistency stdout 바이트 동일 확인 |

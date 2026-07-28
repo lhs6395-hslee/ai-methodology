@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "../key-anchor-lib.mjs";
+import { bareKey, stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "../key-anchor-lib.mjs";
 
 const M = { entity: "E", surface: "S", capability: "C" };
 
@@ -228,4 +228,24 @@ test("게이트: 굵은 키에 카테고리 마커 없음 → advisory ⚠(exit 
       assert.doesNotMatch(r.out, /앵커되지 않음/);           // 전부 앵커됨 → FR-007 무발생
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+test("bareKey: 백틱·괄호 주석을 벗겨 키 본체만 — 앵커 구조적 불가 회귀(FR-003/005)", () => {
+  // 실측 형태(소비 프로젝트 PM SPEC-004 Dependencies): 백틱 + 비-ASCII 사유
+  assert.equal(bareKey("`pjt_salary_ranges` (spec-007 소유 — rank별 최소 월급 조회)"), "pjt_salary_ranges");
+  assert.equal(bareKey("pjt_projects (references)"), "pjt_projects");   // 관계 서픽스(종전에도 됐음)
+  assert.equal(bareKey("`thing`"), "thing");
+  // 사유 안에 괄호·백틱이 중첩돼도 첫 백틱 스팬이 키다(괄호 짝 세기로는 못 벗긴다)
+  assert.equal(bareKey("`pjt_projects.compute` (spec-001 소유 — `computeBudget()` 호출)"), "pjt_projects.compute");
+  assert.equal(bareKey("a (x) (y)"), "a");                              // 괄호 반복
+  assert.equal(bareKey("POST /api/x"), "post /api/x");                  // 괄호 없는 표면은 불변
+  assert.equal(bareKey("—"), "—");                                      // 플레이스홀더 유지
+  assert.equal(bareKey("aws eks 클러스터"), "aws eks 클러스터");           // 산문은 손대지 않음(선언 문제)
+  // 맵에 정상 키가 들어가 앵커가 매치된다(종전엔 통째 키라 미매치)
+  const km = buildKeyKindMap(
+    { Entities: ["thing"], Surfaces: [], Capabilities: [] },
+    { Entities: ["`pjt_salary_ranges` (spec-007 소유 — 조회)"], Surfaces: [], Capabilities: [] },
+    { entity: "Entities", surface: "Surfaces", capability: "Capabilities" });
+  assert.equal(km.get("pjt_salary_ranges"), "entity");
+  assert.ok(![...km.keys()].some((k) => k.includes("`") || k.includes("(")));
 });

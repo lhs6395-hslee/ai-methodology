@@ -66,6 +66,38 @@ export function buildKeySet(ownSections, depSections) {
   return keys;
 }
 
+// Ownership·Dependencies 항목에서 **키 본체만** 남긴다 — 앵커 대조의 좌변.
+//
+// 벗기는 것: ① 감싼 백틱 ② 뒤따르는 괄호 주석·관계 서픽스(내용 무관, 반복). 이 위치의
+// 괄호는 항상 주석 아니면 relation-type이다 — entity 식별자·`entity.verb`·`METHOD /path`
+// 어디에도 괄호가 없다.
+//
+// ⚠ 종전엔 `\([a-z][a-z0-9-]*\)$`(ASCII 소문자 kebab)만 벗겨서, **백틱이나 비-ASCII 사유를
+// 단 항목은 키 본체가 추출되지 않았다** — 그러면 그 키를 굵게 앵커해도 "소유·참조 키 아님"
+// 미매치가 되어 **앵커가 구조적으로 불가능**해진다. 실측(소비 프로젝트 PM SPEC-004):
+// `` `pjt_salary_ranges` (spec-007 소유 — rank별 최소 월급 조회) `` 형태 7건이 통째로 키가
+// 되어 `pjt_salary_ranges` 단독 키가 맵에 없었다. 킷 자기적용으로는 안 보였다 — 킷 스펙은
+// Dependencies에 백틱·한글 주석을 달지 않는다.
+//
+// ⚠ 이 교정은 오탐만 줄이는 것이 **아니다**. 맵에 정상 키가 늘면서, 그 키를 마커 없이 굵게
+// 쓴 FR이 이제 마커 위반으로 드러난다 — 종전엔 "키가 아님"으로 오분류돼 가려져 있던 **진짜
+// 위반**이다(실측: PM 마커 위반 9 → 17). 강도는 그대로이고 보이는 것만 늘어난다.
+//
+// 추출 규칙(결정적, 두 갈래):
+//   ① 항목이 백틱으로 시작하면 **첫 백틱 스팬의 내용**이 키다 — 사유 안에 괄호·백틱이
+//      중첩돼도(`` `x` (… `f()` …) ``) 안전하다. 괄호 짝 세기로는 이 형태를 못 벗긴다.
+//   ② 아니면 첫 ` (` 앞까지가 키다 — `pjt_projects (references)` 류.
+// 둘 다 아니면(산문을 그대로 적은 항목) 손대지 않는다 — 산문에서 키를 뽑는 것은 추측이고,
+// 그 항목은 어차피 앵커 대상이 될 수 없다(실측: 소비 프로젝트에 `aws eks 클러스터`처럼
+// 서술을 Dependencies에 적은 항목이 있다 — 그건 표기 문제가 아니라 선언 문제다).
+export function bareKey(raw) {
+  const s = String(raw ?? "").trim();
+  const tick = s.match(/^`([^`]+)`/);
+  if (tick) return tick[1].trim().toLowerCase();
+  const paren = s.split(/\s+\(/)[0];
+  return paren.trim().toLowerCase();
+}
+
 // 키 → 카테고리 종류(entity|surface|capability) 맵 — 마커 대조용. Ownership∪Dependencies에서
 // **역할이 해석된** 카테고리만(Files·역할 없는 카테고리 제외), 관계 서픽스 제거, 첫 등장 우선.
 // 역할은 config가 선언하고(ownershipCategoryRoles) 미선언 시 이름 정규식 폴백(SPEC-001 FR-010).
@@ -81,7 +113,7 @@ export function buildKeyKindMap(ownSections, depSections, roles = null) {
     ? (byRole.get(String(cat).trim().toLowerCase()) || null)
     : (/entit/i.test(cat) ? "entity" : /surface/i.test(cat) ? "surface" : /capabilit/i.test(cat) ? "capability" : null);
   const add = (raw, kind) => {
-    const k = String(raw).replace(/\s*\([a-z][a-z0-9-]*\)\s*$/, "").trim().toLowerCase();
+    const k = bareKey(raw);
     if (k && k !== "—" && k !== "-" && !map.has(k)) map.set(k, kind);
   };
   for (const sec of [ownSections, depSections]) {

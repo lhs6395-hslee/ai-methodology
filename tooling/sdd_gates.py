@@ -1769,6 +1769,20 @@ def _extract_anchors(line, req_alt="FR"):
     return [tok for tok, _ in _extract_anchors_with_markers(line, req_alt)]
 
 
+def _bare_key(raw):
+    """Ownership·Dependencies 항목에서 키 본체만 — Node판 bareKey 미러.
+
+    ① 백틱으로 시작하면 첫 백틱 스팬 내용이 키(사유 안 괄호·백틱 중첩에 안전).
+    ② 아니면 첫 " (" 앞까지가 키. 둘 다 아니면(산문) 손대지 않는다.
+    ⚠ 오탐만 줄이는 것이 아니다 — 가려져 있던 진짜 마커 위반이 드러난다(실측 PM 9→17).
+    """
+    s = str(raw if raw is not None else "").strip()
+    m = re.match(r"^`([^`]+)`", s)
+    if m:
+        return m.group(1).strip().lower()
+    return re.split(r"\s+\(", s)[0].strip().lower()
+
+
 def _build_key_kind_map(own_sections, dep_sections, roles=None):
     """키 → 종류(entity/surface/capability) 맵 — 마커 대조용. 관계 서픽스 제거, 첫 등장 우선.
     세 종류 카테고리가 하나도 없으면(킷 Modules 등) 빈 맵(inert)."""
@@ -1795,7 +1809,7 @@ def _build_key_kind_map(own_sections, dep_sections, roles=None):
             if not kind:
                 continue
             for raw in lst or []:
-                k = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip().lower()
+                k = _bare_key(raw)
                 if k and k not in ("—", "-") and k not in km:
                     km[k] = kind
     return km
