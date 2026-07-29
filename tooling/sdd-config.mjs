@@ -196,6 +196,16 @@ export const DEFAULTS = {
   // 스키마에 없지만 정당한 aggregate(외부 API 자원·이벤트 스트림 등) 면제: { "<entity>": "<사유>" }.
   // 빈 사유는 에러(entityRegistry 동형). 남용 방지 — 면제는 리뷰 관문.
   entitySchemaExemptEntities: {},
+  // Engines & Events 카테고리(SPEC-030) — 감사(#21) 전수성 구멍 봉합. 둘 다 옵트인(ownershipCategoryRoles로
+  // 카테고리에 "engine"/"event" 역할 선언 — 이름 폴백 없음). 미선언·소스 빈값이면 inert(하위호환).
+  // engine: 코드-모듈 SSOT(함수·클래스) 실재 대조 — [{globs, patterns:["정규식(캡처1=식별자)"]}].
+  enginesSources: [],
+  engineRealityPolicy: "off",               // off(기본)|advisory|hard. engine 역할 카테고리 있을 때만.
+  engineExemptKeys: {},                     // { "<engine키>": "<사유>" } 빈 사유 에러(entityRegistry 동형).
+  // event: 발신 entity 귀속(`entity.event-name`) + 이벤트 카탈로그 SSOT 실재 대조.
+  eventCatalogSources: [],
+  eventAttributionPolicy: "off",            // off(기본)|advisory|hard. event 역할 카테고리 있을 때만.
+  eventExemptKeys: {},                      // 카탈로그 실재 면제(귀속 면제는 아님) — 빈 사유 에러.
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

@@ -99,6 +99,12 @@ DEFAULTS = {
     "entitySchemaExemptEntities": {},
     "policyRatchetPolicy": "advisory",
     "policyRatchetExceptions": [],
+    "enginesSources": [],
+    "engineRealityPolicy": "off",
+    "engineExemptKeys": {},
+    "eventCatalogSources": [],
+    "eventAttributionPolicy": "off",
+    "eventExemptKeys": {},
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -697,7 +703,8 @@ def resolve_category_roles(categories, roles):
     선언 우선(대소문자 무관 카테고리 매칭) → 미선언 역할만 이름 정규식 폴백(하위호환).
     반환 {"entity":..., "surface":..., "capability":...} (각 카테고리명 or None)."""
     cats = categories or []
-    out = {"entity": None, "surface": None, "capability": None}
+    # engine·event(SPEC-030)는 선언 전용(이름 폴백 없음) — 옵트인이라 미선언 시 항상 inert.
+    out = {"entity": None, "surface": None, "capability": None, "engine": None, "event": None}
     for cat, role in (roles or {}).items():
         r = str(role or "").strip().lower()
         if r not in out:
@@ -815,6 +822,57 @@ def schema_backing_findings(owned_by_spec, schema_set, exempt_set, slug_by_spec=
             if slug and ent == slug:
                 continue
             findings.append((spec_id, ent))
+    return findings
+
+
+# ─── Engines & Events (SPEC-030) — engine-event-lib.mjs 미러 ───
+def role_active(policy, sources, role_cat):
+    return policy != "off" and isinstance(sources, list) and len(sources) > 0 and bool(role_cat)
+
+
+def role_inert_reasons(policy, sources, role_cat, sources_knob, role_name):
+    if policy == "off":
+        return []
+    reasons = []
+    if not isinstance(sources, list) or len(sources) == 0:
+        reasons.append(f"{sources_knob} 비어 있음({role_name} SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)")
+    if not role_cat:
+        reasons.append(f"{role_name} 역할 카테고리 미해석(ownershipCategoryRoles에 {role_name} 선언 없음 — engine/event는 선언 전용)")
+    return reasons
+
+
+def reality_findings(owned_by_spec, ssot_set, exempt_set):
+    findings = []
+    for spec_id, keys in owned_by_spec or []:
+        for raw in keys or []:
+            k = str(raw).strip().lower()
+            if not k or k in ("—", "-"):
+                continue
+            if k in ssot_set:
+                continue
+            if exempt_set and k in exempt_set:
+                continue
+            findings.append((spec_id, k))
+    return findings
+
+
+def split_event_key(raw):
+    s = str(raw).strip().lower()
+    i = s.find(".")
+    return (None, s) if i < 0 else (s[:i], s[i + 1:])
+
+
+def event_attribution_findings(owned_events_by_spec, owned_entities_by_spec):
+    findings = []
+    for spec_id, keys in owned_events_by_spec or []:
+        owned = set((owned_entities_by_spec or {}).get(spec_id) or [])
+        for raw in keys or []:
+            k = str(raw).strip().lower()
+            if not k or k in ("—", "-"):
+                continue
+            entity, _ = split_event_key(k)
+            if not entity or entity not in owned:
+                findings.append((spec_id, k, entity))
     return findings
 
 
@@ -2984,7 +3042,7 @@ def cmd_schemadrift(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -3038,6 +3096,119 @@ def cmd_ratchet(cfg, base_arg):
         print(f"\n⚠ {msg} (policyRatchetPolicy:advisory — 경고)")
         sys.exit(0)
     print("정책 래칫 게이트: OK — 강도 하향 없음.")
+    sys.exit(0)
+
+
+def _ee_ssot_set(cfg, sources):
+    ignore = set(cfg["ignoreDirs"])
+    all_files = []
+    for dirpath, dirnames, filenames in os.walk(cfg["__root"]):
+        dirnames[:] = sorted(d for d in dirnames if d not in ignore)
+        rel_dir = os.path.relpath(dirpath, cfg["__root"])
+        for name in sorted(filenames):
+            all_files.append(name if rel_dir == "." else f"{rel_dir}/{name}")
+    units = []
+    for src in sources or []:
+        globs = [compile_glob(g) for g in (src.get("globs") or [])]
+        patterns = src.get("patterns") or []
+        if not globs or not patterns:
+            continue
+        for rel in all_files:
+            if not any(rx.search(rel) for rx in globs):
+                continue
+            try:
+                with open(os.path.join(cfg["__root"], rel), encoding="utf-8") as fh:
+                    units.append({"text": fh.read(), "patterns": patterns})
+            except OSError:
+                pass
+    return extract_schema_entities(units)
+
+
+def _ee_exempt_set(mp, knob):
+    errs = [k for k, reason in (mp or {}).items() if not str(reason or "").strip()]
+    if errs:
+        print(f"✗ {knob} 빈 사유: {', '.join(errs)} — 면제는 사유 필수(entityRegistry 동형)", file=sys.stderr)
+        sys.exit(1)
+    return set(str(k).strip().lower() for k in (mp or {}).keys())
+
+
+def cmd_engineevent(cfg):
+    categories = cfg["ownershipCategories"]
+    roles = cfg["__roles"]
+    eng_policy = cfg.get("engineRealityPolicy") or "off"
+    ev_policy = cfg.get("eventAttributionPolicy") or "off"
+    for name, val in (("engineRealityPolicy", eng_policy), ("eventAttributionPolicy", ev_policy)):
+        if val not in ("off", "advisory", "hard"):
+            print(f'✗ {name} 값 위반 "{val}" — off|advisory|hard 중 하나', file=sys.stderr)
+            sys.exit(1)
+    if eng_policy == "off" and ev_policy == "off":
+        print("Engines/Events 게이트 — engineRealityPolicy·eventAttributionPolicy 모두 off (판정 안 함)")
+        sys.exit(0)
+    # 스펙별 소유 키 수집
+    units = []
+    for file in spec_md_files(cfg):
+        text = read_text(file)
+        m = cfg["__specId"].search(text)
+        spec_id = m.group(0) if m else os.path.basename(file)
+        units.append((spec_id, parse_section(text, "Ownership", categories)))
+    failed = False
+
+    if eng_policy != "off":
+        eng_cat = roles["engine"]
+        inert = role_inert_reasons(eng_policy, cfg.get("enginesSources"), eng_cat, "enginesSources", "engine")
+        if inert:
+            print(f"Engine 실재(engineRealityPolicy={eng_policy}): 판정 불가 — {' · '.join(inert)}")
+            if eng_policy == "hard":
+                print("\n✗ engineRealityPolicy=hard인데 무판정(거짓 안전) — enginesSources·engine 역할을 선언하거나 정책을 off로.", file=sys.stderr)
+                failed = True
+        else:
+            pat_errs = validate_schema_patterns(cfg.get("enginesSources"))
+            if pat_errs:
+                print(f"✗ enginesSources 잘못된 정규식: {', '.join(f'[{i}] {p}' for i, p in pat_errs)}", file=sys.stderr)
+                sys.exit(1)
+            ssot = _ee_ssot_set(cfg, cfg.get("enginesSources"))
+            exempt = _ee_exempt_set(cfg.get("engineExemptKeys"), "engineExemptKeys")
+            owned = [(sid, own.get(eng_cat) or []) for sid, own in units]
+            f = reality_findings(owned, ssot, exempt)
+            tag = "✗" if eng_policy == "hard" else "⚠"
+            print(f"Engine 실재(engineRealityPolicy={eng_policy}): 위반 {len(f)}건 — 소유 engine이 코드-모듈 SSOT에 없음")
+            for sid, key in f:
+                print(f'  {tag} {sid}: engine "{key}" — enginesSources에 실재하지 않음(코드-모듈로 실재시키거나 데이터 교정; 순수 로직이 아니면 entity/surface로 재분류)')
+            if f and eng_policy == "hard":
+                failed = True
+
+    if ev_policy != "off":
+        ev_cat = roles["event"]
+        ent_cat = roles["entity"]
+        inert = role_inert_reasons(ev_policy, cfg.get("eventCatalogSources"), ev_cat, "eventCatalogSources", "event")
+        if inert:
+            print(f"Event 귀속(eventAttributionPolicy={ev_policy}): 판정 불가 — {' · '.join(inert)}")
+            if ev_policy == "hard":
+                print("\n✗ eventAttributionPolicy=hard인데 무판정(거짓 안전) — eventCatalogSources·event 역할을 선언하거나 정책을 off로.", file=sys.stderr)
+                failed = True
+        else:
+            pat_errs = validate_schema_patterns(cfg.get("eventCatalogSources"))
+            if pat_errs:
+                print(f"✗ eventCatalogSources 잘못된 정규식: {', '.join(f'[{i}] {p}' for i, p in pat_errs)}", file=sys.stderr)
+                sys.exit(1)
+            catalog = _ee_ssot_set(cfg, cfg.get("eventCatalogSources"))
+            exempt = _ee_exempt_set(cfg.get("eventExemptKeys"), "eventExemptKeys")
+            owned_events = [(sid, own.get(ev_cat) or []) for sid, own in units]
+            owned_entities = {sid: [str(e).strip().lower() for e in ((own.get(ent_cat) or []) if ent_cat else [])] for sid, own in units}
+            attr = event_attribution_findings(owned_events, owned_entities)
+            real = reality_findings(owned_events, catalog, exempt)
+            tag = "✗" if ev_policy == "hard" else "⚠"
+            print(f"Event 귀속(eventAttributionPolicy={ev_policy}): 귀속 위반 {len(attr)}건, 카탈로그 실재 위반 {len(real)}건")
+            for sid, key, entity in attr:
+                print(f'  {tag} {sid}: event "{key}" — 발신 entity({entity or "없음"})를 이 스펙이 소유하지 않음. `entity.event-name` 형식으로 소유 entity에 귀속(capability 귀속 동형)')
+            for sid, key in real:
+                print(f'  {tag} {sid}: event "{key}" — eventCatalogSources에 실재하지 않음(이벤트 카탈로그에 등록하거나 데이터 교정)')
+            if (attr or real) and ev_policy == "hard":
+                failed = True
+
+    if failed:
+        sys.exit(1)
+    print("Engines/Events 게이트: OK.")
     sys.exit(0)
 
 
@@ -3102,6 +3273,8 @@ def main():
         cmd_schemadrift(cfg)
     elif sub == "ratchet":
         cmd_ratchet(cfg, positional[0] if positional else None)
+    elif sub == "engineevent":
+        cmd_engineevent(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

@@ -11,7 +11,9 @@
 // 이 파생을 한 곳에 두어 ENT_CAT 폴백이 3개 파일에 복붙돼 있던 것(감사 F8)을 없앤다.
 export function resolveCategoryRoles(categories, roles) {
   const cats = categories || [];
-  const out = { entity: null, surface: null, capability: null };
+  // engine·event(SPEC-030)는 **선언 전용**(이름 정규식 폴백 없음) — 옵트인이라 명시 선언 없으면
+  // 항상 inert(기존 프로젝트 무영향). entity/surface/capability만 이름 폴백을 유지한다.
+  const out = { entity: null, surface: null, capability: null, engine: null, event: null };
   for (const [cat, role] of Object.entries(roles || {})) {
     const r = String(role || "").trim().toLowerCase();
     if (!(r in out)) continue; // 미지의 역할은 무시 — 오타가 판정을 뒤집지 않게

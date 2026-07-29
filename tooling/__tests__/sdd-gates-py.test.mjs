@@ -8,6 +8,7 @@
 // @covers SPEC-008/FR-007
 // @covers SPEC-017/FR-001
 // @covers SPEC-027/FR-004
+// @covers SPEC-030/FR-002
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -1041,6 +1042,37 @@ test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·�
       const p = runPy(root, ["ratchet", base]);
       assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(curCfg)})`);
       assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(curCfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+// ── engineevent 게이트 패리티(SPEC-030) ──
+test("py engineevent: off·실재·유령·귀속·inert·미정의정책 — Node·Python 바이트 동일", skip, () => {
+  const eeCfg = {
+    ownershipCategories: ["Entities", "Engines", "Events"],
+    ownershipCategoryRoles: { Entities: "entity", Engines: "engine", Events: "event" },
+    enginesSources: [{ globs: ["src/*.js"], patterns: ["export function ([a-zA-Z0-9_]+)"] }],
+    eventCatalogSources: [{ globs: ["src/*.js"], patterns: ['emit\\("([a-zA-Z0-9_.]+)"'] }],
+  };
+  const okSpecs = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: order\n- **Engines**: priceRules\n- **Events**: order.created\n",
+    "sdd/specs/SPEC-002.md": "**Spec**: `SPEC-002`\n## Ownership\n- **Engines**: nonexist\n- **Events**: ghost.thing\n",
+    "src/logic.js": 'export function priceRules(){}\nemit("order.created");\n',
+  };
+  const scen = [
+    { ...eeCfg }, // 둘 다 off
+    { ...eeCfg, engineRealityPolicy: "hard", eventAttributionPolicy: "advisory" },
+    { ...eeCfg, engineRealityPolicy: "advisory", eventAttributionPolicy: "hard" },
+    { ...eeCfg, enginesSources: [], engineRealityPolicy: "hard" }, // inert 거짓안전
+    { ...eeCfg, engineRealityPolicy: "bogus" },                    // enum 밖
+  ];
+  for (const cfg of scen) {
+    const root = fixture(okSpecs, cfg);
+    try {
+      const n = runNode(root, "check-engine-event.mjs");
+      const p = runPy(root, ["engineevent"]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg.engineRealityPolicy)}/${JSON.stringify(cfg.eventAttributionPolicy)})`);
+      assert.equal(p.code, n.code, `exit 동일`);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

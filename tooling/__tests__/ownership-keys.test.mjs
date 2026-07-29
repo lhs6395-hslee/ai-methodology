@@ -85,27 +85,27 @@ test("resolveCategoryRoles: 선언이 이름을 이긴다(카테고리 이름 �
   // 킷 자신 — 이름 폴백은 전부 실패하지만 선언으로 역할이 확정된다(도그푸딩 공백의 해소 지점)
   assert.deepEqual(
     resolveCategoryRoles(["Modules", "Symbols", "Artifacts"], { Modules: "entity", Symbols: "surface" }),
-    { entity: "Modules", surface: "Symbols", capability: null });
+    { entity: "Modules", surface: "Symbols", capability: null, engine: null, event: null });
   // 개명해도 선언이 있으면 판정 유지(감사 A-1: 개명 한 줄로 hard가 무음 사망하던 자리)
   assert.deepEqual(
     resolveCategoryRoles(["Aggregates", "Routes", "Abilities"],
       { Aggregates: "entity", Routes: "surface", Abilities: "capability" }),
-    { entity: "Aggregates", surface: "Routes", capability: "Abilities" });
+    { entity: "Aggregates", surface: "Routes", capability: "Abilities", engine: null, event: null });
 });
 
 test("resolveCategoryRoles: 선언 없으면 이름 정규식 폴백(하위호환) / 매치 없으면 null", () => {
   assert.deepEqual(resolveCategoryRoles(["Entities", "Surfaces", "Capabilities"], {}),
-    { entity: "Entities", surface: "Surfaces", capability: "Capabilities" });
+    { entity: "Entities", surface: "Surfaces", capability: "Capabilities", engine: null, event: null });
   assert.deepEqual(resolveCategoryRoles(["Modules", "Symbols", "Artifacts"], {}),
-    { entity: null, surface: null, capability: null });
+    { entity: null, surface: null, capability: null, engine: null, event: null });
   assert.deepEqual(resolveCategoryRoles(["Datasets", "Jobs", "Sinks"], null),
-    { entity: null, surface: null, capability: null });
+    { entity: null, surface: null, capability: null, engine: null, event: null });
 });
 
 test("resolveCategoryRoles: 부분 선언은 나머지만 폴백 / 오타·중복·미실재는 무해", () => {
   // surface만 선언 → entity는 이름 폴백으로 채워진다
   assert.deepEqual(resolveCategoryRoles(["Entities", "Panels"], { Panels: "surface" }),
-    { entity: "Entities", surface: "Panels", capability: null });
+    { entity: "Entities", surface: "Panels", capability: null, engine: null, event: null });
   // 미지의 역할 문자열은 무시(오타가 판정을 뒤집지 않게)
   assert.equal(resolveCategoryRoles(["Modules"], { Modules: "entty" }).entity, null);
   // 한 역할에 둘 선언 → 선언 순 첫 매치

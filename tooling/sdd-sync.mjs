@@ -29,6 +29,9 @@ const RULES = [
   // R6(SPEC-027): 강제 정책 강도의 단조성 — knob 하향(회피)을 차단. policyRatchetPolicy가
   // off면 게이트가 스스로 no-op. base config 미조회(최초 채택)면 skip이라 비용 0.
   { rule: "R6 정책 래칫(강도 단조)", gates: ["check-policy-ratchet.mjs"] },
+  // R7(SPEC-030): Engines·Events 카테고리 — 전수성 구멍 봉합. 두 정책이 off(기본)면 게이트가
+  // 스스로 no-op라 비용 0(옵트인 — ownershipCategoryRoles로 engine/event 역할 선언 시 활성).
+  { rule: "R7 Engines·Events(전수성)", gates: ["check-engine-event.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
