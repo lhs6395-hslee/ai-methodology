@@ -59,6 +59,15 @@ for (const file of files) {
     const MAX_AGG = cfg.maxAggregateRootsPerSpec ?? 1;
     if (own[ENT_CAT] && own[ENT_CAT].length > MAX_AGG)
       violations.push({ specId, kind: `${ENT_CAT}(aggregate)`, n: own[ENT_CAT].length, max: MAX_AGG });
+    // 신규: aggregate root 최소 하한(owner #1 "entity 없이 묶임"). entity **역할**이 선언됐는데
+    // 키를 하나라도 소유하면서 그 칸이 비면 위반 — Surface/Capability만 번들한 'entity 없는 스펙'을
+    // 차단(MAX의 거울). 역할 미정의(순수 lib·entity 개념 없음)면 건너뜀(하위호환). 폴백 CATEGORIES[0] 아님.
+    const ENT_ROLE = cfg.__roles.entity;
+    if (ENT_ROLE) {
+      const ownsAny = CATEGORIES.some((c) => own[c] && own[c].length > 0);
+      if (ownsAny && (!own[ENT_ROLE] || own[ENT_ROLE].length === 0))
+        violations.push({ specId, kind: `${ENT_ROLE}(min)`, n: 0, max: 1 });
+    }
     // 기존: 카테고리별 키 > MAX_KEYS
     for (const cat of CATEGORIES) {
       if (own[cat].length > MAX_KEYS)
@@ -73,7 +82,9 @@ if (violations.length) {
   const tag = STRICT ? "✗" : "⚠";
   console.log(`${tag} 과대 spec(분할 권고) ${violations.length}건:`);
   for (const v of violations) {
-    if (v.kind.includes("aggregate"))
+    if (v.kind.includes("(min)"))
+      console.log(`  ${tag} ${v.specId}: aggregate root(${v.kind.replace("(min)", "")}) 0개 — 스펙은 entity(aggregate root)를 최소 1개 소유해야 한다(entity 없이 Surface/Capability만 번들 금지). entity를 소유하거나, 남의 entity 능력이면 그 소유 스펙으로 이관(SPEC-024)`);
+    else if (v.kind.includes("aggregate"))
       console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 \`이름 (relation-type)\`으로 이관(SPEC-017), 그래도 남으면 분할 검토`);
     else
       console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} → capability별 분할 검토`);

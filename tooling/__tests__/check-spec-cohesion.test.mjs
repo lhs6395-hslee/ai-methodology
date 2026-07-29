@@ -28,7 +28,7 @@ const CFG = { specDir: "sdd/specs", maxKeysPerCategoryPerSpec: 4, maxFRsPerSpec:
 test("응집된 spec(키·FR 기준 내) → 통과", () => {
   const dir = fixture(CFG, {
     "sdd/specs/SPEC-001.md":
-      "**Spec**: `SPEC-001`\n**FR-001** a\n**FR-002** b\n## Ownership\n- **Capabilities**: a.create, a.update\n",
+      "**Spec**: `SPEC-001`\n**FR-001** a\n**FR-002** b\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.create, a.update\n",
   });
   const r = run(dir);
   assert.equal(r.code, 0);
@@ -47,12 +47,32 @@ test("FR 과다(>8) → advisory(exit 0), strict 실패", () => {
 test("카테고리 키 과다(Capabilities 5>4) → advisory(exit 0), strict 실패", () => {
   const dir = fixture(CFG, {
     "sdd/specs/SPEC-001.md":
-      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Capabilities**: a.c, a.d, a.e, a.f, a.g\n",
+      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.c, a.d, a.e, a.f, a.g\n",
   });
   const warn = run(dir);
   assert.equal(warn.code, 0);
   assert.match(warn.out, /Capabilities/);
   assert.equal(run(dir, ["--strict"]).code, 1);
+});
+
+test("entity 역할 선언 + 키 소유하나 aggregate root 0개(Surface/Capability만 번들) → advisory, strict 실패 (owner #1)", () => {
+  const dir = fixture(CFG, {
+    "sdd/specs/SPEC-001.md":
+      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Surfaces**: GET /a\n- **Capabilities**: a.create\n",
+  });
+  const warn = run(dir);
+  assert.equal(warn.code, 0);
+  assert.match(warn.out, /aggregate root.*0개|entity.*최소 1개/);
+  assert.equal(run(dir, ["--strict"]).code, 1);
+});
+
+test("entity 역할 미선언(순수 lib 카테고리) → aggregate root 하한 inert(하위호환)", () => {
+  const dir = fixture(
+    { specDir: "sdd/specs", ownershipCategories: ["Widgets", "Gadgets"] },
+    { "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Widgets**: w1\n" });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /분할 권고 없음/); // entity 역할 없음 → 하한 미발화
 });
 
 test("Ownership Entities 2개+ = aggregate 다수 분할 신호(advisory)", () => {

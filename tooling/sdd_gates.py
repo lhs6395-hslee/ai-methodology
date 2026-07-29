@@ -1225,6 +1225,13 @@ def cmd_cohesion(cfg, strict):
             own = parse_section(text, "Ownership", categories)
             if own.get(ent_cat) and len(own[ent_cat]) > max_agg:
                 violations.append((spec_id, f"{ent_cat}(aggregate)", len(own[ent_cat]), max_agg))
+            # 신규: aggregate root 최소 하한(owner #1 "entity 없이 묶임"). entity 역할이 선언됐는데
+            # 키를 하나라도 소유하면서 그 칸이 비면 위반 — MAX의 거울. 역할 미정의면 건너뜀(하위호환).
+            ent_role = roles["entity"]
+            if ent_role:
+                owns_any = any(own.get(c) for c in categories)
+                if owns_any and not own.get(ent_role):
+                    violations.append((spec_id, f"{ent_role}(min)", 0, 1))
             for cat in categories:
                 if len(own[cat]) > max_keys:
                     violations.append((spec_id, cat, len(own[cat]), max_keys))
@@ -1234,7 +1241,9 @@ def cmd_cohesion(cfg, strict):
         tag = "✗" if strict else "⚠"
         print(f"{tag} 과대 spec(분할 권고) {len(violations)}건:")
         for spec_id, kind, n, mx in violations:
-            if "aggregate" in kind:
+            if "(min)" in kind:
+                print(f"  {tag} {spec_id}: aggregate root({kind.replace('(min)', '')}) 0개 — 스펙은 entity(aggregate root)를 최소 1개 소유해야 한다(entity 없이 Surface/Capability만 번들 금지). entity를 소유하거나, 남의 entity 능력이면 그 소유 스펙으로 이관(SPEC-024)")
+            elif "aggregate" in kind:
                 print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 `이름 (relation-type)`으로 이관(SPEC-017), 그래도 남으면 분할 검토")
             else:
                 print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} → capability별 분할 검토")
