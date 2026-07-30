@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ownership Key 모델 — 역할 기반 5분류</title>
+<style>
+  *{box-sizing:border-box}
+  :root{
+    --paper:#f4f6fc; --surface:#fff; --ink:#171f3a; --muted:#5a6489; --line:#e1e4f1;
+    --entity:#3a57d6; --surface-c:#0a946c; --cap:#e2620a; --engine:#8b3fd6; --event:#d6336c;
+    --good:#0a946c; --bad:#d6336c;
+    --mono:"SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+    --sans:"Apple SD Gothic Neo","Pretendard","Noto Sans KR",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --maxw:920px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{--paper:#0e1120;--surface:#161b30;--ink:#e8ebf7;--muted:#9aa3c7;--line:#2a3150}
+  }
+  :root[data-theme="dark"]{--paper:#0e1120;--surface:#161b30;--ink:#e8ebf7;--muted:#9aa3c7;--line:#2a3150}
+  :root[data-theme="light"]{--paper:#f4f6fc;--surface:#fff;--ink:#171f3a;--muted:#5a6489;--line:#e1e4f1}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.65;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px 96px}
+  header.hero{padding:88px 20px 56px;text-align:center;position:relative;overflow:hidden}
+  .hero h1{font-size:clamp(28px,5vw,44px);margin:0 0 12px;letter-spacing:-.02em;
+    opacity:0;transform:translateY(16px);animation:rise .7s .05s cubic-bezier(.2,.7,.3,1) forwards}
+  .hero p{color:var(--muted);max-width:640px;margin:0 auto;font-size:17px;
+    opacity:0;transform:translateY(16px);animation:rise .7s .18s cubic-bezier(.2,.7,.3,1) forwards}
+  .hero .glow{position:absolute;inset:-40% 0 auto;height:340px;pointer-events:none;
+    background:radial-gradient(closest-side,rgba(58,87,214,.16),transparent);
+    animation:drift 9s ease-in-out infinite alternate}
+  @keyframes drift{from{transform:translateX(-12%)}to{transform:translateX(12%)}}
+  @keyframes rise{to{opacity:1;transform:none}}
+  h2{font-size:23px;margin:56px 0 14px;letter-spacing:-.01em}
+  h2 .n{color:var(--entity);font-variant-numeric:tabular-nums;margin-right:10px}
+  p,li{color:var(--ink)}.muted{color:var(--muted)}
+  code{font-family:var(--mono);background:color-mix(in srgb,var(--entity) 10%,transparent);
+    padding:1px 6px;border-radius:5px;font-size:.9em}
+  .reveal{opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
+  .reveal.in{opacity:1;transform:none}
+  .cards{display:grid;gap:14px;margin:22px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c,var(--entity));
+    border-radius:12px;padding:16px 18px;transition:transform .25s,box-shadow .25s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 10px 30px -12px rgba(30,40,90,.35)}
+  .card h3{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:9px}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--c,var(--entity));flex:none;
+    box-shadow:0 0 0 0 var(--c);animation:pulse 2.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}
+    70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .card .fmt{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .card .inv{margin:8px 0 0;font-size:14px}
+  .card .spec{font-size:11.5px;color:var(--muted);margin-top:6px}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:color-mix(in srgb,var(--entity) 8%,var(--surface));font-weight:600}
+  tr:last-child td{border-bottom:0}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;
+    color:#fff;background:var(--c,var(--entity))}
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0;justify-content:center}
+  .flow .node{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 13px;
+    font-size:13px;font-family:var(--mono);opacity:0;transform:scale(.9);transition:.5s}
+  .flow.in .node{opacity:1;transform:none}
+  .flow.in .node:nth-child(2){transition-delay:.12s}.flow.in .node:nth-child(3){transition-delay:.24s}
+  .flow.in .node:nth-child(4){transition-delay:.36s}.flow.in .node:nth-child(5){transition-delay:.48s}
+  .arrow{color:var(--muted);font-size:18px}
+  .callout{background:color-mix(in srgb,var(--good) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--good) 30%,var(--line));
+    border-radius:12px;padding:14px 18px;margin:18px 0}
+  .callout.warn{background:color-mix(in srgb,var(--bad) 7%,var(--surface));border-color:color-mix(in srgb,var(--bad) 30%,var(--line))}
+  .callout b{color:var(--good)}.callout.warn b{color:var(--bad)}
+  .foot{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+    .reveal,.hero h1,.hero p,.flow .node{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="glow"></div>
+  <h1>Ownership Key — 역할 기반 5분류</h1>
+  <p>스펙 간 기능 중복을 <b>예외 없이</b> 막기 위한 소유권 키 모델. 이름이 아니라 <b>역할(role)</b>로 판정하고, 역할마다 <b>실재·귀속 불변식</b>을 강제한다. (SDD 방법론 감사 #21 반영 — 정본: <code>DEDUP.md §3.5</code>)</p>
+</header>
+<div class="wrap">
+
+  <h2><span class="n">1</span>왜 역할(role)인가</h2>
+  <p class="reveal">각 스펙은 <code>## Ownership</code>에 <b>자신만 소유한 키</b>를 선언한다. 한 키는 정확히 한 스펙 — 둘이 같은 키를 소유하면 <b>구조적 중복</b>(결정적 게이트가 <code>exit 1</code>).</p>
+  <p class="reveal">과거엔 판정이 카테고리 <b>이름</b>(<code>/entit/</code> 정규식)에 걸려 있어, 이름을 <code>Entities→Aggregates</code>로 바꾸는 한 줄이면 강제가 조용히 죽었다(감사 A-1). 이제는 config <code>ownershipCategoryRoles</code>로 <b>역할을 선언</b>하고 모든 판정이 그 역할에 걸린다 — 이름은 자유롭고(웹 <code>Entities</code>, 킷 <code>Modules</code>), 킷 자신도 규칙을 자기에게 적용한다(도그푸딩 공백 해소, SPEC-001 FR-010).</p>
+  <div class="flow reveal">
+    <span class="node">카테고리 이름(자유)</span><span class="arrow">→</span>
+    <span class="node">ownershipCategoryRoles</span><span class="arrow">→</span>
+    <span class="node">역할(entity·surface·capability·engine·event)</span><span class="arrow">→</span>
+    <span class="node">역할별 불변식 강제</span>
+  </div>
+
+  <h2><span class="n">2</span>다섯 역할과 불변식</h2>
+  <p class="reveal">모든 소유 키는 <b>무슨 역할인지</b> + <b>그 역할의 SSOT로 뒷받침되는지</b>가 강제된다.</p>
+  <div class="cards">
+    <div class="card reveal" style="--c:var(--entity)">
+      <h3><span class="dot"></span>entity <span class="muted">— aggregate root</span></h3>
+      <div class="fmt">키: 스키마 식별자 그대로 (예: <code>pjt_projects</code>)</div>
+      <div class="inv">구조 SSOT(스키마·마이그레이션)에 <b>실재</b> + <code>entityRegistry</code> 등록 + <b>스펙당 최소 1개</b>(entity 없는 번들 금지) + <code>maxAggregateRootsPerSpec</code> 이하.</div>
+      <div class="spec">SPEC-026 스키마 백킹 · SPEC-002 입도 하한/상한</div>
+    </div>
+    <div class="card reveal" style="--c:var(--surface-c)">
+      <h3><span class="dot"></span>surface <span class="muted">— route·화면</span></h3>
+      <div class="fmt">키: <code>&lt;METHOD&gt; &lt;path&gt;</code> (예: <code>POST /api/pjt</code>)</div>
+      <div class="inv">파일형 심볼은 소스 루트에 <b>정방향 실재</b>(orphan 역방향 판정의 짝).</div>
+      <div class="spec">SPEC-029 심볼 실재</div>
+    </div>
+    <div class="card reveal" style="--c:var(--cap)">
+      <h3><span class="dot"></span>capability</h3>
+      <div class="fmt">키: <code>entity.verb</code> (예: <code>pjt_projects.create</code>)</div>
+      <div class="inv">verb의 <b>entity 조각을 그 스펙이 소유</b>해야 함(귀속). cohesion 캡은 <b>entity별</b>로 카운트 — full-CRUD가 거짓 분할 신호를 받지 않게.</div>
+      <div class="spec">SPEC-024 귀속 · SPEC-002 entity별 캡</div>
+    </div>
+    <div class="card reveal" style="--c:var(--engine)">
+      <h3><span class="dot"></span>engine <span class="muted">— 순수 로직 (신규)</span></h3>
+      <div class="fmt">키: 모듈 식별자 (예: <code>priceRules</code>)</div>
+      <div class="inv">코드-모듈 SSOT(<code>enginesSources</code>)에 <b>실재</b>. capability 소유 금지(능력은 entity에 귀속).</div>
+      <div class="spec">SPEC-030 (옵트인)</div>
+    </div>
+    <div class="card reveal" style="--c:var(--event)">
+      <h3><span class="dot"></span>event <span class="muted">— 신호·job (신규)</span></h3>
+      <div class="fmt">키: <code>entity.event-name</code> (예: <code>order.created</code>)</div>
+      <div class="inv">발신 <b>entity에 귀속</b> + 이벤트 카탈로그(<code>eventCatalogSources</code>)에 <b>실재</b>. <code>job:</code>를 무검증 Surface로 개명하던 우회를 봉합.</div>
+      <div class="spec">SPEC-030 (옵트인)</div>
+    </div>
+  </div>
+  <p class="muted reveal">engine·event는 <b>옵트인</b>(역할 선언 전용·이름 폴백 없음) — 미선언 프로젝트는 무영향. 참조(읽기/호출만)하는 남의 entity는 <code>## Dependencies</code>에 <code>EntityName (relation-type)</code>로 두어 dedup에서 제외한다(SPEC-017).</p>
+
+  <h2><span class="n">3</span>"중복·과분류·예외 없이"의 실제 장치</h2>
+  <table class="reveal">
+    <tr><th>목표</th><th>담당 장치</th><th>한계</th></tr>
+    <tr><td><span class="pill" style="--c:var(--entity)">중복 없이</span></td>
+      <td>dedup 키 유일성(역할·카테고리 내, <code>check-ownership</code>)</td>
+      <td>의미적(동의어 <code>order</code>/<code>orders</code>) 중복은 확률적 리뷰 몫</td></tr>
+    <tr><td><span class="pill" style="--c:var(--cap)">과분류 없이</span></td>
+      <td>실재 불변식(스키마·심볼·모듈·카탈로그)이 유령·억지 분류 차단 + engine/event가 전수성 구멍을 담음</td>
+      <td>다부모 개념은 relation 참조로 표현(단일 트리로 접지 않음)</td></tr>
+    <tr><td><span class="pill" style="--c:var(--event)">예외 없이</span></td>
+      <td>강도 knob <b>하향 불가</b>(단조 증가, SPEC-027 래칫 — 자기 포함). 면제는 사유 필수 + 매 실행 부채 표면화</td>
+      <td>hard 전면화 속도는 프로젝트별 graduation</td></tr>
+  </table>
+  <div class="callout reveal"><b>예외 없이 = 하향 불가.</b> 위반이 대량으로 떠도 정책 강도를 <code>hard→advisory</code>로 내려 회피할 수 없다. <code>off</code>·<code>advisory</code>는 마이그레이션 중 <b>경유지</b>일 뿐 종착지는 <code>hard</code>. 신규 채택은 hard로 태어나되, 기존 프로젝트의 소급 범람만 graduation으로 완충한다(범람 회피가 목적이지 예외가 아님).</div>
+  <div class="callout warn reveal"><b>정직한 잔여 한계.</b> ① 말만 바꾼(reworded) 의미적 중복은 결정적 게이트로 못 잡는다 — 같은 entity 이웃 스펙 좁힌 리뷰(<code>## Dedup-Review</code>)로 보조. ② 다부모(한 개념이 두 aggregate 소속)는 relation 참조. ③ hard 전면 강제는 채택 속도에 달려 있다.</div>
+
+  <h2><span class="n">4</span>키트 반영 위치</h2>
+  <div class="cards reveal">
+    <div class="card" style="--c:var(--entity)"><div class="fmt">tooling/ownership-keys.mjs · sdd.config.json</div><div class="inv">역할 해석(<code>resolveCategoryRoles</code>) · <code>ownershipCategoryRoles</code> 선언</div></div>
+    <div class="card" style="--c:var(--surface-c)"><div class="fmt">check-ownership.mjs · check-spec-cohesion.mjs</div><div class="inv">dedup 유일성 · 입도(하한·상한·entity별 캡)</div></div>
+    <div class="card" style="--c:var(--cap)"><div class="fmt">capability-ownership-lib · schema-backing-lib · ownership-reality-lib · engine-event-lib</div><div class="inv">귀속(SPEC-024) · 스키마 실재(SPEC-026) · 심볼 실재(SPEC-029) · engine/event(SPEC-030) 판정 코어</div></div>
+    <div class="card" style="--c:var(--engine)"><div class="fmt">policy-ratchet-lib · check-policy-ratchet.mjs</div><div class="inv">강도 단조성(하향 회피 차단, SPEC-027)</div></div>
+  </div>
+  <p class="muted reveal">모든 게이트는 Node·Python 바이트 패리티. 판정은 자연어 없이 grep·집합 대조만(결정적) — 그래서 CI에서 <code>exit 1</code>로 강제된다.</p>
+
+  <div class="foot">SDD 방법론 · Ownership Key 모델 (역할 기반 5분류). 정본 문서: <code>DEDUP.md</code> · 전체 방법론: <code>방법론.html</code> · 감사 기록: <code>docs/ownership-taxonomy-audit.md</code>.</div>
+</div>
+<script>
+  const io=new IntersectionObserver((es)=>{for(const e of es)if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}},{threshold:.15});
+  for(const el of document.querySelectorAll('.reveal,.flow'))io.observe(el);
+</script>
+</body>
+</html>

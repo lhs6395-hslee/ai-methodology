@@ -1,13 +1,13 @@
 # SDD 포터블 키트 (범용)
 
-> 📐 **시각 설명서:** [`방법론.html`](방법론.html) — 방법론 전체를 다이어그램으로 설명; 결정성 게이트(키 도출·PREFIX·1 spec=1 aggregate)·강제 hook 세트·채택 후 궤도 운영법 포함. 브라우저로 직접 열어 본다(웹 배포용 진입점 아님 — 그래서 `index.html`이 아니라 `방법론.html`).
+> 📐 **시각 설명서:** [`방법론.html`](docs/방법론.html) — 방법론 전체를 다이어그램으로 설명; 결정성 게이트(키 도출·PREFIX·1 spec=1 aggregate)·강제 hook 세트·채택 후 궤도 운영법 포함. 브라우저로 직접 열어 본다(웹 배포용 진입점 아님 — 그래서 `index.html`이 아니라 `방법론.html`).
 
 어떤 AI vibe-coding 프로젝트에든 **이 폴더만 참조하면** SDD(Spec-Driven Development)를 같은 방식으로 시작·유지할 수 있도록 정리한 재사용 키트다. 도메인 무관 — 모든 예시는 일반 placeholder(`THE SYSTEM SHALL …`, `<MODULE>`)다.
 
 > ⚠️ **먼저 읽을 것: [`REALITY_CHECK.md`](REALITY_CHECK.md).** 이 키트의 어떤 부분이 "참조만 하면 바로 되는지" vs "프로젝트마다 설치/배선해야 되는지" vs "현재 깨져 있는지"를 **실제 실행으로 검증한 결과**가 들어 있다. (추측 아님)
 
 ## 왜 이 방식인가 (한 줄)
-> **바이브 코딩(feature 단위)은 빠르지만 미완성이 "돼 보임" 뒤에 숨는다.** 이 키트는 작업 단위를 **FR(요구 하나하나)**로 내리고 **검증을 회계(unit·smoke·deferred)·추적(spec↔code↔test)으로 강제**해 그 미완성을 드러낸다. 단점(오버헤드·유지비)의 보완, 그리고 *언제 바이브 / 언제 이 방식*까지 → [`METHODOLOGY.md`](METHODOLOGY.md) §"왜 이 방식으로 왔나" · 시각판 [`방법론.html`](방법론.html).
+> **바이브 코딩(feature 단위)은 빠르지만 미완성이 "돼 보임" 뒤에 숨는다.** 이 키트는 작업 단위를 **FR(요구 하나하나)**로 내리고 **검증을 회계(unit·smoke·deferred)·추적(spec↔code↔test)으로 강제**해 그 미완성을 드러낸다. 단점(오버헤드·유지비)의 보완, 그리고 *언제 바이브 / 언제 이 방식*까지 → [`METHODOLOGY.md`](METHODOLOGY.md) §"왜 이 방식으로 왔나" · 시각판 [`방법론.html`](docs/방법론.html).
 
 ## 채택 방법론 (한 줄)
 > **Spec Kit 골격 + 요구사항(FR)만 EARS + 구현·검증은 Superpowers.** module > spec 계층, spec = 살아있는 기능명세서(SSOT), 작성은 LLM·승인은 사람.
@@ -28,7 +28,7 @@
 > - **스펙 문법 규범**: Module 존재·단일성=1레포 1모듈·FR 라인 SHALL·Dedup 참조 실재·Files 카테고리 금지·글롭 문법 staged 차단 — SPEC-013
 > - **리뷰 경계 선언**: 게이트가 판정하지 않는 의미 항목의 명시 표 — `METHODOLOGY.md`, 정의되지 않은 예외 0
 >
-> 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
+> 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](docs/방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
 >
 > 🔁 **키트는 자기 자신의 첫 소비자다(self-hosting):** 이 레포의 게이트 스위트(`tooling/`)도 자기 방법론 궤도 위에 있다 — [`sdd/specs/`](sdd/specs/)의 스펙 전부(SPEC-001~·CICD-001)가 tooling 전체(게이트·lib)와 `sdd.config.json`·CI 워크플로를 소유하고, 테스트는 `@covers`로 FR에 묶이며(전 FR이 unit 또는 smoke-manifest로 회계됨 — `requireAccounting` 상시 on), 자기 git 훅(`tooling/harness/self-hooks-install.sh`)이 tooling 변경을 상시 강제한다. 스펙 없는 소유 파일 커밋은 commit-msg에서, **어느 스펙도 소유하지 않는 신규 파일도 closed-world(`specSyncUnownedPolicy: error`)로** 막히고, 로컬 훅을 우회한 커밋은 **자체 CI**(`.github/workflows/sdd-gates.yml`, CICD-001 — 스위트+게이트, PR엔 range spec-sync·`draftBlockPolicy: hard`)가 서버측에서 잡는다.
 

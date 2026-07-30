@@ -20,7 +20,7 @@ node tooling/check-ownership.mjs   || exit 1   # exit 1 = 중복소유(dedup)·�
 # change_log.html 자동 갱신 — 방법론이 커밋(=push)될 때마다 변경 로그가 따라오게(사람이 말 안 해도).
 # git 이력에서 재생성(직전 커밋까지 반영; 자기 커밋 항목은 다음 커밋에 등장 — 자동 changelog의 본질적 1-커밋 지연).
 if [ -f tooling/gen-changelog.mjs ]; then
-  node tooling/gen-changelog.mjs >/dev/null 2>&1 && git add change_log.html 2>/dev/null || true
+  node tooling/gen-changelog.mjs >/dev/null 2>&1 && git add docs/change_log.html 2>/dev/null || true
 fi
 HOOK
 # pre-merge-commit(M5) — 무충돌 병합도 같은 품질 게이트(두 브랜치의 번호 중복·ownership 충돌을 병합 시점 차단).

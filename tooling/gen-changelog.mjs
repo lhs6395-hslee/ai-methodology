@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// tooling/gen-changelog.mjs — git 이력 → change_log.html 생성 (결정적·재생성 가능).
-// 사용: node tooling/gen-changelog.mjs  → 레포 루트에 change_log.html 기록.
+// tooling/gen-changelog.mjs — git 이력 → docs/change_log.html 생성 (결정적·재생성 가능).
+// 사용: node tooling/gen-changelog.mjs  → docs/change_log.html 기록.
 // 킷의 진화(무엇이·언제 업데이트되는가)를 날짜별로 보여주는 로컬 문서(방법론.html 동류, 웹 배포 아님).
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -100,5 +100,5 @@ ${rows}
 </body>
 </html>
 `;
-writeFileSync(join(root, "change_log.html"), html);
-console.log(`change_log.html 생성 — ${total}개 변경, ${dates.length}일, 최신 ${generated}`);
+writeFileSync(join(root, "docs", "change_log.html"), html);
+console.log(`docs/change_log.html 생성 — ${total}개 변경, ${dates.length}일, 최신 ${generated}`);

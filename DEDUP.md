@@ -1,6 +1,6 @@
 # 스펙 간 중복 — 2계층 차단 (결정 기록)
 
-> 방법론 최대 빈칸은 "각 spec이 서로 중복인지 판정하는 규칙"이 없다는 것이었다. 키트는 이를 **사람/LLM 판단**에 맡겨 두고 있었다(누락 위험). 이를 **2계층**(구조적 게이트 + 의미적 리뷰)으로 메운다. 시각 설계 동반물: [`dedup-gate-design.html`](dedup-gate-design.html).
+> 방법론 최대 빈칸은 "각 spec이 서로 중복인지 판정하는 규칙"이 없다는 것이었다. 키트는 이를 **사람/LLM 판단**에 맡겨 두고 있었다(누락 위험). 이를 **2계층**(구조적 게이트 + 의미적 리뷰)으로 메운다. 시각 설계 동반물(역할 기반 5분류·애니메이션): [`docs/ownership-key.html`](docs/ownership-key.html).
 
 ## 1. 결론 (한 줄)
 > **구조적 중복은 결정적 게이트(`check-ownership.mjs`)로 CI에서 강제, 의미적 중복은 좁힌 LLM 리뷰로 보조.** "LLM은 누락을 낸다 → 강제되는 결정적 게이트가 1차, 확률적 리뷰는 2차."
@@ -125,6 +125,6 @@ engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라
 | `SPEC_REVIEW.md` | cross-spec 중복: 구조적=CI게이트 / 의미적=좁힌 리뷰 |
 | `templates/module-spec.md` | `## Ownership` 블록 |
 | `tooling/sdd-gates.yml` · `APPLYING.md` | `check:ownership` CI·스크립트 배선 |
-| `dedup-gate-design.html` | 시각 설계 동반물(근거·검증·다이어그램) |
+| `docs/ownership-key.html` | 시각 설계 동반물(역할 기반 5분류·불변식·애니메이션) — `ownership-key-derivation.html`+`dedup-gate-design.html` 통합 |
 
 > 관련: FR↔test 추적 게이트는 `SSOT.md` §4. 인프라 spec↔배포실제 drift는 `SSOT.md` §5b(중복론과 별개).

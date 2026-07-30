@@ -127,6 +127,16 @@
   @media(prefers-reduced-motion:no-preference){
     .card,.step{transition:transform .15s ease,box-shadow .15s ease}
     .card:hover,.step:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(30,40,90,.07)}
+    /* 스크롤 리빌 — JS가 .anim을 붙인 섹션만(JS 없으면 전부 표시, 점진 향상) */
+    section.anim{opacity:0;transform:translateY(26px);transition:opacity .65s cubic-bezier(.2,.7,.3,1),transform .65s cubic-bezier(.2,.7,.3,1)}
+    section.anim.in{opacity:1;transform:none}
+    section.anim.in table tr{opacity:0;animation:rowIn .5s forwards}
+    section.anim.in table tr:nth-child(2){animation-delay:.06s}
+    section.anim.in table tr:nth-child(3){animation-delay:.12s}
+    section.anim.in table tr:nth-child(4){animation-delay:.18s}
+    section.anim.in table tr:nth-child(5){animation-delay:.24s}
+    section.anim.in table tr:nth-child(6){animation-delay:.3s}
+    @keyframes rowIn{to{opacity:1}}
   }
 </style>
 
@@ -719,6 +729,24 @@
   <span class="r">✗ 접두어↔클래스 부정합 "SPEC-001" — 소유 실파일 1건 전부 iac/ci 클래스(예: infra/main.tf) → INFRA/CICD- 접두어여야 함(STORAGE §2.2: iac→INFRA·ci→CICD). 부수 소유가 정당하면 prefixClassExemptions["SPEC-001"]에 사유 등록</span></pre>
 </div></section>
 
+<section id="ownership-roles"><div class="wrap">
+  <span class="eyebrow">역할 기반 5분류 (감사 #21 반영)</span>
+  <h2>Ownership 키 모델 — 이름이 아니라 역할(role)로 판정</h2>
+  <p>Ownership-key 감사가 3분류(Entity/Surface/Capability)의 구멍을 실측으로 드러냈다 — 판정이 카테고리 <em>이름</em>(<code>/entit/</code> 정규식)에 걸려 <strong>개명 한 줄로 강제가 무음 사망</strong>하고, entity 없이 Surface/Capability만 번들되며, 순수 엔진·이벤트가 어느 칸에도 안 맞아 유령 entity·<code>job:</code> 개명으로 우회됐다. 봉합의 현행 모델:</p>
+  <p><strong>① 이름이 아니라 역할.</strong> 카테고리 이름은 자유(웹 <code>Entities</code>, 킷 <code>Modules</code>)지만 config <code>ownershipCategoryRoles</code>로 <strong>역할을 선언</strong>하고 모든 판정이 그 역할에 걸린다(SPEC-001 FR-010). 개명해도 판정이 살아 있고, 킷 자신도 규칙을 자기에게 적용한다(도그푸딩 공백 해소).</p>
+  <p><strong>② 다섯 역할 × 실재·귀속 불변식</strong> — 모든 소유 키는 "무슨 역할인지" + "그 역할 SSOT로 뒷받침되는지"가 강제된다:</p>
+  <table>
+    <tr><th>역할</th><th>키 형식</th><th>불변식</th><th>근거</th></tr>
+    <tr><td><strong>entity</strong> (aggregate root)</td><td><code>pjt_projects</code></td><td>스키마 SSOT 실재 + 레지스트리 + <strong>스펙당 ≥1</strong> + <code>maxAggregateRootsPerSpec</code> 이하</td><td>SPEC-026·002</td></tr>
+    <tr><td><strong>surface</strong></td><td><code>POST /api/pjt</code></td><td>파일형 심볼은 소스 루트 정방향 실재</td><td>SPEC-029</td></tr>
+    <tr><td><strong>capability</strong></td><td><code>entity.verb</code></td><td>entity 조각을 그 스펙이 소유(귀속) + cohesion 캡은 <strong>entity별</strong></td><td>SPEC-024·002</td></tr>
+    <tr><td><strong>engine</strong> <em>(신규)</em></td><td><code>priceRules</code></td><td>코드-모듈 SSOT 실재, capability 소유 금지</td><td>SPEC-030</td></tr>
+    <tr><td><strong>event</strong> <em>(신규)</em></td><td><code>order.created</code></td><td>발신 entity 귀속 + 이벤트 카탈로그 실재</td><td>SPEC-030</td></tr>
+  </table>
+  <p><strong>③ "중복·과분류·예외 없이"의 실제 장치.</strong> 중복=dedup 유일성(의미적 동의어는 리뷰 몫), 과분류=실재 불변식 + engine/event가 전수성 구멍을 담음, 예외 없이=강도 knob <strong>하향 불가</strong>(단조 증가, SPEC-027 래칫 자기포함)·면제는 사유 필수+상시 부채 표면화. <code>off</code>·<code>advisory</code>는 마이그레이션 경유지, 종착지는 <code>hard</code>.</p>
+  <p class="note">정직한 잔여 한계: 말만 바꾼 의미적 중복은 결정적 게이트로 못 잡고(좁힌 리뷰 보조), 다부모는 relation 참조로 표현하며, hard 전면화는 프로젝트별 graduation 속도에 달려 있다. 상세·애니메이션 다이어그램 → <a href="ownership-key.html">ownership-key.html</a>.</p>
+</div></section>
+
 <section id="spec-first"><div class="wrap">
   <span class="eyebrow">spec-first 강제</span>
   <h2>코드 변경은 반드시 소유 스펙을 동반한다</h2>
@@ -1005,5 +1033,16 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
   <p><span class="done">✓ Gap 1 · 2 · 3 + spec-first 완료</span> &nbsp; 1 레포=1 모듈 · spec 입도(cohesion) · 하네스 MVP · 결정성 게이트 · 강제 hook 세트 · <strong>spec-first</strong>(<code>check-spec-sync</code>·commit-msg hard·<code>/speckit.fix</code>) — 모두 <code>main</code> 반영.</p>
   <p>저장소: <a href="https://github.com/lhs6395-hslee/ai-methodology">github.com/lhs6395-hslee/ai-methodology</a> · 근거 문서: <code>METHODOLOGY.md</code> · <code>STORAGE.md</code> · <code>STRUCTURE.md</code> · <code>DEDUP.md</code> · <code>HARNESS.md</code> · <code>APPLYING.md</code> · <code>ROADMAP.md</code></p>
 </div></footer>
+<script>
+  // 스크롤 리빌(점진 향상) — JS가 있을 때만 섹션에 .anim을 붙이고 뷰포트 진입 시 .in.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const secs = document.querySelectorAll("section");
+    for (const s of secs) s.classList.add("anim");
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+    for (const s of secs) io.observe(s);
+  }
+</script>
 </body>
 </html>
