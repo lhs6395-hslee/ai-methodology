@@ -9,6 +9,7 @@
 // @covers SPEC-017/FR-001
 // @covers SPEC-027/FR-004
 // @covers SPEC-030/FR-002
+// @covers SPEC-002/FR-002
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -1073,6 +1074,32 @@ test("py engineevent: off·실재·유령·귀속·inert·미정의정책 — No
       const p = runPy(root, ["engineevent"]);
       assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg.engineRealityPolicy)}/${JSON.stringify(cfg.eventAttributionPolicy)})`);
       assert.equal(p.code, n.code, `exit 동일`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+// ── ownership 구조 문법 3종 패리티(SPEC-002 FR-011: G1·G2·G3) ──
+test("py ownership G1·G2·G3: 미선언·카테고리간·Files겹침 — Node·Python 바이트 동일", skip, () => {
+  const scen = [
+    { cfg: { ownershipRequiredPolicy: "hard" }, files: {
+      "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Entities**: alpha"),
+      "sdd/specs/SPEC-002.md": "**Spec**: `SPEC-002`\nno ownership block\n" } },
+    { cfg: { surfaceFormat: "any", crossCategoryDedupPolicy: "hard" }, files: {
+      "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Entities**: order"),
+      "sdd/specs/SPEC-002.md": OWN("SPEC-002", "- **Surfaces**: order") } },
+    { cfg: { filesOverlapPolicy: "hard" }, files: {
+      "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Entities**: alpha\n- **Files**: sdd/specs/SPEC-001.md"),
+      "sdd/specs/SPEC-002.md": OWN("SPEC-002", "- **Entities**: beta\n- **Files**: sdd/specs/SPEC-001.md") } },
+    { cfg: { crossCategoryDedupPolicy: "advisory", filesOverlapPolicy: "advisory" }, files: {
+      "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Entities**: alpha") } },
+  ];
+  for (const { cfg, files } of scen) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-ownership.mjs");
+      const p = runPy(root, ["ownership"]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(cfg)})`);
+      assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(cfg)})`);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

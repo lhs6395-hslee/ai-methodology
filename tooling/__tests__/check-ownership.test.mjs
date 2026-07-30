@@ -185,3 +185,50 @@ test("inert 고지: 백킹 기본값(off)·정상 활성 프로젝트는 새 라
   assert.equal(dflt.code, 0, dflt.out);
   assert.doesNotMatch(dflt.out, /판정 불가\(inert\)/);
 });
+
+// ── 구조 문법 잔여 3종 (SPEC-002 FR-011: G1·G2·G3) ──
+
+test("G1 ownershipRequiredPolicy: 미선언 스펙 → hard exit 1 / advisory ⚠ exit 0", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: alpha\n";
+  const B = "# SPEC-002\n(Ownership 블록 없음)\n"; // 미선언 = dedup 사각
+  const hard = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { ownershipRequiredPolicy: "hard" });
+  assert.equal(hard.code, 1, hard.out);
+  assert.match(hard.out, /Ownership 블록 없음/);
+  const adv = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { ownershipRequiredPolicy: "advisory" });
+  assert.equal(adv.code, 0, adv.out); // 소급 범람 금지
+});
+
+test("G2 crossCategoryDedupPolicy: 같은 키가 2 카테고리에 소유 → hard exit 1", () => {
+  // surfaceFormat:any 로 'order'를 surface 키로도 허용 → entity 'order'와 카테고리 간 충돌.
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: order\n";
+  const B = "# SPEC-002\n## Ownership\n- **Surfaces**: order\n";
+  const cfg = { surfaceFormat: "any", crossCategoryDedupPolicy: "hard" };
+  const hard = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, cfg);
+  assert.equal(hard.code, 1, hard.out);
+  assert.match(hard.out, /카테고리 간 동일 키/);
+  assert.match(hard.out, /order/);
+  const adv = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { ...cfg, crossCategoryDedupPolicy: "advisory" });
+  assert.equal(adv.code, 0, adv.out);
+  assert.match(adv.out, /⚠ 카테고리 간 동일 키/);
+});
+
+test("G3 filesOverlapPolicy: 2 스펙이 같은 실파일 소유 → hard exit 1", () => {
+  // 두 스펙의 Files glob이 실재 파일 SPEC-001.md를 함께 매치 → 겹침.
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: alpha\n- **Files**: sdd/specs/SPEC-001.md\n";
+  const B = "# SPEC-002\n## Ownership\n- **Entities**: beta\n- **Files**: sdd/specs/SPEC-001.md\n";
+  const hard = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { filesOverlapPolicy: "hard" });
+  assert.equal(hard.code, 1, hard.out);
+  assert.match(hard.out, /Files 겹침/);
+  assert.match(hard.out, /SPEC-001\.md/);
+  const adv = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { filesOverlapPolicy: "advisory" });
+  assert.equal(adv.code, 0, adv.out);
+});
+
+test("G1·G2·G3 off → 검출 안 함(하위호환)", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: order\n- **Files**: sdd/specs/SPEC-001.md\n";
+  const B = "# SPEC-002\n(Ownership 없음)\n";
+  const r = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B },
+    { ownershipRequiredPolicy: "off", crossCategoryDedupPolicy: "off", filesOverlapPolicy: "off" });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /카테고리 간 동일 키|Files 겹침/);
+});

@@ -85,6 +85,22 @@ const SR_INERT = symbolRealityInertReasons(SR_POLICY, SR_ROOTS, ROLES);
 const SUR_CAT = ROLES && ROLES.surface;
 const srOwned = []; // {specId, surfaces:[raw...]}
 
+// 구조 문법 잔여 3종(감사 후속 G1·G2·G3) — 결정적 중복차단의 남은 구멍. 기본 advisory(신규 채택
+// 소급 범람 방지), 킷은 config에서 hard(자기 닫음). 순수 신규 검출(G2·G3)이라 위반 추가만 함.
+//   G1 ownershipRequiredPolicy — 모든 스펙의 Ownership 선언 강제(미선언 = dedup 사각).
+//   G2 crossCategoryDedupPolicy — 같은 정규화 키가 2+ 카테고리에 소유되는 것(카테고리 간 중복).
+//   G3 filesOverlapPolicy — 2+ 스펙의 Files glob이 같은 실파일을 소유하는 것(실코드 중복 소유).
+const ORQ_POLICY = String(cfg.ownershipRequiredPolicy ?? "advisory");
+const XCAT_POLICY = String(cfg.crossCategoryDedupPolicy ?? "advisory");
+const FOV_POLICY = String(cfg.filesOverlapPolicy ?? "advisory");
+for (const [n, v] of [["ownershipRequiredPolicy", ORQ_POLICY], ["crossCategoryDedupPolicy", XCAT_POLICY], ["filesOverlapPolicy", FOV_POLICY]]) {
+  if (!["off", "advisory", "hard"].includes(v)) {
+    console.error(`✗ ${n} 값 위반 "${v}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+    process.exit(1);
+  }
+}
+const filesBySpec = []; // {specId, globs:[...]} — G3 Files 겹침 판정용
+
 // ownershipCategories에 Files 금지(SPEC-013, DEDUP.md §3) — 글롭이 dedup 키로 유입되면
 // 유일성·형식검증이 오판한다. 문서의 "금지"를 config 검증으로 기계 강제.
 const catErrors = ownershipCategoriesFindings(CATEGORIES);
@@ -126,6 +142,14 @@ let declaredCount = 0;
 for (const file of files) {
   const text = readFileSync(file, "utf8");
   const specId = (text.match(cfg.__specIdRe) || [file.split("/").pop()])[0];
+
+  // G3: Files glob 수집(Ownership 선언 유무와 무관 — Files만 있는 스펙도 겹침 대상).
+  // 인라인 주석(#) 제거, 쉼표 분리. Files는 관례상 Ownership 블록에만 나타난다.
+  const filesLine = text.match(/^\s*-\s*\*\*Files\*\*:\s*(.+)$/m);
+  if (filesLine) {
+    const globs = filesLine[1].split(",").map((s) => s.split("#")[0].trim()).filter(Boolean);
+    if (globs.length) filesBySpec.push({ specId, globs });
+  }
 
   // Parse Ownership section (dedup target)
   const own = parseSection(text, "Ownership", CATEGORIES);
@@ -189,6 +213,55 @@ for (const cat of CATEGORIES) {
   }
 }
 
+// G2: 카테고리 간 동일 정규화 키(같은 문자열이 2+ 카테고리에 소유) — 카테고리 내부 dedup의 사각.
+const xcatConflicts = [];
+if (XCAT_POLICY !== "off") {
+  const byKey = new Map(); // key → Map(cat → Set(spec))
+  for (const cat of CATEGORIES) {
+    for (const [key, specs] of owners[cat]) {
+      if (!byKey.has(key)) byKey.set(key, new Map());
+      byKey.get(key).set(cat, new Set(specs));
+    }
+  }
+  for (const [key, catMap] of byKey) {
+    if (catMap.size > 1) {
+      const cats = [...catMap.keys()].sort();
+      const specs = [...new Set([].concat(...cats.map((c) => [...catMap.get(c)])))].sort();
+      xcatConflicts.push({ key, cats, specs });
+    }
+  }
+  xcatConflicts.sort((a, b) => a.key.localeCompare(b.key));
+}
+
+// G3: 두 스펙의 Files glob이 같은 실파일을 소유(실코드 중복 소유) — Files는 dedup 밖이라 사각이었다.
+const filesOverlap = [];
+if (FOV_POLICY !== "off" && filesBySpec.length) {
+  const IGNORE = new Set(cfg.ignoreDirs);
+  const allRel = [];
+  (function walk(dir, rel = "") {
+    let entries; try { entries = readdirSync(dir).sort(); } catch { return; }
+    for (const name of entries) {
+      const p = join(dir, name), r = rel ? `${rel}/${name}` : name;
+      let st; try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) { if (!IGNORE.has(name)) walk(p, r); }
+      else allRel.push(r);
+    }
+  })(ROOT);
+  const fileToSpecs = new Map();
+  for (const { specId, globs } of filesBySpec) {
+    const rxs = globs.map(compileGlob);
+    for (const rel of allRel) {
+      if (rxs.some((rx) => rx.test(rel))) {
+        if (!fileToSpecs.has(rel)) fileToSpecs.set(rel, new Set());
+        fileToSpecs.get(rel).add(specId);
+      }
+    }
+  }
+  for (const [rel, specs] of [...fileToSpecs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (specs.size > 1) filesOverlap.push({ file: rel, specs: [...specs].sort() });
+  }
+}
+
 // entity 레지스트리(SPEC-002 FR-009, P3): PREFIX 거버넌스와 동일 패턴 — 등록 = config 변경 = 리뷰 관문.
 // 비어 있으면 비활성(현행). 채워지면 aggregate-root 카테고리의 소유 키는 등록된 것만, 사유는 빈 값 불가.
 const REGISTRY = cfg.entityRegistry || {};
@@ -226,7 +299,7 @@ const relationCycles = findCycles(relationEdges);
 
 console.log(`Ownership 게이트: spec ${files.length}개 중 ${declaredCount}개가 Ownership 선언.`);
 if (missing.length) {
-  const tag = STRICT ? "✗" : "⚠";
+  const tag = (STRICT || ORQ_POLICY === "hard") ? "✗" : "⚠";
   console.log(`${tag} Ownership 블록 없음(${missing.length}): ${missing.join(", ")}`);
 }
 
@@ -406,6 +479,19 @@ if (relationErrors.length) {
   process.exit(1);
 }
 
+// G2 리포트(카테고리 간 동일 키) — hard면 ✗, advisory면 ⚠.
+const xcatHard = XCAT_POLICY === "hard" && xcatConflicts.length > 0;
+if (xcatConflicts.length) {
+  console.log(`${xcatHard ? "✗" : "⚠"} 카테고리 간 동일 키(crossCategoryDedupPolicy=${XCAT_POLICY}) ${xcatConflicts.length}건 — 같은 정규화 키가 여러 카테고리에 소유:`);
+  for (const c of xcatConflicts) console.log(`  ${xcatHard ? "✗" : "⚠"} "${c.key}" ← ${c.cats.join("+")} (${c.specs.join(", ")}) → 한 카테고리로 통합하거나 키를 구분(같은 실체면 한 역할)`);
+}
+// G3 리포트(Files 겹침) — hard면 ✗, advisory면 ⚠.
+const fovHard = FOV_POLICY === "hard" && filesOverlap.length > 0;
+if (filesOverlap.length) {
+  console.log(`${fovHard ? "✗" : "⚠"} Files 겹침(filesOverlapPolicy=${FOV_POLICY}) ${filesOverlap.length}건 — 한 실파일을 2+ 스펙이 소유:`);
+  for (const c of filesOverlap) console.log(`  ${fovHard ? "✗" : "⚠"} ${c.file} ← ${c.specs.join(" + ")} → Files glob을 좁혀 한 스펙만 소유하게`);
+}
+
 if (conflicts.length) {
   console.error(`\n✗ 중복 소유(구조적 중복) ${conflicts.length}건:`);
   for (const c of conflicts) {
@@ -414,10 +500,17 @@ if (conflicts.length) {
   process.exit(1);
 }
 
+// G1: Ownership 선언 강제(미선언 = dedup 사각). ORQ hard면 --strict 없이도 차단.
+const orqHard = ORQ_POLICY === "hard" && missing.length > 0;
+if (orqHard) console.error(`\n✗ ownershipRequiredPolicy=hard: 모든 스펙이 Ownership을 선언해야 한다(미선언 ${missing.length}건: ${missing.join(", ")}) — 미선언 스펙은 중복 검사의 사각이다.`);
+if (xcatHard) console.error(`\n✗ crossCategoryDedupPolicy=hard: 카테고리 간 동일 키는 구조적 중복이다 — 위 항목 해소 필요.`);
+if (fovHard) console.error(`\n✗ filesOverlapPolicy=hard: 한 실파일은 한 스펙만 소유해야 한다 — 위 Files 겹침 해소 필요.`);
+
 if (STRICT && (missing.length || formatIssues.length)) {
   if (missing.length) console.error(`\n✗ --strict: 모든 spec이 Ownership을 선언해야 함.`);
   if (formatIssues.length) console.error(`\n✗ --strict: 형식 위반이 있음 — 수정 필요.`);
   process.exit(1);
 }
+if (orqHard || xcatHard || fovHard) process.exit(1);
 
 console.log(`✓ 구조적 중복 없음 — 모든 ${CATEGORIES.join("/")} 키가 유일.`);

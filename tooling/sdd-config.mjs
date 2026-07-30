@@ -206,6 +206,11 @@ export const DEFAULTS = {
   eventCatalogSources: [],
   eventAttributionPolicy: "off",            // off(기본)|advisory|hard. event 역할 카테고리 있을 때만.
   eventExemptKeys: {},                      // 카탈로그 실재 면제(귀속 면제는 아님) — 빈 사유 에러.
+  // 구조 문법 잔여 3종(감사 후속) — 결정적 중복차단의 남은 구멍. 기본 advisory(신규 채택 소급 범람
+  // 방지), 깨끗해지면 hard 승격(킷 자신은 hard). 순수 신규 검출이라 위반 추가만 한다.
+  ownershipRequiredPolicy: "advisory",      // 모든 스펙 Ownership 선언 강제(미선언=dedup 사각). off|advisory|hard.
+  crossCategoryDedupPolicy: "advisory",     // 같은 정규화 키가 2+ 카테고리에 소유(카테고리 간 중복). off|advisory|hard.
+  filesOverlapPolicy: "advisory",           // 2+ 스펙 Files glob이 같은 실파일 소유(실코드 중복). off|advisory|hard.
 };
 
 // 루트 탐색: cwd에서 위로 올라가며 sdd.config.json을 찾는다.

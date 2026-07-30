@@ -156,5 +156,8 @@
     "run",
     "scan"
   ],
-  "capabilityOwnershipPolicy": "hard"
+  "capabilityOwnershipPolicy": "hard",
+  "ownershipRequiredPolicy": "hard",
+  "crossCategoryDedupPolicy": "hard",
+  "filesOverlapPolicy": "hard"
 }

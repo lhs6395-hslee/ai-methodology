@@ -139,3 +139,4 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-07-28 | Python 포트에 `symbol_candidates` 신설 + 실재 집합 3형태 미러 | 패리티 유지(SPEC-006 계약) — ownership stdout 바이트 동일 확인 |
 | 2026-07-28 | Python 포트 `_bare_key` 신설 + `_build_key_kind_map` 배선 | SPEC-023 키 추출 교정의 패리티 유지 — consistency stdout 바이트 동일 확인 |
 | 2026-07-29 | Python 미러 — `role_active`·`role_inert_reasons`·`reality_findings`·`split_event_key`·`event_attribution_findings` + `cmd_engineevent` + `engineevent` 서브커맨드 + DEFAULTS 6종 + `resolve_category_roles`에 engine/event. Node `check-engine-event.mjs`와 출력·exit 바이트 동일 | SPEC-030 동반 — Engines/Events 게이트 양판 패리티 유지 |
+| 2026-07-29 | Python `cmd_ownership` 미러 — 구조 문법 3종(G1 ownershipRequired·G2 crossCategoryDedup·G3 filesOverlap) + DEFAULTS 3종. Node `check-ownership.mjs`와 출력·exit 바이트 동일 | SPEC-002 FR-011 동반 — 구조 문법 게이트 양판 패리티 유지 |

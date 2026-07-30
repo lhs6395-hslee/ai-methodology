@@ -105,6 +105,9 @@ DEFAULTS = {
     "eventCatalogSources": [],
     "eventAttributionPolicy": "off",
     "eventExemptKeys": {},
+    "ownershipRequiredPolicy": "advisory",
+    "crossCategoryDedupPolicy": "advisory",
+    "filesOverlapPolicy": "advisory",
 }
 
 CRUD = ["create", "read", "update", "delete", "list"]
@@ -1003,6 +1006,16 @@ def cmd_ownership(cfg, strict):
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
 
+    # 구조 문법 잔여 3종(감사 후속 G1·G2·G3) — check-ownership.mjs 미러.
+    orq_policy = str(cfg.get("ownershipRequiredPolicy") or "advisory")
+    xcat_policy = str(cfg.get("crossCategoryDedupPolicy") or "advisory")
+    fov_policy = str(cfg.get("filesOverlapPolicy") or "advisory")
+    for name, val in (("ownershipRequiredPolicy", orq_policy), ("crossCategoryDedupPolicy", xcat_policy), ("filesOverlapPolicy", fov_policy)):
+        if val not in ("off", "advisory", "hard"):
+            print(f'✗ {name} 값 위반 "{val}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+            sys.exit(1)
+    files_by_spec = []  # (spec_id, [globs]) — G3 Files 겹침 판정용
+
     files = spec_md_files(cfg)
 
     owners = {c: {} for c in categories}
@@ -1014,6 +1027,13 @@ def cmd_ownership(cfg, strict):
         text = read_text(file)
         m = cfg["__specId"].search(text)
         spec_id = m.group(0) if m else os.path.basename(file)
+        # G3: Files glob 수집(Ownership 선언 유무 무관). 인라인 주석 제거·쉼표 분리.
+        fm = re.search(r"^\s*-\s*\*\*Files\*\*:\s*(.+)$", text, re.M)
+        if fm:
+            globs = [s.split("#")[0].strip() for s in fm.group(1).split(",")]
+            globs = [g for g in globs if g]
+            if globs:
+                files_by_spec.append((spec_id, globs))
         own = parse_section(text, "Ownership", categories)
         if not any(own[c] for c in categories):
             missing.append(spec_id)
@@ -1059,6 +1079,40 @@ def cmd_ownership(cfg, strict):
             if len(specs) > 1:
                 conflicts.append((cat, key, sorted(set(specs))))
 
+    # G2: 카테고리 간 동일 정규화 키(check-ownership.mjs 미러).
+    xcat_conflicts = []
+    if xcat_policy != "off":
+        by_key = {}  # key → {cat: set(spec)}
+        for cat in categories:
+            for key, specs in owners[cat].items():
+                by_key.setdefault(key, {})[cat] = set(specs)
+        for key in sorted(by_key.keys()):
+            cat_map = by_key[key]
+            if len(cat_map) > 1:
+                cats = sorted(cat_map.keys())
+                specs = sorted(set().union(*[cat_map[c] for c in cats]))
+                xcat_conflicts.append((key, cats, specs))
+
+    # G3: 두 스펙 Files glob이 같은 실파일 소유(check-ownership.mjs 미러).
+    files_overlap = []
+    if fov_policy != "off" and files_by_spec:
+        ignore = set(cfg["ignoreDirs"])
+        all_rel = []
+        for dirpath, dirnames, filenames in os.walk(cfg["__root"]):
+            dirnames[:] = sorted(d for d in dirnames if d not in ignore)
+            rel_dir = os.path.relpath(dirpath, cfg["__root"])
+            for name in sorted(filenames):
+                all_rel.append(name if rel_dir == "." else f"{rel_dir}/{name}")
+        file_to_specs = {}
+        for spec_id, globs in files_by_spec:
+            rxs = [compile_glob(g) for g in globs]
+            for rel in all_rel:
+                if any(rx.search(rel) for rx in rxs):
+                    file_to_specs.setdefault(rel, set()).add(spec_id)
+        for rel in sorted(file_to_specs.keys()):
+            if len(file_to_specs[rel]) > 1:
+                files_overlap.append((rel, sorted(file_to_specs[rel])))
+
     # entity 레지스트리(SPEC-002 FR-009, P3): PREFIX 거버넌스와 동일 패턴 — 등록 = config 변경 = 리뷰 관문.
     # 비어 있으면 비활성(현행). 채워지면 aggregate-root 카테고리의 소유 키는 등록된 것만, 사유는 빈 값 불가.
     registry = cfg.get("entityRegistry") or {}
@@ -1093,7 +1147,7 @@ def cmd_ownership(cfg, strict):
 
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
     if missing:
-        tag = "✗" if strict else "⚠"
+        tag = "✗" if (strict or orq_policy == "hard") else "⚠"
         print(f"{tag} Ownership 블록 없음({len(missing)}): {', '.join(missing)}")
     if format_issues:
         tag = "✗" if strict else "⚠"
@@ -1245,16 +1299,40 @@ def cmd_ownership(cfg, strict):
         for e in relation_errors:
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
+    # G2 리포트(카테고리 간 동일 키).
+    xcat_hard = xcat_policy == "hard" and len(xcat_conflicts) > 0
+    if xcat_conflicts:
+        print(f"{'✗' if xcat_hard else '⚠'} 카테고리 간 동일 키(crossCategoryDedupPolicy={xcat_policy}) {len(xcat_conflicts)}건 — 같은 정규화 키가 여러 카테고리에 소유:")
+        for key, cats, specs in xcat_conflicts:
+            print(f'  {"✗" if xcat_hard else "⚠"} "{key}" ← {"+".join(cats)} ({", ".join(specs)}) → 한 카테고리로 통합하거나 키를 구분(같은 실체면 한 역할)')
+    # G3 리포트(Files 겹침).
+    fov_hard = fov_policy == "hard" and len(files_overlap) > 0
+    if files_overlap:
+        print(f"{'✗' if fov_hard else '⚠'} Files 겹침(filesOverlapPolicy={fov_policy}) {len(files_overlap)}건 — 한 실파일을 2+ 스펙이 소유:")
+        for rel, specs in files_overlap:
+            print(f'  {"✗" if fov_hard else "⚠"} {rel} ← {" + ".join(specs)} → Files glob을 좁혀 한 스펙만 소유하게')
+
     if conflicts:
         print(f"\n✗ 중복 소유(구조적 중복) {len(conflicts)}건:", file=sys.stderr)
         for cat, key, specs in conflicts:
             print(f'  [{cat}] "{key}" ← {" + ".join(specs)}  → 한 spec으로 통합/개정 필요', file=sys.stderr)
         sys.exit(1)
+
+    orq_hard = orq_policy == "hard" and len(missing) > 0
+    if orq_hard:
+        print(f"\n✗ ownershipRequiredPolicy=hard: 모든 스펙이 Ownership을 선언해야 한다(미선언 {len(missing)}건: {', '.join(missing)}) — 미선언 스펙은 중복 검사의 사각이다.", file=sys.stderr)
+    if xcat_hard:
+        print("\n✗ crossCategoryDedupPolicy=hard: 카테고리 간 동일 키는 구조적 중복이다 — 위 항목 해소 필요.", file=sys.stderr)
+    if fov_hard:
+        print("\n✗ filesOverlapPolicy=hard: 한 실파일은 한 스펙만 소유해야 한다 — 위 Files 겹침 해소 필요.", file=sys.stderr)
+
     if strict and (missing or format_issues):
         if missing:
             print("\n✗ --strict: 모든 spec이 Ownership을 선언해야 함.", file=sys.stderr)
         if format_issues:
             print("\n✗ --strict: 형식 위반이 있음 — 수정 필요.", file=sys.stderr)
+        sys.exit(1)
+    if orq_hard or xcat_hard or fov_hard:
         sys.exit(1)
     print(f"✓ 구조적 중복 없음 — 모든 {'/'.join(categories)} 키가 유일.")
 
