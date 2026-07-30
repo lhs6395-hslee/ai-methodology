@@ -68,10 +68,22 @@ for (const file of files) {
       if (ownsAny && (!own[ENT_ROLE] || own[ENT_ROLE].length === 0))
         violations.push({ specId, kind: `${ENT_ROLE}(min)`, n: 0, max: 1 });
     }
-    // 기존: 카테고리별 키 > MAX_KEYS
+    // 카테고리별 키 > MAX_KEYS. 단 capability 역할 카테고리는 **entity별**로 센다 —
+    // SPEC-024가 한 entity의 verb를 같은 스펙에 강제하므로, 총 capability 수로 캡을 걸면
+    // 정상 full-CRUD aggregate나 다-entity 스펙이 거짓 분할 신호를 받는다(감사 oc-3·gran-4의 모순).
+    // entity별 카운트는 순수 완화다(entity별 최대 ≤ 총합 → 위반을 추가하지 않고 거짓양성만 제거).
+    const CAP_CAT = cfg.__roles.capability;
     for (const cat of CATEGORIES) {
-      if (own[cat].length > MAX_KEYS)
+      if (CAP_CAT && cat === CAP_CAT) {
+        const byEnt = {};
+        for (const k of own[cat]) { const e = String(k).split(".")[0].trim().toLowerCase(); byEnt[e] = (byEnt[e] || 0) + 1; }
+        let top = null;
+        for (const [e, n] of Object.entries(byEnt)) if (!top || n > top.n) top = { e, n };
+        if (top && top.n > MAX_KEYS)
+          violations.push({ specId, kind: `${cat}(entity:${top.e})`, n: top.n, max: MAX_KEYS });
+      } else if (own[cat].length > MAX_KEYS) {
         violations.push({ specId, kind: cat, n: own[cat].length, max: MAX_KEYS });
+      }
     }
   }
 }

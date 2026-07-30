@@ -66,6 +66,25 @@ test("entity 역할 선언 + 키 소유하나 aggregate root 0개(Surface/Capabi
   assert.equal(run(dir, ["--strict"]).code, 1);
 });
 
+test("capability 캡은 entity별 — 다-entity 총합>4라도 entity별 ≤4면 통과(SPEC-024 모순 해소)", () => {
+  // a: 3 verbs, b: 2 verbs (총 5 > 4). entity별 최대 3 ≤ 4 → Capabilities 분할 신호 없음.
+  const dir = fixture({ specDir: "sdd/specs", maxKeysPerCategoryPerSpec: 4, maxAggregateRootsPerSpec: 2 }, {
+    "sdd/specs/SPEC-001.md":
+      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Entities**: a, b\n- **Capabilities**: a.create, a.read, a.update, b.create, b.read\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.doesNotMatch(r.out, /Capabilities/); // 총 5개지만 entity별 캡이라 분할 권고 없음
+  // 한 entity가 5 verbs면 여전히 flag(entity별 초과)
+  const dir2 = fixture({ specDir: "sdd/specs", maxKeysPerCategoryPerSpec: 4 }, {
+    "sdd/specs/SPEC-001.md":
+      "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Entities**: a\n- **Capabilities**: a.create, a.read, a.update, a.delete, a.list\n",
+  });
+  const r2 = run(dir2);
+  assert.match(r2.out, /entity:a/);
+  assert.equal(run(dir2, ["--strict"]).code, 1);
+});
+
 test("entity 역할 미선언(순수 lib 카테고리) → aggregate root 하한 inert(하위호환)", () => {
   const dir = fixture(
     { specDir: "sdd/specs", ownershipCategories: ["Widgets", "Gadgets"] },

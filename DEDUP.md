@@ -51,6 +51,31 @@
 
 **설계 출처:** 논문이 아니라 **소프트웨어공학 1차 원칙** — DDD *bounded context*(한 능력은 한 곳이 소유) · Single Source of Truth(진실은 한 곳) · 집합 유일성.
 
+## 3.5 소유권 키 모델 — 역할(role) 기반 5분류와 불변식 (2026-07 감사 #21 반영)
+
+> Ownership-key 감사(`docs/ownership-taxonomy-audit.md`)가 3분류(Entity/Surface/Capability)의 구멍을 실측으로 드러냈다 — 게이트 활성이 카테고리 **이름**에 걸려 개명 한 줄로 무음화되고, entity 없이 Surface/Capability만 번들되며, 순수 엔진·이벤트가 어느 칸에도 안 맞아 유령 entity·`job:` 개명으로 우회됐다. 아래가 그 봉합의 현행 모델이다.
+
+**① 이름이 아니라 역할(role)로 판정한다.** 카테고리 이름은 프로젝트가 자유롭게 쓰되(웹: `Entities/Surfaces/Capabilities`, 킷: `Modules/Symbols/Artifacts`, 파이프라인: `Datasets/…`), config `ownershipCategoryRoles`로 **역할을 선언**한다 — 예 `{ "Modules": "entity", "Symbols": "surface" }`. 방법론 판정은 전부 이 **역할**에 걸린다(SPEC-001 FR-010). 그래서 (a) 이름을 `Entities→Aggregates`로 바꿔도 판정이 살아 있고(감사 A-1: 개명으로 hard가 무음 사망하던 자리), (b) 킷 자신(Modules)도 규칙을 자기에게 적용한다(도그푸딩 공백 해소). 미선언 역할은 entity/surface/capability만 이름 정규식 폴백(하위호환).
+
+**② 다섯 역할과 각 역할의 실재·귀속 불변식** — 모든 소유 키는 "무슨 역할인지" + "그 역할의 SSOT로 뒷받침되는지"가 강제된다:
+
+| 역할 | 키 형식 | 실재/귀속 불변식 | 근거 |
+|---|---|---|---|
+| **entity** (aggregate root) | 스키마 식별자 그대로 | 구조 SSOT(스키마·마이그레이션)에 **실재** + `entityRegistry` 등록 + **스펙당 최소 1개**(entity 없는 번들 금지) + `maxAggregateRootsPerSpec` 이하 | SPEC-026·SPEC-002 |
+| **surface** (route·화면) | `<METHOD> <path>` 등 | 파일형 심볼은 소스 루트에 **정방향 실재**(orphan 역방향의 짝) | SPEC-029 |
+| **capability** | `entity.verb` | verb의 entity 조각을 **그 스펙이 소유**해야 함(귀속). cohesion 캡은 **entity별**로 카운트(full-CRUD 거짓 분할 제거) | SPEC-024·SPEC-002 |
+| **engine** (순수 로직) | 모듈 식별자 | 코드-모듈 SSOT(`enginesSources`)에 **실재**. capability 소유 금지(능력은 entity에 귀속) | SPEC-030 |
+| **event** (신호·job) | `entity.event-name` | 발신 **entity에 귀속** + 이벤트 카탈로그(`eventCatalogSources`)에 **실재** | SPEC-030 |
+
+engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라 미선언 프로젝트는 무영향. `job:`/`event:`를 종전 Surface로 두던 프로젝트는 채택 시 Events 역할로 이관해 Surface를 동기 표면으로 좁힌다(그래듀에이션).
+
+**③ "중복 없이·과분류 없이·예외 없이"의 실제 의미.** 세 목표는 각각 다른 장치가 담당한다:
+- **중복 없이(구조적)** — dedup 유일성(§3, 역할·카테고리 내). *의미적*(동의어 `order`/`orders`) 중복은 결정적으로 못 잡으므로 계층 ③ 좁힌 리뷰 몫(정직한 한계 — §4·§6).
+- **과분류 없이** — 유령 entity·억지 Surface·엔진 욱여넣기를 실재 불변식(entity 스키마 백킹·surface 실재·engine 코드-모듈·event 카탈로그)이 차단. E/S/C로 안 담기던 대상은 engine/event가 담아 **강요된 오분류**를 없앤다(전수성).
+- **예외 없이** — 강도 knob은 **하향 불가**(단조 증가, SPEC-027 래칫 — 자기 자신 포함). 위반을 knob 내려 회피할 수 없다. 다만 `off`·`advisory`는 **마이그레이션 중 경유지**이고 종착지는 `hard`다 — 신규 채택은 hard로 태어나되, 기존 프로젝트의 소급 범람을 막으려 그래듀에이션(advisory→마이그레이션→hard)을 경유한다(범람 회피가 목적이지 예외가 아님). 면제(`entityRegistry`·`*ExemptKeys`·`policyRatchetExceptions`)는 **사유 필수 + 매 실행 부채로 표면화**되어 조용한 우회가 불가능하다.
+
+**정직한 잔여 한계:** (a) 의미적(reworded) 중복은 여전히 확률적 리뷰 몫 — 결정적 게이트로 만들 수 없다. (b) 다부모(한 개념이 두 aggregate에 속함)는 relation 참조로 표현하며 단일 트리로 접지 않는다. (c) hard 전면 강제는 프로젝트별 그래듀에이션 속도에 달려 있다.
+
 ## 4. ③ 의미적 중복 — 게이트가 못 잡는 틈 (보조)
 
 게이트는 "키가 같은" 중복만 막는다. **말만 바꾼 같은 요구(reworded)**는 못 잡는다. 100% 자동화는 불가하므로 두 가지로 보조한다:
@@ -87,7 +112,13 @@
 |---|---|
 | `tooling/check-ownership.mjs` | 게이트 본체(+ `entityRegistry` 등록제 · Entity 관계 실재·순환 검사 — SPEC-017) |
 | `tooling/relation-lib.mjs` · `sdd.config.json` `relationTypes` | Entity 관계 판정 코어(`Entity (relation-type)` 대상 실재 hard·aggregate 순환 advisory) · 관계 어휘 화이트리스트(SPEC-017) |
-| `tooling/check-spec-cohesion.mjs` | 입도 거울상(Ownership.Entities > `maxAggregateRootsPerSpec` = 여러 aggregate 삼킴 advisory) |
+| `tooling/check-spec-cohesion.mjs` | 입도 거울상 — aggregate root 다수(삼킴)·**최소 하한(entity 없는 번들)**·capability **entity별** 캡 |
+| `tooling/ownership-keys.mjs` `resolveCategoryRoles` · `sdd.config.json` `ownershipCategoryRoles` | 카테고리→역할(entity/surface/capability/engine/event) 선언·해석 — 판정이 이름이 아닌 역할에 걸림(SPEC-001 FR-010) |
+| `tooling/capability-ownership-lib.mjs` | capability의 entity 귀속(entity.verb는 소유 entity 스펙만, SPEC-024) |
+| `tooling/schema-backing-lib.mjs` | 소유 entity의 구조 SSOT 실재 대조(유령 entity 차단, SPEC-026) |
+| `tooling/ownership-reality-lib.mjs` | surface 심볼의 소스 실재 정방향 판정(SPEC-029) |
+| `tooling/engine-event-lib.mjs` · `tooling/check-engine-event.mjs` | engine 코드-모듈 실재 · event entity 귀속+카탈로그 실재(전수성 구멍 봉합, SPEC-030) |
+| `tooling/policy-ratchet-lib.mjs` · `tooling/check-policy-ratchet.mjs` | 강제 강도 단조성(하향=회피 차단, 자기포함, SPEC-027) |
 | `tooling/check-spec-completeness.mjs` | `## Dedup-Review` 기록 존재 검사(Reviewed 이상, SPEC-008) |
 | `sdd.config.json` `entityRegistry` | entity 어휘 화이트리스트(entity→도입 사유) — 신설은 config 리뷰 관문 |
 | `STRUCTURE.md` | 소유권 유일성 규칙 + 라우팅 결정트리 |

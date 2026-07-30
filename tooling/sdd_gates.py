@@ -1290,8 +1290,21 @@ def cmd_cohesion(cfg, strict):
                 owns_any = any(own.get(c) for c in categories)
                 if owns_any and not own.get(ent_role):
                     violations.append((spec_id, f"{ent_role}(min)", 0, 1))
+            # capability 역할 카테고리는 entity별로 센다(SPEC-024 병합 강제와의 모순 해소 — 순수 완화).
+            cap_cat = roles["capability"]
             for cat in categories:
-                if len(own[cat]) > max_keys:
+                if cap_cat and cat == cap_cat:
+                    by_ent = {}
+                    for k in own[cat]:
+                        e = str(k).split(".")[0].strip().lower()
+                        by_ent[e] = by_ent.get(e, 0) + 1
+                    top = None
+                    for e, n in by_ent.items():
+                        if top is None or n > top[1]:
+                            top = (e, n)
+                    if top and top[1] > max_keys:
+                        violations.append((spec_id, f"{cat}(entity:{top[0]})", top[1], max_keys))
+                elif len(own[cat]) > max_keys:
                     violations.append((spec_id, cat, len(own[cat]), max_keys))
 
     print(f"Spec 입도(cohesion) 게이트: spec {len(files)}개 검사 (키>{max_keys}/카테고리, FR>{max_frs}).")
