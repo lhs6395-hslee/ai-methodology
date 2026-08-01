@@ -105,6 +105,14 @@ DEFAULTS = {
     "eventCatalogSources": [],
     "eventAttributionPolicy": "off",
     "eventExemptKeys": {},
+    "executionEvidencePolicy": "off",
+    "executionVerbs": [],
+    "browserMarkers": [],
+    "browserEvidencePatterns": [],
+    "liveRealityChecks": [],
+    "liveRealityPolicy": "off",
+    "liveRealityTimeoutMs": 120000,
+    "preEditSpecFirstPolicy": "advisory",
     "ownershipRequiredPolicy": "advisory",
     "crossCategoryDedupPolicy": "advisory",
     "filesOverlapPolicy": "advisory",
@@ -877,6 +885,122 @@ def event_attribution_findings(owned_events_by_spec, owned_entities_by_spec):
             if not entity or entity not in owned:
                 findings.append((spec_id, k, entity))
     return findings
+
+
+# ─── 실행 증거 (SPEC-031) — evidence-lib.mjs 미러 ───
+DEFAULT_EXECUTION_VERBS = [
+    "렌더", "응답", "동작", "표시", "기동", "구동", "수신", "전송",
+    "renders", "render", "responds", "respond", "displays", "display", "serves", "serve", "works",
+]
+DEFAULT_BROWSER_MARKERS = [
+    "대시보드", "dashboard", "화면", "브라우저", "browser", "패널", "panel", "페이지", "page", "UI",
+]
+DEFAULT_BROWSER_EVIDENCE_PATTERNS = ["e2e", "playwright", "cypress", "puppeteer", "selenium", "browser"]
+
+
+def parse_evidence_tag(line):
+    # 코드 스팬(`...`)은 인용이지 주장이 아니다(evidence-lib.mjs 미러).
+    s = re.sub(r"`[^`]*`", " ", str(line or ""))
+    if re.search(r"\[미확인\]", s):
+        return {"kind": "unknown", "paths": []}
+    m = re.search(r"\[검증\s*([:：])?\s*([^\]]*)\]", s)
+    if not m:
+        return None
+    sep, body = m.group(1), (m.group(2) or "").strip()
+    if sep:
+        paths = [p.strip() for p in body.split(",") if p.strip()]
+        return {"kind": "exec", "paths": paths} if paths else {"kind": "bare", "paths": []}
+    if not body:
+        return {"kind": "bare", "paths": []}
+    return {"kind": "self", "paths": []}
+
+
+def has_execution_verb(line, verbs):
+    s = str(line or "").lower()
+    vs = verbs if verbs else DEFAULT_EXECUTION_VERBS
+    return any(str(v).lower() in s for v in vs)
+
+
+def is_browser_grade_evidence(path, patterns):
+    s = str(path or "").lower()
+    ps = patterns if patterns else DEFAULT_BROWSER_EVIDENCE_PATTERNS
+    return any(str(p).lower() in s for p in ps)
+
+
+def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, browser_patterns=None):
+    vs = verbs if verbs else DEFAULT_EXECUTION_VERBS
+    bpat = browser_patterns if browser_patterns else DEFAULT_BROWSER_EVIDENCE_PATTERNS
+    bmark = browser_markers if browser_markers else DEFAULT_BROWSER_MARKERS
+    out = []
+    for u in units or []:
+        for c in u.get("claims") or []:
+            tag = parse_evidence_tag(c["text"])
+            if tag and tag["kind"] == "bare":
+                out.append((u["specId"], c["id"], c["kind"], "bare-tag",
+                            "경로 없는 `[검증]` — 실행 증거 자산 경로를 적어라(`[검증: tests/e2e/x.e2e.ts]`)"))
+                continue
+            if tag and tag["kind"] == "exec":
+                for p in tag["paths"]:
+                    if not asset_exists(p):
+                        out.append((u["specId"], c["id"], c["kind"], "missing-asset", f"증거 자산 없음: {p}"))
+                low = str(c["text"] or "").lower()
+                if any(str(m).lower() in low for m in bmark) and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"]):
+                    out.append((u["specId"], c["id"], c["kind"], "browser-needs-ui-evidence",
+                                f"UI/브라우저 대상인데 증거가 브라우저 등급 아님({', '.join(tag['paths'])}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다"))
+                continue
+            if c["kind"] == "SC" and has_execution_verb(c["text"], vs):
+                out.append((u["specId"], c["id"], c["kind"], "exec-verb-no-evidence",
+                            "실행 동사를 주장하는데 실행 등급 증거(`[검증: <경로>]`)가 없다 — 자기신고는 실행 등급이 아니다"))
+    return out
+
+
+# ─── 라이브 대조 (SPEC-032) — live-reality-lib.mjs 미러 ───
+CHECK_KINDS = ["terraform", "kubernetes", "ownership", "custom"]
+
+
+def validate_checks(checks):
+    errors, seen = [], set()
+    for i, c in enumerate(checks or []):
+        cid = str((c or {}).get("id") or "").strip()
+        if not cid:
+            errors.append(f"liveRealityChecks[{i}] — id 필요(빈 값 불가)")
+            continue
+        if cid in seen:
+            errors.append(f'liveRealityChecks[{i}] — id "{cid}" 중복(유일해야 함)')
+        seen.add(cid)
+        if not str((c or {}).get("command") or "").strip():
+            errors.append(f'liveRealityChecks[{i}] "{cid}" — command 필요(빈 값 불가)')
+        kind = str((c or {}).get("kind") or "custom").strip()
+        if kind not in CHECK_KINDS:
+            errors.append(f'liveRealityChecks[{i}] "{cid}" — 알 수 없는 kind "{kind}"({"|".join(CHECK_KINDS)})')
+    return errors
+
+
+def classify_result(raw):
+    cid = str((raw or {}).get("id") or "")
+    label = str((raw or {}).get("label") or cid)
+    kind = str((raw or {}).get("kind") or "custom")
+    code = (raw or {}).get("exitCode")
+    if code != 0:
+        lines = [l for l in str((raw or {}).get("stderr") or "").strip().split("\n") if l.strip()]
+        why = lines[-1] if lines else f"명령이 exit {code if code is not None else '?'}로 종료"
+        return {"id": cid, "label": label, "kind": kind, "status": "skipped", "items": [], "reason": why}
+    items = [l.strip() for l in str((raw or {}).get("stdout") or "").split("\n") if l.strip()]
+    return {"id": cid, "label": label, "kind": kind,
+            "status": "violations" if items else "clean", "items": items, "reason": ""}
+
+
+def summarize_live(results):
+    out = {"clean": 0, "violations": 0, "skipped": 0, "items": 0}
+    for r in results or []:
+        if r["status"] == "violations":
+            out["violations"] += 1
+            out["items"] += len(r.get("items") or [])
+        elif r["status"] == "skipped":
+            out["skipped"] += 1
+        else:
+            out["clean"] += 1
+    return out
 
 
 # ─── 소유 키 실재 판정의 두 문법 (SPEC-029) — Node판 ownership-reality-lib.mjs 미러 ───
@@ -3133,7 +3257,7 @@ def cmd_schemadrift(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -3303,6 +3427,131 @@ def cmd_engineevent(cfg):
     sys.exit(0)
 
 
+def cmd_evidence(cfg):
+    policy = str(cfg.get("executionEvidencePolicy") or "off")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ executionEvidencePolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        print("실행 증거 게이트 — executionEvidencePolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = policy == "hard"
+    verbs = cfg.get("executionVerbs") or []
+    bmark = cfg.get("browserMarkers") or []
+    bpat = cfg.get("browserEvidencePatterns") or []
+    # 레포 파일·디렉토리 집합(증거 자산 실재 판정).
+    ignore = set(cfg["ignoreDirs"])
+    files, dirs = set(), set()
+    for dirpath, dirnames, filenames in os.walk(cfg["__root"]):
+        dirnames[:] = sorted(d for d in dirnames if d not in ignore)
+        rel_dir = os.path.relpath(dirpath, cfg["__root"])
+        for d in dirnames:
+            dirs.add(d if rel_dir == "." else f"{rel_dir}/{d}")
+        for name in sorted(filenames):
+            files.add(name if rel_dir == "." else f"{rel_dir}/{name}")
+
+    def asset_exists(path):
+        p2 = re.sub(r"^\./", "", str(path)).rstrip("/")
+        if p2 in files or p2 in dirs:
+            return True
+        if re.search(r"[*?]", p2):
+            rx = compile_glob(p2)
+            return any(rx.search(f) for f in files)
+        return False
+
+    sc_re = re.compile(r"\*\*(SC-\d{3}[a-z]?)\*\*")
+    units = []
+    for file in spec_md_files(cfg):
+        text = read_text(file)
+        m = cfg["__specId"].search(text)
+        spec_id = m.group(0) if m else os.path.basename(file)
+        claims = []
+        for line in text.split("\n"):
+            t = line.strip()
+            if t.startswith("|"):
+                continue
+            fr = cfg["__frDecl"].search(t)
+            if fr:
+                claims.append({"id": fr.group(1), "kind": "FR", "text": t})
+                continue
+            sc = sc_re.search(t)
+            if sc:
+                claims.append({"id": sc.group(1), "kind": "SC", "text": t})
+        units.append({"specId": spec_id, "claims": claims})
+
+    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat)
+    claim_count = sum(len(u["claims"]) for u in units)
+    print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")
+    tag = "✗" if hard else "⚠"
+    for spec_id, claim_id, _kind, finding, detail in findings:
+        print(f"  {tag} [{spec_id}] {claim_id} ({finding}) — {detail}")
+    if findings and hard:
+        print("\n✗ executionEvidencePolicy=hard: `[검증]`은 실행 가능한 증거 경로를 지목해야 한다 — 산문 자기신고로 충족되지 않는다(실측: 게이트 전종 green인데 대시보드 패널 30여 개 사망).", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print("실행 증거 게이트: OK — 모든 주장이 실행 증거를 지목하거나 자기신고로 명시됨.")
+    sys.exit(0)
+
+
+def cmd_livereality(cfg):
+    policy = str(cfg.get("liveRealityPolicy") or "off")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ liveRealityPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+        sys.exit(1)
+    checks = cfg.get("liveRealityChecks") or []
+    if policy == "off":
+        print("라이브 대조 게이트 — liveRealityPolicy:off (판정 안 함)")
+        sys.exit(0)
+    cfg_errors = validate_checks(checks)
+    if cfg_errors:
+        print("✗ liveRealityChecks 설정 오류:", file=sys.stderr)
+        for e in cfg_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    hard = policy == "hard"
+    if not checks:
+        print(f"라이브 대조 게이트(liveRealityPolicy={policy}): 판정 불가(inert) — liveRealityChecks 비어 있음(저장소 밖 진실을 볼 명령이 주입되지 않음)")
+        if hard:
+            print("\n✗ liveRealityPolicy=hard인데 검사가 0건이다 — hard 선언 + 무판정은 거짓 안전이다. liveRealityChecks를 주입하거나 정책을 off로 명시하라(SPEC-032).", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+    timeout_s = float(cfg.get("liveRealityTimeoutMs") or 120000) / 1000.0
+    results = []
+    for c in checks:
+        cid, label, kind = str(c["id"]), str(c.get("label") or c["id"]), str(c.get("kind") or "custom")
+        try:
+            r = subprocess.run(str(c["command"]), shell=True, cwd=cfg["__root"], capture_output=True,
+                               text=True, encoding="utf-8", timeout=timeout_s)
+            results.append(classify_result({"id": cid, "label": label, "kind": kind,
+                                            "exitCode": r.returncode, "stdout": r.stdout, "stderr": r.stderr}))
+        except Exception as e:  # noqa: BLE001 — 타임아웃·실행 실패 전부 skipped
+            results.append(classify_result({"id": cid, "label": label, "kind": kind,
+                                            "exitCode": 1, "stdout": "", "stderr": str(e)}))
+    sm = summarize_live(results)
+    print(f"라이브 대조 게이트(liveRealityPolicy={policy}): 검사 {len(results)}건 — clean {sm['clean']}·위반 {sm['violations']}(항목 {sm['items']})·skipped {sm['skipped']}")
+    tag = "✗" if hard else "⚠"
+    for r in results:
+        if r["status"] == "skipped":
+            print(f"  · [skipped] {r['label']} ({r['kind']}) — {r['reason']}")
+        elif r["status"] == "violations":
+            print(f"  {tag} {r['label']} ({r['kind']}) — {len(r['items'])}건:")
+            for it in r["items"]:
+                print(f"      - {it}")
+        else:
+            print(f"  ✓ {r['label']} ({r['kind']}) — 라이브와 일치")
+    if sm["skipped"]:
+        print("  · skipped는 '위반 없음'이 아니라 '판정 못 함'이다 — 자격증명·네트워크가 있는 환경에서 다시 돌려라.")
+    if sm["violations"]:
+        print("  · 해소 방향(회귀 금지): 라이브가 저장소보다 최신이면 저장소를 먼저 라이브에 맞춘 뒤(drift 흡수) 변경을 얹어라 — 낡은 저장소를 그대로 apply하면 라이브가 되돌아간다(APPLYING §라이브 우선 대조).")
+        print("  · 대조 결과는 해당 인프라 스펙의 Change Log에 남긴다(무엇이 어긋났고 어느 방향으로 해소했는지).")
+    if sm["violations"] and hard:
+        print("\n✗ liveRealityPolicy=hard: 저장소 선언과 라이브 실물이 어긋났다 — 위 목록을 해소하라(skipped는 실패로 치지 않는다).", file=sys.stderr)
+        sys.exit(1)
+    if not sm["violations"]:
+        print("라이브 대조 게이트: OK — 위반 0건.")
+    sys.exit(0)
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -3366,6 +3615,10 @@ def main():
         cmd_ratchet(cfg, positional[0] if positional else None)
     elif sub == "engineevent":
         cmd_engineevent(cfg)
+    elif sub == "evidence":
+        cmd_evidence(cfg)
+    elif sub == "livereality":
+        cmd_livereality(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

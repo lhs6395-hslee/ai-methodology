@@ -32,6 +32,11 @@ const RULES = [
   // R7(SPEC-030): Engines·Events 카테고리 — 전수성 구멍 봉합. 두 정책이 off(기본)면 게이트가
   // 스스로 no-op라 비용 0(옵트인 — ownershipCategoryRoles로 engine/event 역할 선언 시 활성).
   { rule: "R7 Engines·Events(전수성)", gates: ["check-engine-event.mjs"] },
+  // R8·R9(SPEC-031·032): "선언이 실제로 동작하는가" 축. 문서 정합(R1~R3)이 green이어도 산출물이
+  // 런타임에서 죽어 있을 수 있다(실측: 게이트 전종 통과인데 대시보드 패널 30여 개 사망).
+  // 둘 다 기본 off라 미채택 프로젝트는 비용 0. 라이브 대조는 자격증명 없으면 skipped(하드 실패 금지).
+  { rule: "R8 실행 증거([검증] 경로)", gates: ["check-evidence.mjs"] },
+  { rule: "R9 라이브 대조(저장소 밖 진실)", gates: ["check-live-reality.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";

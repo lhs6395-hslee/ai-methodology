@@ -105,7 +105,9 @@
     "policy-ratchet": "정책 래칫 — 강제 정책 knob의 강도 단조성(하향 회피 차단, advisory 경유지·hard 종착지의 기계화, SPEC-027)",
     "ownership-map": "Ownership 보증 맵 — 소유 키별로 어느 가드가 실제 판정했는지 생성·가시화(미판정을 키마다 드러냄, SPEC-028)",
     "ownership-reality": "소유 키 실재 판정의 두 문법(모듈 문법·심볼 문법) 코어 — SPEC-029. 어댑터(정규식) 위임의 퇴화·surface 정방향 판정 부재를 문법으로 닫는다",
-    "engine-event": "Engines·Events 카테고리 판정 코어 — 순수 엔진(코드-모듈 실재)·이벤트(entity 귀속+카탈로그 실재)로 전수성 구멍 봉합(SPEC-030)"
+    "engine-event": "Engines·Events 카테고리 판정 코어 — 순수 엔진(코드-모듈 실재)·이벤트(entity 귀속+카탈로그 실재)로 전수성 구멍 봉합(SPEC-030)",
+    "execution-evidence": "실행 증거 등급 — [검증] 태그를 실행 가능한 증거 경로로 강제(산문 자기신고 차단, SPEC-031)",
+    "live-reality": "라이브 대조 — 저장소 밖 진실(클라우드·클러스터 실물)과 선언의 일치 판정(SPEC-032)"
   },
   "relationTypes": [
     "references"
@@ -159,5 +161,6 @@
   "capabilityOwnershipPolicy": "hard",
   "ownershipRequiredPolicy": "hard",
   "crossCategoryDedupPolicy": "hard",
-  "filesOverlapPolicy": "hard"
+  "filesOverlapPolicy": "hard",
+  "executionEvidencePolicy": "hard"
 }

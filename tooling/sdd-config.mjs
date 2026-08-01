@@ -208,6 +208,23 @@ export const DEFAULTS = {
   eventExemptKeys: {},                      // 카탈로그 실재 면제(귀속 면제는 아님) — 빈 사유 에러.
   // 구조 문법 잔여 3종(감사 후속) — 결정적 중복차단의 남은 구멍. 기본 advisory(신규 채택 소급 범람
   // 방지), 깨끗해지면 hard 승격(킷 자신은 hard). 순수 신규 검출이라 위반 추가만 한다.
+  // 실행 증거(SPEC-031) — "선언이 실제로 동작하는가" 축. `[검증]`을 실행 가능한 증거 경로로 강제:
+  // `[검증: tests/e2e/x.e2e.ts]`(실행 등급, 자산 실재 필수) vs `[검증]`(경로 없는 빈 주장 = 위반).
+  // SC가 실행 동사(렌더/응답/동작…)를 주장하면 실행 등급 증거를 요구한다. FR·SC 라인만 판정.
+  executionEvidencePolicy: "off",           // off(기본)|advisory|hard.
+  executionVerbs: [],                       // 빈 값이면 기본 어휘(evidence-lib DEFAULT_EXECUTION_VERBS).
+  browserMarkers: [],                       // UI/브라우저 대상 탐지 마커(빈 값=기본). API 단독 증거 불인정 판정용.
+  browserEvidencePatterns: [],              // 브라우저 등급 증거 경로 패턴(빈 값=기본: e2e·playwright·cypress…).
+  // 라이브 대조(SPEC-032) — 저장소 밖 진실(클라우드·클러스터 실물)을 보는 유일한 게이트.
+  // 인프라 무관: 프로젝트가 명령을 주입하고 **stdout 한 줄 = 위반 항목 하나**(비면 clean).
+  // 실행 실패(exit≠0)는 언제나 skipped(reason) — 자격증명 없는 환경에서 하드 실패 금지.
+  //   [{ id, label, kind: "terraform"|"kubernetes"|"ownership"|"custom", command }]
+  liveRealityChecks: [],
+  liveRealityPolicy: "off",                 // off(기본)|advisory|hard. hard여도 skipped는 실패 아님.
+  liveRealityTimeoutMs: 120000,             // 검사 명령 타임아웃(초과 시 skipped).
+  // pre-edit spec-first(SPEC-003 FR-012) — 소유 surface 편집 직전 소유 스펙 미수정을 경고(비차단).
+  // commit-msg 훅만 있으면 사후 검사라 순서 위반이 커밋 시점까지 무마찰로 진행된다. off|advisory(기본).
+  preEditSpecFirstPolicy: "advisory",
   ownershipRequiredPolicy: "advisory",      // 모든 스펙 Ownership 선언 강제(미선언=dedup 사각). off|advisory|hard.
   crossCategoryDedupPolicy: "advisory",     // 같은 정규화 키가 2+ 카테고리에 소유(카테고리 간 중복). off|advisory|hard.
   filesOverlapPolicy: "advisory",           // 2+ 스펙 Files glob이 같은 실파일 소유(실코드 중복). off|advisory|hard.

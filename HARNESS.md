@@ -12,6 +12,8 @@
 | **R2′ code→deployed-runtime** | 배포 전(preflight) | `check-schema-drift`(코드 기대 스키마 ↔ 배포 DB 실측 diff — opt-in `schemaDriftManifest`, SPEC-022) | "배포 전 마이그레이션 적용 / baseline?" | migrate-on-deploy 또는 배포전 스키마 preflight |
 | **R4 상시 sync** | push·주기·요청 | 위 일괄(`sdd-sync.mjs`) | drift → 해당 규칙 라우팅 | (R1/R2/R3의 act) |
 | **R5 test 실행** | push(pre-push)·CI·완료 주장 시 | `check-test-run`(`runTestsPolicy` off=no-op·advisory·hard — `commands.test` 실행·exit 0 요구, SPEC-021) | "스위트 red — 완료 주장 전 green으로?" | 실패 테스트 수정 → 재실행 |
+| **R8 실행 증거** | spec 저술·리뷰·CI | `check-evidence`(`[검증]`→실행 가능한 증거 경로 강제, SC 실행동사·UI 대상 등급 판정 — `executionEvidencePolicy` off=no-op·advisory·hard, SPEC-031) | "이 주장을 무엇으로 재현하나 — 경로가 있나?" | 증거 자산 작성 후 `[검증: <경로>]`로 지목, 없으면 자기신고 등급으로 정직하게 표기 |
+| **R9 라이브 대조** | 배포 전·주기·가오픈 점검 | `check-live-reality`(저장소 밖 진실 — IaC state 미등재 선언, 라이브↔매니페스트 해시, 무소유 자원. 주입 어댑터 `liveRealityChecks`, 자격증명 없으면 **skipped(reason)**, SPEC-032) | "선언과 실물이 어긋났다 — 어느 쪽이 정본인가?" | 라이브가 최신이면 저장소를 먼저 맞춘 뒤(drift 흡수) 변경을 얹고, 결과를 인프라 스펙 Change Log에 기록 |
 | **R6 정책 래칫** | config 변경·push·CI | `check-policy-ratchet`(강제 정책 강도의 단조성 — base 대비 knob 하향 차단, `policyRatchetPolicy` off=no-op·advisory·hard, 예외는 `policyRatchetExceptions`, SPEC-027). **자기포함:** `policyRatchetPolicy` 자신도 래칫 대상이고 자기 강도는 base 시점과 현재 중 강한 쪽으로 판정된다 — 이 knob을 내려 판정을 끄는 한 줄 자폭이 불가하며, 정당한 롤백은 예외 선언(부채 표면화)으로만 가능 | "강도를 왜 낮췄나 — 위반은 스펙 편집으로 해소 / 진짜 롤백이면 예외 선언?" | knob 복원 또는 예외 선언 → 위반은 스펙 편집으로 소진 |
 
 > **범위 밖(의도적):** `check-derivation`(재도출 소스 회계)·`sdd-smoke-scan`(증거 드리프트)은 이 하네스의 규칙표에 넣지 않는다 — 트리거가 "spec/코드 변경"이 아니라 **재채택(readopt)·증거 갱신** 이벤트라서다. 실행 지점은 readopt 절차(`prompts/readopt.md` 6~7단계)와 CI 스텝(`ci-examples.md`·`sdd-gates.yml` 주석)이 담당한다. `retag`는 게이트가 아니라 마이그레이션 도구(dry-run 기본)라 detect 대상이 아니다.

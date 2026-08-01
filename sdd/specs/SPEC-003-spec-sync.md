@@ -31,7 +31,7 @@
 ## Functional Requirements (EARS)
 > 정본은 영어.
 
-- **FR-001** (event): WHEN a changed code file matches a spec's `Ownership.Files` glob, THE **spec-sync** (E) enforcement SHALL require a meaningful change to that spec in the same changeset (staged ∪ base...HEAD), where meaningful = an added/removed FR line or an added bullet/table row under Edge Cases or Change Log. — capability: **spec-sync.enforce** (C).
+- **FR-001** (event): WHEN a changed code file matches a spec's `Ownership.Files` glob, THE **spec-sync** (E) enforcement SHALL require a meaningful change to that spec in the same changeset (staged ∪ base...HEAD), where meaningful = an added/removed FR line or an added bullet/table row under Edge Cases or Change Log. — capability: **spec-sync.enforce** (C). WHERE `preEditSpecFirstPolicy` is advisory, **check-pre-edit.mjs** (S) SHALL additionally warn at edit time (PreToolUse) that an owned file's spec is untouched in this branch — non-blocking, and silent when the path is unowned, the spec is already touched, or git is unavailable — so that the ordering violation is felt before the code is written rather than at commit time.
 - **FR-002** (state): WHILE running with `--staged --message-file`, THE **check-spec-sync.mjs** (S) gate SHALL judge under the HEAD-committed `sdd.config.json` whenever the staged config differs from it — so a commit that weakens the config is judged by the pre-change rules — and SHALL treat violations as hard errors exiting non-zero; WHILE running in range mode (a base ref only), THE SYSTEM SHALL treat violations as non-blocking advisories and exit zero.
 - **FR-003** (unwanted): IF the commit message contains `Spec-Impact: none` without a trailing reason, THEN THE SYSTEM SHALL exit non-zero; WHERE a non-empty reason is present, THE SYSTEM SHALL waive only the accompaniment requirement and the status block, recording the persisted trailer — the Files glob-syntax check and the unowned-file policy SHALL remain enforced.
 - **FR-004** (event): WHEN the git `commit-msg` hook detects `MERGE_HEAD`, THE SYSTEM SHALL skip the spec-sync check for the merge commit and rely on the range advisory as backstop.
@@ -51,10 +51,10 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: spec-sync
-- **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs, check-converge-drift.mjs, check-orphan-surfaces.mjs
+- **Symbols**: check-spec-sync.mjs, spec-sync-lib.mjs, check-converge-drift.mjs, check-orphan-surfaces.mjs, check-pre-edit.mjs
 - **Artifacts**: .git/hooks/commit-msg
 - **Capabilities**: spec-sync.enforce
-- **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/check-converge-drift.mjs, tooling/check-orphan-surfaces.mjs, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs, tooling/__tests__/check-converge-drift.test.mjs, tooling/__tests__/check-orphan-surfaces.test.mjs
+- **Files**: tooling/check-spec-sync.mjs, tooling/spec-sync-lib.mjs, tooling/harness/commit-msg, tooling/check-converge-drift.mjs, tooling/check-orphan-surfaces.mjs, tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs, tooling/__tests__/check-converge-drift.test.mjs, tooling/__tests__/check-orphan-surfaces.test.mjs, tooling/check-pre-edit.mjs, tooling/__tests__/pre-edit.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > glob 매칭 대상 키의 파싱은 SPEC-001 파이프라인에 위임.
@@ -102,3 +102,4 @@
 | 2026-07-27 | FR-001·002·007~009의 익명 주어를 실제 판정 주체로 교체해 소유 키 5종을 앵커(FR-001 spec-sync(E)·FR-002 check-spec-sync.mjs·FR-007 spec-sync-lib.mjs·FR-008 check-converge-drift.mjs·FR-009 check-orphan-surfaces.mjs) — 백틱 인용 2건은 앵커로 승격, 판정 내용 무변 | SPEC-001 FR-010으로 역할 선언이 들어오며 SPEC-023 키 앵커(FR-005·006·007)가 킷 자신에게 처음 발화 — 자기적용 마이그레이션(감사 이슈 #21) |
 | 2026-07-28 | exempt가 스펙의 Files 소유를 덮을 때 **그 사실을 출력**하도록 — 덮는 스펙 ID를 함께 적는다. 강도·exit·우선순위 불변 | 소비 프로젝트 PM 실측: 면제 글롭이 선언된 소유권 76건(TEST-001 37건 포함)을 조용히 무효화하고 있었고 게이트 출력에 신호가 없었다. ⚠ 처음엔 우선순위를 뒤집어(소유 우선) 고치려 했으나 **테스트가 반증**했다 — `src/lib/pdf/**` 소유 안의 `generated/**` 면제가 이미 고정된 의도된 시나리오다(presets 규범의 "과포함 좁히기"). 우선순위는 정당하므로 침묵만 없앤다. 이번 세션 내내 나온 "선언했는데 발화 안 하는 가드" 계열의 처방과 동일 |
 | 2026-07-28 | `check-spec-sync.mjs`에 Files 리터럴 경로 실재 검증 배선 + `spec-sync-lib.mjs`에 `filesLineMissingPaths` 순수 코어 | SPEC-013 신설 항목의 소비. 게이트 본체·라이브러리는 이 spec 소유이므로 배선 이력을 남긴다. 판정 강도는 미지원 글롭 문법과 동일(staged hard) |
+| 2026-07-30 | pre-edit spec-first 배선(FR-001 확장) — `check-pre-edit.mjs` 신설 + `preEditSpecFirstPolicy`(off\|advisory). 소유 파일 편집 직전 소유 스펙이 이 브랜치에서 미수정이면 경고(비차단·미소유/무git은 침묵) | owner 개정 요청 R3(실측 gsn-ai-pm): spec-first가 commit-msg 훅뿐이라 **사후 검사**였다 — 편집 중 마찰이 0이라 순서 위반이 자각되지 않은 채 커밋 시점까지 진행됐다. 차단이 아니라 마찰을 만드는 것이 목적 |
