@@ -76,11 +76,37 @@ engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라
 
 **정직한 잔여 한계:** (a) 의미적(reworded) 중복은 여전히 확률적 리뷰 몫 — 결정적 게이트로 만들 수 없다. (b) 다부모(한 개념이 두 aggregate에 속함)는 relation 참조로 표현하며 단일 트리로 접지 않는다. (c) hard 전면 강제는 프로젝트별 그래듀에이션 속도에 달려 있다.
 
-## 4. ③ 의미적 중복 — 게이트가 못 잡는 틈 (보조)
+## 4. ③ 의미적 중복 — 3층으로 갈라 잡는다 (SPEC-033, 2026-08)
 
-게이트는 "키가 같은" 중복만 막는다. **말만 바꾼 같은 요구(reworded)**는 못 잡는다. 100% 자동화는 불가하므로 두 가지로 보조한다:
+dedup(§3)은 **키 문자열의 유일성**만 본다. 그래서 `order`/`orders`/`pjt_order`처럼 형태만 다른 같은 실체, `user`/`member`처럼 말만 다른 같은 개념이 전부 통과했다. 이 사각을 **entity 역할로 범위를 좁혀** 세 층으로 가른다(`check-synonym`, `synonymPolicy` off|advisory|hard).
+
+| 층 | 무엇 | 지식원 | 차단 |
+|---|---|---|---|
+| **① 형태 변이** | 케이스·구분자 토큰화 + **보수적** 단수화 + **선언된** 접두어 제거 후 정본형 충돌 | 킷 자체 코드(외부 의존 0) | **결정적 — 강도대로 차단** |
+| **② 선언 동의어** | `synonymRegistry`에 정본·별칭·**사유**를 적으면 별칭 사용을 지적 | 사람이 쓴 도메인 지식 | **결정적 — 강도대로 차단** |
+| **③ 유사 후보** | `entitySimilarityCommand`가 낸 쌍(한 줄 = 한 쌍) | 세션 LLM(기본) 또는 외부 유사도 툴 | **어떤 강도에서도 차단 안 함** |
+
+**③에 차단력을 주지 않는 이유**는 성능이 아니라 구조다 — 확률적 오탐이 빌드를 깨면 그 실수가 곧 방법론의 오류가 되고, 사람은 그 층을 통째로 떼어낸다. 그래서 ③은 "무엇을 볼지"만 정하고, "무엇이 참인지"는 사람이 ①②로 착지시킨다. 미결 후보는 정본 통합(`synonymRegistry`)이나 기각(`synonymReviewLedger`) 중 하나로 착지해야만 사라지며 **둘 다 사유 필수**라 config 리뷰를 거친다(조용한 소실 없음).
+
+**보수적 규칙:** 단수화는 `ss`/`us`/`is`/`os`로 끝나는 말(`status`·`class`·`analysis`)과 3글자 이하를 건드리지 않는다 — 과잉 병합이 정본을 흔드는 것이 오탐보다 나쁘다. 접두어는 `keyPrefixes`에 선언된 것만 벗긴다(임의 병합 금지). 스테머(Porter·Snowball)를 **일부러 쓰지 않는다**(`analysis→analysi` 류 과잉 어간 추출).
+
+**후보 목록은 낡는다:** entity 34건일 때 만든 목록이 47건이 된 뒤에도 그대로면 게이트는 "미결 후보 0"을 찍고 사람은 다 봤다고 믿는다. 생성기가 자기가 본 집합을 `# entity-set: <건수> <해시>` 헤더로 선언하고 게이트가 현재 집합과 대조한다 — 확률적 산출물에 대한 **결정적** 검사이며, 역시 비차단이다(FR-008).
+
+### ③의 생성기 — 실측으로 세션 LLM을 택했다 (2026-08-02)
+
+킷 entity 34건 **561쌍을 전수 판정**하고(열거는 기계 `docs/examples/entity-pairs.mjs`, 판정은 LLM) 같은 쌍에 값싼 어휘 유사도 툴이 매긴 순위를 대조했다:
+
+| LLM이 지목한 축 | 툴 상위 20 진입 | 툴 중앙 순위 |
+|---|---|---|
+| **이름 축**(이름만 비슷) 7쌍 | **7 / 7** | 7위 |
+| **기능 축**(이름 다른데 하는 일 겹침) 11쌍 | **0 / 11** | 84위(최악 353위/561) |
+
+가장 중요한 쌍(`live-reality` ↔ `runtime-schema-drift` — 둘 다 "저장소 밖 진실과 대조")에 툴은 **353위·점수 -0.000**을 줬다. 어떤 임계값으로도 안 걸린다. 반대로 툴의 1~3위는 전부 이름만 비슷한 쌍이고 **그건 ①이 이미 보는 영역**이다. 결론: 외부 임베딩(Ollama·HuggingFace·model2vec)을 깔아 얻는 순증이 없어 **제외**하고, 후보 생성은 세션 LLM이 맡는다 — 설치할 것이 0이고, `entitySimilarityCommand`는 `cat sdd/similarity-candidates.tsv` 한 줄이라 Jenkins·GitLab runner 어디서도 준비물이 없다.
+
+**단, 전수성은 LLM에게 맡기지 않는다.** "34개 중 비슷한 거 찾아봐"라고 던지면 눈에 띄는 몇 개만 집고 가운데를 흘린다 — 그건 모델 능력이 아니라 **루프 구조**의 문제다. 쌍 열거는 기계가 하고 LLM은 쌍 하나씩만 판정한다.
+
+**여전히 남는 것:** 완전히 다른 단어로 재서술된 중복. 그리고 ③에는 정답지가 없어 **재현율을 잴 수 없다** — 이 게이트는 "의미적 중복 없음"이라고 말할 수 없고 **"미결 후보 없음"**까지만 말할 수 있다. 둘은 다른 문장이다. 그래서 아래 좁힌 리뷰를 계속 병행한다:
 - **같은 Entity 이웃 spec과만** LLM diff 리뷰(범위를 전체→이웃으로 축소).
-- (선택) FR 임베딩 유사도.
 
 **절차의 문법화(P3, SPEC-008 연동):** 판정은 여전히 사람/LLM 몫이지만, *검토했다는 사실*은 기계가 강제한다 — Reviewed 이상 스펙은 `## Dedup-Review` 섹션에 **검토한 이웃 스펙 ID + 판정**(이웃이 없으면 명시적 "이웃 없음")을 기록해야 하고, completeness 게이트가 그 **존재·형식만** 검사한다(내용의 질은 검사하지 않음 — 이 경계는 유지). 형식 검사에는 **참조 실재**가 포함된다 — 기록이 언급한 스펙 ID가 실재하지 않으면(오타·삭제 잔재) advisory로 표면화된다(SPEC-013; 삭제된 이웃의 이력은 "이웃 없음(삭제됨)" 등 ID 없는 서술로 갱신). Review Log(P1)와 한 리뷰 절차로 통합해 별도 마찰 없이 수행한다. 어휘 측면은 위 `entityRegistry`가 담당(등록 없는 entity로는 reworded 스펙을 만들 수 없다).
 
@@ -104,8 +130,10 @@ engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라
 
 ## 6. 2계층의 정직한 경계
 - **구조적 중복**(같은 키) = `check-ownership` 게이트로 **기계적 차단**.
-- **의미적 중복**(reworded) = 게이트가 못 잡음 → 같은 Entity 이웃 리뷰로 보조.
-- 받아쓰는 드롭인 cross-spec 중복-탐지 툴은 업계에 없다(상용 Cosmos가 근접). 그래서 **결정적 게이트는 우리가 만들고**(이 스크립트), 의미적 100% 자동화는 포기 — 게이트(구조)+좁힌 리뷰(의미) 2계층으로 닫는다.
+- **형태·선언 동의어**(`order`/`orders`, 등록된 별칭) = `check-synonym` ①②로 **기계적 차단**(SPEC-033).
+- **재서술된 의미적 중복**(reworded) = 결정적으로는 못 잡음 → ③ 후보(비차단) + 같은 Entity 이웃 리뷰로 보조.
+- 받아쓰는 드롭인 cross-spec 중복-탐지 툴은 업계에 없다(상용 Cosmos가 근접). 그래서 **결정적 게이트는 우리가 만들고**(이 스크립트), 의미적 100% 자동화는 포기 — 게이트(구조·형태·선언)+후보 표면화+좁힌 리뷰 3계층으로 좁힌다.
+- **경계의 정직한 표현:** ①②는 "위반 없음"을 단정할 수 있고, ③은 "미결 후보 없음"까지만 말한다(정답지가 없어 재현율 측정 불가).
 
 ## 7. 키트 반영 위치
 | 파일 | 내용 |
@@ -118,6 +146,8 @@ engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라
 | `tooling/schema-backing-lib.mjs` | 소유 entity의 구조 SSOT 실재 대조(유령 entity 차단, SPEC-026) |
 | `tooling/ownership-reality-lib.mjs` | surface 심볼의 소스 실재 정방향 판정(SPEC-029) |
 | `tooling/engine-event-lib.mjs` · `tooling/check-engine-event.mjs` | engine 코드-모듈 실재 · event entity 귀속+카탈로그 실재(전수성 구멍 봉합, SPEC-030) |
+| `tooling/synonym-lib.mjs` · `tooling/check-synonym.mjs` | 형태 변이·선언 동의어(결정적) + 유사 후보 분류·신선도(비차단) — 의미적 중복 3층(SPEC-033) |
+| `docs/examples/entity-pairs.mjs` · `sdd/similarity-candidates.tsv` | 의존성 0 전수 쌍 열거기 · LLM 판정 결과(생성기 계약: 한 줄 = 한 쌍 + `# entity-set` 헤더) |
 | `tooling/policy-ratchet-lib.mjs` · `tooling/check-policy-ratchet.mjs` | 강제 강도 단조성(하향=회피 차단, 자기포함, SPEC-027) |
 | `tooling/check-spec-completeness.mjs` | `## Dedup-Review` 기록 존재 검사(Reviewed 이상, SPEC-008) |
 | `sdd.config.json` `entityRegistry` | entity 어휘 화이트리스트(entity→도입 사유) — 신설은 config 리뷰 관문 |
@@ -125,6 +155,7 @@ engine·event는 **옵트인**(역할 선언 전용·이름 폴백 없음)이라
 | `SPEC_REVIEW.md` | cross-spec 중복: 구조적=CI게이트 / 의미적=좁힌 리뷰 |
 | `templates/module-spec.md` | `## Ownership` 블록 |
 | `tooling/sdd-gates.yml` · `APPLYING.md` | `check:ownership` CI·스크립트 배선 |
+| `docs/ownership-key-easy.html` | 비전문가용 설명(등기 비유·인터랙티브 중복 판정 데모·애니메이션) |
 | `docs/ownership-key.html` | 시각 설계 동반물(역할 기반 5분류·불변식·애니메이션) — `ownership-key-derivation.html`+`dedup-gate-design.html` 통합 |
 
 > 관련: FR↔test 추적 게이트는 `SSOT.md` §4. 인프라 spec↔배포실제 drift는 `SSOT.md` §5b(중복론과 별개).

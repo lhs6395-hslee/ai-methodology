@@ -26,6 +26,11 @@
 > - **선제 캡처**: Change Log 실기록 행의 근거 존재 검사
 > - **접두어↔클래스 정합**: iac/ci 전용 소유 스펙은 INFRA- 강제·`prefixClassExemptions` — SPEC-012
 > - **스펙 문법 규범**: Module 존재·단일성=1레포 1모듈·FR 라인 SHALL·Dedup 참조 실재·Files 카테고리 금지·글롭 문법 staged 차단 — SPEC-013
+> - **의미적 중복 3층**: 형태 변이(`order`/`orders`)·선언 동의어(`synonymRegistry`)는 결정적 차단, 유사 후보는 **어떤 강도에서도 비차단**(확률적 오탐에 차단력 금지) + 후보 목록 신선도 — `synonymPolicy`, SPEC-033
+> - **실행 증거 등급**: `[검증]` 태그가 실행 가능한 경로를 지목하도록 강제(산문 자기신고 차단) — `executionEvidencePolicy`, SPEC-031
+> - **라이브 대조**: 저장소 밖 진실(클라우드·클러스터 실물)과 선언의 diff, 자격증명 없으면 `skipped(reason)` — `liveRealityChecks`, SPEC-032
+> - **정책 래칫**: 강제 강도 하향 차단(자기포함) — advisory는 경유지, hard는 종착지, SPEC-027
+> - **판정 회계 맵**: 소유 키마다 어느 가드가 실제로 판정했는지·**미판정**인지 표로 — SPEC-028
 > - **리뷰 경계 선언**: 게이트가 판정하지 않는 의미 항목의 명시 표 — `METHODOLOGY.md`, 정의되지 않은 예외 0
 >
 > 채택 후 궤도 한 바퀴 운영법은 [`APPLYING.md`](APPLYING.md) §"채택 후 궤도 한 바퀴" + [`방법론.html`](docs/방법론.html) 참조. → [`ROADMAP.md`](ROADMAP.md)
@@ -43,12 +48,12 @@
 | [`STORAGE.md`](STORAGE.md) | **저장 정의** — spec·방법론을 어디·어떻게 두나(프로젝트 레이아웃, 저장 vs 참조, config=SSOT) | ★ 저장 |
 | [`STRUCTURE.md`](STRUCTURE.md) | module>spec·명세서vs델타·dedup·SSOT 3계층 | 문서 |
 | [`SSOT.md`](SSOT.md) | Spec Kit만으로 약한 이유 + 무엇으로 메우나 | 결정기록 |
-| [`DEDUP.md`](DEDUP.md) | **스펙 간 중복 2계층(구조적 게이트+의미적 리뷰)·소유권 유일성·근거** | ★ 중복 |
+| [`DEDUP.md`](DEDUP.md) | **스펙 간 중복 3계층(구조 유일성 + 형태·선언 동의어 게이트 + 유사 후보 표면화·좁힌 리뷰)·소유권 유일성·근거** | ★ 중복 |
 | [`SPEC_REVIEW.md`](SPEC_REVIEW.md) | spec 리뷰 체크리스트(중복·빈공란·모순·누락·추적성)·게이트 매핑 | 문서 |
 | [`APPLYING.md`](APPLYING.md) | **새 프로젝트에 적용하는 설치·배선 절차** + **채택 후 궤도 한 바퀴 운영법**(hook·게이트 실측 출력 포함) | 런북 |
 | [`PROMPTS.md`](PROMPTS.md) | 어느 IDE든 붙여넣는 시작/이어가기 프롬프트 | 프롬프트 |
 | [`principles.md`](principles.md) | 작업 원칙(전부정독·병렬=저비용티어·실패재시도·LLM작성/사람승인·언어/모델/인프라/CI 무관 §10) | 규칙 |
-| [`HARNESS.md`](HARNESS.md) | **인터랙티브 spec↔code sync 계약**(규칙표 R1~R4·실행기 `/sdd-sync`·pre-push 훅) + **강제 hook 세트**(SessionStart·PreToolUse·pre-commit·pre-push, `sdd-init` 배선) + **spec-first**(`check-spec-sync`·commit-msg hard·`/speckit.fix` — Files glob 소유매핑, changeset=브랜치, Spec-Impact 트레일러) | ★ 하네스 |
+| [`HARNESS.md`](HARNESS.md) | **인터랙티브 spec↔code sync 계약**(규칙표 R1~R10·실행기 `/sdd-sync`·pre-push 훅) + **강제 hook 세트**(SessionStart·PreToolUse·pre-commit·pre-push, `sdd-init` 배선) + **spec-first**(`check-spec-sync`·commit-msg hard·`/speckit.fix` — Files glob 소유매핑, changeset=브랜치, Spec-Impact 트레일러) | ★ 하네스 |
 | [`ROADMAP.md`](ROADMAP.md) | **완료 / 보류 항목**(보류는 "필요 증명 시 착수" — YAGNI) | 로드맵 |
 | `templates/` | `module-spec.md`(EARS 범용), `MODULE_MAP.md`(단일 모듈 매니페스트), `constitution.md` | 템플릿 |
 | `tooling/` | **`sdd-init.sh`**(정식 레이아웃 결정적 스캐폴더 — 모든 프로젝트 동일 보장)·**`sdd.config.json`**(언어 어댑터)·**`sdd.config.presets.md`**(Python/Go/Rust/Java/… 프리셋). 게이트 **4판 동봉**(핵심 3커맨드·ID 문법 동일, **Node·Python은 전 게이트 패리티** — 매트릭스: `ci-examples.md`): **`go-gate/`(Go→단일 정적 바이너리, 인터프리터 0 — 사실상 모든 언어 커버, 권장)** + `sdd-gate-release.yml`(전 플랫폼 빌드), `sdd_gates.sh`(POSIX 셸, 빌드 불필요), `sdd_gates.py`(Python), Node판 `*.mjs`. 모두 같은 config 구동. `vitest.config.ts`(JS만), **`ci-examples.md`**(게이트를 로컬·git훅·어떤 CI/CD 도구에서든 거는 예시 — 도구 무관), `sdd-gates.yml`(CI/CD 워크플로우 샘플 하나), `ears-preset/`. 그리고 **`gen-ownership-map.mjs`** — 게이트가 "위반만" 출력하는 것의 거울상으로, 소유 키마다 유일성·앵커·실재 칸을 `✓`/`✗`/`면제`/**`미판정`**으로 적은 `sdd/OWNERSHIP_MAP.md`를 생성한다(초록 화면이 "검증됨"인지 "아무도 안 봤음"인지 구분 — SPEC-028) | 이식 도구 |
