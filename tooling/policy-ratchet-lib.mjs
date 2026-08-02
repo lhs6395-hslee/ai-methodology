@@ -23,6 +23,15 @@ export const RATCHETED_POLICIES = [
   "runTestsPolicy",
   "migrationStatePolicy",
   "entitySchemaBackingPolicy",
+  "symbolRealityPolicy",
+  "ownershipRequiredPolicy",
+  "crossCategoryDedupPolicy",
+  "filesOverlapPolicy",
+  "executionEvidencePolicy",
+  "liveRealityPolicy",
+  "engineRealityPolicy",
+  "eventAttributionPolicy",
+  "synonymPolicy",
 ];
 
 export function rankOf(v) {

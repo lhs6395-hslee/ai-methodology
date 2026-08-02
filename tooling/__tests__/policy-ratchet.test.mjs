@@ -10,6 +10,7 @@
 // @covers SPEC-027/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,12 +58,26 @@ test("classifyRatchet: 미지의 값(오설정)은 심판하지 않음(FR-006 �
   assert.deepEqual(violations, []); // rank null → 건너뜀
 });
 
-test("RATCHETED_POLICIES: 강제 강도를 갖는 9종 — 래칫 자신을 포함(자기포함)", () => {
-  assert.equal(RATCHETED_POLICIES.length, 9);
+test("RATCHETED_POLICIES: 래칫 자신을 포함(자기포함)하고 자기약화를 먼저 지목한다", () => {
   assert.ok(RATCHETED_POLICIES.includes("frKeyAnchorPolicy"));
   // 감사 A-2: 자기포함이 없으면 `policyRatchetPolicy:"off"` 한 줄로 래칫 전체가 자폭한다.
   assert.ok(RATCHETED_POLICIES.includes("policyRatchetPolicy"));
   assert.equal(RATCHETED_POLICIES[0], "policyRatchetPolicy"); // 자기약화를 먼저 지목
+  assert.equal(new Set(RATCHETED_POLICIES).size, RATCHETED_POLICIES.length); // 중복 없음
+});
+
+// 구조적 불변식 — 개수를 세지 않는다. 숫자를 박아두면 새 강도 knob이 래칫 **밖**에 태어나도
+// 테스트는 초록이다(실측: synonymPolicy 등 6종이 hard인 채로 감시 밖에 있었고, `9`를 단정한
+// 이 테스트가 그걸 통과시켰다). 그래서 "킷이 실제로 켠 강도 knob"을 진실의 원천으로 삼는다.
+test("래칫 전수성: 킷 config의 모든 강도 enum knob은 래칫 감시 안에 있어야 한다", () => {
+  const cfg = JSON.parse(readFileSync(new URL("../../sdd.config.json", import.meta.url), "utf8"));
+  const STRENGTH = new Set(["off", "silent", "advisory", "warn", "hard", "error"]);
+  const unwatched = Object.entries(cfg)
+    .filter(([k, v]) => /Policy$/.test(k) && typeof v === "string" && STRENGTH.has(v))
+    .map(([k]) => k)
+    .filter((k) => !RATCHETED_POLICIES.includes(k));
+  assert.deepEqual(unwatched, [],
+    `강도 knob이 래칫 밖이면 hard→advisory 한 줄로 위반을 회피할 수 있다: ${unwatched.join(", ")}`);
 });
 
 test("effectiveRatchetPolicy: 자기 강도는 base·현재 중 강한 쪽 — 하향은 base가 심판, 상향은 즉시", () => {

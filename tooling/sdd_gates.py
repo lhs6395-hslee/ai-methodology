@@ -136,6 +136,15 @@ RATCHETED_POLICIES = [
     "specSyncUnownedPolicy", "draftBlockPolicy", "semanticDriftPolicy",
     "capabilityOwnershipPolicy", "frKeyAnchorPolicy", "runTestsPolicy",
     "migrationStatePolicy", "entitySchemaBackingPolicy",
+    "symbolRealityPolicy",
+    "ownershipRequiredPolicy",
+    "crossCategoryDedupPolicy",
+    "filesOverlapPolicy",
+    "executionEvidencePolicy",
+    "liveRealityPolicy",
+    "engineRealityPolicy",
+    "eventAttributionPolicy",
+    "synonymPolicy",
 ]
 
 
