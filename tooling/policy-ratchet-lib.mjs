@@ -34,6 +34,22 @@ export const RATCHETED_POLICIES = [
   "synonymPolicy",
 ];
 
+// 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다.
+// 실측(다른 소비 프로젝트): FR 12개로 캡(10)을 넘기자 "maxFRsPerSpec을 12로 상향"이 **권장안**으로
+// 제시됐다. 그건 위반을 해소한 게 아니라 자를 늘려 재는 것이고, 강도 knob을 hard→advisory로 내리는
+// 것과 같은 회피다(방법론 금지: 미채택·완화를 권장으로 내세우지 않는다). 캡 초과의 정당한 해소는
+// **분할 또는 병합**이고, 진짜 재조정이면 예외 선언으로 부채를 표면화한다.
+export const RATCHETED_LIMITS = [
+  "maxFRsPerSpec",
+  "maxKeysPerCategoryPerSpec",
+  "maxAggregateRootsPerSpec",
+];
+
+export function numOf(v) {
+  const n = typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
 export function rankOf(v) {
   const r = POLICY_RANK[String(v)];
   return r === undefined ? null : r;
@@ -68,6 +84,16 @@ export function classifyRatchet(baseCfg, curCfg, exceptions = []) {
     if (from === null || to === null) continue; // 미지의 값은 심판하지 않음
     if (to < from) {
       const rec = { knob, from: baseCfg[knob], to: curCfg[knob] };
+      (ex.has(knob) ? allowedDowngrades : violations).push(rec);
+    }
+  }
+  for (const knob of RATCHETED_LIMITS) {
+    if (!baseCfg || !(knob in baseCfg)) continue;
+    const from = numOf(baseCfg[knob]);
+    const to = numOf(curCfg ? curCfg[knob] : undefined);
+    if (from === null || to === null) continue;
+    if (to > from) { // 자를 늘리는 것 = 완화
+      const rec = { knob, from: baseCfg[knob], to: curCfg[knob], kind: "limit" };
       (ex.has(knob) ? allowedDowngrades : violations).push(rec);
     }
   }

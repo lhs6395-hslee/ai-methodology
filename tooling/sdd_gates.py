@@ -147,6 +147,18 @@ RATCHETED_POLICIES = [
     "synonymPolicy",
 ]
 
+# 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
+RATCHETED_LIMITS = [
+    "maxFRsPerSpec",
+    "maxKeysPerCategoryPerSpec",
+    "maxAggregateRootsPerSpec",
+]
+
+
+def num_of(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
 
 def rank_of(v):
     return POLICY_RANK.get(str(v))
@@ -175,6 +187,16 @@ def classify_ratchet(base_cfg, cur_cfg, exceptions=None):
             continue
         if to < frm:
             rec = {"knob": knob, "from": base_cfg.get(knob), "to": cur_cfg.get(knob)}
+            (allowed if knob in ex else violations).append(rec)
+    for knob in RATCHETED_LIMITS:
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = num_of(base_cfg.get(knob))
+        to = num_of(cur_cfg.get(knob) if cur_cfg else None)
+        if frm is None or to is None:
+            continue
+        if to > frm:  # 자를 늘리는 것 = 완화
+            rec = {"knob": knob, "from": base_cfg.get(knob), "to": cur_cfg.get(knob), "kind": "limit"}
             (allowed if knob in ex else violations).append(rec)
     return violations, allowed
 
@@ -3468,15 +3490,17 @@ def cmd_ratchet(cfg, base_arg):
     for d in allowed:
         print(f"  · [부채] {d['knob']}: {d['from']} → {d['to']} (policyRatchetExceptions로 허용된 하향 — 재승격 대상)")
     for v in violations:
-        print(f'  · {v["knob"]}: {v["from"]} → {v["to"]} — 강도 하향 금지(단조 증가만). 정당한 롤백이면 policyRatchetExceptions에 "{v["knob"]}" 선언')
+        why = ("임계 완화 금지 — 캡 초과는 **분할 또는 병합**으로 해소하는 것이지 자를 늘려 재는 것이 아니다"
+               if v.get("kind") == "limit" else "강도 하향 금지(단조 증가만)")
+        print(f'  · {v["knob"]}: {v["from"]} → {v["to"]} — {why}. 정당한 재조정이면 policyRatchetExceptions에 "{v["knob"]}" 선언(부채로 표면화)')
     if violations:
-        msg = "정책 래칫 위반 — 강제 정책 강도를 낮췄다. 위반을 knob 하향으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지)."
+        msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지)."
         if hard:
             print(f"\n✗ {msg}", file=sys.stderr)
             sys.exit(1)
         print(f"\n⚠ {msg} (policyRatchetPolicy:advisory — 경고)")
         sys.exit(0)
-    print("정책 래칫 게이트: OK — 강도 하향 없음.")
+    print("정책 래칫 게이트: OK — 강도 하향·임계 완화 없음.")
     sys.exit(0)
 
 

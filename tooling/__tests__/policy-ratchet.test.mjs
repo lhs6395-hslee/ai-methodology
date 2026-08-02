@@ -8,6 +8,7 @@
 // @covers SPEC-027/FR-005
 // @covers SPEC-027/FR-006
 // @covers SPEC-027/FR-007
+// @covers SPEC-027/FR-008
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -15,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rankOf, classifyRatchet, effectiveRatchetPolicy, RATCHETED_POLICIES } from "../policy-ratchet-lib.mjs";
+import { rankOf, numOf, classifyRatchet, effectiveRatchetPolicy, RATCHETED_POLICIES, RATCHETED_LIMITS } from "../policy-ratchet-lib.mjs";
 
 const GATE = new URL("../check-policy-ratchet.mjs", import.meta.url).pathname;
 
@@ -64,6 +65,32 @@ test("RATCHETED_POLICIES: 래칫 자신을 포함(자기포함)하고 자기약�
   assert.ok(RATCHETED_POLICIES.includes("policyRatchetPolicy"));
   assert.equal(RATCHETED_POLICIES[0], "policyRatchetPolicy"); // 자기약화를 먼저 지목
   assert.equal(new Set(RATCHETED_POLICIES).size, RATCHETED_POLICIES.length); // 중복 없음
+});
+
+// 실측 계기: 다른 소비 프로젝트에서 FR 12개가 캡(10)을 넘기자 "maxFRsPerSpec을 12로 상향"이
+// **권장안**으로 제시됐다. 자를 늘려 재는 것은 위반 해소가 아니라 회피이며, hard→advisory 하향과
+// 같은 부류다(방법론 금지: 완화를 권장으로 내세우지 않는다). 캡 초과의 해소는 분할 또는 병합이다.
+test("수치 임계 래칫: 상향=완화(위반) · 하향=강화(통과) · 예외 선언은 부채로 표면화", () => {
+  const base = { maxFRsPerSpec: 10, maxKeysPerCategoryPerSpec: 7, maxAggregateRootsPerSpec: 1 };
+  const up = classifyRatchet(base, { ...base, maxFRsPerSpec: 12 }, []);
+  assert.equal(up.violations.length, 1);
+  assert.deepEqual(up.violations[0], { knob: "maxFRsPerSpec", from: 10, to: 12, kind: "limit" });
+  assert.equal(classifyRatchet(base, { ...base, maxFRsPerSpec: 8 }, []).violations.length, 0); // 강화는 자유
+  assert.equal(classifyRatchet(base, base, []).violations.length, 0);
+  const exd = classifyRatchet(base, { ...base, maxAggregateRootsPerSpec: 2 }, ["maxAggregateRootsPerSpec"]);
+  assert.equal(exd.violations.length, 0);
+  assert.equal(exd.allowedDowngrades.length, 1); // 조용히 통과하지 않고 부채로 남는다
+  assert.equal(numOf("hard"), null); // 강도 문자열은 수치 판정 대상이 아니다
+});
+
+// 캡을 읽는 게이트가 늘어날 때 래칫 등록을 잊는 것이 이 구멍의 재발 경로다.
+test("수치 래칫 전수성: 코드가 읽는 max* 임계는 모두 래칫 감시 안에 있어야 한다", () => {
+  const srcs = ["../check-spec-cohesion.mjs", "../sdd-config.mjs"]
+    .map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");
+  const used = [...new Set([...srcs.matchAll(/\bmax[A-Z][A-Za-z]*\b/g)].map((m) => m[0]))];
+  const unwatched = used.filter((k) => !RATCHETED_LIMITS.includes(k));
+  assert.deepEqual(unwatched, [],
+    `수치 임계가 래칫 밖이면 캡 상향 한 줄로 위반을 회피할 수 있다: ${unwatched.join(", ")}`);
 });
 
 // 구조적 불변식 — 개수를 세지 않는다. 숫자를 박아두면 새 강도 knob이 래칫 **밖**에 태어나도
@@ -208,7 +235,7 @@ test("게이트: 상향·동일 → OK exit 0", () => {
   try {
     const r = run(root);
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /OK — 강도 하향 없음/);
+    assert.match(r.out, /OK — 강도 하향·임계 완화 없음/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

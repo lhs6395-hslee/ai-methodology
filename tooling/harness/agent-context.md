@@ -17,6 +17,7 @@
 
 **슬래시 없이 진행하라(Kiro·Codex 등):** 슬래시 명령(`/sdd-*`·`/speckit.*`)은 Claude Code 편의 래퍼일 뿐이다. 슬래시를 못 쓰는 환경에서 **"슬래시를 못 쓰는데 어쩌죠?"라고 되묻지 말고, 같은 절차를 그대로 수동으로 밟는다:**
 - 최초 채택 / 재채택 / 평상시 sync = `prompts/{adopt,readopt,update}.md` 절차 그대로
+- **완화를 선택지로 내밀지 않는다.** 게이트 위반의 해소안을 제시할 때 강도 하향(`hard→advisory`)·수치 임계 상향(`maxFRsPerSpec` 등)·면제 목록 추가를 **권장안으로 올리지 않는다** — 그건 위반을 없앤 게 아니라 자를 바꿔 잰 것이다. 정당한 해소는 **분할·병합·스펙 편집**이고, 진짜 재조정이 필요하면 `policyRatchetExceptions`로 부채를 표면화한다(래칫이 강도·임계 양쪽을 감시하므로 조용한 완화는 어차피 exit 1이다).
 - **이름 짓기:** 새 entity는 이미 있는 것의 다른 이름이 아닌지 본다 — `order`/`orders`/`pjt_order`는 정규화하면 같은 키라 게이트가 막는다(SPEC-033). 같은 개념을 두 이름으로 부르고 있으면 정본을 하나 정해 `synonymRegistry`에 사유와 함께 선언한다.
 - 첫 스펙 / 신규 스펙 = `templates/module-spec.md` 복사 → `sdd/specs/SPEC-NNN-<slug>.md` → FR(EARS)·Ownership·SC·Review Log 채움 → 셀프리뷰(`SPEC_REVIEW.md`) → 게이트 green → 사용자 승인
 - drift 점검 = `node scripts/sdd-sync.mjs`

@@ -8,6 +8,8 @@
 **REF(자기참조):** 이 파일을 raw로 받았다면 그 `<ref>`를, 로컬 키트면 `main`을 REF로 쓴다.
 
 ## 무엇을 고치나 (백로그 3종 — 특히 entity·bold)
+
+> **완화를 선택지로 내밀지 않는다.** 게이트 위반의 해소안을 제시할 때 강도 하향(`hard→advisory`)·수치 임계 상향(`maxFRsPerSpec` 등)·면제 목록 추가를 **권장안으로 올리지 않는다** — 그건 위반을 없앤 게 아니라 자를 바꿔 잰 것이다. 정당한 해소는 **분할·병합·스펙 편집**이고, 진짜 재조정이 필요하면 `policyRatchetExceptions`로 부채를 표면화한다(래칫이 강도·임계 양쪽을 감시하므로 조용한 완화는 어차피 exit 1이다).
 1. **Capability 귀속(SPEC-024) + entity 실재(SPEC-026)** — `entity.verb`의 entity 조각이 그 스펙의 **소유** entity가 아님(SPEC-024 — 판정은 소유 `Ownership.Entities`만 본다; `## Dependencies` 참조는 귀속 근거가 아니라 참조로 옮겨도 위반이 남는다), 또는 소유 entity가 구조 SSOT(스키마)에 실재하지 않는 **유령 entity**(SPEC-026 — 지어낸 개념 `wizard`·`project_list`에 capability를 얹어 귀속을 우회). "entity 없이 capability만 소유하는 기술 계층 스펙"도 여기.
 2. **FR 키 앵커(SPEC-023)** — FR 라인의 평문 **bold**가 소유·참조 키가 아님(수사적 강조·필드명·파일경로를 굵게 침), 또는 entity 앵커에 `(E)` 마커 누락·비-entity에 `(E)` 오부착(FR-005).
 3. **Entity 입도(SPEC-005 cohesion·SPEC-017 관계)** — 한 스펙이 aggregate root(Entities)를 `maxAggregateRootsPerSpec` 초과 소유 → root 1개 + 나머지는 `Dependencies`의 `Name (relation-type)`로.

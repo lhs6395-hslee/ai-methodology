@@ -154,7 +154,7 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `surfaceFormat` | Surface 키 형식(SPEC-001) — `"http"`(`<METHOD> <path>`·`event:`·`job:`)·`"path"`(Next.js 등 파일 라우팅·IaC의 파일경로 표면)·`"any"`(형식검증 생략). normalizeKey/validateKey가 이 값으로 분기 | `"http"` |
 | `surfacePathParam` | Surface path param 표준 표기(SPEC-001) — 키 정규화 시 경로 파라미터를 이 토큰으로 환원해 비교(`/users/{name}` 형태) | `"{name}"` |
 | `maxKeysPerCategoryPerSpec` | spec 입도(cohesion) 임계 — 한 spec이 한 카테고리에서 이 수를 초과 소유하면 under-fragmentation 신호로 분할 권고(advisory, check-ownership dedup의 거울상) | `4` |
-| `maxFRsPerSpec` | spec 입도(cohesion) 임계 — 한 spec의 FR 수가 이를 초과하면 여러 기능 욱여넣기 신호로 분할 권고(advisory) | `8` |
+| `maxFRsPerSpec` | spec 입도(cohesion) 임계 — 한 spec의 FR 수가 이를 초과하면 여러 기능 욱여넣기 신호로 분할 권고(advisory)  **래칫 감시 대상**(SPEC-027) — 값을 올리는 것은 완화라 차단된다: 캡 초과는 분할·병합으로 해소한다 | `8` |
 | `maxAggregateRootsPerSpec` | cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수(SPEC-002). 기본 1(1 spec=1 aggregate) — 루트+자식 표를 함께 소유하는 모델이면 상향 | `1` |
 | `assertionPatterns` | 테스트 "단언" 토큰 정규식 배열(test-adequacy 게이트, SPEC-002) — 매치 0인 테스트 파일은 no-assert advisory(--strict hard). 언어 무관 폭넓은 기본 | 단언 토큰 3종(expect·assert·should·require·t.Error…) |
 | `surfaceGlobs` | orphan-surface 게이트가 "표면 파일"로 볼 경로 정규식 배열(SPEC-003) — 채우면 어떤 스펙 `## Ownership Surfaces`에도 안 걸린 표면 파일을 orphan으로 검출(advisory·--strict hard). `[]`면 게이트 비활성 | `[]` |

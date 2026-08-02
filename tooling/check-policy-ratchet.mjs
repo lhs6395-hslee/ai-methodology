@@ -62,13 +62,16 @@ for (const d of allowedDowngrades) {
   console.log(`  · [부채] ${d.knob}: ${d.from} → ${d.to} (policyRatchetExceptions로 허용된 하향 — 재승격 대상)`);
 }
 for (const v of violations) {
-  console.log(`  · ${v.knob}: ${v.from} → ${v.to} — 강도 하향 금지(단조 증가만). 정당한 롤백이면 policyRatchetExceptions에 "${v.knob}" 선언`);
+  const why = v.kind === "limit"
+    ? "임계 완화 금지 — 캡 초과는 **분할 또는 병합**으로 해소하는 것이지 자를 늘려 재는 것이 아니다"
+    : "강도 하향 금지(단조 증가만)";
+  console.log(`  · ${v.knob}: ${v.from} → ${v.to} — ${why}. 정당한 재조정이면 policyRatchetExceptions에 "${v.knob}" 선언(부채로 표면화)`);
 }
 
 if (violations.length) {
-  const msg = "정책 래칫 위반 — 강제 정책 강도를 낮췄다. 위반을 knob 하향으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).";
+  const msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).";
   if (HARD) { console.error(`\n✗ ${msg}`); process.exit(1); }
   console.log(`\n⚠ ${msg} (policyRatchetPolicy:advisory — 경고)`);
   process.exit(0);
 }
-console.log("정책 래칫 게이트: OK — 강도 하향 없음.");
+console.log("정책 래칫 게이트: OK — 강도 하향·임계 완화 없음.");
