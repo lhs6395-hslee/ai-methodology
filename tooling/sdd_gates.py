@@ -113,6 +113,12 @@ DEFAULTS = {
     "liveRealityPolicy": "off",
     "liveRealityTimeoutMs": 120000,
     "preEditSpecFirstPolicy": "advisory",
+    "synonymPolicy": "off",
+    "synonymRegistry": {},
+    "synonymReviewLedger": {},
+    "keyPrefixes": [],
+    "entitySimilarityCommand": None,
+    "entitySimilarityTimeoutMs": 120000,
     "ownershipRequiredPolicy": "advisory",
     "crossCategoryDedupPolicy": "advisory",
     "filesOverlapPolicy": "advisory",
@@ -885,6 +891,135 @@ def event_attribution_findings(owned_events_by_spec, owned_entities_by_spec):
             if not entity or entity not in owned:
                 findings.append((spec_id, k, entity))
     return findings
+
+
+# ─── 동의어·형태 변이 (SPEC-033) — synonym-lib.mjs 미러 ───
+_KEEP_SUFFIX = re.compile(r"(ss|us|is|os)$", re.I)
+
+
+def singularize(word):
+    w = str(word or "")
+    if len(w) <= 3 or _KEEP_SUFFIX.search(w):
+        return w
+    if re.search(r"ies$", w, re.I):
+        return re.sub(r"ies$", "y", w, flags=re.I)
+    if re.search(r"(ches|shes|xes|zes|ses)$", w, re.I):
+        return re.sub(r"es$", "", w, flags=re.I)
+    if re.search(r"s$", w, re.I):
+        return re.sub(r"s$", "", w, flags=re.I)
+    return w
+
+
+def canonical_form(key, prefixes=None):
+    raw = str(key or "").strip()
+    if not raw:
+        return ""
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", raw)
+    tokens = [t.lower() for t in re.split(r"[\s._\-/]+", spaced) if t]
+    pfx = set(str(p).lower() for p in (prefixes or []))
+    body = [t for i, t in enumerate(tokens) if not (i == 0 and t in pfx)]
+    kept = body if body else tokens
+    return "_".join(singularize(t) for t in kept)
+
+
+def lexical_collisions(owned, prefixes=None):
+    by_canon = {}
+    for o in owned or []:
+        c = canonical_form(o["key"], prefixes)
+        if not c:
+            continue
+        by_canon.setdefault(c, []).append(o)
+    out = []
+    for canonical in sorted(by_canon.keys()):
+        members = by_canon[canonical]
+        if len(set(str(m["key"]).strip().lower() for m in members)) > 1:
+            out.append({"canonical": canonical, "members": members})
+    return out
+
+
+def validate_synonym_registry(registry, owned_keys):
+    errors, alias_owner = [], {}
+    for canonical, entry in (registry or {}).items():
+        c = str(canonical).strip().lower()
+        aliases = (entry or {}).get("aliases") or []
+        reason = str((entry or {}).get("reason") or "").strip()
+        if not reason:
+            errors.append(f'synonymRegistry["{canonical}"] — 통합 사유 필요(빈 값 불가: 왜 같은 개념인가)')
+        if not isinstance(aliases, list) or not aliases:
+            errors.append(f'synonymRegistry["{canonical}"] — aliases 최소 1개 필요')
+        if owned_keys and c not in owned_keys:
+            errors.append(f'synonymRegistry["{canonical}"] — 정본 키가 어느 스펙에도 소유되지 않음(실재하지 않는 정본 선언 금지)')
+        for a in aliases:
+            al = str(a).strip().lower()
+            if al == c:
+                errors.append(f'synonymRegistry["{canonical}"] — 별칭 "{a}"가 정본과 동일')
+                continue
+            if al in alias_owner and alias_owner[al] != c:
+                errors.append(f'별칭 "{al}"가 두 정본에 걸림("{alias_owner[al]}" vs "{c}") — 모순 선언')
+            alias_owner[al] = c
+    return errors
+
+
+def declared_synonym_findings(owned, registry):
+    alias_map = {}
+    for canonical, entry in (registry or {}).items():
+        for a in (entry or {}).get("aliases") or []:
+            alias_map[str(a).strip().lower()] = str(canonical).strip().lower()
+    out = []
+    for o in owned or []:
+        k = str(o["key"]).strip().lower()
+        if k in alias_map:
+            out.append({"specId": o["specId"], "category": o["category"], "key": k, "canonical": alias_map[k]})
+    return out
+
+
+def parse_candidate_pairs(stdout):
+    out, seen = [], set()
+    for line in str(stdout or "").split("\n"):
+        t = line.strip()
+        if not t or t.startswith("#"):
+            continue
+        parts = [p.strip() for p in re.split(r"\t|\||,", t) if p.strip()]
+        if len(parts) < 2:
+            continue
+        x, y = sorted([parts[0].lower(), parts[1].lower()])
+        if x == y:
+            continue
+        key = f"{x}::{y}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"a": x, "b": y, "score": parts[2] if len(parts) > 2 else ""})
+    return out
+
+
+def classify_candidates(pairs, registry, ledger):
+    same = set()
+    for canonical, entry in (registry or {}).items():
+        c = str(canonical).strip().lower()
+        for a in (entry or {}).get("aliases") or []:
+            same.add("::".join(sorted([c, str(a).strip().lower()])))
+    rejected = set("::".join(sorted([p.strip().lower() for p in str(k).split("::")])) for k in (ledger or {}).keys())
+    unresolved, by_reg, by_led = [], 0, 0
+    for p in pairs or []:
+        key = f"{p['a']}::{p['b']}"
+        if key in same:
+            by_reg += 1
+        elif key in rejected:
+            by_led += 1
+        else:
+            unresolved.append(p)
+    return {"unresolved": unresolved, "resolvedByRegistry": by_reg, "resolvedByLedger": by_led}
+
+
+def validate_ledger(ledger):
+    errors = []
+    for pair, reason in (ledger or {}).items():
+        if "::" not in str(pair):
+            errors.append(f'synonymReviewLedger["{pair}"] — 키 형식은 "keyA::keyB"')
+        if not str(reason or "").strip():
+            errors.append(f'synonymReviewLedger["{pair}"] — 기각 사유 필요(빈 값 불가: 왜 다른 개념인가)')
+    return errors
 
 
 # ─── 실행 증거 (SPEC-031) — evidence-lib.mjs 미러 ───
@@ -3257,7 +3392,7 @@ def cmd_schemadrift(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -3552,6 +3687,90 @@ def cmd_livereality(cfg):
     sys.exit(0)
 
 
+def cmd_synonym(cfg):
+    policy = str(cfg.get("synonymPolicy") or "off")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ synonymPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        print("동의어 게이트 — synonymPolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = policy == "hard"
+    categories = cfg["ownershipCategories"]
+    ent_cat = cfg["__roles"]["entity"]
+    prefixes = cfg.get("keyPrefixes") or []
+    registry = cfg.get("synonymRegistry") or {}
+    ledger = cfg.get("synonymReviewLedger") or {}
+    sim_cmd = cfg.get("entitySimilarityCommand")
+
+    owned = []
+    if ent_cat:
+        for file in spec_md_files(cfg):
+            text = read_text(file)
+            m = cfg["__specId"].search(text)
+            spec_id = m.group(0) if m else os.path.basename(file)
+            own = parse_section(text, "Ownership", categories)
+            for raw in own.get(ent_cat) or []:
+                owned.append({"specId": spec_id, "category": ent_cat, "key": normalize_key(ent_cat, raw, cfg)})
+    else:
+        print(f"동의어 게이트(synonymPolicy={policy}): 판정 불가(inert) — entity 역할 카테고리 미해석(ownershipCategoryRoles)")
+        if hard:
+            print("\n✗ synonymPolicy=hard인데 판정 대상이 없다(거짓 안전) — entity 역할을 선언하거나 정책을 off로.", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+    owned_keys = set(str(o["key"]).strip().lower() for o in owned)
+
+    cfg_errors = validate_synonym_registry(registry, owned_keys) + validate_ledger(ledger)
+    if cfg_errors:
+        print("✗ 동의어 설정 오류:", file=sys.stderr)
+        for e in cfg_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    collisions = lexical_collisions(owned, prefixes)
+    declared = declared_synonym_findings(owned, registry)
+    deterministic = len(collisions) + len(declared)
+
+    cand = {"unresolved": [], "resolvedByRegistry": 0, "resolvedByLedger": 0}
+    sim_skipped = ""
+    if sim_cmd:
+        try:
+            r = subprocess.run(str(sim_cmd), shell=True, cwd=cfg["__root"], capture_output=True, text=True,
+                               encoding="utf-8", timeout=float(cfg.get("entitySimilarityTimeoutMs") or 120000) / 1000.0)
+            if r.returncode != 0:
+                lines = [l for l in (r.stderr or "").strip().split("\n") if l.strip()]
+                sim_skipped = lines[-1] if lines else "실행 실패"
+            else:
+                cand = classify_candidates(parse_candidate_pairs(r.stdout), registry, ledger)
+        except Exception as e:  # noqa: BLE001
+            lines = [l for l in str(e).strip().split("\n") if l.strip()]
+            sim_skipped = lines[-1] if lines else "실행 실패"
+
+    tag = "✗" if hard else "⚠"
+    print(f"동의어 게이트(synonymPolicy={policy}): entity {len(owned)}건 — 형태 충돌 {len(collisions)}·선언 별칭 {len(declared)}·미결 후보 {len(cand['unresolved'])}")
+    for c in collisions:
+        lst = " + ".join(f"{m['key']}({m['specId']})" for m in c["members"])
+        print(f'  {tag} 형태 변이 충돌 "{c["canonical"]}" ← {lst} — 같은 실체면 정본 하나로 통일, 다르면 이름을 구분되게(단복수·접두어 차이는 같은 키다)')
+    for d in declared:
+        print(f'  {tag} [{d["specId"]}] "{d["key"]}" — synonymRegistry가 "{d["canonical"]}"의 별칭으로 선언한 이름이다: 정본으로 통일하라')
+    if sim_skipped:
+        print(f"  · [skipped] 유사 후보 탐지(entitySimilarityCommand) — {sim_skipped} (판정 못 함이지 '후보 없음'이 아니다)")
+    for p in cand["unresolved"]:
+        sc = f" (score {p['score']})" if p["score"] else ""
+        print(f'  ⚠ 미결 후보: "{p["a"]}" ↔ "{p["b"]}"{sc} — 사람이 결정하라: 같으면 synonymRegistry에 정본·별칭+사유, 다르면 synonymReviewLedger["{p["a"]}::{p["b"]}"]에 기각 사유')
+    if cand["resolvedByRegistry"] or cand["resolvedByLedger"]:
+        print(f"  · 후보 중 이미 결정됨: 정본 통합 {cand['resolvedByRegistry']}건 · 기각 원장 {cand['resolvedByLedger']}건")
+    if cand["unresolved"]:
+        print("  · 미결 후보는 **차단하지 않는다**(확률적 판정에 차단력을 주지 않는다) — 다만 결정 전까지 매 실행 재부상한다(조용한 소실 없음).")
+
+    if deterministic and hard:
+        print("\n✗ synonymPolicy=hard: 형태 변이 충돌·선언된 별칭 사용은 구조적 중복이다 — 정본으로 통일하라(미결 후보는 차단 대상이 아니다).", file=sys.stderr)
+        sys.exit(1)
+    if not deterministic and not cand["unresolved"] and not sim_skipped:
+        print("동의어 게이트: OK — 형태 충돌·선언 별칭·미결 후보 0건.")
+    sys.exit(0)
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -3619,6 +3838,8 @@ def main():
         cmd_evidence(cfg)
     elif sub == "livereality":
         cmd_livereality(cfg)
+    elif sub == "synonym":
+        cmd_synonym(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

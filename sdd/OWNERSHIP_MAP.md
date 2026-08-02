@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 33건
+## Entity 키 (aggregate root) — 34건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -35,6 +35,7 @@
 | `engine-event` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing` | SPEC-026 | ✓ | ✓ | ✓ |
+| `entity-synonym` | SPEC-033 | ✓ | ✓ | ✓ |
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
@@ -62,7 +63,7 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 60건
+## Surface 키 — 62건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -82,6 +83,7 @@
 | `check-spec-completeness.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-spec-consistency.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-spec-sync.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-synonym.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
 | `check-test-adequacy.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | ✓ |
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
@@ -124,10 +126,11 @@
 | `sdd-sync.mjs` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
 | `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `synonym-lib.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 33건
+## Capability 키 — 34건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -138,6 +141,7 @@
 | `engine-event.judge` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations.resolve` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing.judge` | SPEC-026 | ✓ | ✓ | ✓ |
+| `entity-synonym.judge` | SPEC-033 | ✓ | ✓ | ✓ |
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
@@ -188,7 +192,7 @@
 
 ## 집계
 
-- 소유 키 총 **142건** (entity 33 · surface 60 · capability 33 · 역할없음 16)
+- 소유 키 총 **146건** (entity 34 · surface 62 · capability 34 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

@@ -40,6 +40,9 @@ const RULES = [
   // 둘 다 기본 off라 미채택 프로젝트는 비용 0. 라이브 대조는 자격증명 없으면 skipped(하드 실패 금지).
   { rule: "R8 실행 증거([검증] 경로)", gates: ["check-evidence.mjs"] },
   { rule: "R9 라이브 대조(저장소 밖 진실)", gates: ["check-live-reality.mjs"] },
+  // R10(SPEC-033): 동의어·형태 변이 — dedup이 키 문자열만 보는 사각. ①② 결정적(차단 가능),
+  // ③ 확률적 후보는 **어떤 강도에서도 advisory**(LLM 오탐에 차단력을 주지 않는다). 기본 off.
+  { rule: "R10 동의어·형태 변이", gates: ["check-synonym.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";

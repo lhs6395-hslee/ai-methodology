@@ -225,6 +225,18 @@ export const DEFAULTS = {
   // pre-edit spec-first(SPEC-003 FR-012) — 소유 surface 편집 직전 소유 스펙 미수정을 경고(비차단).
   // commit-msg 훅만 있으면 사후 검사라 순서 위반이 커밋 시점까지 무마찰로 진행된다. off|advisory(기본).
   preEditSpecFirstPolicy: "advisory",
+  // 동의어·형태 변이(SPEC-033) — 의미적 중복의 결정적 포획층. dedup은 키 문자열 유일성만 본다.
+  //   ① 형태 변이(order/orders/pjt_order): 정규화 후 충돌 — 결정적
+  //   ② 선언 동의어: synonymRegistry { "<정본>": {aliases:[...], reason:"..."} } — 사유 필수
+  //   ③ 유사 후보: entitySimilarityCommand로 외부 툴(SBERT·LLM·WordNet) 주입 — **언제나 advisory**
+  // LLM/임베딩은 후보만 낸다. 미결 후보는 registry(같음) 또는 synonymReviewLedger(다름+사유)로
+  // 착지시켜야 사라지며, 확률적 판정에는 어떤 강도에서도 차단력을 주지 않는다(오탐 = 방법론 오류).
+  synonymPolicy: "off",                     // off(기본)|advisory|hard. hard는 ①②만 차단.
+  synonymRegistry: {},                      // 정본↔별칭 선언(사유 필수·모순 금지·정본 실재 필수)
+  synonymReviewLedger: {},                  // { "keyA::keyB": "기각 사유" } — 다르다고 판정한 기록
+  keyPrefixes: [],                          // 프로젝트 접두어(예: ["pjt"]) — 비면 접두어 제거 안 함
+  entitySimilarityCommand: null,            // 후보 생성기(stdout 한 줄 = "keyA<TAB>keyB[<TAB>score]")
+  entitySimilarityTimeoutMs: 120000,
   ownershipRequiredPolicy: "advisory",      // 모든 스펙 Ownership 선언 강제(미선언=dedup 사각). off|advisory|hard.
   crossCategoryDedupPolicy: "advisory",     // 같은 정규화 키가 2+ 카테고리에 소유(카테고리 간 중복). off|advisory|hard.
   filesOverlapPolicy: "advisory",           // 2+ 스펙 Files glob이 같은 실파일 소유(실코드 중복). off|advisory|hard.
