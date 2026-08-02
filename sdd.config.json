@@ -182,6 +182,9 @@
     "runtime-schema-drift::semantic-drift": "drift의 대상이 다르다 — 019는 이름·소유의 의미 드리프트, 022는 배포 스키마 드리프트",
     "test-domain::test-execution": "015는 TEST 접두어 도메인의 소유 규칙, 021은 테스트를 실제로 돌려 green을 확인. 분류 vs 실행이다",
     "adoption-lifecycle::spec-lifecycle": "주체가 다르다 — 005는 프로젝트의 채택 단계, 008은 개별 스펙의 상태",
-    "capability-ownership::ownership-reality": "024는 누가 가질 자격이 있나(귀속), 029는 있기는 한가(실재). 자격 vs 존재다"
+    "capability-ownership::ownership-reality": "024는 누가 가질 자격이 있나(귀속), 029는 있기는 한가(실재). 자격 vs 존재다",
+    "live-reality::runtime-schema-drift": "둘 다 저장소 밖 진실과 대조하지만 판정 대상과 실행 지점이 다르다 — 022는 배포 DB 스키마를 마이그레이션 의미론(적용/baseline)과 함께 배포 preflight(R2′)에서, 032는 클라우드·클러스터 자원을 주입 어댑터로 주기·가오픈 점검(R9)에서 본다. 향후 022를 032의 한 kind로 흡수할 여지는 있으나, 그러면 migrate-on-deploy라는 배포 게이트 의미가 일반 diff에 묻힌다",
+    "entity-schema-backing::ownership-reality": "'선언한 키가 실재하는가'라는 같은 축이지만 역할과 SSOT가 다르다 — 026은 entity를 구조 SSOT(DB 스키마·마이그레이션·proto)와, 029는 surface 심볼을 소스 트리와 대조한다. 역할마다 실재의 근거가 다르므로 스펙이 갈리는 것이 분산이 아니라 역할 경계다",
+    "engine-event::ownership-reality": "위와 같은 축의 다른 역할 — 030은 engine을 코드-모듈 SSOT, event를 카탈로그+발신 entity 귀속으로 판정한다(surface 심볼 문법으로는 둘 다 판정 불가). 실재 판정을 한 스펙으로 합치면 역할별 SSOT 어댑터가 한 덩어리가 되어 옵트인 경계가 사라진다"
   }
 }
