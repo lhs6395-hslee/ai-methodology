@@ -70,7 +70,7 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 **유일하게 소유(권위)**하는 키. 한 키는 전 spec에서 **정확히 한 spec**만 소유한다(`check-ownership.mjs`가 CI에서 강제 — DEDUP.md, STRUCTURE.md 중복 규칙). 새 요구가 오면 그 키의 owner를 조회해 **이미 있으면 그 spec 개정, 없으면 여기 등록**. 이 spec이 변경하는 **aggregate root**(독립적으로 생성·삭제되는 핵심 Entity)가 소유의 경계 닻이다. 다른 aggregate의 키는 아래 Dependencies로.
 > ⚠ **키 종류는 `sdd.config.json`의 `ownershipCategories`와 일치해야 한다.** 아래는 웹/CRUD 기본. 비-웹은 바꿔 쓴다(라이브러리/CLI=`Modules·Symbols·Artifacts`, 데이터=`Datasets·Jobs·Sinks`, IaC=`Resources·…`). 헤더(`- **<Category>**:`)는 config의 카테고리명과 이름이 같아야 게이트가 파싱한다(파서는 대소문자 무관 — 다만 표기는 config와 동일하게 유지). `ownershipCategories`에 `Files`는 넣지 않는다(ownership 게이트가 exit 1 — SPEC-013, `DEDUP.md` §3).
-- **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분. 스키마 식별자 그대로(trim+소문자, 단복수 임의변환 금지)]
+- **Entities**: [이 spec이 권위 보유하는 도메인 객체/테이블 — 쉼표구분. 스키마 식별자 그대로(trim+소문자, 단복수 임의변환 금지). **이미 있는 것의 다른 이름을 만들지 않는다** — `order`/`orders`/`pjt_order`는 정규화하면 같은 키라 SPEC-033이 막는다. 같은 개념을 두 이름으로 부르고 있으면 정본을 하나 정해 `synonymRegistry`에 사유와 함께 선언한다]
 - **Surfaces**: [이 spec이 관할하는 route·화면·job/event — 예: `POST /api/{id}`, `event:<name>`. METHOD 대문자·path 소문자·param `{name}` 표준형·trailing slash 없음]
 - **Capabilities**: [entity.verb 형태 — entity 조각은 **이 스펙이 소유한 Entities 키와 일치**해야 한다(SPEC-024: 스펙 경계=entity 기준, verb가 달라도 같은 entity면 같은 스펙에 FR 신설). verb ∈ CRUD 기본(create/read/update/delete/list) + config `capabilityVerbs` 등록 verb만 허용]
 - **Files**: [이 spec이 소유하는 코드 파일 glob — 예: `src/lib/<feature>/**, src/app/api/<feature>/**`. **`**`·`*`만 지원**(중괄호·`?`·`[` 금지 — 미지원 문법은 spec-sync staged가 exit 1로 차단, SPEC-013), 콤마 구분, 인라인 주석 금지. route뿐 아니라 그 기능의 라이브러리까지 빠짐없이(§Files 완전성). check-spec-sync가 이 glob으로 코드→스펙 동반을 강제]

@@ -85,7 +85,7 @@ cp <KIT>/tooling/sdd-config.mjs <KIT>/tooling/check-fr-coverage.mjs \
 - **CI가 green인지 확인** — config의 lint/typecheck/test가 기존 코드에서 통과하는지 먼저 점검(참조 프로젝트는 lint 4 errors로 red였음 → 적용 시 흔한 함정).
 
 ## 3b. (선택) 하네스 — 인터랙티브 spec↔code sync
-`--gate=node`로 init하면 `scripts/sdd-sync.mjs`·`/sdd-sync` 스킬·`scripts/sdd-pre-push.sh`가 설치된다(계약: 키트 `HARNESS.md`). spec/코드 변경 후 또는 수시로 `/sdd-sync`로 R1~R4(spec→code·code→spec·dedup+입도·상시 sync)를 사람 확인 게이트로 정렬한다. push마다 점검하려면: `ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push`(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
+`--gate=node`로 init하면 `scripts/sdd-sync.mjs`·`/sdd-sync` 스킬·`scripts/sdd-pre-push.sh`가 설치된다(계약: 키트 `HARNESS.md`). spec/코드 변경 후 또는 수시로 `/sdd-sync`로 R1~R10(spec→code·code→spec·dedup+입도·상시 sync)를 사람 확인 게이트로 정렬한다. push마다 점검하려면: `ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push`(기본 비차단, `SDD_SYNC_BLOCK=1`로 차단).
 
 > **수명주기 스킬도 함께 설치된다**(`--gate=node`): `/sdd-start`(최초 채택)·`/sdd-readopt`(완전 재채택)·`/sdd-update`(평상시 sync). 각각 `prompts/{adopt,readopt,update}.md` 정본 절차를 실행하며 승인 게이트·재채택 안전망 태그를 불변식으로 강제한다(계약: `sdd/specs/SPEC-005-adoption-lifecycle.md`).
 
@@ -120,7 +120,9 @@ incremental FR 게이트로 시작 → 완전 커버에 도달한 spec부터 `st
 게이트(품질): check-fr-coverage(+검증회계·접두어↔클래스)·check-ownership(+entity 레지스트리·Files 카테고리 금지)·check-spec-cohesion·check-spec-completeness(SC·수명주기·근거·문법 규범)·check-spec-consistency
 게이트(보강·spec-first): check-test-adequacy·check-converge-drift·check-orphan-surfaces·check-spec-sync(commit-msg hard — Draft 차단·unowned 정책·글롭 문법)
 게이트(재도출·증거): check-derivation(소스 9클래스 회계)·sdd-smoke-scan(검증 태그↔smokeManifest 드리프트)
-동기화: /sdd-sync (drift 점검), pre-push 훅
+게이트(실재·강도): check-policy-ratchet(강도 하향 차단·자기포함)·check-engine-event(엔진/이벤트 실재, 옵트인)·gen-ownership-map --check(키별 판정 회계 드리프트)
+게이트(증거·실물·의미): check-evidence([검증]이 실행 경로를 지목)·check-live-reality(저장소 밖 실물, 자격증명 없으면 skipped)·check-synonym(형태 변이·선언 동의어는 차단 / 유사 후보는 항상 비차단)
+동기화: /sdd-sync (R1~R10 집계·drift 점검), pre-push 훅
 ```
 
 **왜:** superpowers 스킬이 기본 경로(`docs/superpowers/specs/`)로 이끌고, FEAT 같은 임의 PREFIX를 만드는 이탈이 실제로 반복됐다. hook이 컨텍스트에 명시해야 모델이 프로젝트 규약을 따른다. 같은 기본 경로가 **브레인스토밍 설계 문서**(정본 스펙 이전 단계)에도 적용되는데, 그 산출물은 스펙이 아니라 `docs/design/`에 둔다(STORAGE §2.7) — 착지 전 초안과 정본 스펙을 같은 폴더에 두면 스펙 게이트가 잘못 스캔하거나 사람이 헷갈린다.

@@ -13,10 +13,11 @@
 5. 코드 전에 spec부터 — 작성=LLM, 승인=사람. 1 spec = 1 aggregate
 6. 소유 코드 변경엔 같은 changeset에 소유 spec 변경 동반(순수 hotfix만 `Spec-Impact: none <사유>` 트레일러)
 
-**강제는 실행기 무관:** git 훅(commit-msg·pre-commit)과 게이트(`check-fr-coverage`·`check-ownership`·`check-spec-sync` 등)가 **누가 커밋하든** 발화한다. 게이트 직접 실행 = `node scripts/<gate>.mjs` (또는 `python3 scripts/sdd_gates.py <gate>`).
+**강제는 실행기 무관:** git 훅(commit-msg·pre-commit)과 게이트(`check-fr-coverage`·`check-ownership`·`check-spec-sync`·`check-synonym` 등 R1~R10)가 **누가 커밋하든** 발화한다. 게이트 직접 실행 = `node scripts/<gate>.mjs` (또는 `python3 scripts/sdd_gates.py <gate>`).
 
 **슬래시 없이 진행하라(Kiro·Codex 등):** 슬래시 명령(`/sdd-*`·`/speckit.*`)은 Claude Code 편의 래퍼일 뿐이다. 슬래시를 못 쓰는 환경에서 **"슬래시를 못 쓰는데 어쩌죠?"라고 되묻지 말고, 같은 절차를 그대로 수동으로 밟는다:**
 - 최초 채택 / 재채택 / 평상시 sync = `prompts/{adopt,readopt,update}.md` 절차 그대로
+- **이름 짓기:** 새 entity는 이미 있는 것의 다른 이름이 아닌지 본다 — `order`/`orders`/`pjt_order`는 정규화하면 같은 키라 게이트가 막는다(SPEC-033). 같은 개념을 두 이름으로 부르고 있으면 정본을 하나 정해 `synonymRegistry`에 사유와 함께 선언한다.
 - 첫 스펙 / 신규 스펙 = `templates/module-spec.md` 복사 → `sdd/specs/SPEC-NNN-<slug>.md` → FR(EARS)·Ownership·SC·Review Log 채움 → 셀프리뷰(`SPEC_REVIEW.md`) → 게이트 green → 사용자 승인
 - drift 점검 = `node scripts/sdd-sync.mjs`
 

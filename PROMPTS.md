@@ -11,7 +11,7 @@
 방법론 https://github.com/lhs6395-hslee/ai-methodology 를 기준으로 이 프로젝트에 SDD를 셋업해줘.
 (키트가 로컬에 있으면 그걸, 없으면 위 레포의 raw로 읽어라 — 다운로드 불필요.)
 먼저 REALITY_CHECK.md → STORAGE.md → APPLYING.md → STRUCTURE.md → DEDUP.md → METHODOLOGY.md 순서로 읽어
-(STORAGE.md=spec·방법론 저장 정의/레이아웃, DEDUP.md=스펙 간 중복 2계층 게이트, 누락 금지).
+(STORAGE.md=spec·방법론 저장 정의/레이아웃, DEDUP.md=스펙 간 중복 3계층 게이트(구조·형태/선언 동의어·유사 후보), 누락 금지).
 추측 금지: "된다"고 하기 전에 실제로 실행/확인해 증거를 대고 [검증]/[추론]/[미확인]로 구분해.
 이 프로젝트 도메인으로 placeholder를 치환하되, 방법론(Spec Kit+EARS+Superpowers,
 module>spec, 작성=LLM/승인=사람, FR↔test 게이트)은 그대로. 지금은 APPLYING.md의

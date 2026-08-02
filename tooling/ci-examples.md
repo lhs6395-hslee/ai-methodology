@@ -25,10 +25,21 @@
 | **재도출 소스 회계(SPEC-009 — 9클래스·검출 교차검사·미설정 no-op)** | `node check-derivation.mjs` | `python sdd_gates.py derivation` |
 | **smoke 증거 자동 수집(SPEC-010 — 태그 수집·`--write` 재생성·드리프트 check)** | `node sdd-smoke-scan.mjs [--write]` | `python sdd_gates.py smokescan [--write]` |
 | **추적 태그 마이그레이션(SPEC-011 — dry-run 기본·`--write` 적용)** | `node sdd-retag.mjs <map.json> [--write]` | `python sdd_gates.py retag <map.json> [--write]` |
+| **테스트 실행(SPEC-021 — `runTestsPolicy`로 `commands.test` 실제 실행·green 요구)** | `node check-test-run.mjs` | `python sdd_gates.py testrun` |
+| **배포 스키마 드리프트(SPEC-022, R2′ — 코드 기대 ↔ 배포 DB 실측, 배포 preflight)** | `node check-schema-drift.mjs` | `python sdd_gates.py schemadrift` |
+| **정책 래칫(SPEC-027 — 강도 하향 차단·자기포함)** | `node check-policy-ratchet.mjs [base]` | `python sdd_gates.py ratchet [base]` |
+| **Engines·Events(SPEC-030 — 엔진 모듈 실재·이벤트 entity 귀속+카탈로그, 옵트인)** | `node check-engine-event.mjs` | `python sdd_gates.py engineevent` |
+| **실행 증거(SPEC-031 — `[검증]`이 실행 가능한 경로를 지목하는가)** | `node check-evidence.mjs` | `python sdd_gates.py evidence` |
+| **라이브 대조(SPEC-032 — 저장소 밖 실물 diff, 자격증명 없으면 skipped)** | `node check-live-reality.mjs` | `python sdd_gates.py livereality` |
+| **동의어·형태 변이(SPEC-033 — ①②는 강도대로 차단, ③ 유사 후보는 항상 비차단)** | `node check-synonym.mjs` | `python sdd_gates.py synonym` |
+| **판정 회계 맵(SPEC-028 — 소유 키별 가드 발화·미판정 가시화, 생성물 드리프트 검사)** | `node gen-ownership-map.mjs [--check]` | (Node 전용) |
+| 전 규칙 집계(R1~R10) | `node sdd-sync.mjs [--strict] [--json]` | (Node 전용) |
 
 셸/Go판은 핵심 3커맨드만 제공한다 — 보강 게이트가 필요한 비-Node 프로젝트는 Python판을 쓴다(둘 다 없는 환경이 실제 생기면 그때 승격 판단).
 
 아래 예시는 `<GATE>` = 위 중 택1로 읽으면 된다.
+
+> **③ 확률적 층은 CI에 넣어도 무해하다** — `check-synonym`의 유사 후보는 어떤 강도에서도 차단하지 않으므로 CI를 붉게 만들지 않는다. 다만 후보 **생성**은 CI에서 하지 않는다: 무거운 판정은 로컬 세션에서 가끔 돌려 `sdd/similarity-candidates.tsv`로 커밋하고, CI는 그 파일을 `cat`으로 읽기만 한다(어느 러너에도 설치할 것이 없다 — Jenkins·GitLab runner 포함).
 
 ---
 

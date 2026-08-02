@@ -5,7 +5,7 @@
 | **빈 공란** | `[NEEDS CLARIFICATION]` 미해소 | `/speckit.clarify`(찾아 질문→반영) + `/analyze`(마커 플래그) | 반자동 |
 | **중복(한 기능 내)** | 같은 요구가 spec/plan/tasks에 중복 | `/speckit.analyze` | 자동 |
 | **중복(spec 간) — 구조적** | 두 spec이 같은 Entity/Surface/Capability 소유 | **`check-ownership.mjs` 게이트(소유권 유일성)** | ★자동(CI) |
-| **중복(spec 간) — 의미적** | 키는 다른데 의도 같음(reworded) | 같은 Entity 이웃 spec과 좁힌 LLM diff + (선택)임베딩 유사도. **절차·어휘는 게이트화**: `## Dedup-Review` 기록 존재(`check-spec-completeness`) + `entityRegistry` 등록제(`check-ownership`) | 반자동(기록·어휘는 ★자동) |
+| **중복(spec 간) — 의미적** | 키는 다른데 같은 개념(형태 변이·동의어·재서술) | **3층(SPEC-033, entity 한정)**: ①형태 변이(`order`/`orders`)·②선언 동의어(`synonymRegistry`)는 `check-synonym`이 **결정적 차단**, ③유사 후보는 **비차단**(사람이 정본 통합 또는 기각 원장에 사유와 함께 결정할 때까지 매 실행 재부상) + 같은 Entity 이웃 spec과 좁힌 LLM diff | ①② 자동 / ③ 반자동 |
 | **리뷰 안 된 스펙** | Draft 스펙이 코드를 이끎 / 리뷰 기록 없이 Reviewed 이상 | **수명주기 게이트(SPEC-008)**: Draft 소유 코드 차단(`check-spec-sync` staged) + Status enum·`## Review Log` 존재(`check-spec-completeness`) | ★자동(CI) |
 | **과대 spec(입도)** | 한 spec에 여러 기능 욱여넣음(under-fragmentation) — 키/FR 과다 | **`check-spec-cohesion.mjs` 게이트(dedup의 거울상, advisory)** | ★자동(CI) |
 | **불완전 spec** | FR 있는데 SC·인수조건 없음 | **`check-spec-completeness.mjs`(존재만, advisory)** · 충족·측정가능성=`/checklist` | ★자동(CI) |
