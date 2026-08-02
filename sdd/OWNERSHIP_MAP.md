@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 36건
+## Entity 키 (aggregate root) — 37건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -40,6 +40,7 @@
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
+| `hook-wiring` | SPEC-036 | ✓ | ✓ | ✓ |
 | `key-pipeline` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci` | CICD-001 | ✓ | ✓ | ✓ |
 | `live-reality` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -65,7 +66,7 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 67건
+## Surface 키 — 70건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -76,6 +77,7 @@
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-hooks-installed.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
 | `check-live-reality.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
 | `check-orphan-surfaces.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -99,6 +101,8 @@
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
 | `go-gate` | SPEC-006 | ✓ | ✓ | ✓ |
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
+| `hooks-install-lib.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
+| `hooks.list` | SPEC-036 | ✓ | ✓ | ✓ |
 | `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | ✓ |
 | `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | ✓ |
 | `live-reality-lib.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -137,7 +141,7 @@
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 36건
+## Capability 키 — 37건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -153,6 +157,7 @@
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
+| `hook-wiring.gate` | SPEC-036 | ✓ | ✓ | ✓ |
 | `key-pipeline.parse` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci.gate` | CICD-001 | ✓ | ✓ | ✓ |
 | `live-reality.judge` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -201,7 +206,7 @@
 
 ## 집계
 
-- 소유 키 총 **155건** (entity 36 · surface 67 · capability 36 · 역할없음 16)
+- 소유 키 총 **160건** (entity 37 · surface 70 · capability 37 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

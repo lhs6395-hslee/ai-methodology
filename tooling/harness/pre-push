@@ -2,7 +2,10 @@
 # SDD 하네스 pre-push — spec↔code sync 점검 (HARNESS.md R4 "수시").
 # 기본 비차단(안내만). 차단하려면: SDD_SYNC_BLOCK=1.
 # 설치: ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push
-node scripts/sdd-sync.mjs --strict && exit 0
+# --hook: config의 syncHookRules로 무거운 규칙을 선언적으로 위임(위임처 syncHookDelegatedTo 필수).
+# --budget: 안전망 — 초과분은 조용한 통과가 아니라 "미판정"으로 표면화된다.
+# 훅이 몇 초를 넘기면 사람이 --no-verify로 우회하고, 그 순간 훅 전체가 무의미해진다(실측 30초+).
+node scripts/sdd-sync.mjs --hook --strict --budget "${SDD_SYNC_BUDGET_MS:-15000}" && exit 0
 echo ""
 echo "↑ spec↔code drift 가능 — node scripts/sdd-sync.mjs로 검토(Claude Code: /sdd-sync). (push는 계속됨)"
 [ "${SDD_SYNC_BLOCK:-0}" = "1" ] && exit 1

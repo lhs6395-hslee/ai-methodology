@@ -1,0 +1,9 @@
+# 킷이 설치하는 git 훅 이름 집합 — **단일 선언**(SPEC-036).
+# 설치기(self-hooks-install.sh·sdd-init.sh)와 검사 게이트(check-hooks-installed)가 같은 파일을 읽는다.
+# 개별 파일을 하드코딩하면 훅을 추가해도 설치기·검사 중 한쪽이 뒤처져 "설치 안 됐는데 아무도 모르는"
+# 상태가 된다(실측 제보: scripts/hooks에 pre-commit·pre-push가 있었지만 .git/hooks엔 commit-msg만
+# 복사돼 게이트가 한 번도 발동하지 않았다).
+pre-commit
+pre-merge-commit
+commit-msg
+pre-push

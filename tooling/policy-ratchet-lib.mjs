@@ -34,6 +34,7 @@ export const RATCHETED_POLICIES = [
   "synonymPolicy",
   "e2eTestsPolicy",
   "scCoveragePolicy",
+  "hooksInstalledPolicy",
 ];
 
 // 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다.

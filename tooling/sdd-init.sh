@@ -52,7 +52,7 @@ case "$GATE" in
         # 주장과 어긋나게 훅 0개로 끝나던 결함 봉합. pre-merge-commit(M5): merge commit에도 동일
         # 게이트(번호 중복·ownership — 두 브랜치가 같은 번호를 집는 경쟁을 병합 시점에 차단).
         if [ -d "$T/.git" ]; then
-          printf '#!/bin/sh\nsh scripts/sdd_gates.sh fr && sh scripts/sdd_gates.sh ownership\n' > "$T/.git/hooks/pre-commit"
+          printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd_gates.sh fr && sh scripts/sdd_gates.sh ownership\n' > "$T/.git/hooks/pre-commit"
           cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
           chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
           say "  → git pre-commit·pre-merge-commit 훅 연결됨(셸 게이트 — fr·ownership)"
@@ -62,11 +62,11 @@ case "$GATE" in
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py"
         # Python판은 spec-first(specsync) 포함 Node 전 게이트 패리티(SPEC-006) — 훅도 배선.
         if [ -d "$T/.git" ]; then
-          printf '#!/bin/sh\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$T/.git/hooks/pre-commit"
+          printf '#!/bin/sh\n# sdd-managed-hook\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$T/.git/hooks/pre-commit"
           # pre-merge-commit(M5): merge commit에도 fr·ownership — 병합 시점 번호 경쟁 차단.
           cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
           # merge commit은 skip(§5.6) — harness/commit-msg와 동일 의미론.
-          printf '#!/bin/sh\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
+          printf '#!/bin/sh\n# sdd-managed-hook\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
           chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit" "$T/.git/hooks/commit-msg"
           say "  → git pre-commit·pre-merge-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
         else
@@ -78,7 +78,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs; do
+                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs hooks-install-lib.mjs check-hooks-installed.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -102,13 +102,14 @@ if [ "$GATE" = "node" ]; then
   copy "$KIT/tooling/sdd-sync.mjs"               "$T/scripts/sdd-sync.mjs"
   copy "$KIT/tooling/harness/sdd-sync.SKILL.md"  "$T/.claude/skills/sdd-sync/SKILL.md"
   copy "$KIT/tooling/harness/pre-push"           "$T/scripts/sdd-pre-push.sh"
-  say "  → 하네스 훅 설치(선택): ln -sf ../../scripts/sdd-pre-push.sh .git/hooks/pre-push"
+  say "  → pre-push는 아래 훅 배선 단계에서 설치된다(선택 아님 — 미설치면 R4 sync가 한 번도 안 돈다)"
   say "  → 계약: $KIT/HARNESS.md  · 스킬: /sdd-sync"
 
   # ── hook 세트 배선: 채택 순간 = 상시 강제 궤도 ─────────────────
   copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
   copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
   copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
+  copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
   copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
   chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-pre-commit.sh"
 
@@ -117,8 +118,12 @@ if [ "$GATE" = "node" ]; then
   # 스펙 번호(SPEC-014 중복)나 같은 ownership 키를 들고 깨끗이 병합돼 main이 사후 red가 되던
   # 경쟁을 병합 시점에 차단(같은 게이트 재사용).
   if [ -d "$T/.git" ]; then
-    printf '#!/bin/sh\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
+    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
     cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+    # pre-push는 선택이 아니다 — 미설치면 R4 sync가 한 번도 안 돈다(설치 안 된 것을 green으로 읽지 않기 위해
+    # check-hooks-installed가 hooks.list 전체를 검사한다). 훅은 --hook·--budget으로 수 초 내 끝난다.
+    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-push.sh\n' > "$T/.git/hooks/pre-push"
+    chmod +x "$T/.git/hooks/pre-push"
     chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
     say "  → git pre-commit·pre-merge-commit 훅 연결됨"
   else

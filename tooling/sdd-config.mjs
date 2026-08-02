@@ -76,6 +76,15 @@ export const DEFAULTS = {
   // out-of-band 배포 가드(SPEC-035) — 배포가 커밋보다 먼저인 궤도에서 spec-first 발화 지점을
   // 커밋에서 **배포 행위**까지 앞당긴다. PostToolUse라 항상 비차단(이미 실행된 뒤에 돈다).
   // off|advisory. 감지 패턴은 deploy-guard-lib의 기본값을 쓰거나 아래로 대체한다.
+  // pre-push 훅(`sdd-sync --hook`)에서 판정할 규칙 집합. 미선언 = 전체 실행(하위호환).
+  // 선언하면 목록 밖 규칙은 **위임**으로 표시되고 flagged가 아니다 — 대신 syncHookDelegatedTo로
+  // 누가 대신 판정하는지 반드시 밝혀야 한다(담당자 없는 생략은 조용한 미판정이라 에러).
+  // 실측 근거: 스윕 30.3초 중 R5(스위트 실행) 29.8초 — 30초 훅은 --no-verify로 우회되고
+  // 그 순간 훅 전체가 무의미해진다. 우회를 유발하는 강제는 강제가 아니다.
+  // 훅 배선 실재(SPEC-004 FR-012) — .git/hooks에 킷 훅이 설치·실행 가능한가. off|advisory|hard.
+  hooksInstalledPolicy: "advisory",
+  syncHookRules: null,
+  syncHookDelegatedTo: "",
   outOfBandDeployPolicy: "advisory",
   outOfBandDeployCommands: null,
   scCoveragePolicy: "off",

@@ -13,6 +13,7 @@ mkdir -p .git/hooks
 # 전역 스캔이라 매 커밋 실행이 옳다) + change_log.html 자동 재생성(킷 전용).
 cat > .git/hooks/pre-commit <<'HOOK'
 #!/bin/sh
+# sdd-managed-hook — 이 마커로 check-hooks-installed가 '킷 훅인가'를 판정한다(남의 훅 점유 감지).
 DIR=$(git rev-parse --show-toplevel) || exit 1
 cd "$DIR"
 node tooling/check-fr-coverage.mjs || exit 1   # incremental(미커버 warn), PREFIX·번호·Planned모순 exit 1
@@ -29,6 +30,7 @@ cp .git/hooks/pre-commit .git/hooks/pre-merge-commit
 # commit-msg — spec-first 강제(소유 tooling 변경에 스펙 동반). merge는 skip.
 cat > .git/hooks/commit-msg <<'HOOK'
 #!/bin/sh
+# sdd-managed-hook
 DIR=$(git rev-parse --show-toplevel) || exit 1
 cd "$DIR"
 git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && { echo "self commit-msg: merge skip" >&2; exit 0; }
@@ -38,10 +40,31 @@ HOOK
 # pre-push — 상시 sync 집계(advisory).
 cat > .git/hooks/pre-push <<'HOOK'
 #!/bin/sh
+# sdd-managed-hook
 DIR=$(git rev-parse --show-toplevel) || exit 1
 cd "$DIR"
-node tooling/sdd-sync.mjs || true
+# --hook: config의 syncHookRules로 무거운 규칙을 선언적으로 위임(위임처는 syncHookDelegatedTo).
+# --budget: 안전망 — 초과분은 조용히 통과가 아니라 "미판정"으로 표면화된다.
+# 훅이 몇 초를 넘기면 사람이 --no-verify로 우회하고, 그 순간 훅 전체가 무의미해진다.
+node tooling/sdd-sync.mjs --hook --budget "${SDD_SYNC_BUDGET_MS:-15000}" || true
 HOOK
 
 chmod +x .git/hooks/pre-commit .git/hooks/pre-merge-commit .git/hooks/commit-msg .git/hooks/pre-push
+
+# 자기검증 — 선언 집합(hooks.list)을 실제로 다 깔았는지 설치기 스스로 확인한다.
+# 개별 파일 하드코딩만 있으면 훅을 추가해도 설치기가 뒤처져 "설치 안 됐는데 아무도 모르는" 상태가 된다.
+LIST=tooling/harness/hooks.list
+MISSING=""
+if [ -f "$LIST" ]; then
+  while IFS= read -r line; do
+    name=$(printf '%s' "$line" | sed 's/#.*//' | tr -d '[:space:]')
+    [ -z "$name" ] && continue
+    if [ ! -x ".git/hooks/$name" ]; then MISSING="$MISSING $name"; fi
+  done < "$LIST"
+fi
+if [ -n "$MISSING" ]; then
+  echo "✗ self-hooks: 선언됐지만 설치되지 않은 훅 —$MISSING (설치기와 hooks.list가 어긋났다)" >&2
+  exit 1
+fi
 echo "sdd self-hooks 설치 완료 — pre-commit·pre-merge-commit(품질)·commit-msg(spec-first)·pre-push(sync), tooling/ 직접 호출."
+echo "  자기검증 통과: hooks.list 선언 집합 전체가 설치·실행 가능."
