@@ -66,15 +66,40 @@ function specUnits() {
       const fr = cfg.__frDeclRe.exec(t);
       cfg.__frDeclRe.lastIndex = 0;
       if (fr) { claims.push({ id: fr[1], kind: "FR", text: t }); continue; }
-      const sc = t.match(/\*\*(SC-\d{3}[a-z]?)\*\*/);
-      if (sc) claims.push({ id: sc[1], kind: "SC", text: t });
+      // SC와 NFR을 한 정규식으로 — NFR은 실행 동사 규칙 대상이 아니고(SC 전용) 매니페스트
+      // 대조만을 위해 수집한다. kind는 접두어에서 나온다.
+      const sc = t.match(/\*\*((?:SC|NFR)-\d{3}[a-z]?)\*\*/);
+      if (sc) claims.push({ id: sc[1], kind: sc[1].startsWith("N") ? "NFR" : "SC", text: t });
     }
     return { specId, claims };
   });
 }
 
+// 회계 매니페스트 조회 — 본문과 매니페스트는 같은 주장에 대한 두 개의 선언이라 모순할 수 있는데
+// 그동안 아무도 둘을 대조하지 않았다(실측 제보: `[미확인]` FR이 매니페스트엔 실측을 갖고 있었다).
+// 여기서는 **키와 method만** 본다 — 무결성 검증은 각자의 소유 게이트(fr-coverage·sc-coverage)가 한다.
+function loadRawManifest(value, label) {
+  let raw = value;
+  if (typeof raw === "string" && raw.trim()) {
+    try { raw = JSON.parse(readFileSync(resolveFromRoot(cfg, raw), "utf8")); }
+    catch { return new Map(); } // 읽기·파싱 실패는 소유 게이트의 판정 대상이다(여기서 중복 차단하지 않는다)
+  }
+  const out = new Map();
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw)) {
+      const method = v && typeof v === "object" ? String(v.method ?? v.kind ?? "").trim() : "";
+      out.set(k, { source: label, method });
+    }
+  }
+  return out;
+}
+const SMOKE = loadRawManifest(cfg.smokeManifest, "smokeManifest");
+const EVID = loadRawManifest(cfg.evidenceManifest, "evidenceManifest");
+const manifestOf = (specId, claimId) =>
+  (/^(SC|NFR)-/.test(claimId) ? EVID : SMOKE).get(`${specId}/${claimId}`) || null;
+
 const units = specUnits();
-const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS });
+const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS, manifestOf });
 const claimCount = units.reduce((n, u) => n + u.claims.length, 0);
 
 console.log(`실행 증거 게이트(executionEvidencePolicy=${POLICY}): spec ${units.length}개·주장 ${claimCount}건 검사 — 위반 ${findings.length}건`);

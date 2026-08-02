@@ -68,6 +68,15 @@ export const DEFAULTS = {
   // cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수. 기본 1(1 spec = 1 aggregate).
   // aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 모델이면 상향(자식은 별도 root 아님).
   maxAggregateRootsPerSpec: 1,
+  // 지원 계층 스펙 등록부 — `{ "<SPEC-ID>": "<사유>" }`. 사유 빈 값 금지.
+  // aggregate(entity)를 가질 수 없는 계층(공유 설정·빌드 배선·순수 도구 계층)이 실재한다.
+  // 그동안 이들은 교착이었다: entity 0개면 cohesion의 `entity(min)`가 막고, 그래서 **분할이
+  // 불가능**해지고, 남은 출구가 `maxFRsPerSpec` 상향(=완화, 래칫이 차단)뿐이었다.
+  // 이 등록부는 **캡을 풀지 않는다** — 오직 `entity(min)`만 면제해 분할을 가능하게 한다.
+  // 잡동사니 서랍이 되지 않도록: (a) 등록 스펙이 entity를 소유하면 등록이 모순이라 에러,
+  // (b) 없는 스펙 ID 등록은 낡은 등록부라 에러, (c) 등록 목록은 clean일 때도 **항상 표면화**한다
+  // (schema-backing 면제와 같은 경계 — 면제는 조용히 '완료'가 되지 않는다).
+  supportLayerSpecs: {},
   // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도
@@ -87,6 +96,12 @@ export const DEFAULTS = {
   syncHookDelegatedTo: "",
   outOfBandDeployPolicy: "advisory",
   outOfBandDeployCommands: null,
+  // hard일 때 미기록 배포가 착지하는 **세션 부채 파일**(JSONL). 터미널 스크롤은 죽지만 파일은 남는다.
+  // advisory와 hard가 출력만 같고 아무것도 달라지지 않으면 승격이 무의미하다(실측 제보) — hard는
+  // 여기에 적재하고, pre-commit의 `check-deploy-debt`가 **커밋을 막는다**. 배포 자체는 여전히
+  // 비차단이다(PostToolUse는 이미 실행된 뒤에 돈다 — 되돌릴 수 없는 것을 막는 척하지 않는다).
+  // 로컬 세션 기억 장치라 커밋 대상이 아니다(sdd-init가 .gitignore에 넣는다).
+  outOfBandDeployDebtFile: ".sdd/deploy-debt.jsonl",
   scCoveragePolicy: "off",
   // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
   // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).

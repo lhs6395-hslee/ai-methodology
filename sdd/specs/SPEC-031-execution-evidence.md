@@ -32,6 +32,7 @@
 - **FR-004** (unwanted): IF a success criterion asserts an execution verb (renders / responds / works …) without an executable-grade evidence path, THEN THE SYSTEM SHALL surface it as a finding — self-reported grades do not satisfy an execution claim.
 - **FR-005** (unwanted): IF a claim names a UI or browser target while its evidence paths match no browser-grade pattern, THEN THE SYSTEM SHALL surface it, because API-only verification passes variable-interpolation and render-stage defects.
 - **FR-006** (unwanted): IF the `executionEvidencePolicy` value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it clearly and exit non-zero (without leaking a runtime stack trace).
+- **FR-007** (unwanted): IF a claim declared `[미확인]` has a non-deferred entry in the accounting manifest that covers it (smokeManifest for requirement claims, evidenceManifest for SC and NFR claims), or a claim carrying an executable tag also has a manifest entry, THEN THE SYSTEM SHALL surface the contradiction naming both sides, because prose and manifest are two declarations about the same claim and nothing compared them; a deferred entry SHALL NOT be a contradiction, and manifest integrity SHALL remain the owning gate's judgment.
 
 ### Key Entities
 - **execution evidence** — the property that a verification claim points at a runnable asset (test, script, suite) that exercises the declared behavior, as opposed to prose self-report, so that "[검증]" means someone can re-run the proof rather than that someone once asserted it.
@@ -55,6 +56,7 @@
 ## Success Criteria (측정형)
 - **SC-001**: `evidence.test.mjs` 전 케이스 green + 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인). [검증: tooling/__tests__/evidence.test.mjs]
 - **SC-002**: 재현 픽스처(빈 태그·없는 자산·실행 동사 SC·등급 불일치) 4종에서 각 finding을 지목하고 hard exit 1, 킷 자신은 hard에서 위반 0(양판 바이트 동일). [검증: tooling/__tests__/evidence.test.mjs]
+- **SC-003**: `[미확인]`↔매니페스트 실측, 실행 태그↔매니페스트 이중 회계 두 모순이 각각 지목되고 deferred 엔트리는 모순으로 잡히지 않는다. [검증: tooling/__tests__/evidence.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 판정 코어는 문자열 파싱·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 자산 실재 판정(파일 IO·글롭)은 소비 게이트가 주입한다.
@@ -62,6 +64,8 @@
 ## Assumptions / Clarifications Retained
 - 이 게이트는 "증거가 **존재하고 실행 가능한 자산을 지목하는가**"만 본다 — 그 증거가 실제로 옳은 것을 검사하는지(테스트의 질)는 판정하지 않는다(SPEC-002 NFR·SPEC-007과 동일한 경계: 존재는 기계, 질은 리뷰).
 - 브라우저 등급 판정은 경로 이름 근사다. 정확히는 "렌더 payload를 가로채는가"인데 그건 정적으로 못 본다 — 그래서 의심 표면화까지가 게이트의 몫이다.
+- 증거 등급은 **경로**로 판정하고 라벨로 판정하지 않는다. 기각한 대안: `@verifies method=browser` 같은 주장별 라벨로 등급을 선언하게 하기 — 검토했고 채택하지 않는다. **파일 위치는 게이트가 검증할 수 있고 라벨은 자기신고다**, 그리고 이 spec이 존재하는 이유가 바로 "산문 자기신고로 소비된 `[검증]`"이다. 라벨을 도입하면 같은 결함을 한 층 위에 다시 만든다(브라우저 테스트라고 적힌 API 테스트를 게이트가 반증할 수 없다). 브라우저 테스트가 관례 밖 경로에 사는 프로젝트는 `browserEvidencePatterns`를 확장한다 — config는 **한 번 선언하고 리뷰에 걸리는 것**이고, 주장별 라벨은 매 주장마다 반복되는 자기신고다. 재검토 조건: 실행 자산의 종류를 기계가 파일 내용에서 결정적으로 판별할 수 있게 되면(예: 러너 매니페스트가 표준화되면) 경로 근사를 그것으로 대체한다.
+- 이 게이트는 매니페스트의 **무결성**을 판정하지 않는다(그건 SPEC-007·SPEC-034의 몫) — 키와 method만 읽어 본문과 대조한다. 읽기·파싱 실패도 여기서 차단하지 않는다: 같은 오류를 두 게이트가 각자 판정하면 어느 쪽이 정본인지 흐려진다.
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
@@ -81,3 +85,5 @@
 |---|---|---|
 | 2026-07-30 | 초안 — `executionEvidencePolicy`(off\|advisory\|hard) + `executionVerbs`·`browserMarkers`·`browserEvidencePatterns` knob + `evidence-lib`(태그 파싱·등급 판정) + `check-evidence` 게이트 + sdd-sync R8, Node·Python 바이트 패리티. 킷 자신 hard 채택 | owner 개정 요청 R1(실측 gsn-ai-pm): 게이트 8종 green인데 대시보드 패널 30여 개 사망 — `[검증]`이 산문 자기신고로 소비되고 렌더 확인 코드가 0줄이었다. API 단독 검증도 통과하는 결함(변수 보간)이라 UI 대상엔 브라우저 등급을 요구 |
 | 2026-08-02 | 브라우저 마커 대조를 부분일치에서 **ASCII 단어 경계 일치**로 교정(`markerHits`) — 한글 마커는 교착어라 부분일치를 유지. Node·Python 동시 | 실측 제보(gsn-aiops-finops-module): `ui` 마커가 `TicketPackage`·`REQUIRED`·`pricing-guide`에 걸려 무관한 FR을 브라우저 주장으로 오분류했다. 오탐이 잦은 게이트는 꺼지므로 오탐 억제가 곧 강도다 [검증: tooling/__tests__/evidence.test.mjs] |
+| 2026-08-02 | 본문↔회계 매니페스트 대조 신설(FR-007·SC-003) — `[미확인]`인데 매니페스트가 실측을 주장하면 `unknown-vs-manifest`, 실행 태그가 있는데 매니페스트에도 엔트리면 `manifest-vs-tag`. NFR 라인도 대조 대상으로 수집(실행 동사 규칙은 SC 전용 유지). Node·Python 바이트 동일 | 실측 제보(gsn-aiops-finops-module): `[미확인]` 선언 FR이 smokeManifest에 실측 증거를 갖고 있었는데 어느 게이트도 그 모순을 판정하지 않아, "정직한 미확인"과 "회계된 검증"이 동시에 참인 채로 통과했다. 본문과 매니페스트는 같은 주장에 대한 두 개의 선언이다 [검증: tooling/__tests__/evidence.test.mjs] |
+| 2026-08-02 | 증거 등급을 `@verifies` 라벨로 선언하는 대안을 **기각**하고 근거를 Assumptions에 기록(재검토 조건 포함) | 부수 설계 논점 제보에 대한 판정: 파일 위치는 게이트가 검증할 수 있고 라벨은 자기신고다. 이 spec의 존재 이유가 자기신고로 소비된 `[검증]`인데, 라벨을 도입하면 같은 결함을 한 층 위에 재생산한다(SPEC-018 3자리 규범 — 기각한 대안은 Assumptions에 산다) |

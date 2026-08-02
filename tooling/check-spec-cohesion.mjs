@@ -44,8 +44,21 @@ function countFRs(text) {
   return new Set(frDeclarations(text, cfg.__frDeclRe, cfg.__reqAlt)).size;
 }
 
+// 지원 계층 등록부 — aggregate를 가질 수 없는 계층의 `entity(min)` 면제(캡은 그대로).
+// 실측 제보: entity 0개 계층이 FR 캡을 넘겼을 때, 분할하려 해도 새 스펙이 `entity(min)`에
+// 걸려 **분할 자체가 불가능**했고 남은 출구가 캡 상향(=완화)뿐인 교착이 생겼다.
+// 여기서 푸는 것은 `entity(min)` 하나뿐이다 — 캡을 풀면 교착이 아니라 규범이 사라진다.
+const SUPPORT = cfg.supportLayerSpecs && typeof cfg.supportLayerSpecs === "object" && !Array.isArray(cfg.supportLayerSpecs)
+  ? cfg.supportLayerSpecs : {};
+const supportErrors = [];
+for (const [id, reason] of Object.entries(SUPPORT)) {
+  if (!String(reason ?? "").trim())
+    supportErrors.push(`supportLayerSpecs "${id}" — 사유 필수(왜 이 계층엔 aggregate가 없나; 빈 값은 무언의 면제다)`);
+}
+
 const files = specFiles();
 const violations = [];
+const supportSeen = new Set();
 
 for (const file of files) {
   const text = readFileSync(file, "utf8");
@@ -63,7 +76,14 @@ for (const file of files) {
     // 키를 하나라도 소유하면서 그 칸이 비면 위반 — Surface/Capability만 번들한 'entity 없는 스펙'을
     // 차단(MAX의 거울). 역할 미정의(순수 lib·entity 개념 없음)면 건너뜀(하위호환). 폴백 CATEGORIES[0] 아님.
     const ENT_ROLE = cfg.__roles.entity;
-    if (ENT_ROLE) {
+    const registered = Object.prototype.hasOwnProperty.call(SUPPORT, specId);
+    if (registered) {
+      supportSeen.add(specId);
+      // 등록해 놓고 entity를 소유하면 등록이 거짓이다 — 면제가 필요 없는데 면제를 들고 있다.
+      if (ENT_ROLE && own[ENT_ROLE] && own[ENT_ROLE].length > 0)
+        supportErrors.push(`supportLayerSpecs "${specId}" — 이 스펙은 ${ENT_ROLE} ${own[ENT_ROLE].length}개를 소유한다(aggregate 있음). 등록을 지워라(불필요한 면제는 다음 사람에게 거짓 근거가 된다)`);
+    }
+    if (ENT_ROLE && !registered) {
       const ownsAny = CATEGORIES.some((c) => own[c] && own[c].length > 0);
       if (ownsAny && (!own[ENT_ROLE] || own[ENT_ROLE].length === 0))
         violations.push({ specId, kind: `${ENT_ROLE}(min)`, n: 0, max: 1 });
@@ -90,12 +110,27 @@ for (const file of files) {
 
 console.log(`Spec 입도(cohesion) 게이트: spec ${files.length}개 검사 (키>${MAX_KEYS}/카테고리, FR>${MAX_FRS}).`);
 
+// 낡은 등록부는 등록부가 아니다 — 없는 스펙 ID가 남아 있으면 다음 면제도 못 믿는다.
+for (const id of Object.keys(SUPPORT)) {
+  if (!supportSeen.has(id))
+    supportErrors.push(`supportLayerSpecs "${id}" — 그런 스펙이 없다(또는 Ownership 블록이 없다). 낡은 등록을 지워라`);
+}
+if (supportErrors.length) {
+  console.log(`✗ 지원 계층 등록부 무결성 위반 ${supportErrors.length}건:`);
+  for (const e of supportErrors) console.log(`  ✗ ${e}`);
+  console.error(`\n✗ supportLayerSpecs가 유효하지 않다 — 면제 목록이 틀리면 면제로 통과한 스펙도 못 믿는다.`);
+  process.exit(1);
+}
+// 면제는 clean일 때도 항상 보인다 — 조용한 '완료'가 되지 않게(schema-backing 면제와 같은 경계).
+if (supportSeen.size)
+  console.log(`· 지원 계층 스펙 ${supportSeen.size}건(aggregate 없음 — 부채·리뷰 대상, 캡은 그대로 적용): ${[...supportSeen].sort().map((id) => `${id}(${SUPPORT[id]})`).join(", ")}`);
+
 if (violations.length) {
   const tag = STRICT ? "✗" : "⚠";
   console.log(`${tag} 과대 spec(분할 권고) ${violations.length}건:`);
   for (const v of violations) {
     if (v.kind.includes("(min)"))
-      console.log(`  ${tag} ${v.specId}: aggregate root(${v.kind.replace("(min)", "")}) 0개 — 스펙은 entity(aggregate root)를 최소 1개 소유해야 한다(entity 없이 Surface/Capability만 번들 금지). entity를 소유하거나, 남의 entity 능력이면 그 소유 스펙으로 이관(SPEC-024)`);
+      console.log(`  ${tag} ${v.specId}: aggregate root(${v.kind.replace("(min)", "")}) 0개 — 스펙은 entity(aggregate root)를 최소 1개 소유해야 한다(entity 없이 Surface/Capability만 번들 금지). entity를 소유하거나, 남의 entity 능력이면 그 소유 스펙으로 이관(SPEC-024). 정말로 aggregate를 가질 수 없는 계층(공유 설정·빌드 배선)이면 supportLayerSpecs에 **사유와 함께** 등록하라 — 면제는 부채로 매 실행 표면화되고 FR·키 캡은 그대로 적용된다`);
     else if (v.kind.includes("aggregate"))
       console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 \`이름 (relation-type)\`으로 이관(SPEC-017), 그래도 남으면 분할 검토`);
     else

@@ -87,6 +87,47 @@ export function changeLogRowShape(diffText) {
   return rows;
 }
 
+// ── 세션 부채(JSONL) — hard 정책의 실체 ──
+// advisory와 hard가 출력만 같으면 승격이 이름뿐이다(실측 제보: 둘이 구분 불가능했다).
+// hard는 미기록 배포를 부채 파일에 적재하고, pre-commit이 그 부채가 남아 있으면 커밋을 막는다.
+// 배포 시점은 여전히 비차단이다 — 막을 수 있는 유일한 지점은 아직 오지 않은 커밋이다.
+
+// 부채 한 줄 = 하나의 finding. date는 호출부가 주입한다(순수 유지 — 시계는 IO다).
+export function debtLine(date, tool, finding) {
+  return JSON.stringify({
+    date: String(date || ""), tool: String(tool || ""),
+    kind: finding.kind, path: finding.path, specId: finding.specId || "",
+  });
+}
+
+// JSONL 파싱 — 깨진 줄은 **버리지 않고** 보존한다(부채를 파싱 실패로 지우면 그게 세탁이다).
+export function parseDebt(text) {
+  const open = [];
+  const malformed = [];
+  for (const line of String(text || "").split("\n")) {
+    const s = line.trim();
+    if (!s) continue;
+    let o = null;
+    try { o = JSON.parse(s); } catch { /* below */ }
+    if (o && typeof o === "object" && !Array.isArray(o) && o.path) open.push({ ...o, raw: s });
+    else malformed.push(s);
+  }
+  return { open, malformed };
+}
+
+// 부채 해소 판정 — 소유 스펙의 Change Log에 행이 착지했으면 그 부채는 갚아진 것이다.
+//   resolvedSpec(specId) -> boolean (게이트가 staged diff로 판정해 주입)
+// specId 없는 부채(unowned)는 스펙이 없으므로 해소 판정 대상이 아니다 — 소유가 생겨야 갚힌다.
+export function settleDebt(open, resolvedSpec) {
+  const settled = [];
+  const remaining = [];
+  for (const d of open || []) {
+    if (d.specId && resolvedSpec(d.specId)) settled.push(d);
+    else remaining.push(d);
+  }
+  return { settled, remaining };
+}
+
 // 최종 판정. 입력은 전부 소비 게이트가 조회해 넘긴다.
 //   deployed: 배포 소스로 쓰인 경로들 / dirty: 워킹트리에서 미커밋인 경로 집합
 //   ownerOf(path) -> specId|null / specTouched(specId) -> {changed, diff}

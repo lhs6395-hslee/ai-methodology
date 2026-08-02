@@ -18,3 +18,9 @@ node scripts/check-fr-coverage.mjs   # PREFIX 화이트리스트·사유·번호
 # 키 형식(Capability entity.verb·미등록 verb·Surface 형식)과 Ownership 블록 부재는 ⚠ warn이고
 # exit 0이다 — 이 훅은 --strict를 붙이지 않는다(형식을 차단하려면 --strict를 명시하라).
 node scripts/check-ownership.mjs
+# check-deploy-debt: outOfBandDeployPolicy=hard일 때만 발화한다(그 외엔 즉시 exit 0, 파일 IO 1회).
+# hard가 advisory와 다른 유일한 지점 — 미기록 배포를 적재해 두고 여기서 커밋을 막는다.
+# 게이트가 없는 구버전 배선에서도 커밋이 죽지 않도록 존재를 확인하고 부른다.
+if [ -f scripts/check-deploy-debt.mjs ]; then
+  node scripts/check-deploy-debt.mjs
+fi

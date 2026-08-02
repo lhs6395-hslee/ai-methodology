@@ -78,7 +78,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs hooks-install-lib.mjs check-hooks-installed.mjs; do
+                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs hooks-install-lib.mjs check-hooks-installed.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -111,6 +111,12 @@ if [ "$GATE" = "node" ]; then
   copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
   copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
   copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
+  # 배포 부채 파일은 **로컬 세션 기억 장치**다(SPEC-035) — 커밋 대상이 아니다.
+  # 추적되면 부채가 팀 diff에 섞이고, 더 나쁘게는 "커밋해서 없앤다"가 갚는 방법이 된다.
+  if [ -f "$T/.gitignore" ] && ! grep -qx '\.sdd/' "$T/.gitignore"; then
+    printf '\n# SDD 로컬 세션 상태(배포 부채 등) — 커밋 대상 아님\n.sdd/\n' >> "$T/.gitignore"
+    say "  → .gitignore에 .sdd/ 추가(배포 부채 파일)"
+  fi
   chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-pre-commit.sh"
 
   # git pre-commit + pre-merge-commit 훅 연결 (.git 있을 때만).

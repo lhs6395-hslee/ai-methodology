@@ -66,12 +66,13 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 70건
+## Surface 키 — 71건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
 | `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | ✓ |
 | `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-deploy-debt.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
@@ -206,7 +207,7 @@
 
 ## 집계
 
-- 소유 키 총 **160건** (entity 37 · surface 70 · capability 37 · 역할없음 16)
+- 소유 키 총 **161건** (entity 37 · surface 71 · capability 37 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

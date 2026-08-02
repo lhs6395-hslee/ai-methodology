@@ -88,8 +88,15 @@ export function isBrowserGradeEvidence(path, patterns) {
 //   opts: {verbs, browserMarkers, browserPatterns}
 // ⚠ 브라우저 마커는 **주장 라인 자체**에서만 찾는다 — 스펙 전문을 훑으면 무관한 언급(예: "웹 UI
 // 병합")이 오탐을 낸다(킷 시운전에서 SPEC-020이 그렇게 걸려 실측 교정).
+// opts.manifestOf(specId, claimId) → null | {source, method} — 회계 매니페스트 조회(선택 주입).
+//   source: "smokeManifest"(FR) | "evidenceManifest"(SC·NFR) / method: 그 엔트리의 kind·method
+// 본문과 매니페스트는 같은 주장에 대한 **두 개의 선언**이라 서로 모순될 수 있는데, 지금까지
+// 아무도 그 둘을 대조하지 않았다(실측 제보: `[미확인]`인 FR이 매니페스트엔 실측 증거를 갖고 있었다).
+// 게이트는 어느 쪽이 맞는지 모른다 — 모순을 지목하고 하나를 고치게 한다.
+//
 // 반환 [{specId, claimId, kind, finding, detail}] — 선언 순(결정적).
 //   finding: "bare-tag" | "missing-asset" | "exec-verb-no-evidence" | "browser-needs-ui-evidence"
+//          | "unknown-vs-manifest" | "manifest-vs-tag"
 export function evidenceFindings(units, assetExists, opts = {}) {
   const verbs = opts.verbs && opts.verbs.length ? opts.verbs : DEFAULT_EXECUTION_VERBS;
   const bpat = opts.browserPatterns && opts.browserPatterns.length ? opts.browserPatterns : DEFAULT_BROWSER_EVIDENCE_PATTERNS;
@@ -98,10 +105,22 @@ export function evidenceFindings(units, assetExists, opts = {}) {
     const s = String(t || "").toLowerCase();
     return bmark.some((m) => markerHits(s, m));
   };
+  const manifestOf = typeof opts.manifestOf === "function" ? opts.manifestOf : () => null;
   const out = [];
   for (const u of units || []) {
     for (const c of u.claims || []) {
       const tag = parseEvidenceTag(c.text);
+      // 본문 ↔ 매니페스트 대조. deferred 엔트리는 `[미확인]`과 같은 말이라 모순이 아니다.
+      const man = manifestOf(u.specId, c.id);
+      if (man && String(man.method || "") !== "deferred") {
+        if (tag && tag.kind === "unknown") {
+          out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "unknown-vs-manifest",
+            detail: `본문은 \`[미확인]\`인데 ${man.source}는 실측 증거를 주장한다(${man.method}) — 둘 중 하나가 낡았다: 증거가 진짜면 본문을 \`[검증: <경로>]\`로 올리고, 아니면 매니페스트 엔트리를 지우거나 deferred+사유로 내려라` });
+        } else if (tag && tag.kind === "exec") {
+          out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "manifest-vs-tag",
+            detail: `본문에 실행 증거 \`[검증: ${tag.paths.join(", ")}]\`가 있는데 ${man.source}에도 엔트리가 있다(${man.method}) — 매니페스트는 **실행할 수 없는 검증**의 회계 수단이다. 이중 회계이거나 매니페스트가 낡았다` });
+        }
+      }
       if (tag && tag.kind === "bare") {
         out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "bare-tag",
           detail: "경로 없는 `[검증]` — 실행 증거 자산 경로를 적어라(`[검증: tests/e2e/x.e2e.ts]`)" });

@@ -56,11 +56,13 @@ DEFAULTS = {
     "maxKeysPerCategoryPerSpec": 4,
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
+    "supportLayerSpecs": {},
     "hooksInstalledPolicy": "advisory",
     "syncHookRules": None,
     "syncHookDelegatedTo": "",
     "outOfBandDeployPolicy": "advisory",
     "outOfBandDeployCommands": None,
+    "outOfBandDeployDebtFile": ".sdd/deploy-debt.jsonl",
     "scCoveragePolicy": "off",
     "verificationKinds": {},
     "evidenceManifest": None,
@@ -1170,14 +1172,27 @@ def is_browser_grade_evidence(path, patterns):
     return any(str(p).lower() in s for p in ps)
 
 
-def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, browser_patterns=None):
+def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, browser_patterns=None,
+                      manifest_of=None):
     vs = verbs if verbs else DEFAULT_EXECUTION_VERBS
     bpat = browser_patterns if browser_patterns else DEFAULT_BROWSER_EVIDENCE_PATTERNS
     bmark = browser_markers if browser_markers else DEFAULT_BROWSER_MARKERS
+    man_of = manifest_of if callable(manifest_of) else (lambda s, c: None)
     out = []
     for u in units or []:
         for c in u.get("claims") or []:
             tag = parse_evidence_tag(c["text"])
+            # 본문 ↔ 매니페스트 대조(deferred는 `[미확인]`과 같은 말이라 모순 아님)
+            man = man_of(u["specId"], c["id"])
+            if man and str(man.get("method") or "") != "deferred":
+                if tag and tag["kind"] == "unknown":
+                    out.append((u["specId"], c["id"], c["kind"], "unknown-vs-manifest",
+                                f"본문은 `[미확인]`인데 {man['source']}는 실측 증거를 주장한다({man.get('method')}) — "
+                                "둘 중 하나가 낡았다: 증거가 진짜면 본문을 `[검증: <경로>]`로 올리고, 아니면 매니페스트 엔트리를 지우거나 deferred+사유로 내려라"))
+                elif tag and tag["kind"] == "exec":
+                    out.append((u["specId"], c["id"], c["kind"], "manifest-vs-tag",
+                                f"본문에 실행 증거 `[검증: {', '.join(tag['paths'])}]`가 있는데 {man['source']}에도 엔트리가 있다({man.get('method')}) — "
+                                "매니페스트는 **실행할 수 없는 검증**의 회계 수단이다. 이중 회계이거나 매니페스트가 낡았다"))
             if tag and tag["kind"] == "bare":
                 out.append((u["specId"], c["id"], c["kind"], "bare-tag",
                             "경로 없는 `[검증]` — 실행 증거 자산 경로를 적어라(`[검증: tests/e2e/x.e2e.ts]`)"))
@@ -3896,7 +3911,32 @@ def cmd_evidence(cfg):
             return any(rx.search(f) for f in files)
         return False
 
-    sc_re = re.compile(r"\*\*(SC-\d{3}[a-z]?)\*\*")
+    # 회계 매니페스트 조회 — 키와 method만 본다(무결성은 각자의 소유 게이트가 판정).
+    def load_raw_manifest(value, label):
+        raw = value
+        if isinstance(raw, str) and raw.strip():
+            try:
+                raw = json.loads(read_text(resolve(cfg, raw)))
+            except Exception:
+                return {}
+        out = {}
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                method = str((v.get("method") if isinstance(v, dict) else None)
+                             or (v.get("kind") if isinstance(v, dict) else None) or "").strip()
+                out[k] = {"source": label, "method": method}
+        return out
+
+    smoke_man = load_raw_manifest(cfg.get("smokeManifest"), "smokeManifest")
+    evid_man = load_raw_manifest(cfg.get("evidenceManifest"), "evidenceManifest")
+
+    def manifest_of(spec_id, claim_id):
+        src = evid_man if re.match(r"^(SC|NFR)-", claim_id) else smoke_man
+        return src.get(f"{spec_id}/{claim_id}")
+
+    # SC와 NFR을 한 정규식으로 — NFR은 실행 동사 규칙 대상이 아니고(SC 전용) 매니페스트
+    # 대조만을 위해 수집한다. kind는 접두어에서 나온다.
+    sc_re = re.compile(r"\*\*((?:SC|NFR)-\d{3}[a-z]?)\*\*")
     units = []
     for file in spec_md_files(cfg):
         text = read_text(file)
@@ -3913,10 +3953,11 @@ def cmd_evidence(cfg):
                 continue
             sc = sc_re.search(t)
             if sc:
-                claims.append({"id": sc.group(1), "kind": "SC", "text": t})
+                claims.append({"id": sc.group(1),
+                               "kind": "NFR" if sc.group(1).startswith("N") else "SC", "text": t})
         units.append({"specId": spec_id, "claims": claims})
 
-    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat)
+    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of)
     claim_count = sum(len(u["claims"]) for u in units)
     print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")
     tag = "✗" if hard else "⚠"

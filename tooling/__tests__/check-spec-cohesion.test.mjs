@@ -148,3 +148,45 @@ test("Change Log의 FR 인용은 FR 수 카운트에서 제외 — 정의(**FR-N
   assert.match(warn.out, /분할 권고 없음/, warn.out);        // 정의 3개뿐 → 오탐 없어야
   assert.equal(run(dir, ["--strict"]).code, 0, "인용 카운트로 FR 과다 오탐(strict exit 1)");
 });
+
+// ── 지원 계층 등록부(교착 해소) ──
+// 실측 제보: entity 0개 계층이 FR 캡을 넘겼을 때 분할하려 해도 새 스펙이 `entity(min)`에 걸려
+// **분할 자체가 불가능**했고, 남은 출구가 캡 상향(=완화, 래칫이 차단)뿐인 교착이 생겼다.
+// 여기서 푸는 것은 `entity(min)` 하나뿐 — 캡을 풀면 교착이 아니라 규범이 사라진다.
+const ENTLESS = "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Surfaces**: config/build.json\n";
+
+test("지원 계층: 미등록 entity-less는 (min) 위반 / 등록하면 면제되고 사유와 함께 항상 표면화", () => {
+  const plain = run(fixture(CFG, { "sdd/specs/SPEC-001.md": ENTLESS }));
+  assert.match(plain.out, /aggregate root\(Entities\) 0개/);
+  assert.match(plain.out, /supportLayerSpecs에 \*\*사유와 함께\*\* 등록/); // 처방에 경로가 보여야 한다
+
+  const reg = run(fixture({ ...CFG, supportLayerSpecs: { "SPEC-001": "공유 빌드 설정 — 도메인 entity가 없다" } },
+    { "sdd/specs/SPEC-001.md": ENTLESS }));
+  assert.equal(reg.code, 0);
+  assert.match(reg.out, /지원 계층 스펙 1건/);
+  assert.match(reg.out, /SPEC-001\(공유 빌드 설정 — 도메인 entity가 없다\)/); // clean일 때도 부채로 보인다
+  assert.match(reg.out, /분할 권고 없음/);
+});
+
+test("지원 계층: 등록해도 FR·키 캡은 그대로 — 면제는 (min) 하나뿐(캡을 풀면 규범이 사라진다)", () => {
+  const frs = Array.from({ length: 9 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const dir = fixture({ ...CFG, supportLayerSpecs: { "SPEC-001": "공유 설정" } },
+    { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n## Ownership\n- **Surfaces**: config/build.json\n` });
+  assert.match(run(dir).out, /FR 9개 > 8/);
+  assert.equal(run(dir, ["--strict"]).code, 1);
+});
+
+test("지원 계층 등록부 무결성: 빈 사유·없는 스펙·entity 소유 스펙 등록은 판정 전 exit 1", () => {
+  const noReason = run(fixture({ ...CFG, supportLayerSpecs: { "SPEC-001": "  " } }, { "sdd/specs/SPEC-001.md": ENTLESS }));
+  assert.equal(noReason.code, 1);
+  assert.match(noReason.out, /사유 필수/);
+
+  const stale = run(fixture({ ...CFG, supportLayerSpecs: { "SPEC-999": "낡음" } }, { "sdd/specs/SPEC-001.md": ENTLESS }));
+  assert.equal(stale.code, 1);
+  assert.match(stale.out, /그런 스펙이 없다/);
+
+  const hasEnt = run(fixture({ ...CFG, supportLayerSpecs: { "SPEC-001": "필요 없는 면제" } },
+    { "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** a\n## Ownership\n- **Entities**: a\n" }));
+  assert.equal(hasEnt.code, 1);
+  assert.match(hasEnt.out, /aggregate 있음/);
+});

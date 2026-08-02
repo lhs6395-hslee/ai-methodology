@@ -13,12 +13,12 @@
 // 게이트의 일이 아니다. 할 수 있는 일은 즉시 상기시키는 것이다. 진짜 차단은 커밋(commit-msg)·CI가 한다.
 // git 없음·미소유 경로·정책 off면 침묵(오탐 금지 — 오탐이 잦으면 사람이 훅을 꺼버린다).
 
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
-import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings } from "./deploy-guard-lib.mjs";
+import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine } from "./deploy-guard-lib.mjs";
 
 function readCommand() {
   const i = process.argv.indexOf("--command");
@@ -34,7 +34,8 @@ if (!command.trim()) process.exit(0);
 
 let cfg;
 try { cfg = loadConfig(); } catch { process.exit(0); }
-if (String(cfg.outOfBandDeployPolicy ?? "advisory") === "off") process.exit(0);
+const POLICY = String(cfg.outOfBandDeployPolicy ?? "advisory");
+if (POLICY === "off") process.exit(0);
 
 const parsed = parseDeployCommand(command, cfg.outOfBandDeployCommands || DEFAULT_DEPLOY_PATTERNS);
 if (!parsed.matched || !parsed.paths.length) process.exit(0);
@@ -101,4 +102,20 @@ for (const f of findings) {
     console.log(`  ⚠ ${f.path} → ${f.specId} Change Log ${f.rows}행이 최소 기록 형식 미달 — {날짜 | 무엇을 | 왜}를 채우고 실측 여부를 \`[검증: <경로>]\` 또는 \`[미확인]\`으로 표기하라.`);
   }
 }
-console.log("  · 이 경고는 차단하지 않는다(배포는 이미 끝났다). 진짜 차단은 커밋(commit-msg)·CI가 한다 — 지금 적어두지 않으면 그때 막힌다.");
+
+// hard = 부채 적재. advisory는 터미널 한 번으로 끝나고 스크롤과 함께 죽는다 — 그 차이가 승격의 실체다.
+if (POLICY === "hard") {
+  const rel = String(cfg.outOfBandDeployDebtFile || ".sdd/deploy-debt.jsonl");
+  const abs = join(ROOT, ...rel.split("/").filter(Boolean));
+  const date = new Date().toISOString().slice(0, 10);
+  try {
+    mkdirSync(dirname(abs), { recursive: true });
+    appendFileSync(abs, findings.map((f) => debtLine(date, parsed.tool, f)).join("\n") + "\n", "utf8");
+    console.log(`  · outOfBandDeployPolicy=hard — 위 ${findings.length}건을 세션 부채로 적재했다: ${rel}`);
+    console.log("    다음 커밋은 pre-commit(check-deploy-debt)이 막는다. 소유 스펙 Change Log에 행을 추가하면 그 자리에서 해소된다.");
+  } catch (e) {
+    console.log(`  ⚠ 부채 파일 기록 실패(${rel}): ${e.message} — 기록되지 않았으므로 이 경고가 유일한 흔적이다.`);
+  }
+} else {
+  console.log("  · advisory — 이 경고는 차단하지 않고 어디에도 남지 않는다(배포는 이미 끝났다). hard로 승격하면 세션 부채로 적재돼 다음 커밋에서 막힌다.");
+}

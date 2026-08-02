@@ -31,6 +31,7 @@
 - **FR-002** (event): WHERE a deployed source path is uncommitted, **check-deploy-guard.mjs** (S) SHALL resolve its owning spec through the Files globs and report the spec as untouched, as touched without a new Change Log row, or as carrying a row that misses the minimum record shape.
 - **FR-003** (unwanted): IF a deployed source path is owned by no spec, THEN THE SYSTEM SHALL report it as unowned so the deploy does not stay outside the drift radar.
 - **FR-004** (state): WHILE the guard runs from the **sdd-deploy-check.sh** (S) hook wrapper, THE SYSTEM SHALL exit zero in every branch, and SHALL stay silent when the source is committed, when the policy is off, or when the repository has no git directory.
+- **FR-005** (state): WHILE `outOfBandDeployPolicy` is hard, **check-deploy-guard.mjs** (S) SHALL append each unrecorded deploy to `outOfBandDeployDebtFile` as one JSON line while still exiting zero, and **check-deploy-debt.mjs** (S) SHALL — at pre-commit — settle every debt whose owning spec has a Change Log row added in the staged change, rewrite the file with only the unsettled lines (preserving unparseable lines), and exit non-zero while any debt remains; WHERE the policy is not hard or the file is absent, THE gate SHALL exit zero in silence.
 
 ### Key Entities
 - **deploy-guard** — the check that fires at deploy time rather than commit time, so that a change already living in production has its rationale written down before the commit gate ever sees it.
@@ -40,10 +41,10 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: deploy-guard
-- **Symbols**: deploy-guard-lib.mjs, check-deploy-guard.mjs, sdd-deploy-check.sh
+- **Symbols**: deploy-guard-lib.mjs, check-deploy-guard.mjs, check-deploy-debt.mjs, sdd-deploy-check.sh
 - **Artifacts**: —
 - **Capabilities**: deploy-guard.gate
-- **Files**: tooling/deploy-guard-lib.mjs, tooling/check-deploy-guard.mjs, tooling/harness/sdd-deploy-check.sh, tooling/__tests__/deploy-guard.test.mjs
+- **Files**: tooling/deploy-guard-lib.mjs, tooling/check-deploy-guard.mjs, tooling/check-deploy-debt.mjs, tooling/harness/sdd-deploy-check.sh, tooling/__tests__/deploy-guard.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > config knob·설치 배선은 각 소유 스펙(001/004). 커밋 시점 spec-first는 SPEC-003이 소유하고 이 spec은 그보다 **앞선 발화 지점**만 담당한다. 라이브 실물 대조는 SPEC-032.
@@ -54,6 +55,7 @@
 ## Success Criteria (측정형)
 - **SC-001**: `deploy-guard.test.mjs` 전 케이스 green — 명령 파싱 5분기·기록 판정·findings 4종·게이트 e2e(경고 후 exit 0, 커밋 후 침묵). [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **SC-002**: 재현 픽스처에서 스펙 미수정·Change Log 행 없음·형식 미달·충족(침묵)의 4단계가 각각 구분돼 출력된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
+- **SC-003**: 같은 픽스처에서 advisory는 부채 파일을 만들지 않고, hard는 부채를 적재해 후속 커밋을 exit 1로 막으며, 소유 스펙 Change Log 행을 스테이징하면 해소돼 exit 0이 된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 판정 코어는 정규식·집합 대조만의 순수 함수이고 git 조회는 소비 게이트가 수행하므로, 훅이 없는 환경에서도 코어를 단독 테스트할 수 있다. [검증: tooling/__tests__/deploy-guard.test.mjs]
@@ -61,6 +63,10 @@
 ## Assumptions / Clarifications Retained
 - 감지 패턴은 프로젝트가 `outOfBandDeployCommands`로 대체한다 — 킷 기본값은 kubectl·helm·terraform·클라우드 CLI의 상태 변경 서브커맨드다(도구를 못 박지 않는다).
 - "같은 세션 내"를 시간으로 판정하지 않고 **워킹트리 상태**로 판정한다 — 세션 경계는 기계가 알 수 없고, 미커밋 여부는 결정적이다.
+- advisory와 hard의 차이는 **부채 적재**다(실측 제보: 둘이 출력도 동작도 같아 승격이 장식이었다). 배포 시점은 여전히 비차단이다 — 되돌릴 수 없는 것을 막는 척하지 않는다. 대신 막을 수 있는 유일한 지점, 아직 오지 않은 커밋에서 막는다.
+- 부채는 **자동으로만** 해소된다 — 소유 스펙 Change Log에 행이 스테이징되는 순간이다. 사람이 파일을 지워 갚게 두면 "지우기"가 갚는 방법이 되고, 그러면 부채 파일은 기록 장치가 아니라 성가신 알림이 된다. 파싱 불가한 줄도 지우지 않는다(파싱 실패로 부채를 지우는 것이 곧 세탁이다).
+- 부채 파일은 **로컬 세션 상태**라 커밋 대상이 아니다(sdd-init가 `.gitignore`에 `.sdd/`를 넣는다) — 추적하면 "커밋해서 없앤다"가 또 하나의 갚는 방법이 된다.
+- 기각한 대안: hard에서 배포 명령 자체를 차단하기. PostToolUse는 명령이 **이미 실행된 뒤**에 돌아 차단할 대상이 없고, PreToolUse로 옮기면 배포 전 워킹트리만 보고 판정하게 돼 "배포 후 기록"이라는 이 spec의 궤도와 어긋난다. 재검토 조건: 훅 계약이 배포 명령의 사전 차단을 지원하게 되면.
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
@@ -80,3 +86,4 @@
 |---|---|---|
 | 2026-08-02 | 초안 — `outOfBandDeployPolicy`·`outOfBandDeployCommands` + `deploy-guard-lib`(명령 파싱·기록 판정) + `check-deploy-guard` + PostToolUse(Bash) 훅 `sdd-deploy-check.sh` + sdd-init 배선 | 실측 제보: 배포가 커밋보다 먼저인 궤도에서 commit-msg 훅만으로는 커밋을 미루는 동안 신호가 0이라 spec↔live 드리프트가 누적됐다(INFRA-005 역방향 흡수). 발화 지점을 배포 행위까지 앞당기되, PostToolUse는 이미 실행된 뒤라 **비차단**이 유일하게 정직한 강도다 — 되돌릴 수 없는 것을 막는 척하지 않는다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
 | 2026-08-02 | 경로 인자 인식이 **단일 대시 옵션**(`-var-file=`·`-backend-config=`)을 수용하도록 확장 | 실측 제보(gsn-aiops-finops-module): Terraform 공식 문법은 단일 대시라 `terraform apply -var-file=stages/dev/x.tfvars`에서 경로가 하나도 안 잡혔고, 경로가 없으면 소비 게이트가 조기 종료해 **판정 자체가 성립하지 않았다** — terraform이 주 배포 수단인 프로젝트에서 이 게이트는 사실상 kubectl·helm 전용이었다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
+| 2026-08-02 | `outOfBandDeployPolicy=hard`에 실체 부여 — 미기록 배포를 `outOfBandDeployDebtFile`(JSONL)에 적재 + pre-commit의 `check-deploy-debt`가 잔여 부채로 커밋 차단, 소유 스펙 Change Log 행 스테이징 시 자동 해소. FR-005·SC-003 신설, sdd-init가 `.sdd/`를 .gitignore에 배선 | 실측 제보(gsn-aiops-finops-module): advisory와 hard가 **출력도 동작도 구분되지 않아** 승격이 무의미했다. 배포 시점은 여전히 못 막지만(이미 실행된 뒤) 아직 오지 않은 커밋은 막을 수 있다 — 터미널 스크롤은 죽고 파일은 남는다 [검증: tooling/__tests__/deploy-guard.test.mjs] |

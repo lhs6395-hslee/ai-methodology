@@ -7,6 +7,7 @@
 // @covers SPEC-031/FR-004
 // @covers SPEC-031/FR-005
 // @covers SPEC-031/FR-006
+// @covers SPEC-031/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -136,4 +137,60 @@ test("markerHits: ASCII 마커는 단어 경계 — 부분일치 오탐 차단, 
   // 한글 마커 — 교착어라 경계가 성립하지 않으므로 부분일치 유지(실측 충돌 없음)
   assert.equal(markerHits("대시보드에 표시된다", "대시보드"), true);
   assert.equal(markerHits("화면을 렌더", "화면"), true);
+});
+
+// ── 본문 ↔ 회계 매니페스트 대조 (FR-007) ──
+// 본문과 매니페스트는 같은 주장에 대한 **두 개의 선언**인데 그동안 아무도 둘을 대조하지 않았다
+// (실측 제보: `[미확인]`으로 선언된 FR이 smokeManifest엔 실측 증거를 갖고 있었고, 어느 게이트도
+// 그 모순을 판정하지 않아 "정직한 미확인"과 "회계된 검증"이 동시에 참인 채로 통과했다).
+// 게이트는 어느 쪽이 맞는지 모른다 — 모순을 지목하고 하나를 고치게 한다.
+
+test("게이트: `[미확인]` ↔ 매니페스트 실측 주장은 모순으로 표면화, deferred는 모순 아님", () => {
+  const specs = {
+    "INFRA-005.md": [
+      "**Spec**: `INFRA-005`",
+      "- **FR-001** The system SHALL render panels. [미확인]",
+      "- **FR-002** The system SHALL rotate keys. [미확인]",
+      "- **SC-001**: 침투 High 0건. [미확인]",
+      "",
+    ].join("\n"),
+  };
+  const root = fixture({
+    executionEvidencePolicy: "hard",
+    smokeManifest: "sdd/smoke.json",
+    evidenceManifest: { "INFRA-005/SC-001": { kind: "pentest", evidence: "docs/e/zap.md" } },
+  }, specs, {
+    "sdd/smoke.json": JSON.stringify({
+      "INFRA-005/FR-001": { method: "manual-smoke", evidence: "docs/e/2026-08-02.md" },
+      "INFRA-005/FR-002": { method: "deferred", reason: "관리형 KMS라 CI에서 회전 불가" },
+    }),
+  });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /FR-001 \(unknown-vs-manifest\)/);
+    assert.match(r.out, /smokeManifest는 실측 증거를 주장한다\(manual-smoke\)/);
+    assert.match(r.out, /SC-001 \(unknown-vs-manifest\)/);
+    assert.match(r.out, /evidenceManifest는 실측 증거를 주장한다\(pentest\)/);
+    // deferred는 `[미확인]`과 같은 말이다 — 모순이 아니다
+    assert.doesNotMatch(r.out, /FR-002/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트: 본문에 실행 증거가 있는데 매니페스트에도 엔트리면 이중 회계로 표면화", () => {
+  const root = fixture({
+    executionEvidencePolicy: "advisory",
+    smokeManifest: "sdd/smoke.json",
+  }, {
+    "INFRA-006.md": "**Spec**: `INFRA-006`\n- **FR-001** The system SHALL sync. [검증: tests/sync.test.ts]\n",
+  }, {
+    "tests/sync.test.ts": "// asset\n",
+    "sdd/smoke.json": JSON.stringify({ "INFRA-006/FR-001": { method: "manual-smoke", evidence: "docs/e/x.md" } }),
+  });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0);
+    assert.match(r.out, /FR-001 \(manifest-vs-tag\)/);
+    assert.match(r.out, /매니페스트는 \*\*실행할 수 없는 검증\*\*의 회계 수단이다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
