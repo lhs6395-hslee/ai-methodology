@@ -52,14 +52,18 @@ export function loadManifest(cfg, specs) {
 
 // FR별 분류. entries가 null이면 unit/unaccounted 2분류만(=manifest 미설정에서 requireAccounting).
 // 반환: { classes: Map("SPEC/FR" -> class), counts: {unit, smoke, deferred, unaccounted} }
-export function classify(specs, covered, entries, plannedSpecs = new Set()) {
+// e2eOnly: "SPEC/FR" 집합 — 커버 파일이 **전부** e2e인 FR. 태그는 붙어 있지만 로컬 스위트
+// (commands.test)가 실행하지 않으므로 `unit`(=실행 검증됨)과 섞으면 거짓 안전이 된다.
+// 실측(소비 프로젝트 PM): e2e-only FR 58건이 unit으로 집계되는 동안 e2e 57개가 전부 로그인
+// 단계에서 죽어 있었고 R5는 계속 green이었다. 분리하면 그 사실이 매 실행 출력에 보인다.
+export function classify(specs, covered, entries, plannedSpecs = new Set(), e2eOnly = new Set()) {
   const classes = new Map();
-  const counts = { unit: 0, smoke: 0, deferred: 0, planned: 0, unaccounted: 0 };
+  const counts = { unit: 0, e2e: 0, smoke: 0, deferred: 0, planned: 0, unaccounted: 0 };
   for (const [spec, frs] of specs) {
     for (const fr of frs) {
       const key = `${spec}/${fr}`;
       let cls = "unaccounted";
-      if (covered.has(spec) && covered.get(spec).has(fr)) cls = "unit"; // unit이 manifest보다 우선
+      if (covered.has(spec) && covered.get(spec).has(fr)) cls = e2eOnly.has(key) ? "e2e" : "unit";
       else if (entries && entries.has(key)) cls = entries.get(key).method === "deferred" ? "deferred" : "smoke";
       else if (plannedSpecs.has(spec)) cls = "planned"; // SPEC-018: Planned 스펙의 미커버 FR = 의도적 미구현(R3 미검증 아님)
       classes.set(key, cls);

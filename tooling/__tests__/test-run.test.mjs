@@ -5,10 +5,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync , existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { testRunVerdict, RUN_TESTS_ENUM } from "../check-test-run.mjs";
+import { e2eRunVerdict, testRunVerdict, RUN_TESTS_ENUM } from "../check-test-run.mjs";
 
 // ── 순수 판정 코어 ──
 test("FR-001: off → 실행 안 함, exit 0, '수동 실행 권장' 안내", () => {
@@ -89,9 +89,62 @@ test("게이트 e2e: 러너 출력은 stdout이 아니라 stderr로 — 판정 �
     const r = spawnSync("node", [join(process.cwd(), "tooling/check-test-run.mjs")],
       { cwd: root, encoding: "utf8" });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.equal(r.stdout.trim().split("\n").length, 1, `stdout은 판정 한 줄이어야 함: ${JSON.stringify(r.stdout)}`);
-    assert.match(r.stdout, /green/);
+    // stdout = 판정 줄만(러너 텍스트 0). 축이 둘이라 줄 수는 2 — e2e 축(off 명시) + 스위트 판정.
+    const lines = r.stdout.trim().split("\n");
+    assert.equal(lines.length, 2, `stdout은 판정 줄만이어야 함: ${JSON.stringify(r.stdout)}`);
+    assert.match(lines[0], /e2e 실행 축 — e2eTestsPolicy:off/);
+    // 마지막 줄이 요약으로 쓰인다(하네스 lastLine) — 스위트 판정이 마지막이어야 한다.
+    assert.match(lines[1], /green/);
     assert.ok(!/[⚠✗]/.test(r.stdout), `green 판정의 stdout에 ⚠/✗가 새면 하네스가 오독한다: ${JSON.stringify(r.stdout)}`);
     assert.match(r.stderr, /러너가 낸 경고 텍스트/); // 진단은 stderr에 보존
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── e2e 실행 축 (SPEC-021 확장) ──
+// 실측 결함(소비 프로젝트 PM): testFileRegex가 e2e를 포함해 회계는 "검증됨"으로 세는데
+// commands.test는 e2e를 실행하지 않았다. e2e 57개가 전부 로그인 단계에서 죽어 있는 동안
+// R5는 계속 green이었고 FR 58건이 covered로 집계됐다. 실행하지 않는 것을 검증됐다고 세면
+// 거짓 안전이므로, 회계와 실행 계약이 같이 닫혀야 한다.
+// @covers SPEC-021/FR-005
+test("e2e 판정: off·미선언·green·실패·skipped — hard에서 미판정은 거짓 안전이라 실패", () => {
+  assert.equal(e2eRunVerdict("off", true)[Symbol.iterator] ? 0 : 0, 0); // 형태 확인용 no-op
+  const off = e2eRunVerdict("off", false);
+  assert.equal(off.exit, 0); assert.match(off.line, /판정 안 함/);
+
+  const noCmd = e2eRunVerdict("hard", false);
+  assert.equal(noCmd.exit, 1); assert.match(noCmd.line, /거짓 안전/); // 정책만 켜고 명령 없음
+
+  assert.equal(e2eRunVerdict("advisory", true, { exitCode: 0 }).exit, 0);
+  assert.match(e2eRunVerdict("advisory", true, { exitCode: 0 }).line, /green/);
+
+  const fail = e2eRunVerdict("hard", true, { exitCode: 3 });
+  assert.equal(fail.exit, 1); assert.match(fail.line, /실패 \(exit 3/);
+  assert.equal(e2eRunVerdict("advisory", true, { exitCode: 3 }).exit, 0); // advisory는 경고만
+
+  // ★ 핵심 계약 — "판정 못 함"과 "통과"를 섞지 않는다(SPEC-032 live-reality와 같은 원칙).
+  const skipAdv = e2eRunVerdict("advisory", true, { skipped: "앱 미기동" });
+  assert.equal(skipAdv.exit, 0); assert.match(skipAdv.line, /\[skipped\] 앱 미기동/);
+  assert.match(skipAdv.line, /판정 못 함이지 '통과'가 아니다/);
+  const skipHard = e2eRunVerdict("hard", true, { skipped: "앱 미기동" });
+  assert.equal(skipHard.exit, 1, "hard에서 skipped는 거짓 안전이라 실패여야 한다");
+
+  assert.equal(e2eRunVerdict("strict", true).valid, false); // enum 밖
+});
+
+// @covers SPEC-021/FR-005
+test("게이트 e2e: precheck 실패 → 테스트를 돌리지 않고 skipped(사유)", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-e2e-"));
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({
+    specDir: "sdd/specs", runTestsPolicy: "off", e2eTestsPolicy: "advisory",
+    e2ePrecheck: "sh -c 'echo BASE_URL 응답 없음 >&2; exit 7'",
+    commands: { e2e: "sh -c 'echo E2E가_실행됨 > ran.txt'" },
+  }));
+  try {
+    const r = spawnSync("node", [join(process.cwd(), "tooling/check-test-run.mjs")],
+      { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /\[skipped\] 실행 전제 미충족/);
+    assert.match(r.stdout, /BASE_URL 응답 없음/);
+    assert.ok(!existsSync(join(root, "ran.txt")), "precheck 실패면 e2e 명령을 실행하지 않아야 한다");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

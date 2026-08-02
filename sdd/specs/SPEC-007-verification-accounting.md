@@ -34,6 +34,7 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 - **FR-003** (state): WHILE `requireAccounting` is true, THE **verification-accounting** (E) ledger SHALL require every declared FR to be unit-covered, smoke-verified, or deferred, and SHALL report each remaining FR as an R3 unaccounted error with non-zero exit.
 - **FR-004** (event): WHEN `smokeManifest` is configured, THE **verification-accounting.mjs** (S) core SHALL load the JSON file and exit non-zero for a missing or unparsable file, a key that does not match the derived spec/requirement ID grammar or references a nonexistent FR, an entry without a non-empty method, a deferred entry without a non-empty reason, or a non-deferred entry without non-empty evidence.
 - **FR-005** (event): WHEN accounting is active (manifest configured or `requireAccounting` true), THE SYSTEM SHALL append the accounted counts (unit/smoke/deferred/unaccounted) to the gate summary line, classifying an FR that is both unit-covered and manifest-listed as unit.
+- **FR-006** (unwanted): IF every covering test file for a requirement matches `e2eFileRegex`, THEN the **verification-accounting** (E) core SHALL classify it as e2e rather than unit, and the consuming gate SHALL surface those requirements on every run while `e2eTestsPolicy` is off.
 
 ### Key Entities
 - **accounting class** — the verification state of one FR: unit / smoke / deferred / unaccounted.
@@ -86,3 +87,4 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 | 2026-07-15 | `classify`에 `plannedSpecs` 인자·`planned` 클래스 추가(회계 = unit/smoke/deferred/planned/unaccounted), Node·Python | SPEC-018 FR-005 동반: Planned 스펙 미커버 FR을 회계 코어가 planned로 분류(R3 미검증 아님) — 회계 계층은 이 spec 소유 |
 | 2026-07-16 | 소유 테스트(fr-accounting.test.mjs)에 Planned↔커버리지 모순 케이스 추가(@covers SPEC-018/FR-007) — 회계 분류 자체는 불변 | 감사 T2 동반: planned 분류(SPEC-018 FR-005)가 커버리지와 공존하면 모순임을 회계 테스트 계층에서 고정 |
 | 2026-07-27 | FR-003·004 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — aggregate **verification-accounting**·심볼 **verification-accounting.mjs** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 2건이 FR 선언 라인에 흔적이 없던 것을 명시(회계 규칙·에러 조건은 불변) |
+| 2026-08-02 | **e2e-only 버킷 분리**(FR-006) — 커버 파일이 전부 e2e인 FR을 `unit`에서 떼어 `e2e`로 집계하고, 실행 축이 off면 어느 FR인지 지목해 매 실행 경고 | 같은 제보(SPEC-021 FR-005 참조): `unit`은 "실행으로 검증됨"을 뜻하는데 e2e는 로컬 스위트가 돌리지 않는다. 섞어 세면 58건이 검증된 것처럼 보인다. 분리하면 "실행 게이트가 없다"는 사실이 회계 출력에 상시 드러난다 — 감추는 대신 표면화(§7 원칙) |

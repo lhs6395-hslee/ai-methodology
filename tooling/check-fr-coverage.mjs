@@ -24,7 +24,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile} from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
@@ -173,6 +173,8 @@ for (const id of [...frDecls.keys()].sort()) {
 
 // 2. Collect @covers tags from test files.
 const covered = new Map();   // SPEC-ID -> Set(FR-ID covered)
+const coverSeen = new Set();       // "SPEC/FR" — 커버 태그가 하나라도 있는 FR
+const runnableCovered = new Set(); // "SPEC/FR" — e2e가 **아닌** 파일이 커버한 FR
 const badRefs = [];          // tags pointing to nonexistent FRs
 for (const dir of SCAN_DIRS) {
   for (const file of walk(dir)) {
@@ -181,6 +183,10 @@ for (const dir of SCAN_DIRS) {
       const [, spec, fr] = m;
       if (!covered.has(spec)) covered.set(spec, new Set());
       covered.get(spec).add(fr);
+      // e2e-only 판정용: FR별로 "e2e가 아닌 커버 파일"이 하나라도 있었는지 기록.
+      const key = `${spec}/${fr}`;
+      coverSeen.add(key);
+      if (!isE2eFile(file, cfg)) runnableCovered.add(key);
       const declared = specs.get(spec);
       if (!declared || !declared.has(fr)) {
         badRefs.push({ file, spec, fr });
@@ -217,7 +223,8 @@ for (const f of specMdNames) {
   const id = f.match(SPEC_ID)?.[0]; if (!id) continue;
   if (parseStatus(readFileSync(join(SPEC_DIR, f), "utf8")) === "Planned") plannedSpecs.add(id);
 }
-const acct = accountingActive ? classify(specs, covered, manifest, plannedSpecs) : null;
+const e2eOnly = new Set([...coverSeen].filter((k) => !runnableCovered.has(k)));
+const acct = accountingActive ? classify(specs, covered, manifest, plannedSpecs, e2eOnly) : null;
 // Planned↔커버리지 모순(SPEC-018 FR-007): Planned는 "안 지음" 선언인데 unit 커버 FR이 실재하면 모순 —
 // Active→Planned 뒤집기로 strictSpecs·R3를 침묵시키는 "회계 침묵기" 경로를 hard 차단(감사 T2).
 for (const spec of [...plannedSpecs].sort()) {
@@ -253,6 +260,19 @@ for (const [spec, frs] of specs) {
   }
 }
 
+// e2e-only 표면화: 태그는 있지만 로컬 스위트가 실행하지 않는 FR. e2e 실행 축(SPEC-021 확장,
+// `e2eTestsPolicy`)이 꺼져 있으면 **아무도 이 FR들을 실행 검증하지 않는다** — 그 사실을 매 실행
+// 드러낸다(감춰지면 "covered ✓"가 실행 green으로 오인된다).
+if (acct && acct.counts.e2e > 0) {
+  const axis = String(cfg.e2eTestsPolicy || "off");
+  const list = [...acct.classes].filter(([, c]) => c === "e2e").map(([k]) => k).sort();
+  if (axis === "off") {
+    warnings.push(`⚠ e2e-only ${acct.counts.e2e}건 — e2e로만 커버돼 실행 검증하는 게이트가 없다(e2eTestsPolicy:off). commands.e2e 선언 후 정책을 켜거나, 실행 불가면 evidence로 회계하라: ${list.slice(0, 8).join(", ")}${list.length > 8 ? ` 외 ${list.length - 8}건` : ""}`);
+  } else {
+    warnings.push(`· e2e-only ${acct.counts.e2e}건 — e2e 실행 축(e2eTestsPolicy:${axis})이 판정한다`);
+  }
+}
+
 // R3(requireAccounting): 모든 FR이 unit ∨ smoke ∨ deferred — "조용히 미검증" 제거.
 if (cfg.requireAccounting) {
   for (const [spec, frs] of specs) {
@@ -268,7 +288,7 @@ if (cfg.requireAccounting) {
 const totalFR = [...specs.values()].reduce((n, s) => n + s.size, 0);
 const totalCov = [...covered.values()].reduce((n, s) => n + s.size, 0);
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
-const acctTag = acct ? ` accounted(unit:${acct.counts.unit} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} planned:${acct.counts.planned} unaccounted:${acct.counts.unaccounted})` : "";
+const acctTag = acct ? ` accounted(unit:${acct.counts.unit} e2e:${acct.counts.e2e} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} planned:${acct.counts.planned} unaccounted:${acct.counts.unaccounted})` : "";
 console.log(`FR coverage gate — specs:${specs.size} FRs:${totalFR} covered:${totalCov}${acctTag} mode:${STRICT ? "strict" : "incremental"} config:${cfgTag}`);
 for (const w of warnings) console.log(`  · ${w}`);
 if (errors.length) {

@@ -30,6 +30,13 @@ export const DEFAULTS = {
   //   Java:   ["Test\\.java$", "Tests\\.java$", "IT\\.java$"]
   //   Ruby:   ["_spec\\.rb$", "_test\\.rb$"]
   testFileRegex: ["\\.(test|spec)\\.(ts|tsx|js|jsx|mjs|cjs)$"],
+  // e2e(브라우저·기동 앱 필요) 테스트 파일 정규식 — testFileRegex의 **부분집합**을 지목한다.
+  // 왜 따로 세나(실측 결함, 소비 프로젝트 PM): testFileRegex가 `\.e2e\.ts$`를 포함하면 e2e의
+  // @covers가 커버리지 회계에서 **unit(=실행 검증됨)** 버킷에 들어간다. 그런데 commands.test는
+  // vitest만 돌려 e2e를 실행하지 않으므로, e2e 57개가 전부 로그인 단계에서 죽어 있어도 R5는
+  // 계속 green이고 FR 58건이 "검증됨"으로 집계됐다. 실행하지 않는 것을 검증됐다고 세면 거짓
+  // 안전이다. 이 정규식을 선언하면 e2e로만 커버된 FR이 `e2e` 버킷으로 분리 집계된다.
+  e2eFileRegex: [],
   // Ownership(구조적 중복) 키 종류. 기본 = 웹/CRUD. 비-웹 대안 예:
   //   라이브러리/CLI: ["Modules", "Symbols", "Artifacts"]
   //   데이터파이프라인: ["Datasets", "Jobs", "Sinks"]
@@ -61,6 +68,14 @@ export const DEFAULTS = {
   // cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수. 기본 1(1 spec = 1 aggregate).
   // aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 모델이면 상향(자식은 별도 root 아님).
   maxAggregateRootsPerSpec: 1,
+  // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
+  // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
+  // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도
+  // 프로브(e2ePrecheck)로 판정한다: 프로브 실패 = skipped(사유), 프로브 통과 후 비-0 = 실패.
+  e2eTestsPolicy: "off",
+  // 실행 전제 프로브(선택) — 앱 기동·자격·도달성 확인용 명령. 비-0이면 skipped(사유).
+  // 미선언이면 프로브 없이 바로 실행한다(비-0 = 실패로 판정).
+  e2ePrecheck: null,
   // check-spec-sync 예외 glob(§5.5) — Files glob이 과포함한 생성물·락파일 등.
   // 통과하되 영속 흔적 없음(정직) — 목록 자체가 config 리뷰 대상.
   specSyncExemptGlobs: [],
@@ -289,6 +304,7 @@ function buildConfig(user, path, root) {
   cfg.__path = path;
   cfg.__root = root; // 모든 상대경로의 기준
   cfg.__testRegex = cfg.testFileRegex.map((s) => new RegExp(s));
+  cfg.__e2eRegex = (cfg.e2eFileRegex || []).map((s) => new RegExp(s));
   // spec ID 접두어 파생값(게이트 공통). 예: ["SPEC","TEST","INFRA"] → "SPEC|TEST|INFRA"
   const alt = (cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes)
     .map((p) => String(p).replace(/[^A-Za-z0-9_]/g, "")) // 정규식 안전
@@ -326,4 +342,10 @@ export function resolveFromRoot(cfg, rel) {
 // 파일명이 테스트 파일인가(config의 testFileRegex 기준).
 export function isTestFile(name, cfg) {
   return cfg.__testRegex.some((re) => re.test(name));
+}
+
+// 파일명이 e2e 테스트인가(e2eFileRegex 기준 — testFileRegex의 부분집합으로 선언한다).
+// 비선언(빈 배열)이면 언제나 false = 기존 동작 유지(하위호환: e2e 축은 옵트인).
+export function isE2eFile(name, cfg) {
+  return (cfg.__e2eRegex || []).some((re) => re.test(name));
 }

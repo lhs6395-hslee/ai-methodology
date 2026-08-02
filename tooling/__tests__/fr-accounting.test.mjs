@@ -9,8 +9,8 @@
 // @covers SPEC-007/FR-005
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { execFileSync , spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync , readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -154,7 +154,7 @@ test("회계 리포트: accounted(unit/smoke/deferred/unaccounted) 집계 + unit
   try {
     const r = run(root);
     assert.equal(r.code, 0, r.out); // requireAccounting 아님 — unaccounted는 warn 영역
-    assert.match(r.out, /accounted\(unit:1 smoke:1 deferred:0 planned:0 unaccounted:1\)/);
+    assert.match(r.out, /accounted\(unit:1 e2e:0 smoke:1 deferred:0 planned:0 unaccounted:1\)/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -197,4 +197,38 @@ test("Planned 모순: Status Planned인데 unit 커버 FR 실재 → hard exit 1
     "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Planned\n- **FR-001** (event): x.\n",
   });
   assert.equal(run(dir2).code, 0);
+});
+
+// e2e-only 분리 집계 — "실행하지 않는 것을 검증됐다고 세지 않는다"(SPEC-007 확장).
+// @covers SPEC-007/FR-006
+test("e2e-only 버킷: e2e로만 커버된 FR은 unit과 분리되고 실행 축이 off면 매 실행 표면화", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-e2eacct-"));
+  mkdirSync(join(root, "sdd/specs"), { recursive: true });
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({
+    specDir: "sdd/specs", scanDirs: ["src"], requireAccounting: true,
+    testFileRegex: ["\\.(test|spec)\\.(ts|js)$", "\\.e2e\\.ts$"],
+    e2eFileRegex: ["\\.e2e\\.ts$"],
+  }));
+  writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+    "**Spec**: `SPEC-001`\n**FR-001** The system SHALL a.\n**FR-002** The system SHALL b.\n");
+  writeFileSync(join(root, "src/a.test.ts"), "// @covers SPEC-001/FR-001\n");
+  writeFileSync(join(root, "src/b.e2e.ts"), "// @covers SPEC-001/FR-002\n");
+  try {
+    const r = spawnSync("node", [join(process.cwd(), "tooling/check-fr-coverage.mjs")],
+      { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /accounted\(unit:1 e2e:1 /);           // unit에 섞이지 않는다
+    assert.match(r.stdout, /e2e-only 1건/);
+    assert.match(r.stdout, /실행 검증하는 게이트가 없다/);
+    assert.match(r.stdout, /SPEC-001\/FR-002/);                    // 어느 FR인지 지목
+    // 실행 축을 켜면 경고가 사실 진술로 바뀐다(감춤이 아니라 담당자 변경)
+    const cfg = JSON.parse(readFileSync(join(root, "sdd.config.json"), "utf8"));
+    cfg.e2eTestsPolicy = "advisory";
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify(cfg));
+    const r2 = spawnSync("node", [join(process.cwd(), "tooling/check-fr-coverage.mjs")],
+      { cwd: root, encoding: "utf8" });
+    assert.match(r2.stdout, /e2e 실행 축\(e2eTestsPolicy:advisory\)이 판정한다/);
+    assert.doesNotMatch(r2.stdout, /실행 검증하는 게이트가 없다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

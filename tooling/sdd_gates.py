@@ -44,6 +44,7 @@ DEFAULTS = {
         ".idea", ".gradle", "bin", "obj", "Pods", ".dart_tool",
     ],
     "testFileRegex": [r"\.(test|spec)\.(ts|tsx|js|jsx|mjs|cjs)$"],
+    "e2eFileRegex": [],
     "ownershipCategories": ["Entities", "Surfaces", "Capabilities"],
     "ownershipCategoryRoles": {},
     "assertionPatterns": [
@@ -55,6 +56,8 @@ DEFAULTS = {
     "maxKeysPerCategoryPerSpec": 4,
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
+    "e2eTestsPolicy": "off",
+    "e2ePrecheck": None,
     "specSyncExemptGlobs": [],
     "specIdPrefixes": ["SPEC", "INFRA", "TEST", "CICD"],
     "prefixRationale": {},
@@ -145,6 +148,7 @@ RATCHETED_POLICIES = [
     "engineRealityPolicy",
     "eventAttributionPolicy",
     "synonymPolicy",
+    "e2eTestsPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -247,6 +251,7 @@ def _build_config(user, path, root):
     cfg["__path"] = path
     cfg["__root"] = root
     cfg["__testRegex"] = [re.compile(s) for s in cfg["testFileRegex"]]
+    cfg["__e2eRegex"] = [re.compile(s) for s in (cfg.get("e2eFileRegex") or [])]
     # spec ID 접두어 파생값(게이트 공통). ["SPEC","TEST"] → "SPEC|TEST"
     alt = _alt(cfg.get("specIdPrefixes"), DEFAULTS["specIdPrefixes"])
     cfg["__prefixes"] = cfg.get("specIdPrefixes") or DEFAULTS["specIdPrefixes"]
@@ -276,6 +281,10 @@ def rel_from_root(cfg, path):
 
 def is_test_file(name, cfg):
     return any(rx.search(name) for rx in cfg["__testRegex"])
+
+
+def is_e2e_file(name, cfg):
+    return any(rx.search(name) for rx in cfg.get("__e2eRegex", []))
 
 
 def walk_files(root, cfg):
@@ -454,17 +463,19 @@ def load_manifest(cfg, specs):
     return entries, errors
 
 
-def classify_accounting(specs, covered, entries, planned_specs=None):
-    """FR별 분류(unit > smoke > deferred > planned > unaccounted) + 카운트."""
+def classify_accounting(specs, covered, entries, planned_specs=None, e2e_only=None):
+    """FR별 분류(unit > e2e > smoke > deferred > planned > unaccounted) + 카운트.
+    e2e_only: 커버 파일이 전부 e2e인 "SPEC/FR" 집합 — 로컬 스위트가 실행하지 않으므로 unit과 섞지 않는다."""
     planned_specs = planned_specs or set()
+    e2e_only = e2e_only or set()
     classes = {}
-    counts = {"unit": 0, "smoke": 0, "deferred": 0, "planned": 0, "unaccounted": 0}
+    counts = {"unit": 0, "e2e": 0, "smoke": 0, "deferred": 0, "planned": 0, "unaccounted": 0}
     for spec, frs in specs.items():
         for fr in frs:
             key = f"{spec}/{fr}"
             cls = "unaccounted"
             if fr in covered.get(spec, set()):
-                cls = "unit"  # unit이 manifest보다 우선
+                cls = "e2e" if key in e2e_only else "unit"
             elif entries is not None and key in entries:
                 cls = "deferred" if entries[key]["method"] == "deferred" else "smoke"
             elif spec in planned_specs:
@@ -661,12 +672,18 @@ def cmd_fr(cfg, strict):
 
     # 2. 테스트 파일의 @covers 수집.
     covered = {}
+    cover_seen = set()
+    runnable_covered = set()
     bad_refs = []
     for scan in cfg["scanDirs"]:
         for file in walk_tests(resolve(cfg, scan), cfg):
             text = read_text(file)
             for spec, fr in cfg["__covers"].findall(text):
                 covered.setdefault(spec, set()).add(fr)
+                key = f"{spec}/{fr}"
+                cover_seen.add(key)
+                if not is_e2e_file(file, cfg):
+                    runnable_covered.add(key)
                 if spec not in specs or fr not in specs[spec]:
                     bad_refs.append((file, spec, fr))
 
@@ -692,7 +709,8 @@ def cmd_fr(cfg, strict):
         m = cfg["__specId"].search(f)
         if m and f.endswith(".md") and parse_status(read_text(os.path.join(spec_dir, f))) == "Planned":
             planned_specs.add(m.group(0))
-    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest, planned_specs)
+    e2e_only = {k for k in cover_seen if k not in runnable_covered}
+    acct_classes, acct_counts = (classify_accounting(specs, covered, manifest, planned_specs, e2e_only)
                                  if accounting_active else (None, None))
     # Planned↔커버리지 모순(SPEC-018 FR-007): Planned는 "안 지음" 선언인데 unit 커버 FR이 실재하면 모순 —
     # Active→Planned 뒤집기로 strictSpecs·R3를 침묵시키는 "회계 침묵기" 경로를 hard 차단(감사 T2).
@@ -728,10 +746,20 @@ def cmd_fr(cfg, strict):
                 if acct_classes.get(f"{spec}/{fr}") == "unaccounted":
                     errors.append(f"R3 unaccounted {spec}/{fr} — unit·smoke·deferred 어느 것도 아님(requireAccounting)")
 
+    if accounting_active and acct_counts["e2e"] > 0:
+        axis = str(cfg.get("e2eTestsPolicy") or "off")
+        lst = sorted(k for k, c in acct_classes.items() if c == "e2e")
+        if axis == "off":
+            more = f" 외 {len(lst) - 8}건" if len(lst) > 8 else ""
+            warnings.append(f"⚠ e2e-only {acct_counts['e2e']}건 — e2e로만 커버돼 실행 검증하는 게이트가 없다(e2eTestsPolicy:off). "
+                            f"commands.e2e 선언 후 정책을 켜거나, 실행 불가면 evidence로 회계하라: {', '.join(lst[:8])}{more}")
+        else:
+            warnings.append(f"· e2e-only {acct_counts['e2e']}건 — e2e 실행 축(e2eTestsPolicy:{axis})이 판정한다")
+
     total_fr = sum(len(s) for s in specs.values())
     total_cov = sum(len(s) for s in covered.values())
     mode = "strict" if strict else "incremental"
-    acct_tag = (f" accounted(unit:{acct_counts['unit']} smoke:{acct_counts['smoke']}"
+    acct_tag = (f" accounted(unit:{acct_counts['unit']} e2e:{acct_counts['e2e']} smoke:{acct_counts['smoke']}"
                 f" deferred:{acct_counts['deferred']} planned:{acct_counts['planned']} unaccounted:{acct_counts['unaccounted']})"
                 if accounting_active else "")
     print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov}{acct_tag} mode:{mode} config:{cfg_tag(cfg)}")
@@ -3388,6 +3416,26 @@ def test_run_verdict(policy, has_command, exit_code):
     return True, (1 if hard else 0), f"{'✗' if hard else '⚠'} 테스트 실행 게이트 — commands.test 실패 (exit {exit_code}, runTestsPolicy:{policy})"
 
 
+E2E_ENUM = ("off", "advisory", "hard")
+
+
+def e2e_run_verdict(policy, has_command, skipped="", exit_code=None):
+    """e2e 실행 판정 순수 코어 (SPEC-021 확장, check-test-run.mjs e2eRunVerdict 미러 — 바이트 동일)."""
+    if policy not in E2E_ENUM:
+        return False, 1, f'✗ e2eTestsPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)'
+    if policy == "off":
+        return True, 0, "e2e 실행 축 — e2eTestsPolicy:off (판정 안 함; e2e로만 커버된 FR은 check-fr-coverage가 e2e 버킷으로 표면화한다)"
+    hard = policy == "hard"
+    if not has_command:
+        return True, (1 if hard else 0), f"{'✗' if hard else '⚠'} e2e 실행 축 — e2eTestsPolicy:{policy}인데 commands.e2e 미선언 — 판정 대상이 없다(거짓 안전)"
+    if skipped:
+        extra = "; hard에서 미판정은 거짓 안전이라 실패로 센다" if hard else ""
+        return True, (1 if hard else 0), f"{'✗' if hard else '·'} e2e 실행 축 — [skipped] {skipped} (판정 못 함이지 '통과'가 아니다{extra})"
+    if exit_code == 0:
+        return True, 0, f"e2e 실행 축 — commands.e2e green (e2eTestsPolicy:{policy})"
+    return True, (1 if hard else 0), f"{'✗' if hard else '⚠'} e2e 실행 축 — commands.e2e 실패 (exit {exit_code}, e2eTestsPolicy:{policy})"
+
+
 def cmd_testrun(cfg):
     """`commands.test`(로컬 안전 tier)를 실제 실행해 결과를 판정 (SPEC-021). 러너/언어 중립."""
     policy = cfg.get("runTestsPolicy") or "off"
@@ -3399,8 +3447,30 @@ def cmd_testrun(cfg):
         # ⚠/✗로 스캔하다 green을 "확인 필요"로 읽는다. 리다이렉트라 실시간 출력은 그대로.
         exit_code = subprocess.run(cmd, shell=True, cwd=cfg["__root"], stdout=sys.stderr).returncode
     valid, code, line = test_run_verdict(policy, bool(cmd), exit_code)
+
+    e2e_policy = str(cfg.get("e2eTestsPolicy") or "off")
+    e2e_cmd = (cfg.get("commands") or {}).get("e2e")
+    skipped, e2e_exit = "", None
+    if e2e_policy in ("advisory", "hard") and e2e_cmd:
+        probe = cfg.get("e2ePrecheck")
+        if probe:
+            try:
+                r = subprocess.run(str(probe), shell=True, cwd=cfg["__root"], capture_output=True,
+                                   text=True, encoding="utf-8",
+                                   timeout=float(cfg.get("e2ePrecheckTimeoutMs") or 60000) / 1000.0)
+                if r.returncode != 0:
+                    lines = [l for l in (r.stderr or "").strip().split("\n") if l.strip()]
+                    skipped = f"실행 전제 미충족(e2ePrecheck 실패) — {lines[-1] if lines else '사유 불명'}"
+            except Exception as e:  # noqa: BLE001
+                lines = [l for l in str(e).strip().split("\n") if l.strip()]
+                skipped = f"실행 전제 미충족(e2ePrecheck 실패) — {lines[-1] if lines else '사유 불명'}"
+        if not skipped:
+            e2e_exit = subprocess.run(str(e2e_cmd), shell=True, cwd=cfg["__root"], stdout=sys.stderr).returncode
+    e_valid, e_code, e_line = e2e_run_verdict(e2e_policy, bool(e2e_cmd), skipped, e2e_exit)
+    # 출력 순서: e2e 축 먼저, 스위트 판정 마지막 (check-test-run.mjs 미러 — 집계기가 마지막 줄을 요약으로 쓴다).
+    print(e_line, file=(sys.stdout if (e_valid and e_code == 0) else sys.stderr))
     print(line, file=(sys.stdout if valid else sys.stderr))
-    sys.exit(code)
+    sys.exit(code or e_code)
 
 
 MIGRATION_ENUM = ("advisory", "hard")
