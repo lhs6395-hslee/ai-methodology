@@ -75,6 +75,7 @@
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
 | 일시 | 수행자 | 판정 |
 |---|---|---|
+| 2026-08-02 | 소유자 확정 | 킷 자기적용 미결 후보 3건 **전부 비중복 승인**. `live-reality`↔`runtime-schema-drift`는 통합 여지를 인지한 채 분리 유지(재검토 조건: 032가 여러 kind를 갖는 시점) — 초안=LLM·확정=사람 절차대로 착지 |
 | 2026-07-30 | 셀프리뷰(순수 코어 TDD·게이트 e2e·Node↔Python 바이트 패리티·확률적 비차단 계약 실측 고정) + owner 확정("①+②+③ 전부" + "LLM 실수를 방지하는 툴킷이 필요") → Active | FR-001~007 unit 커버. 킷 자기적용 advisory에서 형태 충돌 0(entity 33건) |
 
 ## Dedup-Review
