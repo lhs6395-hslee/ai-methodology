@@ -52,7 +52,7 @@
 - **Capability 귀속(2026-07-20, SPEC-024)** — 소비 프로젝트 실측(budget-engine: Entities 0개+capability 4개) → owner 확정 "스펙 경계는 entity 기준 — entity 키 동일=같은 스펙, verb 상이=같은 스펙에 FR 신설, 참조는 relation": capability `x.verb`는 entity `x` 소유 스펙만(`capabilityOwnershipPolicy`, 기본 advisory — ownership 게이트 배선, Node·Python 바이트 패리티). METHODOLOGY "Dependencies의 entity여도 무방" 탈출구 문장 개정 + DEDUP·템플릿 예시 정합.
 - **FR 키 앵커(2026-07-17, SPEC-023)** — 소비 프로젝트 실측(FR bold가 수사적 장식뿐)에서 owner 제안: **bold를 키 앵커 전용으로 예약** — FR 선언 라인의 평문 bold를 소유∪참조 키와 대조(`frKeyAnchorPolicy` off|advisory|hard, consistency 게이트 배선, 코드 스팬은 리터럴). consistency(키→본문)와 합쳐 양방향 앵커. 도입 즉시 킷 자신에서 수사적 bold 1건 실수확·정리(advisory 상시 on).
 
-설계·계획 근거: `docs/design/` · `docs/superpowers/plans/`.
+설계 근거: `docs/design/`. (구현 계획 문서 `docs/superpowers/plans/`는 2026-08-02 삭제 — 실행 체크리스트라 착지 후 SSOT가 `sdd/specs/`+Change Log로 옮겨갔다. 필요하면 git 이력에서 복원.)
 
 > **키트는 이제 자기 자신의 첫 소비자다.** 게이트가 키트 자신의 tooling 변경을 상시 강제하고(자기 훅), 자기 커버리지 갭(미커버 FR)까지 정직하게 드러낸다 — 지속적 도그푸딩.
 
