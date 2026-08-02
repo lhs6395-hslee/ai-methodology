@@ -54,7 +54,7 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 - **SC-002**: 로컬 훅 미설치 클론에서 만든 위반 PR이 CI 체크 실패로 표면화된다(서버측 백스톱 실증).
 
 ## Non-Functional Requirements
-- **NFR-001**: 워크플로는 게이트를 그대로 호출만 한다(판정 로직 신규 0) — 게이트 CLI가 CI 도구 무관이라는 범용성 보장(principles §10)을 킷 자신이 소비.
+- **NFR-001**: 워크플로는 게이트를 그대로 호출만 한다(판정 로직 신규 0) — 게이트 CLI가 CI 도구 무관이라는 범용성 보장(principles §10)을 킷 자신이 소비. [검증: .github/workflows/sdd-gates.yml]
 
 ## Assumptions / Clarifications Retained
 - GitHub Actions는 이 레포(정본이 GitHub)의 소비 선택이지 방법론 요구가 아니다 — 소비 프로젝트는 어느 CI/CD 도구든 같은 명령을 건다(`ci-examples.md`). 이 스펙이 소유하는 것은 킷 자신의 파이프라인 인스턴스다.
@@ -77,3 +77,4 @@ PR 이벤트에선 spec-sync 게이트를 range 모드(merge-base 대비)로 실
 |---|---|---|
 | 2026-07-16 | 초안 — push/PR 스위트+게이트+smoke 드리프트, PR range spec-sync(merge-base·fetch-depth 0), `@verifies` 태그로 smoke 회계 | 감사 M1: `runTestsPolicy: "hard"` 선언·"CI가 웹 UI 병합을 막는다" 처방과 달리 킷 자신은 `.github/` 부재로 발동 지점 0곳 — 선언과 배선의 드리프트를 킷 자신의 CI 인스턴스로 봉합 |
 | 2026-07-27 | FR-001 주어를 `THE SYSTEM`에서 **kit-ci** (E)로 교체 — 소유 entity 키 FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화 — 익명 주어라 이 스펙이 세우는 aggregate가 FR 선언 라인에 흔적이 없던 것을 명시(동작 불변) |
+| 2026-08-02 | CI 게이트 목록 전수화 — test-adequacy·orphan-surfaces·converge-drift·derivation·policy-ratchet·engine-event·evidence·sc-coverage·live-reality·schema-drift·ownership-map(--check) 11종 추가 | **증거를 붙이는 행위가 증거의 부재를 실수확했다.** SC·NFR 회계를 hard로 올리며 도그푸딩 SC 18건의 증거로 이 워크플로를 지목하려다, 지목 대상 게이트 상당수가 CI에 아예 없다는 것이 드러났다. CI에서 빠진 게이트는 로컬 훅에만 걸려 있고 로컬 훅은 `--no-verify`로 우회된다 — 우회 가능한 강제는 강제가 아니다. 제외 3종(hooks-installed·deploy-guard/debt·pre-edit)은 사유를 파일 상단에 명시 |

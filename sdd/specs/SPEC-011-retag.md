@@ -56,11 +56,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `retag.test.mjs` 전 케이스 green + dry-run·write 출력과 치환 산출물의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 재번호 시나리오(픽스처)에서 수동 재태깅 0건 — 맵 적용만으로 fr 게이트 R1 green 도달.
+- **SC-001**: `retag.test.mjs` 전 케이스 green + dry-run·write 출력과 치환 산출물의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/retag.test.mjs]
+- **SC-002**: 재번호 시나리오(픽스처)에서 수동 재태깅 0건 — 맵 적용만으로 fr 게이트 R1 green 도달. [검증: tooling/__tests__/retag.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 치환은 태그 문맥·키 경계로 한정된 결정적 문자열 연산이며, 코드 의미 분석·태그 라인 삭제를 하지 않는다.
+- **NFR-001**: 치환은 태그 문맥·키 경계로 한정된 결정적 문자열 연산이며, 코드 의미 분석·태그 라인 삭제를 하지 않는다. [검증: tooling/__tests__/retag.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 마이그레이션 맵의 작성 주체는 재도출 세션(LLM 제안 + 사람 승인)이다 — 이 도구는 맵의 의미(왜 이 키가 저 키인가)를 판정하지 않는다.

@@ -61,11 +61,11 @@
 - **Consolidation**: 해당 없음(N/A) — 이전 대상 객체가 없다.
 
 ## Success Criteria (측정형)
-- **SC-001**: `object-storage.test.mjs` 전 케이스 green + completeness 출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 completeness를 돌 때 오브젝트 스토리지 경고 0건(SPEC-016은 N/A 결정 섹션 구비, 나머지 스펙은 마커 미매치 — 도그푸딩).
+- **SC-001**: `object-storage.test.mjs` 전 케이스 green + completeness 출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/object-storage.test.mjs]
+- **SC-002**: 이 레포 자신이 completeness를 돌 때 오브젝트 스토리지 경고 0건(SPEC-016은 N/A 결정 섹션 구비, 나머지 스펙은 마커 미매치 — 도그푸딩). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정은 마커 문자열 매치·섹션 추출·라벨 존재 검사만으로 결정적이며, 레포 밖 스토리지 시스템 조회나 IaC 파싱을 하지 않는다.
+- **NFR-001**: 판정은 마커 문자열 매치·섹션 추출·라벨 존재 검사만으로 결정적이며, 레포 밖 스토리지 시스템 조회나 IaC 파싱을 하지 않는다. [검증: tooling/__tests__/object-storage.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 감지는 결정적 선언 신호가 아니라 config 마커 휴리스틱이다 — 그래서 severity를 advisory로 두고(리마인더), 강제 승격은 `--strict`·팀 선택으로 남긴다.

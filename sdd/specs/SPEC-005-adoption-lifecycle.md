@@ -61,11 +61,11 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `lifecycle-skills.test.mjs`가 세 스킬 파일의 존재와 각 스킬의 계약(초안+승인 게이트·안전망 태그·`/sdd-sync` 래핑·자동 덮어쓰기 금지·인자 기본값)을 검증하며 통과한다(현재 green).
-- **SC-002**: `sdd-init.sh --gate=node` 실행 후 세 스킬이 `.claude/skills/{sdd-start,sdd-readopt,sdd-update}/SKILL.md`로 설치된다(SPEC-004 FR-003이 소유·강제).
+- **SC-001**: `lifecycle-skills.test.mjs`가 세 스킬 파일의 존재와 각 스킬의 계약(초안+승인 게이트·안전망 태그·`/sdd-sync` 래핑·자동 덮어쓰기 금지·인자 기본값)을 검증하며 통과한다(현재 green). [검증: tooling/__tests__/lifecycle-skills.test.mjs]
+- **SC-002**: `sdd-init.sh --gate=node` 실행 후 세 스킬이 `.claude/skills/{sdd-start,sdd-readopt,sdd-update}/SKILL.md`로 설치된다(SPEC-004 FR-003이 소유·강제). [검증: tooling/__tests__/lifecycle-skills.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 세 스킬의 상세 절차 원본은 `prompts/`에 한 곳으로 두고(SSOT), 스킬은 이를 참조·실행한다 — 절차 본문을 중복 저장하지 않는다(드리프트 방지).
+- **NFR-001**: 세 스킬의 상세 절차 원본은 `prompts/`에 한 곳으로 두고(SSOT), 스킬은 이를 참조·실행한다 — 절차 본문을 중복 저장하지 않는다(드리프트 방지). [검증: tooling/__tests__/lifecycle-skills.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 최초 채택(`/sdd-start`)은 배선 전 상태에서도 실행될 수 있으므로, 진정한 clean-machine 진입은 `prompts/adopt.md`(raw URL)로도 가능하다. 설치형 스킬은 채택 이후의 재채택·업데이트에서 특히 유용하다.

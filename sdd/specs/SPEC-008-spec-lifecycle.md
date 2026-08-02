@@ -58,11 +58,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `spec-lifecycle.test.mjs` 전 케이스 green + completeness 수명주기 출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포의 전 스펙이 Status 선언 + Reviewed 이상은 Review Log·Dedup-Review 기록 구비(completeness 수명주기 warn 0건).
+- **SC-001**: `spec-lifecycle.test.mjs` 전 케이스 green + completeness 수명주기 출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/spec-lifecycle.test.mjs]
+- **SC-002**: 이 레포의 전 스펙이 Status 선언 + Reviewed 이상은 Review Log·Dedup-Review 기록 구비(completeness 수명주기 warn 0건). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 수명주기 판정은 순수 텍스트 파서로 결정적이며, 리뷰 내용의 질(판정 타당성)은 판정하지 않는다.
+- **NFR-001**: 수명주기 판정은 순수 텍스트 파서로 결정적이며, 리뷰 내용의 질(판정 타당성)은 판정하지 않는다. [검증: tooling/__tests__/spec-lifecycle.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - Deprecated/Removed 상태는 리뷰 기록 요구 대상이 아니다 — 수명 종료 스펙에 소급 기록을 강요하지 않는다(폐기 절차는 STRUCTURE.md).

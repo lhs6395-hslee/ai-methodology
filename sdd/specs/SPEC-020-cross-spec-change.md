@@ -58,11 +58,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `cross-spec.test.mjs` 전 케이스 green + `parseDrivers`·`crossSpecRelaxed`의 Node↔Python 바이트 동일(패리티 테스트 green).
+- **SC-001**: `cross-spec.test.mjs` 전 케이스 green + `parseDrivers`·`crossSpecRelaxed`의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/cross-spec.test.mjs]
 - **SC-002**: 이 레포 자신을 돌 때 Change-Driver 없는 커밋은 동작 불변(거짓 완화 0). [검증: tooling/__tests__/cross-spec.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: `cross-spec-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(트레일러 문자열·집합 → 완화 판정)라 결정적으로 단위 테스트된다; changeset 의미변경 수집은 소비 게이트(check-spec-sync)가 수행.
+- **NFR-001**: `cross-spec-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(트레일러 문자열·집합 → 완화 판정)라 결정적으로 단위 테스트된다; changeset 의미변경 수집은 소비 게이트(check-spec-sync)가 수행. [검증: tooling/__tests__/cross-spec.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - Change-Driver는 `Spec-Impact`와 동형의 정직한 선언이다 — 게이트는 동인의 실재·의미변경만 확인하고, 동인이 정말 그 변경의 이유인지(인과 타당성)는 리뷰 경계.

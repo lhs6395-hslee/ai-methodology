@@ -24,11 +24,11 @@
 
 ## Success Criteria (측정형)
 
-- **SC-001**: 킷 자기적용에서 모듈 문법 29/29 · 심볼 문법 52/52 성립, **예외 0**.
-- **SC-002**: `sdd/OWNERSHIP_MAP.md`의 실재 칸 `미판정` 수가 0(도입 전 79).
-- **SC-003**: 키를 실재하지 않는 이름으로 바꾸면 두 문법 각각 exit 1 — 침묵하지 않는다.
-- **SC-005**: 점 표기 모듈 경로 키(`src.cli.finops_ticket_chat`)가 실재 파일(`src/cli/finops_ticket_chat.py`)에 매치하고, 없는 모듈은 여전히 exit 1 — 소비 프로젝트 finops 실측 형태로 고정.
-- **SC-004**: `symbolRealityPolicy: off`(기본)인 레포의 게이트 출력·exit는 도입 전과 바이트 동일.
+- **SC-001**: 킷 자기적용에서 모듈 문법 29/29 · 심볼 문법 52/52 성립, **예외 0**. [검증: .github/workflows/sdd-gates.yml]
+- **SC-002**: `sdd/OWNERSHIP_MAP.md`의 실재 칸 `미판정` 수가 0(도입 전 79). [검증: tooling/__tests__/ownership-reality.test.mjs]
+- **SC-003**: 키를 실재하지 않는 이름으로 바꾸면 두 문법 각각 exit 1 — 침묵하지 않는다. [검증: tooling/__tests__/ownership-reality.test.mjs]
+- **SC-005**: 점 표기 모듈 경로 키(`src.cli.finops_ticket_chat`)가 실재 파일(`src/cli/finops_ticket_chat.py`)에 매치하고, 없는 모듈은 여전히 exit 1 — 소비 프로젝트 finops 실측 형태로 고정. [검증: tooling/__tests__/ownership-reality.test.mjs]
+- **SC-004**: `symbolRealityPolicy: off`(기본)인 레포의 게이트 출력·exit는 도입 전과 바이트 동일. [검증: tooling/__tests__/ownership-reality.test.mjs]
 
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
@@ -43,8 +43,8 @@
 - **Symbols**: check-ownership.mjs, gen-ownership-map.mjs
 
 ## Non-Functional Requirements
-- **NFR-001** (portability): 판정 코어는 순수(문자열·집합)이며 파일 IO는 소비 게이트가 한다 — 언어·인프라 무관.
-- **NFR-002** (compatibility): 두 문법은 옵트인이다. 미선언 사이트의 출력은 바이트 불변(SC-004).
+- **NFR-001** (portability): 판정 코어는 순수(문자열·집합)이며 파일 IO는 소비 게이트가 한다 — 언어·인프라 무관. [검증: tooling/__tests__/ownership-reality.test.mjs]
+- **NFR-002** (compatibility): 두 문법은 옵트인이다. 미선언 사이트의 출력은 바이트 불변(SC-004). [검증: tooling/__tests__/ownership-reality.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 디렉토리를 심볼로 인정한다 — `go-gate`처럼 디렉토리 자체가 표면인 경우가 실재한다(킷 실측).

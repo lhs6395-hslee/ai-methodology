@@ -57,7 +57,7 @@
 - **SC-002**: 재현 픽스처에서 terraform·kubernetes·ownership 위반이 각각 목록으로 출력되고, 바이너리 없는 환경(자격증명 없음 대리)에서는 전부 skipped(사유 포함)로 hard에서도 exit 0. [검증: tooling/__tests__/live-reality.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어는 실행 결과(exit code·stdout·stderr) → 분류의 순수 함수라 결정적으로 단위 테스트되고, 명령 실행·타임아웃은 소비 게이트가 수행한다.
+- **NFR-001**: 판정 코어는 실행 결과(exit code·stdout·stderr) → 분류의 순수 함수라 결정적으로 단위 테스트되고, 명령 실행·타임아웃은 소비 게이트가 수행한다. [검증: tooling/__tests__/live-reality.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - "무엇이 라이브 진실인가"는 주입된 명령이 답한다 — 게이트는 클라우드 API·state 포맷을 알지 못하고, 알아서도 안 된다(인프라 무관성이 이식성의 전제).

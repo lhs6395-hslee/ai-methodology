@@ -59,11 +59,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `test-run.test.mjs` 전 케이스 green + 게이트 판정·출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 `runTestsPolicy: hard` + `commands.test`로 돌 때 실제 테스트 스위트 green을 요구(커버리지 회계와 독립).
+- **SC-001**: `test-run.test.mjs` 전 케이스 green + 게이트 판정·출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/test-run.test.mjs]
+- **SC-002**: 이 레포 자신이 `runTestsPolicy: hard` + `commands.test`로 돌 때 실제 테스트 스위트 green을 요구(커버리지 회계와 독립). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어(`testRunVerdict`)는 정책·명령유무·exit code만 보는 순수 함수라 결정적으로 단위 테스트되고, 실제 명령 실행(부작용)은 게이트 래퍼가 수행.
+- **NFR-001**: 판정 코어(`testRunVerdict`)는 정책·명령유무·exit code만 보는 순수 함수라 결정적으로 단위 테스트되고, 실제 명령 실행(부작용)은 게이트 래퍼가 수행. [검증: tooling/__tests__/test-run.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 게이트는 러너/언어를 모른다 — 프로젝트가 `commands.test`로 선언한 명령을 그대로 실행하고 exit code만 판정한다(pytest·vitest·go test 등 무관).

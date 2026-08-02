@@ -63,11 +63,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `check-spec-sync.test.mjs`·`spec-sync-lib.test.mjs`·`commit-msg-hook.test.mjs`의 모든 케이스가 통과한다(현재 green).
-- **SC-002**: 소유 코드만 바뀌고 스펙 동반이 없는 스테이징에서 commit-msg 훅이 exit 1로 100% 차단한다(거짓음성 0).
+- **SC-001**: `check-spec-sync.test.mjs`·`spec-sync-lib.test.mjs`·`commit-msg-hook.test.mjs`의 모든 케이스가 통과한다(현재 green). [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs]
+- **SC-002**: 소유 코드만 바뀌고 스펙 동반이 없는 스테이징에서 commit-msg 훅이 exit 1로 100% 차단한다(거짓음성 0). [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: `spec-sync-lib.mjs`는 git·파일시스템에 비의존한 순수 함수라 결정적으로 단위 테스트된다.
+- **NFR-001**: `spec-sync-lib.mjs`는 git·파일시스템에 비의존한 순수 함수라 결정적으로 단위 테스트된다. [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/spec-sync-lib.test.mjs, tooling/__tests__/commit-msg-hook.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - range 모드 base 기본값은 `origin/main`(또는 `SDD_DIFF_BASE`) — 브랜치에 스펙만 추가되는 경우 위반은 0이다.

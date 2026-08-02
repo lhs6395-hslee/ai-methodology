@@ -57,12 +57,12 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `policy-ratchet.test.mjs` 전 케이스 green + 래칫 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인).
-- **SC-002**: 실측 재현 픽스처(base `frKeyAnchorPolicy: hard` → 현재 `advisory`)에서 위반 지목·hard exit 1, 예외 선언 시 부채 표면화 + exit 0(양판 바이트 동일).
-- **SC-003**: 자폭 재현 픽스처(base `policyRatchetPolicy: hard` + `frKeyAnchorPolicy: hard` → 현재 둘 다 `off`)에서 자기 하향과 감춰지던 하향을 **둘 다** 지목하고 exit 1이며 "판정 안 함"이 출력되지 않는다(감사 A-2 회귀, 양판 바이트 동일).
+- **SC-001**: `policy-ratchet.test.mjs` 전 케이스 green + 래칫 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인). [검증: tooling/__tests__/policy-ratchet.test.mjs]
+- **SC-002**: 실측 재현 픽스처(base `frKeyAnchorPolicy: hard` → 현재 `advisory`)에서 위반 지목·hard exit 1, 예외 선언 시 부채 표면화 + exit 0(양판 바이트 동일). [검증: tooling/__tests__/policy-ratchet.test.mjs]
+- **SC-003**: 자폭 재현 픽스처(base `policyRatchetPolicy: hard` + `frKeyAnchorPolicy: hard` → 현재 둘 다 `off`)에서 자기 하향과 감춰지던 하향을 **둘 다** 지목하고 exit 1이며 "판정 안 함"이 출력되지 않는다(감사 A-2 회귀, 양판 바이트 동일). [검증: tooling/__tests__/policy-ratchet.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 래칫 판정 코어는 두 config dict의 강도 순위 대조만의 순수 함수라 결정적으로 단위 테스트되고, git·파일 IO는 소비 게이트가 수행.
+- **NFR-001**: 래칫 판정 코어는 두 config dict의 강도 순위 대조만의 순수 함수라 결정적으로 단위 테스트되고, git·파일 IO는 소비 게이트가 수행. [검증: tooling/__tests__/policy-ratchet.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 프롬프트(update.md graduation)는 회피를 "권장하지 말라"고 지시할 뿐 강제하지 못한다 — 하위 세션 준수는 기계 게이트로만 보장된다는 것이 이 spec의 전제(실측: 프롬프트 서술만으로는 12회차 넘게 회피가 반복됨).

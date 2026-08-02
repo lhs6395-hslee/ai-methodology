@@ -59,11 +59,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `prefix-class.test.mjs` 전 케이스 green + fr 접두어↔클래스 출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 접두어↔클래스 위반 0건(도그푸딩 — iac/ci 실체 0인 문서·툴 키트로 트리거 없음이 정상).
+- **SC-001**: `prefix-class.test.mjs` 전 케이스 green + fr 접두어↔클래스 출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/prefix-class.test.mjs]
+- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 접두어↔클래스 위반 0건(도그푸딩 — iac/ci 실체 0인 문서·툴 키트로 트리거 없음이 정상). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정은 글롭 매칭·파일 존재·고정 문자열 비교만으로 결정적이며, 스펙 본문의 의미 판정(NLP)·레포 밖 시스템 조회를 하지 않는다.
+- **NFR-001**: 판정은 글롭 매칭·파일 존재·고정 문자열 비교만으로 결정적이며, 스펙 본문의 의미 판정(NLP)·레포 밖 시스템 조회를 하지 않는다. [검증: tooling/__tests__/prefix-class.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 접두어 의미의 정본은 STORAGE §2.2, 착지 규칙의 정본은 prompts/readopt.md 6단계 — 이 게이트는 그 규범의 기계 신호(소유 파일 클래스)만 강제한다. 스펙 본문이 "정말 인프라 명세인가"는 리뷰 경계(METHODOLOGY 리뷰 경계 선언).

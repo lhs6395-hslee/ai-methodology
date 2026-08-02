@@ -199,10 +199,13 @@
     "deploy-guard::semantic-drift": "019는 리네임·소유 이동으로 옛 의미가 남는 것을 리뷰로 승격, 035는 라이브 반영이 기록 없이 지나가는 것을 상기. 드리프트의 원인이 이름 vs 배포로 다르다",
     "harness-install::hook-wiring": "004는 훅을 **설치**하고 스윕을 배선하는 행위, 036은 설치 결과가 **실재하는지** 판정. 행위 vs 검증이며, 004가 입도 캡을 넘긴 것을 캡 상향이 아니라 이 분할로 해소했다"
   },
-  "scCoveragePolicy": "advisory",
+  "scCoveragePolicy": "hard",
   "verificationKinds": {
     "unit": [
       "tooling/__tests__/**"
+    ],
+    "ci": [
+      ".github/workflows/**"
     ],
     "load": [
       "tests/load/**"
@@ -210,6 +213,16 @@
     "pentest": [
       "tests/security/**"
     ]
+  },
+  "evidenceManifest": {
+    "CICD-001/SC-001": {
+      "kind": "ci-run",
+      "evidence": "https://github.com/lhs6395-hslee/ai-methodology/actions/workflows/sdd-gates.yml — main push·PR run 실행 로그(레포 밖에 산다). 첫 green: PR #1 gates job, 2026-07-17 19초"
+    },
+    "CICD-001/SC-002": {
+      "kind": "deferred",
+      "reason": "음성 대조 실험(훅 미설치 클론에서 위반 PR을 만들어 CI가 잡는지 확인)을 아직 실행하지 않았다 — 서버측 백스톱이 '설계상 그렇다'까지만 참이고 실측이 없다. 다음 CI 변경 라운드에 위반 브랜치 1건으로 실증한다"
+    }
   },
   "syncHookRules": [
     "R1",

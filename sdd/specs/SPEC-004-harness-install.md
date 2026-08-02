@@ -66,12 +66,12 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `sdd-sync.test.mjs`·`init-gates.test.mjs`·`init-hooks.test.mjs`·`init-spec-sync.test.mjs`·`pre-commit.test.mjs`·`session-context.test.mjs`·`edit-check.test.mjs`가 모두 통과한다(현재 green).
-- **SC-002**: 신선한 프로젝트에서 `sdd-init.sh --gate=node` 후 설치된 파일만으로 게이트가 `ERR_MODULE_NOT_FOUND` 없이 실행된다.
-- **SC-003**: `sdd-sync.mjs --json` 출력이 유효 JSON(사람 텍스트 누출 0)이며 스키마 회귀 테스트(`sdd-sync.test.mjs`)가 최상위 키·타입·rule id 집합·내부 정합(clean⟺flaggedRules 빔)을 green으로 잠근다.
+- **SC-001**: `sdd-sync.test.mjs`·`init-gates.test.mjs`·`init-hooks.test.mjs`·`init-spec-sync.test.mjs`·`pre-commit.test.mjs`·`session-context.test.mjs`·`edit-check.test.mjs`가 모두 통과한다(현재 green). [검증: tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs]
+- **SC-002**: 신선한 프로젝트에서 `sdd-init.sh --gate=node` 후 설치된 파일만으로 게이트가 `ERR_MODULE_NOT_FOUND` 없이 실행된다. [검증: tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs]
+- **SC-003**: `sdd-sync.mjs --json` 출력이 유효 JSON(사람 텍스트 누출 0)이며 스키마 회귀 테스트(`sdd-sync.test.mjs`)가 최상위 키·타입·rule id 집합·내부 정합(clean⟺flaggedRules 빔)을 green으로 잠근다. [검증: tooling/__tests__/sdd-sync.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 재실행(idempotency) 시 `.claude/settings.json`에 SDD 훅 항목이 중복되지 않는다.
+- **NFR-001**: 재실행(idempotency) 시 `.claude/settings.json`에 SDD 훅 항목이 중복되지 않는다. [검증: tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 키트는 원본이므로 훅·명령은 `tooling/`을 직접 호출하고, 소비 프로젝트에는 `scripts/`로 복사된다(설치기 대상 분리).

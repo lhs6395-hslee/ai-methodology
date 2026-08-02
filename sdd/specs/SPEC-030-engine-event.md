@@ -53,11 +53,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `engine-event.test.mjs` 전 케이스 green + 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인).
-- **SC-002**: 재현 픽스처(실재 엔진+귀속 이벤트 스펙은 통과, 유령 엔진·귀속 없는 이벤트 스펙은 지목·hard exit 1)에서 양판 바이트 동일.
+- **SC-001**: `engine-event.test.mjs` 전 케이스 green + 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인). [검증: tooling/__tests__/engine-event.test.mjs]
+- **SC-002**: 재현 픽스처(실재 엔진+귀속 이벤트 스펙은 통과, 유령 엔진·귀속 없는 이벤트 스펙은 지목·hard exit 1)에서 양판 바이트 동일. [검증: tooling/__tests__/engine-event.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어는 문자열 집합 대조·키 분해만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO·글롭 매치는 소비 게이트가 수행(SSOT 추출은 SPEC-026 `extractSchemaEntities` 재사용).
+- **NFR-001**: 판정 코어는 문자열 집합 대조·키 분해만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO·글롭 매치는 소비 게이트가 수행(SSOT 추출은 SPEC-026 `extractSchemaEntities` 재사용). [검증: tooling/__tests__/engine-event.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - "이 이름이 실제 코드 모듈/이벤트인가"는 SSOT 파일이 답한다 — 게이트는 추출 집합과의 대조만 하고 도메인 사실을 창작하지 않는다(없으면 면제 또는 재분류는 사람 결정).

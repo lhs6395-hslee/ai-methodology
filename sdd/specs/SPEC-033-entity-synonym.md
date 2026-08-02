@@ -64,7 +64,7 @@
 - **SC-002**: 재현 픽스처에서 형태 충돌(`order`/`pjt_orders`)은 hard exit 1, **미결 후보만 남으면 hard에서도 exit 0**(확률적 비차단 보장), registry·원장 무결성 위반은 판정 전 exit 1. [검증: tooling/__tests__/synonym.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어는 문자열 정규화·집합 대조만의 순수 함수라 결정적이며, 외부 툴 실행·타임아웃은 소비 게이트가 수행한다(킷은 SBERT·LLM을 번들하지 않는다 — 이식성).
+- **NFR-001**: 판정 코어는 문자열 정규화·집합 대조만의 순수 함수라 결정적이며, 외부 툴 실행·타임아웃은 소비 게이트가 수행한다(킷은 SBERT·LLM을 번들하지 않는다 — 이식성). [검증: tooling/__tests__/synonym.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 외부 툴 선택은 프로젝트 몫이다 — 임베딩(SBERT·fastembed·로컬 Ollama), 어휘 DB(WordNet), 스키마 매칭(Valentine), LLM judge 중 무엇이든 "한 줄 = 한 후보 쌍" 계약만 지키면 된다.

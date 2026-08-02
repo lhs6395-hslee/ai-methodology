@@ -59,11 +59,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `derivation.test.mjs` 전 케이스 green + derivation·completeness 근거 출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 `derivationManifest`로 돌 때 미회계 클래스 0건 + 전 스펙 Change Log 실기록 행의 근거 빈 값 0건.
+- **SC-001**: `derivation.test.mjs` 전 케이스 green + derivation·completeness 근거 출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/derivation.test.mjs]
+- **SC-002**: 이 레포 자신이 `derivationManifest`로 돌 때 미회계 클래스 0건 + 전 스펙 Change Log 실기록 행의 근거 빈 값 0건. [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 회계 판정은 순수 텍스트/JSON 파서와 파일 존재 검사로 결정적이며, evidence/reason의 의미 판정(NLP)·레포 밖 시스템 조회를 하지 않는다.
+- **NFR-001**: 회계 판정은 순수 텍스트/JSON 파서와 파일 존재 검사로 결정적이며, evidence/reason의 의미 판정(NLP)·레포 밖 시스템 조회를 하지 않는다. [검증: tooling/__tests__/derivation.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 소스 클래스 → 산출물 매핑 규약(iac/ci/ops-docs→INFRA 스펙, build-evidence→smoke evidence, vcs-history→Change Log 근거, prior-traceability→FR 키 보존, prior-intent→Story·Clarifications 이월)은 절차 문서(prompts/readopt.md·METHODOLOGY.md)가 정본 — 게이트는 회계의 존재·형식만 강제한다.

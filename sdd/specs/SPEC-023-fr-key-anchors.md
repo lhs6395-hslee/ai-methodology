@@ -57,11 +57,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `key-anchor.test.mjs` 전 케이스 green + 앵커 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 advisory로 켠 상태에서 미매치 0(도그푸딩 — 도입 시 실수확 1건: SPEC-003 FR-005의 수사적 bold "beginning"을 검출·정리).
+- **SC-001**: `key-anchor.test.mjs` 전 케이스 green + 앵커 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/key-anchor.test.mjs]
+- **SC-002**: 이 레포 자신이 advisory로 켠 상태에서 미매치 0(도그푸딩 — 도입 시 실수확 1건: SPEC-003 FR-005의 수사적 bold "beginning"을 검출·정리). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어는 문자열 파싱·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO는 소비 게이트(check-spec-consistency)가 수행.
+- **NFR-001**: 판정 코어는 문자열 파싱·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO는 소비 게이트(check-spec-consistency)가 수행. [검증: tooling/__tests__/key-anchor.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 앵커의 "의미 적정성"(이 FR에 앵커를 달았어야 하는가, 달지 않은 것이 정당한가)은 리뷰 경계 — 게이트는 "단 bold가 키인가"의 결정 신호만 강제한다.

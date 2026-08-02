@@ -72,11 +72,11 @@ FR 식별자는 `<SPEC-ID>/FR-NNN`이고 스펙 ID가 네임스페이스라 번�
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `numbering.test.mjs` 전 케이스 green + fr 번호 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 번호 위반 0건(spec-ID는 접두어별 001 연속, FR은 28스펙 전부 001 연번·중복 0·결번 0 — 도그푸딩 실측).
+- **SC-001**: `numbering.test.mjs` 전 케이스 green + fr 번호 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/numbering.test.mjs]
+- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 번호 위반 0건(spec-ID는 접두어별 001 연속, FR은 28스펙 전부 001 연번·중복 0·결번 0 — 도그푸딩 실측). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정은 id 문자열 파싱·정수 비교만으로 결정적이며, 접두어별 출력은 정렬되어 실행 간 안정적이다.
+- **NFR-001**: 판정은 id 문자열 파싱·정수 비교만으로 결정적이며, 접두어별 출력은 정렬되어 실행 간 안정적이다. [검증: tooling/__tests__/numbering.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 번호 모델의 정본은 "접두어별 001 순차"다 — 전역 공유 번호는 채택하지 않는다(가독성·접두어별 독립성). 이 결정은 STORAGE 접두어 의미(§2.2)와 정합.

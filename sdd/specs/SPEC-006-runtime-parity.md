@@ -56,11 +56,11 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: 같은 픽스처에 대한 Node↔Python 게이트 판정 불일치 0건(패리티 테스트 green).
-- **SC-002**: 하드코딩 요구 접두어가 남은 파싱 사이트 0곳(전 런타임 회귀 테스트가 검출).
+- **SC-001**: 같은 픽스처에 대한 Node↔Python 게이트 판정 불일치 0건(패리티 테스트 green). [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
+- **SC-002**: 하드코딩 요구 접두어가 남은 파싱 사이트 0곳(전 런타임 회귀 테스트가 검출). [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: Python판은 표준 라이브러리만 사용(3.7+), 셸판은 POSIX `sh`+`grep`+`awk`+`jq`만 사용 — 추가 의존 도입 금지.
+- **NFR-001**: Python판은 표준 라이브러리만 사용(3.7+), 셸판은 POSIX `sh`+`grep`+`awk`+`jq`만 사용 — 추가 의존 도입 금지. [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - Go판은 로컬 툴체인이 없어도 소스 계약 테스트로 문법 회귀를 잡는다 — 실행 패리티 재검증은 Go 툴체인이 있는 CI에서 수행(REALITY_CHECK.md 갱신 대상).

@@ -74,11 +74,11 @@ Module 헤더가 없거나, 스펙 간 Module 값이 갈라지거나, FR 선언 
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `grammar-hardening.test.mjs` 전 케이스 green + completeness/ownership/spec-sync 신규 신호 출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 completeness를 돌 때 신규 신호 0건(전 스펙 Module 단일·SHALL 구비·Dedup 참조 실재).
+- **SC-001**: `grammar-hardening.test.mjs` 전 케이스 green + completeness/ownership/spec-sync 신규 신호 출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/grammar-hardening.test.mjs]
+- **SC-002**: 이 레포 자신이 completeness를 돌 때 신규 신호 0건(전 스펙 Module 단일·SHALL 구비·Dedup 참조 실재). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 전 판정은 텍스트 파싱·집합 비교로 결정적이며, EARS 어휘의 질·기록 내용의 질 등 의미 판정을 하지 않는다(리뷰 경계 침범 금지).
+- **NFR-001**: 전 판정은 텍스트 파싱·집합 비교로 결정적이며, EARS 어휘의 질·기록 내용의 질 등 의미 판정을 하지 않는다(리뷰 경계 침범 금지). [검증: tooling/__tests__/grammar-hardening.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 감사에서 (b)로 분류된 순수 의미 항목(EARS 어휘 질, 역량/제품 구분, Entity 표기의 스키마 일치, verb 동의어성, 스펙 본문의 도메인 판정, 현지어본 병행 편집, 승인 절차)은 게이트가 아니라 METHODOLOGY의 리뷰 경계 선언이 정본 — 억지 게이트로 오판을 만들지 않는다.

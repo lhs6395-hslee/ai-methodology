@@ -60,11 +60,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `retire.test.mjs` 전 케이스 green. **게이트 경로에 영향 주는 판정**(FR-005 Planned 회계·FR-006 numbering retirement-gap)은 Node↔Python 바이트 동일(패리티 테스트 green — CI가 두 런타임 중 무엇으로 돌든 동일). `sdd-retire` 커맨드·`retire-lib` 계획 코어는 CI 게이트 경로 밖 유지보수 도구라 **Node 참조 구현**(런타임 패리티 비대상) — 소비 프로젝트 CI 판정은 회계·numbering 게이트가 좌우하고 폐기 실행은 유지보수자 로컬 작업이므로.
-- **SC-002**: 이 레포 자신에 `sdd-retire`를 dry-run으로 돌릴 때 의도한 대상만 계획에 잡히고 무관 스펙은 불변(거짓양성 0).
+- **SC-001**: `retire.test.mjs` 전 케이스 green. **게이트 경로에 영향 주는 판정**(FR-005 Planned 회계·FR-006 numbering retirement-gap)은 Node↔Python 바이트 동일(패리티 테스트 green — CI가 두 런타임 중 무엇으로 돌든 동일). `sdd-retire` 커맨드·`retire-lib` 계획 코어는 CI 게이트 경로 밖 유지보수 도구라 **Node 참조 구현**(런타임 패리티 비대상) — 소비 프로젝트 CI 판정은 회계·numbering 게이트가 좌우하고 폐기 실행은 유지보수자 로컬 작업이므로. [검증: tooling/__tests__/retire.test.mjs]
+- **SC-002**: 이 레포 자신에 `sdd-retire`를 dry-run으로 돌릴 때 의도한 대상만 계획에 잡히고 무관 스펙은 불변(거짓양성 0). [검증: tooling/__tests__/retire.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: `retire-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(계획 산출)라 결정적으로 단위 테스트된다; 파일 편집은 커맨드 래퍼가 `--write`에서만 수행.
+- **NFR-001**: `retire-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(계획 산출)라 결정적으로 단위 테스트된다; 파일 편집은 커맨드 래퍼가 `--write`에서만 수행. [검증: tooling/__tests__/retire.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 테스트 코드 삭제는 자동화하지 않는다(한 테스트가 여러 FR을 커버할 수 있어 사람 판단) — 폐기는 dangling을 드러내고 R1 그물이 잔존을 차단한다.

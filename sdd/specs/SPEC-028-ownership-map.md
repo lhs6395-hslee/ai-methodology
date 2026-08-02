@@ -59,11 +59,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `ownership-map.test.mjs` 전 케이스 green + 맵의 역할별 위반 집계가 같은 픽스처에서 해당 게이트의 위반 수와 100% 일치.
-- **SC-002**: 킷 자신·데이터 백킹 소비 프로젝트·미판정 가드가 섞인 소비 프로젝트 세 형태에서 생성이 성공하고, 각 레포의 가드 포스처가 그 레포 config와 일치한다(실측 대조).
+- **SC-001**: `ownership-map.test.mjs` 전 케이스 green + 맵의 역할별 위반 집계가 같은 픽스처에서 해당 게이트의 위반 수와 100% 일치. [검증: tooling/__tests__/ownership-map.test.mjs]
+- **SC-002**: 킷 자신·데이터 백킹 소비 프로젝트·미판정 가드가 섞인 소비 프로젝트 세 형태에서 생성이 성공하고, 각 레포의 가드 포스처가 그 레포 config와 일치한다(실측 대조). [검증: tooling/__tests__/ownership-map.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 생성은 읽기 전용 판정과 텍스트 조립뿐이라 결정적이며(같은 입력 → 바이트 동일 출력), `--check`가 그 결정성 위에서 드리프트를 판정한다.
+- **NFR-001**: 생성은 읽기 전용 판정과 텍스트 조립뿐이라 결정적이며(같은 입력 → 바이트 동일 출력), `--check`가 그 결정성 위에서 드리프트를 판정한다. [검증: tooling/__tests__/ownership-map.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 맵은 게이트를 **대체하지 않는다** — 차단은 게이트가, 가시화는 맵이 한다. 맵이 위반을 보여도 exit는 0이다(`--check`의 드리프트 판정만 예외).

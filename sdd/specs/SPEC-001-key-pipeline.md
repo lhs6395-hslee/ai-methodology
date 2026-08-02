@@ -69,11 +69,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `ownership-keys.test.mjs`·`sdd-config.test.mjs`의 모든 케이스가 통과하며(현재 green), 동일 입력에 대한 `parseSection`/`normalizeKey`/`validateKey` 결과가 100% 재현된다.
-- **SC-002**: config 파일이 없는 프로젝트에서 `loadConfig`가 `DEFAULTS`와 동일한 유효 config를 산출한다(하위호환 회귀 0건).
+- **SC-001**: `ownership-keys.test.mjs`·`sdd-config.test.mjs`의 모든 케이스가 통과하며(현재 green), 동일 입력에 대한 `parseSection`/`normalizeKey`/`validateKey` 결과가 100% 재현된다. [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
+- **SC-002**: config 파일이 없는 프로젝트에서 `loadConfig`가 `DEFAULTS`와 동일한 유효 config를 산출한다(하위호환 회귀 0건). [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 파이프라인은 순수 텍스트 파서로 Node 런타임만 요구하고 대상 프로젝트 언어에 비의존한다.
+- **NFR-001**: 파이프라인은 순수 텍스트 파서로 Node 런타임만 요구하고 대상 프로젝트 언어에 비의존한다. [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - `ownershipCategories` 헤더 문자열은 config 값과 정확히 일치해야 게이트가 파싱한다(정규화 표기 규칙은 설계 §4 표를 따른다).
@@ -130,3 +130,4 @@
 | 2026-07-30 | DEFAULTS에 `synonymPolicy`·`synonymRegistry`·`synonymReviewLedger`·`keyPrefixes`·`entitySimilarityCommand`·`entitySimilarityTimeoutMs` knob 추가(Node) | SPEC-033 동반: 판정 코어·게이트는 SPEC-033 소유, config knob은 이 spec 소유 |
 | 2026-08-02 | config knob 신설 — `hooksInstalledPolicy`·`syncHookRules`·`syncHookDelegatedTo`(훅 배선·훅 성능, SPEC-036/004) + `sdd/OWNERSHIP_MAP.md`를 생성물 예외에 편입 | 훅 미설치·pre-push 30초 제보 대응. 맵은 게이트가 재생성하는 산출물이라 `sdd/smoke-manifest.json`과 같은 클래스인데 예외 목록에서 빠져 있어, 맵 재생성마다 SPEC-028 Change Log를 요구했다(억지 동반요구) |
 | 2026-08-02 | config knob 3종 추가 — `supportLayerSpecs`(SPEC-002 교착 출구)·`outOfBandDeployDebtFile`(SPEC-035 hard의 실체). Python DEFAULTS 미러 동반 | 소유 스펙의 판정 변경에 따른 knob 신설. 등록부형 knob은 사유 필수·상시 표면화 관례를 따른다(schema-backing 면제와 같은 경계) |
+| 2026-08-02 | 킷 자기적용 config — `scCoveragePolicy: advisory → hard`, `verificationKinds`에 `ci` 추가, `evidenceManifest` 최초 선언(CICD-001 2건) | SPEC-034 백로그 소진 동반. `ci` 종류는 도그푸딩 SC가 지목하는 CI 실행을 unit과 구분해 세기 위한 것이다 — 같은 verified라도 무엇이 재현하는지가 다르다 |

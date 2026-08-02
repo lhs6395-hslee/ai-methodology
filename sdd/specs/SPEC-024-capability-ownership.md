@@ -59,11 +59,11 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `capability-ownership.test.mjs` 전 케이스 green + 귀속 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: budget-engine 픽스처(Entities 0 + capability 4)에서 위반 4건 전부 지목·hard exit 1(실측 재현 — 도입 검증에서 양판 바이트 동일 확인).
+- **SC-001**: `capability-ownership.test.mjs` 전 케이스 green + 귀속 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/capability-ownership.test.mjs]
+- **SC-002**: budget-engine 픽스처(Entities 0 + capability 4)에서 위반 4건 전부 지목·hard exit 1(실측 재현 — 도입 검증에서 양판 바이트 동일 확인). [검증: tooling/__tests__/capability-ownership.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어는 문자열 정규화·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO는 소비 게이트(check-ownership)가 수행.
+- **NFR-001**: 판정 코어는 문자열 정규화·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO는 소비 게이트(check-ownership)가 수행. [검증: tooling/__tests__/capability-ownership.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - "이 스펙이 정말 그 aggregate인가"(소유 선언으로 해소할지 이관할지)는 리뷰 몫 — 게이트는 귀속 신호만 강제한다.

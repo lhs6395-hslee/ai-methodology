@@ -57,11 +57,11 @@ incremental 모드의 "0커버 spec은 warn"은 점진 도입엔 옳지만, 성�
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `fr-accounting.test.mjs` 전 케이스 green + Node↔Python 회계 출력 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 `requireAccounting`으로 돌 때 미회계 FR 0건(전 FR이 unit 또는 매니페스트 회계).
+- **SC-001**: `fr-accounting.test.mjs` 전 케이스 green + Node↔Python 회계 출력 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/fr-accounting.test.mjs]
+- **SC-002**: 이 레포 자신이 `requireAccounting`으로 돌 때 미회계 FR 0건(전 FR이 unit 또는 매니페스트 회계). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 회계 코어는 순수 텍스트/JSON 파서로 결정적이며, evidence/reason의 의미 판정(NLP)을 하지 않는다.
+- **NFR-001**: 회계 코어는 순수 텍스트/JSON 파서로 결정적이며, evidence/reason의 의미 판정(NLP)을 하지 않는다. [검증: tooling/__tests__/fr-accounting.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 매니페스트의 method 어휘는 자유형(deferred만 예약) — 프로젝트가 smoke/e2e/manual 등을 선언하되 게이트는 deferred 여부만 분기한다.

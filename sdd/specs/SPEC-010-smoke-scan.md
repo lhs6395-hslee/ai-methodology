@@ -58,11 +58,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `smoke-scan.test.mjs` 전 케이스 green + check·write 출력과 재생성 매니페스트의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신의 smoke-scan check가 green(태그 파생·수동 엔트리 이중 진실 0건).
+- **SC-001**: `smoke-scan.test.mjs` 전 케이스 green + check·write 출력과 재생성 매니페스트의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/smoke-scan.test.mjs]
+- **SC-002**: 이 레포 자신의 smoke-scan check가 green(태그 파생·수동 엔트리 이중 진실 0건). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 수집·재생성은 순수 텍스트/JSON 파서로 결정적이며, evidence 본문의 의미 판정을 하지 않는다(존재·문법만 — SPEC-007 원칙 유지).
+- **NFR-001**: 수집·재생성은 순수 텍스트/JSON 파서로 결정적이며, evidence 본문의 의미 판정을 하지 않는다(존재·문법만 — SPEC-007 원칙 유지). [검증: tooling/__tests__/smoke-scan.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - method 어휘는 SPEC-007과 동일하게 자유형(deferred만 예약) — 태그의 method가 그대로 매니페스트에 실린다.

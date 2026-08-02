@@ -63,11 +63,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: 다섯 게이트의 테스트(`check-ownership`·`check-prefix`·`check-spec-cohesion`·`check-spec-completeness`·`check-spec-consistency`)가 모두 통과한다(현재 green).
-- **SC-002**: 구조적 중복이 있는 spec 세트에서 `check-ownership.mjs`가 exit 1로 100% 검출한다(거짓음성 0).
+- **SC-001**: 다섯 게이트의 테스트(`check-ownership`·`check-prefix`·`check-spec-cohesion`·`check-spec-completeness`·`check-spec-consistency`)가 모두 통과한다(현재 green). [검증: tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs]
+- **SC-002**: 구조적 중복이 있는 spec 세트에서 `check-ownership.mjs`가 exit 1로 100% 검출한다(거짓음성 0). [검증: tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 모든 게이트는 결정적(동일 spec 세트 → 동일 판정)이며 자연어 NLP 없이 grep 근사만 사용한다.
+- **NFR-001**: 모든 게이트는 결정적(동일 spec 세트 → 동일 판정)이며 자연어 NLP 없이 grep 근사만 사용한다. [검증: tooling/__tests__/check-fr-coverage.test.mjs, tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/check-prefix.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 의미적 중복(키는 다른데 의도 동일)은 이 계층이 못 잡는다 — 좁힌 사람 리뷰(SPEC_REVIEW.md)로 보완.

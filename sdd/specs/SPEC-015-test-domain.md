@@ -55,11 +55,11 @@ TEST 스펙이 소유한 실파일이 전적으로 iac/ci여도 prefix-class 게
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `test-domain.test.mjs` 전 케이스 green + fr 격리 판정의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 테스트 인프라 격리 위반 0건(`testInfraGlobs` 기본 [] — 도그푸딩, 트리거 없음이 정상).
+- **SC-001**: `test-domain.test.mjs` 전 케이스 green + fr 격리 판정의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/test-domain.test.mjs]
+- **SC-002**: 이 레포 자신이 fr 게이트를 돌 때 테스트 인프라 격리 위반 0건(`testInfraGlobs` 기본 [] — 도그푸딩, 트리거 없음이 정상). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정은 글롭 매칭·접두어 문자열 비교만으로 결정적이며, 레포 밖 시스템 조회나 IaC 파싱을 하지 않는다.
+- **NFR-001**: 판정은 글롭 매칭·접두어 문자열 비교만으로 결정적이며, 레포 밖 시스템 조회나 IaC 파싱을 하지 않는다. [검증: tooling/__tests__/test-domain.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - TEST 접두어 의미의 정본은 STORAGE §2.2 — 이 spec은 그 규범의 기계 신호(소유 허용 + 네임스페이스 격리)만 강제한다. "무엇이 정말 삭제 예정 도구인가"는 리뷰 경계(`METHODOLOGY.md`).

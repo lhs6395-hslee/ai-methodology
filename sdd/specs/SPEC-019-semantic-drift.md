@@ -58,11 +58,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `drift.test.mjs` 전 케이스 green + `escalations` 판정의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신을 `semanticDriftPolicy: advisory`로 돌 때 무-리네임 커밋에 escalation 0(거짓양성 없음).
+- **SC-001**: `drift.test.mjs` 전 케이스 green + `escalations` 판정의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/drift.test.mjs]
+- **SC-002**: 이 레포 자신을 `semanticDriftPolicy: advisory`로 돌 때 무-리네임 커밋에 escalation 0(거짓양성 없음). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: `drift-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(트리거 집합·충족 집합 → 위반 집합)라 결정적으로 단위 테스트된다; git diff 수집은 소비 게이트(check-spec-sync)가 수행.
+- **NFR-001**: `drift-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(트리거 집합·충족 집합 → 위반 집합)라 결정적으로 단위 테스트된다; git diff 수집은 소비 게이트(check-spec-sync)가 수행. [검증: tooling/__tests__/drift.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - MVP는 파일 리네임(`git diff --find-renames`)만 트리거로 쓴다 — 심볼 치환 휴리스틱은 오탐 위험이 커 채택하지 않는다(보수적, 설계 열린 결정 반영).

@@ -51,11 +51,11 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `migrate-skill.test.mjs` 전 케이스 green — 스킬 frontmatter·정본 절차·불변식(승인 관문·한 스펙 한 커밋·도메인 사실 창작 금지·update와의 차이) 존재 검사.
-- **SC-002**: 소비 프로젝트에서 `/sdd-update`(목록) → `/sdd-migrate`(실행)로 백로그가 실제 스펙 재구성으로 소진된다(승인 경유) — "update 반복해도 똑같다"가 해소.
+- **SC-001**: `migrate-skill.test.mjs` 전 케이스 green — 스킬 frontmatter·정본 절차·불변식(승인 관문·한 스펙 한 커밋·도메인 사실 창작 금지·update와의 차이) 존재 검사. [검증: tooling/__tests__/migrate-skill.test.mjs]
+- **SC-002**: 소비 프로젝트에서 `/sdd-update`(목록) → `/sdd-migrate`(실행)로 백로그가 실제 스펙 재구성으로 소진된다(승인 경유) — "update 반복해도 똑같다"가 해소. [검증: tooling/__tests__/migrate-skill.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 실행기는 판정 로직을 신규로 만들지 않는다 — 백로그는 기존 게이트(SPEC-023/024/017/cohesion)가 내고, 이 스킬은 triage·승인·적용 오케스트레이션만(런타임 중립, 실행기=에이전트).
+- **NFR-001**: 실행기는 판정 로직을 신규로 만들지 않는다 — 백로그는 기존 게이트(SPEC-023/024/017/cohesion)가 내고, 이 스킬은 triage·승인·적용 오케스트레이션만(런타임 중립, 실행기=에이전트). [검증: tooling/__tests__/migrate-skill.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 마이그레이션의 "옳음"(어느 entity가 root인가·유령 entity 처리)은 리뷰 경계 — 스킬은 결정을 구조화하고 적용할 뿐 도메인 판단을 대신하지 않는다.

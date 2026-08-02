@@ -3,6 +3,16 @@
 # 강제하고, PR엔 range 모드 spec-sync(draftBlockPolicy=hard 소비)로 서버측 병합 경로까지 막는다.
 # @verifies CICD-001/FR-001 smoke: 이 워크플로의 GitHub Actions 실행 로그(push/PR마다 스위트+게이트)
 # @verifies CICD-001/FR-002 smoke: PR run의 spec-sync(range) 스텝 로그 — merge-base 대비 판정
+#
+# ⚠ 게이트 목록은 **전수여야 한다.** CI에서 빠진 게이트는 로컬 훅에만 걸려 있고, 로컬 훅은
+# `--no-verify`와 웹 UI 병합으로 우회된다 — 즉 그 게이트는 우회 가능한 강제다. 실측(2026-08-02):
+# SC·NFR 회계를 hard로 올리며 도그푸딩 SC 18건의 증거를 이 워크플로로 지목하려다, 그중
+# derivation·ratchet·evidence·ownership-map 등 게이트 11종이 CI에 아예 없다는 것이 드러났다
+# (증거를 붙이는 행위가 증거의 부재를 실수확했다). 게이트를 추가하면 여기에도 추가한다.
+#
+# 여기 없는 것과 그 이유: check-hooks-installed(CI 체크아웃엔 .git/hooks가 없다 — 로컬 채택 축),
+# check-deploy-guard·check-deploy-debt(PostToolUse·pre-commit 로컬 훅 계층, 부채 파일은 gitignore),
+# check-pre-edit(PreToolUse 편의 계층 — 게이트가 아니다).
 name: sdd-gates
 on:
   push:
@@ -28,6 +38,19 @@ jobs:
           node tooling/check-spec-cohesion.mjs
           node tooling/check-spec-completeness.mjs
           node tooling/check-spec-consistency.mjs
+      - name: 실재·증거·회계 게이트 (R6~R11 — 로컬 훅만 걸려 있으면 --no-verify로 통째 우회된다)
+        run: |
+          node tooling/check-test-adequacy.mjs
+          node tooling/check-orphan-surfaces.mjs
+          node tooling/check-converge-drift.mjs
+          node tooling/check-derivation.mjs
+          node tooling/check-policy-ratchet.mjs
+          node tooling/check-engine-event.mjs
+          node tooling/check-evidence.mjs
+          node tooling/check-sc-coverage.mjs
+          node tooling/check-live-reality.mjs
+          node tooling/check-schema-drift.mjs
+          node tooling/gen-ownership-map.mjs --check
       - name: 동의어·형태 변이 (①② hard 차단 / ③ 후보는 구조적으로 비차단)
         run: node tooling/check-synonym.mjs
       - name: smoke evidence drift (태그↔매니페스트)

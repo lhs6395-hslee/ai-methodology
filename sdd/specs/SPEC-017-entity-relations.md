@@ -58,11 +58,11 @@ spec A가 B를 참조하고 B가 다시 A를 참조하면(구조화 관계 기�
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `relation.test.mjs` 전 케이스 green + ownership 게이트 관계 검사의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: 이 레포 자신이 ownership 게이트를 돌 때 관계 위반 0건(도그푸딩 — 이 킷 자체는 구조화 관계를 아직 쓰지 않음, 신규 기능 도입만).
+- **SC-001**: `relation.test.mjs` 전 케이스 green + ownership 게이트 관계 검사의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/relation.test.mjs]
+- **SC-002**: 이 레포 자신이 ownership 게이트를 돌 때 관계 위반 0건(도그푸딩 — 이 킷 자체는 구조화 관계를 아직 쓰지 않음, 신규 기능 도입만). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정은 문자열 파싱·맵 조회·그래프 순회만으로 결정적이며, 관계의 의미(예: "정말 has-many가 맞나")는 판정하지 않는다(리뷰 경계).
+- **NFR-001**: 판정은 문자열 파싱·맵 조회·그래프 순회만으로 결정적이며, 관계의 의미(예: "정말 has-many가 맞나")는 판정하지 않는다(리뷰 경계). [검증: tooling/__tests__/relation.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - relation-type의 의미(has-many/belongs-to 등 방향성)는 문서적 라벨일 뿐 — 게이트는 존재·순환만 기계적으로 본다. 의미가 실제 코드/스키마와 맞는지는 리뷰 몫.

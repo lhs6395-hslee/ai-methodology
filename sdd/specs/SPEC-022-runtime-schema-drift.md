@@ -57,11 +57,11 @@ expected/deployed 조회 명령 중 하나라도 실패하면(자격증명·연�
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `schema-drift.test.mjs` 전 케이스 green + `schemaDriftVerdict` 판정·출력의 Node↔Python 바이트 동일(패리티 테스트 green).
-- **SC-002**: `schemaDriftManifest` 미설정 프로젝트(이 레포 포함)에서 게이트가 no-op exit 0(하위호환 — 기존 프로젝트 영향 0).
+- **SC-001**: `schema-drift.test.mjs` 전 케이스 green + `schemaDriftVerdict` 판정·출력의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/schema-drift.test.mjs]
+- **SC-002**: `schemaDriftManifest` 미설정 프로젝트(이 레포 포함)에서 게이트가 no-op exit 0(하위호환 — 기존 프로젝트 영향 0). [검증: .github/workflows/sdd-gates.yml]
 
 ## Non-Functional Requirements
-- **NFR-001**: 판정 코어(`schemaDriftVerdict`)는 두 집합·정책·조회성공여부만 보는 순수 함수라 결정적으로 단위 테스트되고, 명령 실행(부작용)은 게이트 래퍼가 수행한다.
+- **NFR-001**: 판정 코어(`schemaDriftVerdict`)는 두 집합·정책·조회성공여부만 보는 순수 함수라 결정적으로 단위 테스트되고, 명령 실행(부작용)은 게이트 래퍼가 수행한다. [검증: tooling/__tests__/schema-drift.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - 게이트는 특정 ORM(drizzle 등)·DB(Postgres 등)를 모른다 — 프로젝트가 스키마 조회 방법을 명령으로 주입(objectStorageMarkers·derivationManifest·commands.test와 동형의 주입 원칙).

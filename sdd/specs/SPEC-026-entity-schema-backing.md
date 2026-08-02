@@ -55,11 +55,11 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `schema-backing.test.mjs` 전 케이스 green + 백킹 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인).
-- **SC-002**: gsn-ai-pm 픽스처(스키마에 `pjt_projects` 존재, 스펙이 `wizard` 소유)에서 위반 지목·hard exit 1(실측 우회 재현 — 양판 바이트 동일).
+- **SC-001**: `schema-backing.test.mjs` 전 케이스 green + 백킹 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인). [검증: tooling/__tests__/schema-backing.test.mjs]
+- **SC-002**: gsn-ai-pm 픽스처(스키마에 `pjt_projects` 존재, 스펙이 `wizard` 소유)에서 위반 지목·hard exit 1(실측 우회 재현 — 양판 바이트 동일). [검증: tooling/__tests__/schema-backing.test.mjs]
 
 ## Non-Functional Requirements
-- **NFR-001**: 백킹 판정 코어는 문자열 집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO·글롭 매치는 소비 게이트(check-ownership)가 수행.
+- **NFR-001**: 백킹 판정 코어는 문자열 집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO·글롭 매치는 소비 게이트(check-ownership)가 수행. [검증: tooling/__tests__/schema-backing.test.mjs]
 
 ## Assumptions / Clarifications Retained
 - "이 명사가 실제 테이블인가"는 스키마 파일이 답한다 — 게이트는 스키마 추출 집합과의 대조만 하고 도메인 사실을 창작하지 않는다(스키마에 없으면 면제 등록 또는 재구성은 사람 결정).
