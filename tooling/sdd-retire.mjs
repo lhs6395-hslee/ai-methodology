@@ -77,6 +77,14 @@ if (plan.inboundRefs.length) {
   }
 }
 
+const REJECT_REMINDER = [
+  "",
+  "· 방향 전환이면 **기각 이유를 남겨라** — 본문은 '현재 진실'이라 지운 구성의 흔적이 0이 된다.",
+  "  그 상태에서 '왜 그 대안이 아닌가'까지 사라지면 같은 제안이 몇 달 뒤 다시 올라온다.",
+  "  자리: `## Assumptions / Clarifications Retained`에 기각한 대안 + **재검토 조건**",
+  "  (Change Log는 사건 기록이라 시간이 지나면 아래로 밀린다 — 상시 유효한 제약은 Assumptions).",
+].join("\n");
+console.log(REJECT_REMINDER);
 if (!WRITE) { console.log("\ndry-run — 적용하려면 --write. 테스트 삭제는 사람이 원자적 PR로."); process.exit(0); }
 
 // 5. 적용(all-or-nothing) — 매니페스트 prune + FR 라인 제거(또는 스펙 파일 삭제)
@@ -86,3 +94,4 @@ for (const r of plan.removals) {
   else { writeFileSync(specPath.get(r.specId), removeFrFromSpecText(specText.get(r.specId), r.frId)); console.log(`✓ FR 제거: ${r.specId}/${r.frId}`); }
 }
 console.log("✓ 적용 완료. dangling @covers는 위 목록대로 사람이 삭제(원자적 PR).");
+console.log(REJECT_REMINDER);
