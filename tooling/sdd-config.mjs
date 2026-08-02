@@ -72,6 +72,17 @@ export const DEFAULTS = {
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도
   // 프로브(e2ePrecheck)로 판정한다: 프로브 실패 = skipped(사유), 프로브 통과 후 비-0 = 실패.
+  // SC·NFR 검증 회계(SPEC-034) — FR만 회계하던 사각을 닫는다. off|advisory|hard.
+  scCoveragePolicy: "off",
+  // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
+  // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).
+  // 예: { unit:["**/*.test.*"], e2e:["**/*.e2e.*"], load:["tests/load/**"], pentest:["tests/security/**"] }
+  verificationKinds: {},
+  // CI에서 못 도는 검증(라이브 클러스터·WAF·관리형 DB)의 증거 회계 — smokeManifest 동형.
+  // 경로 문자열(파일) 또는 객체. { "<SPEC>/<SC-001>": {kind, evidence} | {kind:"deferred", reason} }
+  evidenceManifest: null,
+  // 미회계 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
+  scCoverageListCap: 12,
   e2eTestsPolicy: "off",
   // 실행 전제 프로브(선택) — 앱 기동·자격·도달성 확인용 명령. 비-0이면 skipped(사유).
   // 미선언이면 프로브 없이 바로 실행한다(비-0 = 실패로 판정).

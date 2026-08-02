@@ -33,7 +33,8 @@
 | **라이브 대조(SPEC-032 — 저장소 밖 실물 diff, 자격증명 없으면 skipped)** | `node check-live-reality.mjs` | `python sdd_gates.py livereality` |
 | **동의어·형태 변이(SPEC-033 — ①②는 강도대로 차단, ③ 유사 후보는 항상 비차단)** | `node check-synonym.mjs` | `python sdd_gates.py synonym` |
 | **판정 회계 맵(SPEC-028 — 소유 키별 가드 발화·미판정 가시화, 생성물 드리프트 검사)** | `node gen-ownership-map.mjs [--check]` | (Node 전용) |
-| 전 규칙 집계(R1~R10) | `node sdd-sync.mjs [--strict] [--json]` | (Node 전용) |
+| **SC·NFR 검증 회계(SPEC-034 — 성능·보안 목표의 검증 바인딩)** | `node check-sc-coverage.mjs` | `python sdd_gates.py sccoverage` |
+| 전 규칙 집계(R1~R11) | `node sdd-sync.mjs [--strict] [--json]` | (Node 전용) |
 
 셸/Go판은 핵심 3커맨드만 제공한다 — 보강 게이트가 필요한 비-Node 프로젝트는 Python판을 쓴다(둘 다 없는 환경이 실제 생기면 그때 승격 판단).
 

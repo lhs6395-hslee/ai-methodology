@@ -56,6 +56,10 @@ DEFAULTS = {
     "maxKeysPerCategoryPerSpec": 4,
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
+    "scCoveragePolicy": "off",
+    "verificationKinds": {},
+    "evidenceManifest": None,
+    "scCoverageListCap": 12,
     "e2eTestsPolicy": "off",
     "e2ePrecheck": None,
     "specSyncExemptGlobs": [],
@@ -149,6 +153,7 @@ RATCHETED_POLICIES = [
     "eventAttributionPolicy",
     "synonymPolicy",
     "e2eTestsPolicy",
+    "scCoveragePolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -3515,7 +3520,157 @@ def cmd_schemadrift(cfg):
     sys.exit(code)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym> [...]"
+# ─── SC·NFR 검증 회계 (SPEC-034) — sc-coverage-lib.mjs 미러 ───
+SC_DECL_RE = re.compile(r"^\s*[-*]\s+\*\*(SC|NFR)-(\d+)\*\*\s*:")
+_SC_TAG_RE = re.compile(r"\[검증\s*[:：]\s*([^\]]+)\]")
+_SC_UNKNOWN_RE = re.compile(r"\[미확인\]")
+
+
+def parse_sc_line(line):
+    raw = str(line or "")
+    m = SC_DECL_RE.match(raw)
+    if not m:
+        return None
+    stripped = re.sub(r"`[^`]*`", " ", raw)
+    tag = _SC_TAG_RE.search(stripped)
+    return {"id": f"{m.group(1)}-{m.group(2)}", "kindOfId": m.group(1),
+            "pointer": tag.group(1).strip() if tag else "",
+            "unknown": bool(_SC_UNKNOWN_RE.search(stripped))}
+
+
+def kind_of_pointer(pointer, kinds, matcher):
+    p = str(pointer or "").strip()
+    if not p:
+        return ""
+    for kind, globs in (kinds or {}).items():
+        for g in globs or []:
+            if matcher(g, p):
+                return kind
+    return "other"
+
+
+def validate_evidence_manifest(manifest):
+    entries, errors = {}, []
+    for key, v in (manifest or {}).items():
+        if not re.match(r"^[A-Za-z]+-\d+[A-Za-z]?/(SC|NFR)-\d+$", key):
+            errors.append(f'evidenceManifest "{key}" — 키 형식은 "<SPEC-ID>/<SC-NNN|NFR-NNN>"')
+            continue
+        if not isinstance(v, dict):
+            errors.append(f'evidenceManifest "{key}" — 객체여야 한다({{kind, evidence, reason}})')
+            continue
+        kind = str(v.get("kind") or "").strip()
+        if not kind:
+            errors.append(f'evidenceManifest "{key}" — kind 없음(빈 값 불가)')
+            continue
+        evidence = str(v.get("evidence") or "").strip()
+        reason = str(v.get("reason") or "").strip()
+        if kind == "deferred":
+            if not reason:
+                errors.append(f'evidenceManifest "{key}" — kind=deferred는 reason 필수(왜 아직 검증하지 않나)')
+                continue
+        elif not evidence:
+            errors.append(f'evidenceManifest "{key}" — evidence 필수(실행 로그·대시보드 스냅샷 등 근거 경로; 존재만 강제, 질은 리뷰 몫)')
+            continue
+        entries[key] = {"kind": kind, "evidence": evidence, "reason": reason}
+    return entries, errors
+
+
+def classify_sc_coverage(items, manifest, kinds, matcher):
+    classes = {}
+    counts = {"verified": 0, "evidence": 0, "deferred": 0, "unaccounted": 0}
+    for it in items or []:
+        key = f'{it["specId"]}/{it["id"]}'
+        cls, kind = "unaccounted", ""
+        if it["pointer"]:
+            cls = "verified"
+            kind = kind_of_pointer(it["pointer"], kinds, matcher)
+        elif manifest and key in manifest:
+            e = manifest[key]
+            kind = e["kind"]
+            cls = "deferred" if e["kind"] == "deferred" else "evidence"
+        elif it["unknown"]:
+            cls, kind = "unaccounted", "미확인"
+        classes[key] = {"cls": cls, "kind": kind}
+        counts[cls] += 1
+    return classes, counts
+
+
+def cmd_sccoverage(cfg):
+    policy = str(cfg.get("scCoveragePolicy") or "off")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ scCoveragePolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        print("SC·NFR 회계 게이트 — scCoveragePolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = policy == "hard"
+    raw = cfg.get("evidenceManifest")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            raw = json.loads(read_text(resolve(cfg, raw)))
+        except Exception as e:  # noqa: BLE001
+            print(f"✗ evidenceManifest 읽기 실패: {raw} — {e}", file=sys.stderr)
+            sys.exit(1)
+    entries, m_errors = validate_evidence_manifest(raw if isinstance(raw, dict) else {})
+    if m_errors:
+        print("✗ evidenceManifest 오류:", file=sys.stderr)
+        for e in m_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    kinds = {k: [compile_glob(g) for g in (v or [])] for k, v in (cfg.get("verificationKinds") or {}).items()}
+    def matcher(rx, p):
+        return bool(rx.search(re.sub(r"^\./", "", str(p))))
+
+    spec_dir = resolve(cfg, cfg["specDir"])
+    try:
+        names = sorted(os.listdir(spec_dir))
+    except OSError:
+        print(f"✗ spec 디렉토리 없음: {spec_dir}", file=sys.stderr)
+        sys.exit(1)
+    items = []
+    for n in [x for x in names if x.endswith(".md")]:
+        text = read_text(os.path.join(spec_dir, n))
+        m = cfg["__specId"].search(text)
+        spec_id = m.group(0) if m else n[:-3]
+        for line in text.split("\n"):
+            it = parse_sc_line(line)
+            if it:
+                it["specId"] = spec_id
+                items.append(it)
+
+    classes, counts = classify_sc_coverage(items, entries, kinds, matcher)
+    by_kind = {}
+    for v in classes.values():
+        if v["kind"]:
+            by_kind[v["kind"]] = by_kind.get(v["kind"], 0) + 1
+    kind_tag = " ".join(f"{k}:{by_kind[k]}" for k in sorted(by_kind)) or "—"
+    print(f"SC·NFR 회계 게이트(scCoveragePolicy={policy}): 항목 {len(items)}건 — "
+          f"verified {counts['verified']}·evidence {counts['evidence']}·deferred {counts['deferred']}·미회계 {counts['unaccounted']} | 종류({kind_tag})")
+    tag = "✗" if hard else "⚠"
+    bad = sorted((k, v) for k, v in classes.items() if v["cls"] == "unaccounted")
+    cap = int(cfg.get("scCoverageListCap") or 12)
+    for k, v in bad[:cap]:
+        why = ("`[미확인]`은 정직한 자기신고지만 회계가 아니다 — evidenceManifest에 사유와 함께 착지시켜라"
+               if v["kind"] == "미확인" else
+               '`[검증: <경로>]`로 실행 가능한 검증을 지목하거나, 실행 불가면 evidenceManifest에 {kind, evidence} 또는 {kind:"deferred", reason}')
+        print(f"  {tag} {k} — 검증 바인딩 없음: {why}")
+    if len(bad) > cap:
+        print(f"  {tag} … 외 {len(bad) - cap}건 (전체 목록은 scCoverageListCap 상향 또는 게이트 단독 실행으로 확인)")
+    if not items:
+        print("  · 판정 대상 없음 — SC·NFR 선언 라인(`- **SC-001**: …`)이 한 건도 없다")
+        if hard:
+            print("\n✗ scCoveragePolicy=hard인데 판정 대상이 없다(거짓 안전) — SC 문법을 확인하거나 정책을 off로.", file=sys.stderr)
+            sys.exit(1)
+    if bad and hard:
+        print(f"\n✗ scCoveragePolicy=hard: SC·NFR {len(bad)}건에 검증 바인딩이 없다 — 성능·보안 목표가 검증 없이 통과하는 것이 이 게이트가 막는 것이다.", file=sys.stderr)
+        sys.exit(1)
+    if not bad and items:
+        print("SC·NFR 회계 게이트: OK — 모든 SC·NFR이 검증·증거·유예 중 하나로 회계됨.")
+    sys.exit(0)
+
+
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -3974,6 +4129,8 @@ def main():
         cmd_livereality(cfg)
     elif sub == "synonym":
         cmd_synonym(cfg)
+    elif sub == "sccoverage":
+        cmd_sccoverage(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

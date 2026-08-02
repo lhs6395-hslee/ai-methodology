@@ -43,6 +43,9 @@ const RULES = [
   // R10(SPEC-033): 동의어·형태 변이 — dedup이 키 문자열만 보는 사각. ①② 결정적(차단 가능),
   // ③ 확률적 후보는 **어떤 강도에서도 advisory**(LLM 오탐에 차단력을 주지 않는다). 기본 off.
   { rule: "R10 동의어·형태 변이", gates: ["check-synonym.mjs"] },
+  // R11(SPEC-034): SC·NFR 검증 회계 — FR만 회계하던 사각. 성능·보안 목표가 산문으로 방치돼도
+  // green이던 것을 닫는다. 기본 off(선언 문법이 있는 프로젝트만 발화).
+  { rule: "R11 SC·NFR 검증 회계", gates: ["check-sc-coverage.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";

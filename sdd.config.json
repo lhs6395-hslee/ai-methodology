@@ -108,7 +108,8 @@
     "engine-event": "Engines·Events 카테고리 판정 코어 — 순수 엔진(코드-모듈 실재)·이벤트(entity 귀속+카탈로그 실재)로 전수성 구멍 봉합(SPEC-030)",
     "execution-evidence": "실행 증거 등급 — [검증] 태그를 실행 가능한 증거 경로로 강제(산문 자기신고 차단, SPEC-031)",
     "live-reality": "라이브 대조 — 저장소 밖 진실(클라우드·클러스터 실물)과 선언의 일치 판정(SPEC-032)",
-    "entity-synonym": "동의어·형태 변이 판정 — 정규화 충돌·선언 별칭(결정적) + 유사 후보(확률적, 비차단, SPEC-033)"
+    "entity-synonym": "동의어·형태 변이 판정 — 정규화 충돌·선언 별칭(결정적) + 유사 후보(확률적, 비차단, SPEC-033)",
+    "sc-coverage": "SC·NFR 검증 회계 — 성공기준·비기능 목표를 검증 바인딩(태그·증거·유예)에 묶는다(FR 전용 회계의 사각, SPEC-034)"
   },
   "relationTypes": [
     "references"
@@ -185,6 +186,22 @@
     "capability-ownership::ownership-reality": "024는 누가 가질 자격이 있나(귀속), 029는 있기는 한가(실재). 자격 vs 존재다",
     "live-reality::runtime-schema-drift": "둘 다 저장소 밖 진실과 대조하지만 판정 대상과 실행 지점이 다르다 — 022는 배포 DB 스키마를 마이그레이션 의미론(적용/baseline)과 함께 배포 preflight(R2′)에서, 032는 클라우드·클러스터 자원을 주입 어댑터로 주기·가오픈 점검(R9)에서 본다. 향후 022를 032의 한 kind로 흡수할 여지는 있으나, 그러면 migrate-on-deploy라는 배포 게이트 의미가 일반 diff에 묻힌다 — **소유자 확정 2026-08-02**: 지금은 분리 유지. 032가 실제로 여러 kind를 갖게 되는 시점에 022 흡수를 재검토한다(쓰지 않는 일반화를 먼저 하지 않는다)",
     "entity-schema-backing::ownership-reality": "'선언한 키가 실재하는가'라는 같은 축이지만 역할과 SSOT가 다르다 — 026은 entity를 구조 SSOT(DB 스키마·마이그레이션·proto)와, 029는 surface 심볼을 소스 트리와 대조한다. 역할마다 실재의 근거가 다르므로 스펙이 갈리는 것이 분산이 아니라 역할 경계다",
-    "engine-event::ownership-reality": "위와 같은 축의 다른 역할 — 030은 engine을 코드-모듈 SSOT, event를 카탈로그+발신 entity 귀속으로 판정한다(surface 심볼 문법으로는 둘 다 판정 불가). 실재 판정을 한 스펙으로 합치면 역할별 SSOT 어댑터가 한 덩어리가 되어 옵트인 경계가 사라진다"
+    "engine-event::ownership-reality": "위와 같은 축의 다른 역할 — 030은 engine을 코드-모듈 SSOT, event를 카탈로그+발신 entity 귀속으로 판정한다(surface 심볼 문법으로는 둘 다 판정 불가). 실재 판정을 한 스펙으로 합치면 역할별 SSOT 어댑터가 한 덩어리가 되어 옵트인 경계가 사라진다",
+    "sc-coverage::verification-accounting": "007은 **FR**의 검증 클래스 회계(unit·e2e·smoke·deferred), 034는 **SC·NFR** 축. 회계라는 형식은 같고 대상이 요구 vs 성공기준으로 갈린다 — 한 스펙으로 합치면 FR 회계와 SC 회계의 강도를 따로 졸업시킬 수 없다",
+    "execution-evidence::sc-coverage": "031은 `[검증]` 태그가 실행 가능한 것을 지목하는가(증거의 **질**), 034는 모든 SC·NFR이 바인딩을 갖는가(**전수성**). 034는 031의 태그 문법을 재사용할 뿐 판정 축이 다르다",
+    "sc-coverage::smoke-scan": "010은 `@verifies` 태그 수집·매니페스트 자동 채움(수집 실행), 034는 SC·NFR 회계 규칙. 수집 vs 규칙이다(007↔010과 같은 경계)",
+    "derivation-accounting::sc-coverage": "accounting은 공통 접미사일 뿐 — 009는 재도출 소스 클래스, 034는 성공기준의 검증 바인딩. 회계 대상이 다르다"
+  },
+  "scCoveragePolicy": "advisory",
+  "verificationKinds": {
+    "unit": [
+      "tooling/__tests__/**"
+    ],
+    "load": [
+      "tests/load/**"
+    ],
+    "pentest": [
+      "tests/security/**"
+    ]
   }
 }

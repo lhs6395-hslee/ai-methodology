@@ -1,8 +1,8 @@
 # SPEC-033 ③층 유사 후보 — 생성기: 세션 LLM(전수 열거는 entity-pairs.mjs가 수행)
-# 생성 2026-08-02 · 판정 대상 entity 34건 · 전 쌍 561건 · 후보 18건(3.2%)
+# 생성 2026-08-02(2차: sc-coverage 추가) · 판정 대상 entity 35건 · 전 쌍 595건 · 후보 22건
 # 계약: 한 줄 = 한 쌍(탭 구분, 3번째 칸은 확신도). 이 파일은 판정이 아니라 "사람이 봐야 할 목록"이다.
 # 아래 한 줄이 신선도 선언 — 이 목록이 본 entity 집합이다. 집합이 바뀌면 게이트가 "낡음"을 알린다.
-# entity-set: 34 e00615914d44
+# entity-set: 35 070974c52ccc
 # 결정된 쌍은 sdd.config.json의 synonymRegistry(같음) 또는 synonymReviewLedger(다름+사유)로 소멸한다.
 #
 # ── 기능 축: 이름은 안 비슷한데 하는 일이 겹칠 수 있는 쌍 ──
@@ -25,3 +25,8 @@ runtime-schema-drift	semantic-drift	0.4
 test-domain	test-execution	0.4
 adoption-lifecycle	spec-lifecycle	0.4
 capability-ownership	ownership-reality	0.4
+# ── 2차: 신규 entity sc-coverage의 34쌍 전수 판정 결과 ──
+sc-coverage	verification-accounting	0.8
+execution-evidence	sc-coverage	0.7
+sc-coverage	smoke-scan	0.6
+derivation-accounting	sc-coverage	0.4

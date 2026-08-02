@@ -128,3 +128,20 @@ sh <KIT>/tooling/sdd-init.sh --gate=sh    # gate: go|sh|py|node (출력 동일)
 - 항상 같은 것을 만든다: `sdd.config.json` · `sdd/specs/` · `sdd/MODULE_MAP.md` · `sdd/templates/spec-template.md` · `scripts/<게이트>` · `sdd/README.md`(키트 참조 포인터).
 - **방법론 설명서는 복사하지 않는다**(§0) — 포인터만. 기존 파일은 보존(`--force`로 덮어씀).
 - 검증: 서로 다른 두 프로젝트에 돌려 **공통 큰 틀(폴더 구조·스펙 위치)이 같게** 생성됨을 확인. 그 골격 안의 내용(스펙·모듈)과 `sdd.config.json` 값은 프로젝트가 채운다(`tooling/sdd.config.presets.md`).
+
+## 비기능 TEST 스펙 아키타입 (부하·성능·보안/침투·가용성)
+
+부하·침투 같은 **블랙박스/운영 검증**은 FR을 커버하는 코드 파일이 없어 `@covers` 인벤토리(TEST-001형)에 진입하지 못한다. 그래서 별도 유형으로 둔다 — 기존 단위 인벤토리 모델과 **혼입하지 않는다**.
+
+| | 단위 인벤토리형 (기존) | **비기능/운영형 (신설)** |
+|---|---|---|
+| FR | 테스트 자산의 존재·구조 | **검증 가능한 운영 단언**(EARS) — `WHILE 업무시간에 2파드가 활성일 때, THE SYSTEM SHALL p95<300ms에서 200 RPS를 지속한다` / `WHEN 미인증 요청이 보호 라우트에 도달하면, THE SYSTEM SHALL 401을 반환한다` |
+| Ownership Surfaces | 테스트 파일 글롭 | **테스트 킷 경로** — `tests/load/**`, `tests/security/**` |
+| 검증 바인딩 | `@covers` | SC에 `[검증: tests/load/x.js]` 또는 `evidenceManifest`(라이브 필요 시 증거·사유) |
+| 게이트 | fr-coverage | **sc-coverage**(SPEC-034) + ownership·spec-sync |
+
+**왜 Surfaces를 선언하나:** 그래야 `tests/load/**`를 커밋하는 순간 소유 스펙이 없으면 ownership·spec-sync가 차단한다 — "스펙 없이 scratchpad에 남는" 기본값이 사라진다.
+
+**최소 기록 형식(선언적 산출물).** 대시보드 JSON-in-ConfigMap처럼 FR 문구가 아니라 Change Log로만 추적되는 산출물은 한 행에 **무엇을·왜·실측 여부**가 있어야 한다 — 날짜·변경(대상과 동작)·근거(왜)·실측 표기(`[검증: 경로]` 또는 `[미확인]`). 게이트가 검사하는 것은 그 **형식과 존재**이고(SPEC-009 근거 캡처 + SPEC-031 증거 등급), 내용의 타당성은 리뷰 몫이다.
+
+**진입규칙 분기.** 작업 성격이 **부하·성능·보안/침투·가용성**이면 MODULE_MAP 대조 결과와 무관하게 **비기능 TEST 스펙으로 라우팅**한다 — 없으면 만든다(있는 기능 스펙에 욱여넣지 않는다). 이 분기가 없으면 산출물이 어느 스펙으로 가야 하는지 신호가 없어 scratchpad 방치가 기본값이 된다.
