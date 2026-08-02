@@ -13,6 +13,9 @@
 // 즉 확률적 층은 "무엇을 볼지"만 정하고, "무엇이 참인지"는 결정적 층만 정한다.
 // 순수 함수(IO 없음) — 외부 툴 실행은 소비 게이트. Python 미러(SPEC-006).
 
+import { createHash } from "node:crypto";
+const sha1hex = (s) => createHash("sha1").update(String(s), "utf8").digest("hex");
+
 // 단수화: 보수적으로만 — 오탐이 정본을 흔들면 안 된다. `status`·`class`·`analysis`는 건드리지 않는다.
 const KEEP_SUFFIX = /(ss|us|is|os)$/i;
 export function singularize(word) {
@@ -122,6 +125,33 @@ export function parseCandidatePairs(stdout) {
   // 중복 쌍 제거(결정적 순서 유지)
   const seen = new Set();
   return out.filter((p) => { const k = `${p.a}::${p.b}`; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+// 후보 목록의 신선도 — 확률적 산출물에 대한 **결정적** 검사.
+// 후보 목록은 낡는다: entity가 34건일 때 만든 목록이 47건이 된 뒤에도 그대로면 게이트는
+// "미결 후보 0"을 찍고 사람은 다 봤다고 믿는다(SPEC-028이 없애려던 그 착각). 그래서 생성기가
+// 자기가 본 entity 집합을 stdout 헤더로 함께 선언하게 하고, 게이트가 현재 집합과 대조한다.
+//   생성기 헤더 형식: `# entity-set: <건수> <해시>`
+export function entitySetFingerprint(keys) {
+  const norm = [...new Set((keys || []).map((k) => String(k).trim().toLowerCase()))].sort();
+  return { count: norm.length, hash: sha1hex(norm.join("\n")).slice(0, 12) };
+}
+
+export function parseCandidateHeader(stdout) {
+  for (const line of String(stdout || "").split("\n")) {
+    const m = line.match(/^\s*#\s*entity-set:\s*(\d+)\s+([0-9a-f]{6,40})\s*$/i);
+    if (m) return { count: Number(m[1]), hash: m[2].toLowerCase() };
+  }
+  return null;
+}
+
+// null = 최신 / {kind:"undeclared"} / {kind:"stale", declared, current}
+// 판정 결과는 **언제나 advisory**다 — 목록이 낡았다고 커밋을 막으면 새 entity를 추가할 때마다
+// LLM 세션이 커밋의 선행 조건이 된다. 그러면 사람은 ③을 통째로 떼어낸다(회피 유발 = 설계 실패).
+export function candidateFreshness(declared, current) {
+  if (!declared) return { kind: "undeclared" };
+  if (declared.hash !== current.hash) return { kind: "stale", declared, current };
+  return null;
 }
 
 // ③ 후보 분류 — **판정이 아니라 미결 목록이다.** 이미 결정된 쌍(정본·별칭 관계 ∨ 기각 원장)은

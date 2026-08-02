@@ -21,6 +21,8 @@
 - 접두어 제거는 `keyPrefixes`가 비면 **하지 않는다** — 프로젝트가 선언한 접두어만 벗긴다(임의 병합 금지). 토큰이 전부 접두어면 원형을 유지한다.
 - 판정 대상은 **entity 역할 카테고리만**이다 — surface(경로)·capability(`entity.verb`)는 형태 규칙이 다르고, entity가 동의어 문제의 최고가치 표적이다. entity 역할 미해석이면 inert이고 hard면 거짓 안전이라 exit 1.
 - 후보 생성기 실행 실패(오프라인·바이너리 없음·타임아웃)는 **skipped(사유)** — "후보 없음"이 아니라 "판정 못 함"으로 명시한다.
+- **후보 목록은 낡는다** — entity 34건일 때 만든 목록이 47건이 된 뒤에도 그대로면 게이트는 "미결 후보 0"을 찍고 사람은 다 봤다고 믿는다(SPEC-028이 없애려던 그 착각). 생성기가 자기가 본 집합을 헤더로 선언하게 하고 현재 집합과 대조한다 — 확률적 산출물에 대한 **결정적** 검사다.
+- 낡음·미선언은 **차단하지 않는다**(정책 강도와 무관). 낡음이 커밋을 막으면 entity를 추가할 때마다 후보 재생성이 커밋의 선행 조건이 되고, 그러면 사람은 ③을 통째로 떼어낸다 — 회피를 유발하는 강제는 강제가 아니다. 대신 미선언일 때 **붙여넣을 헤더 값을 출력**해 선언 비용을 0에 가깝게 만든다.
 - 기본 `off`. ③은 `entitySimilarityCommand`를 꽂아야 동작하는 옵트인이라, 킷·미채택 프로젝트는 비용 0.
 
 ---
@@ -35,6 +37,7 @@
 - **FR-005** (event): WHERE `entitySimilarityCommand` is declared, WHEN the gate runs, THE SYSTEM SHALL execute it, read each stdout line as a candidate pair, drop pairs already resolved by the registry or the ledger, and surface the remainder as unresolved candidates requiring a human decision; WHERE the command fails, THE SYSTEM SHALL report it as skipped with the reason.
 - **FR-006** (unwanted): IF only unresolved candidates exist and no deterministic finding does, THEN THE SYSTEM SHALL exit zero even under hard — probabilistic judgment SHALL never gain blocking power, regardless of policy strength.
 - **FR-007** (unwanted): IF the `synonymPolicy` value is outside off|advisory|hard, or the entity role is unresolved while the policy is hard, THEN THE SYSTEM SHALL report it clearly and exit non-zero.
+- **FR-008** (event): WHEN candidates are produced, THE SYSTEM SHALL compare the entity-set fingerprint declared in the generator's `# entity-set: <count> <hash>` header against the current owned set, report the list as stale when they differ and as undeclared when the header is absent, and SHALL keep both advisory regardless of policy strength.
 
 ### Key Entities
 - **entity-synonym** — the judgment that two owned entity keys denote one concept, split into a deterministic half (canonical-form collision, declared aliases) that may block and a probabilistic half (injected similarity candidates) that may only surface, so that machine guessing never silently redefines the domain.
@@ -57,6 +60,7 @@
 
 ## Success Criteria (측정형)
 - **SC-001**: `synonym.test.mjs` 전 케이스 green + 판정 출력·exit의 Node↔Python 바이트 동일(패리티 확인). [검증: tooling/__tests__/synonym.test.mjs]
+- **SC-003**: 신선도 3분기(미선언·낡음·최신)가 hard에서 모두 exit 0이고, 미선언 출력이 붙여넣을 `# entity-set` 값을 포함한다. [검증: tooling/__tests__/synonym.test.mjs]
 - **SC-002**: 재현 픽스처에서 형태 충돌(`order`/`pjt_orders`)은 hard exit 1, **미결 후보만 남으면 hard에서도 exit 0**(확률적 비차단 보장), registry·원장 무결성 위반은 판정 전 exit 1. [검증: tooling/__tests__/synonym.test.mjs]
 
 ## Non-Functional Requirements
@@ -84,4 +88,5 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-30 | 초안 — `synonymPolicy`(off\|advisory\|hard) + `synonymRegistry`(정본·별칭·사유) + `synonymReviewLedger`(기각 원장) + `keyPrefixes` + `entitySimilarityCommand`(외부 툴 주입) + `synonym-lib`(정규화·충돌·분류) + `check-synonym` 게이트 + sdd-sync R10, Node·Python 바이트 패리티 | 감사(#21) semantic-dup: dedup이 키 문자열만 봐서 `order`/`orders`·`user`/`member`가 통과. owner 확정 "①+②+③ 전부" + **"LLM 실수 방지 툴킷"** — 확률적 층에 차단력을 주지 않고(코드 분기·테스트 고정), 미결 후보를 사유 있는 결정으로만 소멸시키는 포획 구조로 설계 |
+| 2026-08-02 | 후보 목록 **신선도 검사** 추가(FR-008) — 생성기 헤더 `# entity-set: <건수> <해시>` ↔ 현재 소유 entity 집합 대조. 최신·낡음·미선언 3분기, 전부 비차단 | 후보 목록은 낡는데 게이트는 "미결 후보 0"을 찍는다 — 그 사이 추가된 entity를 아무도 안 봤는데 다 본 것처럼 보인다(SPEC-028이 지목한 미판정 착각의 재발). 확률적 산출물이지만 낡음 자체는 결정적으로 판정된다. 차단하지 않는 이유는 FR-006과 같다: 커밋마다 재생성을 요구하면 ③이 떼어진다 |
 | 2026-08-02 | ③층 생성기를 **세션 LLM**으로 확정(Ollama·HuggingFace·model2vec 제외) + 킷 자기적용 개시 — `entity-pairs.mjs`(의존성 0 전수 열거) 추가, `sdd/similarity-candidates.tsv`(후보 18건) 착지, `synonymReviewLedger` 15건 기각 사유 기록, CI에 `check-synonym` 편입 | 실측: 킷 entity 34건 561쌍 전수 판정 결과, 값싼 어휘 툴은 **이름 축 7/7을 상위 20에 올렸지만 기능 축은 0/11**(중앙 순위 84위, 최악 353위/561). 이름 축은 ①이 이미 보는 영역이고 기능 축이 실제 사각이므로, 외부 임베딩 없이 LLM 판정으로 간다. 전수성은 LLM이 아니라 열거기가 보장한다(누락은 모델 능력이 아니라 루프 구조 문제). CI는 ③을 차단하지 못하므로 무해하나, ①②(hard)가 서버측 백스톱에서 빠져 있던 구멍을 함께 닫는다 |

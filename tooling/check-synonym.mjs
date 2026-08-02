@@ -18,6 +18,7 @@ import { parseSection, normalizeKey } from "./ownership-keys.mjs";
 import {
   canonicalForm, lexicalCollisions, validateSynonymRegistry, declaredSynonymFindings,
   parseCandidatePairs, classifyCandidates, validateLedger,
+  entitySetFingerprint, parseCandidateHeader, candidateFreshness,
 } from "./synonym-lib.mjs";
 
 const cfg = loadConfig();
@@ -73,6 +74,8 @@ const deterministic = collisions.length + declared.length;
 // ③ 확률적 후보(옵트인) — 실행 실패는 skipped, 결과는 언제나 advisory.
 let cand = { unresolved: [], resolvedByRegistry: 0, resolvedByLedger: 0 };
 let simSkipped = "";
+let fresh = null; // null=최신 | {kind:"undeclared"|"stale"}
+const curFp = entitySetFingerprint([...ownedKeys]);
 if (SIM_CMD) {
   try {
     const out = execSync(String(SIM_CMD), {
@@ -80,6 +83,7 @@ if (SIM_CMD) {
       stdio: ["ignore", "pipe", "pipe"],
     });
     cand = classifyCandidates(parseCandidatePairs(out), REGISTRY, LEDGER);
+    fresh = candidateFreshness(parseCandidateHeader(out), curFp);
   } catch (e) {
     simSkipped = String((e && (e.stderr || e.message)) || "").trim().split("\n").filter(Boolean).pop() || "실행 실패";
   }
@@ -106,6 +110,14 @@ if (cand.resolvedByRegistry || cand.resolvedByLedger) {
 }
 if (cand.unresolved.length) {
   console.log("  · 미결 후보는 **차단하지 않는다**(확률적 판정에 차단력을 주지 않는다) — 다만 결정 전까지 매 실행 재부상한다(조용한 소실 없음).");
+}
+// 신선도 — 확률적 산출물에 대한 결정적 검사. 언제나 advisory(낡음이 커밋을 막으면 ③이 떼어진다).
+if (fresh && fresh.kind === "stale") {
+  console.log(`  ⚠ 후보 목록이 낡았다 — 생성 당시 entity ${fresh.declared.count}건(${fresh.declared.hash}) → 현재 ${curFp.count}건(${curFp.hash}). 재생성하라: 그 사이 추가된 entity는 **아직 아무도 보지 않았다**(미결 후보 0이 '다 봤다'는 뜻이 아니다).`);
+} else if (fresh && fresh.kind === "undeclared") {
+  console.log(`  · 후보 목록 신선도 미선언 — 생성기 출력에 \`# entity-set: ${curFp.count} ${curFp.hash}\` 한 줄을 넣으면 낡음을 판정한다(없으면 낡아도 알 수 없다).`);
+} else if (SIM_CMD && !simSkipped) {
+  console.log(`  · 후보 목록 신선도: 최신 (entity-set ${curFp.count} ${curFp.hash})`);
 }
 
 // hard는 ①②(결정적)만 차단한다 — ③은 정책과 무관하게 advisory(구조적 보장).

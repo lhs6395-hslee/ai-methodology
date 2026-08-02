@@ -8,6 +8,7 @@
 // @covers SPEC-033/FR-005
 // @covers SPEC-033/FR-006
 // @covers SPEC-033/FR-007
+// @covers SPEC-033/FR-008
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -17,6 +18,7 @@ import { join } from "node:path";
 import {
   singularize, canonicalForm, lexicalCollisions, validateSynonymRegistry,
   declaredSynonymFindings, parseCandidatePairs, classifyCandidates, validateLedger,
+  entitySetFingerprint, parseCandidateHeader, candidateFreshness,
 } from "../synonym-lib.mjs";
 
 const GATE = new URL("../check-synonym.mjs", import.meta.url).pathname;
@@ -156,6 +158,46 @@ test("게이트: 후보가 registry·원장으로 결정되면 소멸 / 사유 �
   const badLedger = run(fixture({ synonymPolicy: "advisory", synonymReviewLedger: { "a::b": "" } }, ["user"]));
   assert.equal(badLedger.code, 1);
   assert.match(badLedger.out, /기각 사유 필요/);
+});
+
+test("신선도 코어: 집합 지문은 순서·중복·대소문자 무관, 헤더 파싱, 낡음 판정", () => {
+  const a = entitySetFingerprint(["user", "order"]);
+  assert.deepEqual(a, entitySetFingerprint(["ORDER", " user ", "order"])); // 정규화·중복 제거
+  assert.equal(a.count, 2);
+  assert.notEqual(a.hash, entitySetFingerprint(["user", "order", "invoice"]).hash);
+  assert.deepEqual(parseCandidateHeader("# entity-set: 34 ABC123def456\nuser\tmember\n"),
+    { count: 34, hash: "abc123def456" });
+  assert.equal(parseCandidateHeader("user\tmember\n"), null);
+  assert.equal(candidateFreshness({ count: 2, hash: a.hash }, a), null);            // 최신
+  assert.equal(candidateFreshness(null, a).kind, "undeclared");
+  const st = candidateFreshness({ count: 9, hash: "deadbeefcafe" }, a);
+  assert.equal(st.kind, "stale");
+  assert.equal(st.declared.count, 9);
+});
+
+// 낡음은 결정적 사실이지만 **차단하지 않는다** — 막으면 entity를 추가할 때마다 LLM 세션이
+// 커밋의 선행 조건이 되고, 사람은 ③을 통째로 떼어낸다(회피 유발 = 설계 실패).
+test("게이트: 후보 목록 신선도 — 미선언/낡음/최신 3분기, 어느 쪽도 hard에서 차단하지 않음", () => {
+  const cand = (body) => {
+    const root = fixture({ synonymPolicy: "hard", entitySimilarityCommand: "cat cands.tsv" }, ["user", "order"]);
+    writeFileSync(join(root, "cands.tsv"), body);
+    return run(root);
+  };
+  const undecl = cand("user\torder\n");
+  assert.equal(undecl.code, 0);
+  assert.match(undecl.out, /신선도 미선언/);
+  assert.match(undecl.out, /# entity-set: 2 [0-9a-f]{12}/); // 붙여넣을 값을 알려준다
+
+  const stale = cand("# entity-set: 9 deadbeefcafe\nuser\torder\n");
+  assert.equal(stale.code, 0, `낡음이 차단하면 안 된다: ${stale.out}`);
+  assert.match(stale.out, /후보 목록이 낡았다/);
+  assert.match(stale.out, /아직 아무도 보지 않았다/);
+
+  const hash = /entity-set: 2 ([0-9a-f]{12})/.exec(undecl.out)[1];
+  const okRun = cand(`# entity-set: 2 ${hash}\nuser\torder\n`);
+  assert.equal(okRun.code, 0);
+  assert.match(okRun.out, /신선도: 최신/);
+  assert.doesNotMatch(okRun.out, /낡았다|미선언/);
 });
 
 test("게이트: 후보 생성기 실행 실패 → skipped(사유), '후보 없음'으로 오독 금지", () => {

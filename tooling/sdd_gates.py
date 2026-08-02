@@ -26,6 +26,7 @@
 #   python sdd_gates.py retag <map.json> [--write] # 추적 태그 마이그레이션(SPEC-011)
 #   python sdd_gates.py run <stage>               # commands.<stage> 실행(언어무관 CI)
 
+import hashlib
 import json
 import os
 import re
@@ -935,6 +936,27 @@ def lexical_collisions(owned, prefixes=None):
         if len(set(str(m["key"]).strip().lower() for m in members)) > 1:
             out.append({"canonical": canonical, "members": members})
     return out
+
+
+def entity_set_fingerprint(keys):
+    norm = sorted(set(str(k).strip().lower() for k in (keys or [])))
+    return {"count": len(norm), "hash": hashlib.sha1("\n".join(norm).encode("utf-8")).hexdigest()[:12]}
+
+
+def parse_candidate_header(stdout):
+    for line in str(stdout or "").split("\n"):
+        m = re.match(r"^\s*#\s*entity-set:\s*(\d+)\s+([0-9a-fA-F]{6,40})\s*$", line)
+        if m:
+            return {"count": int(m.group(1)), "hash": m.group(2).lower()}
+    return None
+
+
+def candidate_freshness(declared, current):
+    if not declared:
+        return {"kind": "undeclared"}
+    if declared["hash"] != current["hash"]:
+        return {"kind": "stale", "declared": declared, "current": current}
+    return None
 
 
 def validate_synonym_registry(registry, owned_keys):
@@ -3733,6 +3755,8 @@ def cmd_synonym(cfg):
 
     cand = {"unresolved": [], "resolvedByRegistry": 0, "resolvedByLedger": 0}
     sim_skipped = ""
+    fresh = None
+    cur_fp = entity_set_fingerprint(list(owned_keys))
     if sim_cmd:
         try:
             r = subprocess.run(str(sim_cmd), shell=True, cwd=cfg["__root"], capture_output=True, text=True,
@@ -3742,6 +3766,7 @@ def cmd_synonym(cfg):
                 sim_skipped = lines[-1] if lines else "실행 실패"
             else:
                 cand = classify_candidates(parse_candidate_pairs(r.stdout), registry, ledger)
+                fresh = candidate_freshness(parse_candidate_header(r.stdout), cur_fp)
         except Exception as e:  # noqa: BLE001
             lines = [l for l in str(e).strip().split("\n") if l.strip()]
             sim_skipped = lines[-1] if lines else "실행 실패"
@@ -3762,6 +3787,12 @@ def cmd_synonym(cfg):
         print(f"  · 후보 중 이미 결정됨: 정본 통합 {cand['resolvedByRegistry']}건 · 기각 원장 {cand['resolvedByLedger']}건")
     if cand["unresolved"]:
         print("  · 미결 후보는 **차단하지 않는다**(확률적 판정에 차단력을 주지 않는다) — 다만 결정 전까지 매 실행 재부상한다(조용한 소실 없음).")
+    if fresh and fresh["kind"] == "stale":
+        print(f'  ⚠ 후보 목록이 낡았다 — 생성 당시 entity {fresh["declared"]["count"]}건({fresh["declared"]["hash"]}) → 현재 {cur_fp["count"]}건({cur_fp["hash"]}). 재생성하라: 그 사이 추가된 entity는 **아직 아무도 보지 않았다**(미결 후보 0이 \'다 봤다\'는 뜻이 아니다).')
+    elif fresh and fresh["kind"] == "undeclared":
+        print(f'  · 후보 목록 신선도 미선언 — 생성기 출력에 `# entity-set: {cur_fp["count"]} {cur_fp["hash"]}` 한 줄을 넣으면 낡음을 판정한다(없으면 낡아도 알 수 없다).')
+    elif sim_cmd and not sim_skipped:
+        print(f'  · 후보 목록 신선도: 최신 (entity-set {cur_fp["count"]} {cur_fp["hash"]})')
 
     if deterministic and hard:
         print("\n✗ synonymPolicy=hard: 형태 변이 충돌·선언된 별칭 사용은 구조적 중복이다 — 정본으로 통일하라(미결 후보는 차단 대상이 아니다).", file=sys.stderr)
