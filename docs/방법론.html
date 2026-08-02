@@ -470,7 +470,7 @@
 
   <h3>dedup ↔ cohesion = 거울상 (핵심 통찰)</h3>
   <p><strong>방법론의 최대 빈칸이 여기 있었다.</strong> "이 spec이 기존과 중복인가?"를 판정할 <em>규칙</em>이 없어 사람·LLM 판단에 맡겨 뒀고 — LLM은 누락을 낸다(→ 거짓 green). 그래서 각 spec이 자기가 <strong>소유하는 키</strong>를 선언하게 하고, <strong>"하나의 키는 정확히 한 spec만 소유"</strong>라는 <strong>집합 규칙</strong>으로 바꿨다. 판정이 "감"이 아니라 "집합 조회"가 된다. (출처: 논문이 아니라 소프트웨어공학 1차 원칙 — DDD <em>bounded context</em>·SSOT·집합 유일성. 1차 원칙이라 결정적이고, 그래서 CI에서 <code>exit 1</code>로 강제할 수 있다.)</p>
-  <p class="note gate"><strong>그래서 Ownership만 필수다 (SC·NFR은 선택).</strong> 이 판정은 <em>모든 spec이 키를 선언해야</em> 성립한다 — 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(<strong>미선언 1개 = 보장에 뚫린 구멍</strong>). SC·NFR 누락은 <em>그 기능 하나</em>의 로컬 약점이지만, Ownership 누락은 <strong>시스템 전체</strong> 중복 보장을 깬다. 비유하면 Ownership은 그 spec이 점유한 땅의 <strong>등기</strong> — 등기가 없으면 두 spec이 같은 땅에 건물을 올려도(중복) 아무도 모른다. (게이트는 미선언을 warn으로 두고 <code>--strict</code>로 완전 강제 — 점진 도입.)</p>
+  <p class="note gate"><strong>그래서 Ownership만 필수다 (SC·NFR은 선택).</strong> 이 판정은 <em>모든 spec이 키를 선언해야</em> 성립한다 — 안 적은 spec은 dedup 레이더 밖이라 그 중복이 안 걸린다(<strong>미선언 1개 = 보장에 뚫린 구멍</strong>). SC·NFR 누락은 <em>그 기능 하나</em>의 로컬 약점이지만, Ownership 누락은 <strong>시스템 전체</strong> 중복 보장을 깬다. 비유하면 Ownership은 그 spec이 점유한 땅의 <strong>등기</strong> — 등기가 없으면 두 spec이 같은 땅에 건물을 올려도(중복) 아무도 모른다. (미선언은 <code>ownershipRequiredPolicy</code>로 강도를 정한다 — 기존 프로젝트는 <code>advisory</code>를 경유하되 종착지는 <code>hard</code>이고, 래칫이 하향을 막는다. 킷 자신은 <code>hard</code>.)</p>
   <pre><span class="c">## Ownership  ← SPEC-001이 "내가 소유한다"고 선언하는 키들</span>
 - **Entities**: pjt_projects, pjt_staff       <span class="c"># 도메인 객체/테이블</span>
 - **Surfaces**: POST /api/recommend           <span class="c"># route·화면·이벤트</span>
@@ -744,7 +744,7 @@
     <tr><td><strong>event</strong> <em>(신규)</em></td><td><code>order.created</code></td><td>발신 entity 귀속 + 이벤트 카탈로그 실재</td><td>SPEC-030</td></tr>
   </table>
   <p><strong>③ "중복·과분류·예외 없이"의 실제 장치.</strong> 중복=dedup 유일성(의미적 동의어는 리뷰 몫), 과분류=실재 불변식 + engine/event가 전수성 구멍을 담음, 예외 없이=강도 knob <strong>하향 불가</strong>(단조 증가, SPEC-027 래칫 자기포함)·면제는 사유 필수+상시 부채 표면화. <code>off</code>·<code>advisory</code>는 마이그레이션 경유지, 종착지는 <code>hard</code>.</p>
-  <p class="note">정직한 잔여 한계: 말만 바꾼 의미적 중복은 결정적 게이트로 못 잡고(좁힌 리뷰 보조), 다부모는 relation 참조로 표현하며, hard 전면화는 프로젝트별 graduation 속도에 달려 있다. 상세·애니메이션 다이어그램 → <a href="ownership-key.html">ownership-key.html</a>.</p>
+  <p class="note">의미적 중복은 세 층으로 나뉜다(SPEC-033, entity 한정): <strong>형태 변이</strong>(<code>order</code>/<code>orders</code>/<code>pjt_order</code>)와 <strong>선언 동의어</strong>는 결정적이라 차단하고, 외부 임베딩·LLM이 낸 <strong>유사 후보</strong>는 <em>어떤 강도에서도 차단하지 않는다</em> — 확률적 오탐이 빌드를 깨면 그 실수가 곧 방법론의 오류가 되기 때문이다. 대신 사람이 정본 통합 또는 기각 원장(둘 다 사유 필수)으로 결정할 때까지 매 실행 재부상한다. 정직한 잔여 한계: 완전히 다른 단어로 재서술된 중복은 여전히 그 후보 + 좁힌 리뷰에 달려 있고, 다부모는 relation 참조로 표현하며, hard 전면화는 프로젝트별 graduation 속도에 달려 있다. 상세·애니메이션 다이어그램 → <a href="ownership-key.html">ownership-key.html</a>.</p>
 </div></section>
 
 <section id="spec-first"><div class="wrap">
