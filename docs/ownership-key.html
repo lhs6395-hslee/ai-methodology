@@ -123,6 +123,12 @@
   .layer h4{margin:0 0 3px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .layer p{margin:0;font-size:13.5px;color:var(--muted)}
   .layer .verdict{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 8px;color:#fff;background:var(--c)}
+  .layer .tool{margin-top:9px;font-size:13px;background:color-mix(in srgb,var(--c) 8%,transparent);
+    border-radius:8px;padding:7px 11px}
+  .layer .tool b{color:var(--c)}
+  .cmd{font-family:var(--mono);font-size:12.5px;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre;margin:14px 0}
+  .cmd .c{color:var(--muted)}
   .loop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0 0;
     font-size:13px;font-family:var(--mono);color:var(--muted)}
   .loop b{color:var(--ink);font-family:var(--sans)}
@@ -238,16 +244,41 @@
     <div class="layer reveal" style="--c:var(--entity)">
       <h4>① 형태 변이 <span class="verdict">결정적 · 차단</span></h4>
       <p>케이스·구분자 토큰화 + <b>보수적</b> 단수화 + <b>선언된</b> 접두어 제거로 정본형을 만들고, 같은 정본형을 두 키가 주장하면 충돌. <code>status</code>·<code>class</code>·<code>analysis</code>는 건드리지 않는다(과잉 병합이 오탐보다 나쁘다).</p>
+      <div class="tool"><b>사용 툴: 없음 — 킷 자체 코드.</b> <code>tooling/synonym-lib.mjs</code>의 <code>canonicalForm</code>·<code>lexicalCollisions</code>(문자열 폴딩 + 집합 대조). 외부 의존 0, 네트워크 0, Node·Python 바이트 동일. 형태소 분석기·스테머(Porter·Snowball) 같은 라이브러리를 <b>일부러 쓰지 않는다</b> — 공격적 어간 추출이 <code>analysis→analysi</code>처럼 정본을 흔들기 때문에, 규칙을 손으로 좁게 적고 테스트로 고정했다.</div>
     </div>
     <div class="layer reveal" style="--c:var(--cap)">
       <h4>② 선언 동의어 <span class="verdict">결정적 · 차단</span></h4>
       <p><code>synonymRegistry</code>에 정본·별칭·<b>사유</b>를 적으면, 별칭을 소유한 스펙이 지적된다. 사유 없음·별칭 0개·유령 정본·한 별칭이 두 정본에 걸림은 <b>판정 전</b> 즉시 에러.</p>
+      <div class="tool"><b>사용 툴: 없음 — 사람의 선언 + 킷 자체 대조.</b> 지식원은 <code>sdd.config.json</code>의 <code>synonymRegistry</code>(사람이 쓴 도메인 지식)이고, 기계는 <code>validateSynonymRegistry</code>·<code>declaredSynonymFindings</code>로 무결성과 사용 여부만 본다. WordNet 같은 <b>범용 어휘 DB를 정본으로 쓰지 않는다</b> — 사전의 동의어(<code>user</code>≈<code>member</code>)가 이 도메인에서도 같다는 보장이 없어서, 판단은 도메인 소유자가 쓰고 사전은 ③의 후보 생성기로만 쓴다.</div>
     </div>
     <div class="layer reveal" style="--c:var(--event)">
       <h4>③ 유사 후보 <span class="verdict">확률적 · <b>절대 차단 안 함</b></span></h4>
-      <p><code>entitySimilarityCommand</code>로 SBERT·LLM·WordNet 무엇이든 꽂는다(한 줄 = 한 후보 쌍). <b><code>hard</code>여도 미결 후보만 남으면 <code>exit 0</code></b> — 산문 규범이 아니라 코드 분기이고 회귀 테스트로 고정돼 있다. 확률적 오탐이 빌드를 깨면 그 실수가 곧 방법론의 오류가 되기 때문이다.</p>
+      <p><code>entitySimilarityCommand</code>로 외부 툴을 꽂는다(한 줄 = 한 후보 쌍). <b><code>hard</code>여도 미결 후보만 남으면 <code>exit 0</code></b> — 산문 규범이 아니라 코드 분기이고 회귀 테스트로 고정돼 있다. 확률적 오탐이 빌드를 깨면 그 실수가 곧 방법론의 오류가 되기 때문이다.</p>
+      <div class="tool"><b>사용 툴: 프로젝트가 고른다 — 킷은 아무것도 번들하지 않는다.</b> 임베딩 모델을 킷에 넣으면 설치가 무거워지고(수백 MB·파이썬 런타임), 언어·인프라 무관 원칙이 깨진다. 대신 <b>명령 주입</b> 한 줄로 무엇이든 붙인다. 이 킷 자신은 <code>entitySimilarityCommand</code>를 선언하지 않아 ③이 <b>비활성</b>(비용 0) — ①②만으로 entity 34건을 판정 중.</div>
     </div>
   </div>
+
+  <h3 class="sub">③에 꽂을 수 있는 툴 (선택지와 성격)</h3>
+  <div class="scrollx reveal"><table>
+    <tr><th>부류</th><th>구체적 툴</th><th>성격</th><th>이런 중복을 잡는다</th></tr>
+    <tr><td>문장 임베딩</td><td><b>SBERT</b>(sentence-transformers) · <b>fastembed</b>(ONNX, 경량) · <b>Ollama</b> 로컬 임베딩(<code>nomic-embed-text</code>)</td><td>로컬 실행 · 오프라인 가능 · 임계값 조정 필요</td><td>이름 + <code>entityRegistry</code> 설명문이 의미상 가까운 쌍</td></tr>
+    <tr><td>어휘 DB</td><td><b>WordNet</b>(NLTK) · 도메인 시소러스</td><td>결정적이지만 <b>도메인 무지</b> — 사전상 동의어가 여기서도 같다는 보장은 없음</td><td><code>user</code>/<code>member</code>, <code>vendor</code>/<code>supplier</code> 류 일반 어휘</td></tr>
+    <tr><td>스키마 매칭</td><td><b>Valentine</b> · <b>COMA</b> 계열</td><td>이름이 아니라 <b>컬럼 구조·값 분포</b>로 비교</td><td>이름은 전혀 다른데 같은 테이블을 감싼 쌍</td></tr>
+    <tr><td>LLM judge</td><td>Claude · GPT 등 API 호출 스크립트</td><td>맥락 이해가 가장 넓고 <b>오탐도 가장 넓다</b> — 그래서 차단력을 주지 않는 설계의 직접적 이유</td><td>완전히 재서술된(reworded) 개념 중복</td></tr>
+  </table></div>
+  <p class="muted reveal">계약은 하나뿐이다 — <b>stdout 한 줄 = 후보 쌍 하나</b>. 탭·파이프·콤마 구분, 3번째 칸은 선택적 점수. 주석(<code>#</code>)과 자기쌍은 무시하고, 순서는 정렬해 중복을 접는다. 실행 실패(오프라인·바이너리 없음·타임아웃)는 “후보 없음”이 아니라 <code>skipped(사유)</code>로 찍힌다.</p>
+  <div class="cmd reveal"><span class="c">// sdd.config.json — 무엇을 쓰든 계약만 지키면 된다</span>
+"synonymPolicy": "hard",
+"entitySimilarityCommand": "python tools/entity-sim.py --threshold 0.82",
+
+<span class="c">// 그 명령의 stdout (한 줄 = 한 쌍, 3번째 칸은 선택적 점수)</span>
+user	member	0.91
+order	purchase_request	0.84
+
+<span class="c">// 게이트 출력 — 차단하지 않는다. 사람이 결정할 때까지 매 실행 재부상.</span>
+동의어 게이트(synonymPolicy=hard): entity 34건 — 형태 충돌 0·선언 별칭 0·미결 후보 2
+  ⚠ 미결 후보: "member" ↔ "user" (score 0.91) — 사람이 결정하라
+  · 미결 후보는 **차단하지 않는다** — 다만 결정 전까지 매 실행 재부상한다.</div>
   <div class="loop reveal">
     <span class="cyc">↻</span> 미결 후보 <span class="arrow">→</span> <b>사람의 결정</b> <span class="arrow">→</span>
     같음: <code>synonymRegistry</code>(정본+사유) <span class="arrow">|</span> 다름: <code>synonymReviewLedger</code>(기각+사유) <span class="arrow">→</span> 소멸
