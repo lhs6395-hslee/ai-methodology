@@ -1,0 +1,25 @@
+# SPEC-033 ③층 유사 후보 — 생성기: 세션 LLM(전수 열거는 entity-pairs.mjs가 수행)
+# 생성 2026-08-02 · 판정 대상 entity 34건 · 전 쌍 561건 · 후보 18건(3.2%)
+# 계약: 한 줄 = 한 쌍(탭 구분, 3번째 칸은 확신도). 이 파일은 판정이 아니라 "사람이 봐야 할 목록"이다.
+# 결정된 쌍은 sdd.config.json의 synonymRegistry(같음) 또는 synonymReviewLedger(다름+사유)로 소멸한다.
+#
+# ── 기능 축: 이름은 안 비슷한데 하는 일이 겹칠 수 있는 쌍 ──
+live-reality	runtime-schema-drift	0.8
+entity-schema-backing	ownership-reality	0.7
+engine-event	ownership-reality	0.7
+spec-grammar-hardening	spec-quality-gates	0.6
+retag	spec-migration	0.6
+smoke-scan	verification-accounting	0.6
+spec-lifecycle	spec-retirement	0.5
+prefix-class-consistency	spec-id-numbering	0.5
+adoption-lifecycle	spec-migration	0.5
+execution-evidence	verification-accounting	0.5
+cross-spec-change	semantic-drift	0.5
+# ── 이름 축: 이름·접미사가 겹쳐 같은 것으로 오해되기 쉬운 쌍 ──
+derivation-accounting	verification-accounting	0.4
+runtime-parity	runtime-schema-drift	0.4
+live-reality	ownership-reality	0.4
+runtime-schema-drift	semantic-drift	0.4
+test-domain	test-execution	0.4
+adoption-lifecycle	spec-lifecycle	0.4
+capability-ownership	ownership-reality	0.4

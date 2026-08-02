@@ -28,6 +28,8 @@ jobs:
           node tooling/check-spec-cohesion.mjs
           node tooling/check-spec-completeness.mjs
           node tooling/check-spec-consistency.mjs
+      - name: 동의어·형태 변이 (①② hard 차단 / ③ 후보는 구조적으로 비차단)
+        run: node tooling/check-synonym.mjs
       - name: smoke evidence drift (태그↔매니페스트)
         run: node tooling/sdd-smoke-scan.mjs
       - name: spec-sync range (웹 UI 병합 백스톱 — draftBlockPolicy=hard 승격 소비)

@@ -122,6 +122,7 @@
     "templates/**",
     "sdd/smoke-manifest.json",
     "sdd/derivation.json",
+    "sdd/similarity-candidates.tsv",
     "sdd/MODULE_MAP.md",
     "tooling/*.md",
     "tooling/*.yml",
@@ -164,5 +165,23 @@
   "crossCategoryDedupPolicy": "hard",
   "filesOverlapPolicy": "hard",
   "executionEvidencePolicy": "hard",
-  "synonymPolicy": "hard"
+  "synonymPolicy": "hard",
+  "entitySimilarityCommand": "cat sdd/similarity-candidates.tsv",
+  "synonymReviewLedger": {
+    "spec-grammar-hardening::spec-quality-gates": "002는 구조 판정(dedup·입도·완전성), 013은 서술 문법↔게이트 동기(Module 헤더·SHALL·글롭). 판정 대상이 구조 vs 문장이다",
+    "retag::spec-migration": "011은 추적 태그의 기계 재번호(맵 적용), 025는 스펙 본문의 재구성(승인 경유). 대상이 태그 vs 본문이다",
+    "smoke-scan::verification-accounting": "007은 무엇을 검증됐다고 칠 수 있나(회계 규칙), 010은 태그 수집·매니페스트 채움·드리프트(수집 실행). 규칙 vs 수집이다",
+    "spec-lifecycle::spec-retirement": "008은 살아있는 스펙의 상태·리뷰 문법, 018은 폐기·삭제·재sync 워크플로. 존속 vs 소멸이다",
+    "prefix-class-consistency::spec-id-numbering": "012는 접두어 의미↔소유 실파일 클래스 일치, 014는 번호 무결성(연번·중복). 의미 vs 번호다",
+    "adoption-lifecycle::spec-migration": "005는 채택 스킬이 백로그를 표면화, 025는 그 백로그를 실제 재구성. 표면화 vs 실행이다",
+    "execution-evidence::verification-accounting": "007은 FR이 어느 검증 클래스인가(분류), 031은 그 주장이 실행 가능한 증거를 지목하는가(증거 등급). 분류 vs 증거다",
+    "cross-spec-change::semantic-drift": "020은 변경 동인 추적으로 억지 동반요구를 완화, 019는 리네임·소유 이동을 리뷰로 승격. 방향이 반대다",
+    "derivation-accounting::verification-accounting": "accounting은 공통 접미사일 뿐 — 009는 재도출 소스 클래스, 007은 FR 검증 클래스. 회계 대상이 다르다",
+    "runtime-parity::runtime-schema-drift": "runtime의 뜻이 다르다 — 006은 게이트를 복제한 실행 언어, 022는 배포된 실행 환경의 DB 스키마",
+    "live-reality::ownership-reality": "reality의 대상이 다르다 — 029는 저장소 안 코드 실재, 032는 저장소 밖 실물(클라우드·클러스터)",
+    "runtime-schema-drift::semantic-drift": "drift의 대상이 다르다 — 019는 이름·소유의 의미 드리프트, 022는 배포 스키마 드리프트",
+    "test-domain::test-execution": "015는 TEST 접두어 도메인의 소유 규칙, 021은 테스트를 실제로 돌려 green을 확인. 분류 vs 실행이다",
+    "adoption-lifecycle::spec-lifecycle": "주체가 다르다 — 005는 프로젝트의 채택 단계, 008은 개별 스펙의 상태",
+    "capability-ownership::ownership-reality": "024는 누가 가질 자격이 있나(귀속), 029는 있기는 한가(실재). 자격 vs 존재다"
+  }
 }
