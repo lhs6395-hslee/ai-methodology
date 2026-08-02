@@ -4,6 +4,23 @@
 
 **한 줄:** 기능 중복은 예외 없이 막히지 않는다 — 가장 약한 지점은 Surfaces가 무검증 수납칸이면서 유령 entity의 공식 강등 종착지라는 점, 그리고 hard 게이트의 활성 여부가 config 이름 한 줄·래칫 밖 knob에 걸려 있어 policy=hard인 채로 조용히 꺼진다는 점이다.
 
+> **해소 상태 (2026-08-02 기준 — 이 보고서는 2026-07 시점 기록이고, 아래는 이후 반영 결과다).**
+> 이 문서는 **감사 시점의 판정을 그대로 보존**한다(고쳐 쓰지 않는다). 무엇이 닫혔는지는 여기서 본다.
+>
+> | 감사 지적 | 반영 | 상태 |
+> |---|---|---|
+> | 판정이 카테고리 **이름**(정규식)에 걸려 개명 한 줄로 무력화 | `ownershipCategoryRoles` 역할 선언 + `resolveCategoryRoles`(SPEC-001 FR-010) | ✅ |
+> | 순수 로직·비동기 신호를 담을 칸 없음 → 유령 entity·`job:` 우회 | **Engines·Events** 역할 신설(SPEC-030, 옵트인) | ✅ |
+> | Surfaces가 무검증 수납칸(정방향 실재 판정 부재) | 심볼 실재 문법(SPEC-029) — orphan 역방향과 짝 | ✅ |
+> | entity 없는 소유 번들(경계 없는 잡화점) | aggregate root **최소 하한**(SPEC-002) | ✅ |
+> | capability 캡이 full-CRUD를 거짓 분할 신호로 읽음 | 캡을 **entity별**로 카운트(SPEC-002) | ✅ |
+> | 소유 선언 없는 스펙·카테고리 교차 중복·Files 글롭 겹침 | G1·G2·G3 게이트(`ownershipRequiredPolicy`·`crossCategoryDedupPolicy`·`filesOverlapPolicy`) | ✅ |
+> | 강도 knob 하향으로 위반을 회피 | 정책 래칫(자기포함, SPEC-027) | ✅ |
+> | **semantic-dup 6건** — `order`/`orders`·`user`/`member`가 dedup을 통과 | 동의어 3층(SPEC-033): ①형태 변이·②선언 동의어는 결정적 차단, ③유사 후보는 **비차단** + 후보 목록 신선도 | ✅ 부분 — 재서술된 중복은 여전히 사람 몫(재현율 측정 불가) |
+> | 소유자 제안: `user.student` 같은 **깊이 모델**로 FR 주어를 잡자 | **미채택** — 단일 점(dot) capability 문법·첫 점 귀속·리터럴 스키마 백킹과 충돌하고, 다부모 개념을 표현하지 못해 예외를 늘린다. 다부모는 relation 참조로 표현한다(SPEC-017) | ❌ 기각(사유 기록) |
+>
+> 상세·시각 설명: [`ownership-key.html`](ownership-key.html) · 비전문가용 [`ownership-key-easy.html`](ownership-key-easy.html) · 정본 산문 `DEDUP.md` §3.5·§4
+
 ## 새 카테고리 제안
 
 ### Engines (또는 Derivations/Values) — 코드-모듈 SSOT로 백킹되는 비-aggregate 순수 로직

@@ -51,6 +51,12 @@
 | [`DEDUP.md`](DEDUP.md) | **스펙 간 중복 3계층(구조 유일성 + 형태·선언 동의어 게이트 + 유사 후보 표면화·좁힌 리뷰)·소유권 유일성·근거** | ★ 중복 |
 | [`SPEC_REVIEW.md`](SPEC_REVIEW.md) | spec 리뷰 체크리스트(중복·빈공란·모순·누락·추적성)·게이트 매핑 | 문서 |
 | [`APPLYING.md`](APPLYING.md) | **새 프로젝트에 적용하는 설치·배선 절차** + **채택 후 궤도 한 바퀴 운영법**(hook·게이트 실측 출력 포함) | 런북 |
+| [`docs/방법론.html`](docs/방법론.html) | **방법론 전체 시각 설명서**(다이어그램·게이트 표·애니메이션) — 브라우저로 연다 | ★ 시각 |
+| [`docs/ownership-key.html`](docs/ownership-key.html) | **소유권 키 모델과 동작 방식**(역할 5분류·키가 지나는 6단계 파이프라인·역할별 게이트 탐색기·의미적 중복 3층) | 시각 |
+| [`docs/ownership-key-easy.html`](docs/ownership-key-easy.html) | **비전문가용 쉬운 설명**(등기 비유·인터랙티브 등기 데모·561쌍 판정 격자) — 사전 지식 0 | 시각 |
+| [`docs/change_log.html`](docs/change_log.html) | 전 스펙 Change Log 통합 타임라인(생성물 — `tooling/gen-changelog.mjs`) | 생성물 |
+| [`docs/ownership-taxonomy-audit.md`](docs/ownership-taxonomy-audit.md) | Ownership 분류 감사(2026-07, 41건) + **해소 상태 표** — 원문 보존 | 감사 기록 |
+| `docs/design/` · `docs/superpowers/plans/` | 날짜별 설계·계획 기록 — **역사 기록이라 갱신하지 않는다**(당시 판단의 보존이 목적) | 기록 |
 | [`PROMPTS.md`](PROMPTS.md) | 어느 IDE든 붙여넣는 시작/이어가기 프롬프트 | 프롬프트 |
 | [`principles.md`](principles.md) | 작업 원칙(전부정독·병렬=저비용티어·실패재시도·LLM작성/사람승인·언어/모델/인프라/CI 무관 §10) | 규칙 |
 | [`HARNESS.md`](HARNESS.md) | **인터랙티브 spec↔code sync 계약**(규칙표 R1~R10·실행기 `/sdd-sync`·pre-push 훅) + **강제 hook 세트**(SessionStart·PreToolUse·pre-commit·pre-push, `sdd-init` 배선) + **spec-first**(`check-spec-sync`·commit-msg hard·`/speckit.fix` — Files glob 소유매핑, changeset=브랜치, Spec-Impact 트레일러) | ★ 하네스 |
