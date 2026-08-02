@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseEvidenceTag, hasExecutionVerb, isBrowserGradeEvidence, evidenceFindings } from "../evidence-lib.mjs";
+import { parseEvidenceTag, hasExecutionVerb, isBrowserGradeEvidence, evidenceFindings , markerHits } from "../evidence-lib.mjs";
 
 const GATE = new URL("../check-evidence.mjs", import.meta.url).pathname;
 
@@ -118,4 +118,22 @@ test("게이트: 글롭 증거 경로 인정 / enum 밖 정책 → exit 1", () =
   const bad = run(fixture({ executionEvidencePolicy: "strict" }, { "S.md": "**Spec**: `SPEC-001`\n" }));
   assert.equal(bad.code, 1);
   assert.match(bad.out, /executionEvidencePolicy 값 위반/);
+});
+
+// 실측 제보(소비 프로젝트 finops): 부분일치가 흔한 단어를 대량 오탐했다 — `page`→`TicketPackage`,
+// `UI`→`REQUIRED`(q-ui-red)·`pricing-guide`(g-ui-de). 순수 백엔드 스펙의 FR 7건 중 4건이
+// "UI 대상인데 증거가 브라우저 등급 아님"으로 표면화됐다. 마커를 지우면 진짜 UI 주장을 놓치므로
+// 지우는 대신 **경계로 좁힌다**(킷이 `재생`을 뺀 것과 같은 판단, 다른 처방).
+// @covers SPEC-031/FR-004
+test("markerHits: ASCII 마커는 단어 경계 — 부분일치 오탐 차단, 한글은 부분일치 유지", () => {
+  assert.equal(markerHits("ticketpackage 분류 규칙", "page"), false);   // 실측 오탐 ①
+  assert.equal(markerHits("required 필드 검증", "ui"), false);          // 실측 오탐 ②
+  assert.equal(markerHits("pricing-guide 문서", "ui"), false);          // 실측 오탐 ③
+  assert.equal(markerHits("the page renders", "page"), true);           // 진짜 주장은 살린다
+  assert.equal(markerHits("결과 page", "page"), true);
+  assert.equal(markerHits("ui 표시", "ui"), true);
+  assert.equal(markerHits("admin-ui 화면", "ui"), true);                // 구분자 경계도 인정
+  // 한글 마커 — 교착어라 경계가 성립하지 않으므로 부분일치 유지(실측 충돌 없음)
+  assert.equal(markerHits("대시보드에 표시된다", "대시보드"), true);
+  assert.equal(markerHits("화면을 렌더", "화면"), true);
 });

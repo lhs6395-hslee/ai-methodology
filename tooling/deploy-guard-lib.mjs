@@ -41,8 +41,12 @@ export function parseDeployCommand(command, patterns = DEFAULT_DEPLOY_PATTERNS) 
   }
   if (!tool) return { matched: false, tool: "", paths: [] };
 
+  // 옵션은 **단일 대시도 받는다** — Terraform 공식 문법이 `-var-file=`(단일)이라 이중 대시만
+  // 인식하면 terraform 배포에서 경로가 하나도 안 잡히고, 경로가 없으면 소비 게이트가 조기 종료해
+  // 판정 자체가 성립하지 않는다(실측 제보: terraform이 주 배포 수단이면 이 게이트는 사실상
+  // kubectl·helm 전용이었다).
   const paths = [];
-  for (const m of cmd.matchAll(/(?:^|\s)(?:-f|--filename|-k|--kustomize|--values|--var-file)[=\s]+("[^"]+"|'[^']+'|\S+)/g)) {
+  for (const m of cmd.matchAll(/(?:^|\s)--?(?:f|filename|k|kustomize|values|var-file|backend-config)[=\s]+("[^"]+"|'[^']+'|\S+)/g)) {
     const raw = m[1].replace(/^["']|["']$/g, "");
     if (raw && raw !== "-" && !/^https?:\/\//.test(raw)) paths.push(raw);
   }

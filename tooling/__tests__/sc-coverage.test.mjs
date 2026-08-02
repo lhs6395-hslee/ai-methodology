@@ -32,6 +32,12 @@ test("parseScLine: SC·NFR 선언만 인식, 태그·[미확인] 추출, 코드 
     { id: "NFR-002", kindOfId: "NFR", pointer: "", unknown: true });
   assert.equal(parseScLine("- **FR-001** The system SHALL x."), null);   // FR은 대상 아님
   assert.equal(parseScLine("| SC-001 | 표 행 |"), null);                  // 표 행도 아님
+  // 실측 제보: 분류 접미가 붙은 NFR이 **집계에서 조용히 빠졌다**(미회계로도 안 잡힘).
+  // FR 선언 정규식은 EARS 분류 `(event)`를 받는데 SC/NFR만 비일관이었다 — 회계 게이트가 자기 사각을 못 봄.
+  assert.deepEqual(parseScLine("- **NFR-001** (security): 침투 High 0건."),
+    { id: "NFR-001", kindOfId: "NFR", pointer: "", unknown: false });
+  assert.equal(parseScLine("- **SC-002** (performance): p95<300ms. [검증: tests/load/k6.js]").pointer,
+    "tests/load/k6.js");
   // 산문이 태그를 흉내내지 못한다 — 코드 스팬 안의 문자열은 인용문이다(SPEC-031·033 동형)
   assert.equal(parseScLine("- **SC-003**: 태그는 `[검증: 경로]` 형식이다.").pointer, "");
 });

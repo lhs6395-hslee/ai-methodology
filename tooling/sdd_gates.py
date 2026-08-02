@@ -1125,6 +1125,22 @@ DEFAULT_BROWSER_MARKERS = [
 DEFAULT_BROWSER_EVIDENCE_PATTERNS = ["e2e", "playwright", "cypress", "puppeteer", "selenium", "browser"]
 
 
+_ASCII_ONLY = re.compile(r"^[\x00-\x7F]+$")
+
+
+def marker_hits(haystack, marker):
+    """ASCII 마커는 **단어 경계**로만 맞춘다(evidence-lib.mjs markerHits 미러).
+    부분일치는 page→TicketPackage, UI→REQUIRED 같은 대량 오탐을 낸다(실측 제보).
+    한글 마커는 교착어라 경계가 성립하지 않고 실측 충돌도 없어 부분일치 유지."""
+    m = str(marker or "").lower()
+    if not m:
+        return False
+    s = str(haystack or "").lower()
+    if not _ASCII_ONLY.match(m):
+        return m in s
+    return bool(re.search(r"(^|[^a-z0-9])" + re.escape(m) + r"([^a-z0-9]|$)", s))
+
+
 def parse_evidence_tag(line):
     # 코드 스팬(`...`)은 인용이지 주장이 아니다(evidence-lib.mjs 미러).
     s = re.sub(r"`[^`]*`", " ", str(line or ""))
@@ -1171,7 +1187,7 @@ def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, bro
                     if not asset_exists(p):
                         out.append((u["specId"], c["id"], c["kind"], "missing-asset", f"증거 자산 없음: {p}"))
                 low = str(c["text"] or "").lower()
-                if any(str(m).lower() in low for m in bmark) and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"]):
+                if any(marker_hits(low, m) for m in bmark) and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"]):
                     out.append((u["specId"], c["id"], c["kind"], "browser-needs-ui-evidence",
                                 f"UI/브라우저 대상인데 증거가 브라우저 등급 아님({', '.join(tag['paths'])}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다"))
                 continue
@@ -3527,7 +3543,7 @@ def cmd_schemadrift(cfg):
 
 
 # ─── SC·NFR 검증 회계 (SPEC-034) — sc-coverage-lib.mjs 미러 ───
-SC_DECL_RE = re.compile(r"^\s*[-*]\s+\*\*(SC|NFR)-(\d+)\*\*\s*:")
+SC_DECL_RE = re.compile(r"^\s*[-*]\s+\*\*(SC|NFR)-(\d+)\*\*\s*(?:\([^)]*\))?\s*:")
 _SC_TAG_RE = re.compile(r"\[검증\s*[:：]\s*([^\]]+)\]")
 _SC_UNKNOWN_RE = re.compile(r"\[미확인\]")
 

@@ -26,6 +26,14 @@ test("parseDeployCommand: 상태 변경 명령만 감지, dry-run·조회는 제
   assert.equal(parseDeployCommand("terraform plan").matched, false);        // 계획
   assert.equal(parseDeployCommand("kubectl apply -f x.yaml --dry-run=client").matched, false);
   assert.equal(parseDeployCommand("kubectl apply -f https://ex/x.yaml").paths.length, 0); // 원격은 소스 아님
+  // 실측 제보: Terraform 공식 문법은 **단일 대시**(`-var-file=`)라 이중 대시만 인식하면 경로가
+  // 하나도 안 잡히고, 경로가 없으면 소비 게이트가 조기 종료해 판정 자체가 성립하지 않았다
+  // (terraform이 주 배포 수단인 프로젝트에서 이 게이트는 사실상 kubectl·helm 전용).
+  assert.deepEqual(parseDeployCommand("terraform apply -var-file=stages/dev/x.tfvars").paths,
+    ["stages/dev/x.tfvars"]);
+  assert.deepEqual(parseDeployCommand("terraform apply -var-file stages/prod.tfvars -backend-config=be.hcl").paths,
+    ["stages/prod.tfvars", "be.hcl"]);
+  assert.equal(parseDeployCommand("terraform plan -var-file=x.tfvars").matched, false); // plan은 여전히 제외
   assert.ok(DEFAULT_DEPLOY_PATTERNS.length > 0);
 });
 

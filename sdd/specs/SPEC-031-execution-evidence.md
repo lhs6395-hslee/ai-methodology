@@ -80,3 +80,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-30 | 초안 — `executionEvidencePolicy`(off\|advisory\|hard) + `executionVerbs`·`browserMarkers`·`browserEvidencePatterns` knob + `evidence-lib`(태그 파싱·등급 판정) + `check-evidence` 게이트 + sdd-sync R8, Node·Python 바이트 패리티. 킷 자신 hard 채택 | owner 개정 요청 R1(실측 gsn-ai-pm): 게이트 8종 green인데 대시보드 패널 30여 개 사망 — `[검증]`이 산문 자기신고로 소비되고 렌더 확인 코드가 0줄이었다. API 단독 검증도 통과하는 결함(변수 보간)이라 UI 대상엔 브라우저 등급을 요구 |
+| 2026-08-02 | 브라우저 마커 대조를 부분일치에서 **ASCII 단어 경계 일치**로 교정(`markerHits`) — 한글 마커는 교착어라 부분일치를 유지. Node·Python 동시 | 실측 제보(gsn-aiops-finops-module): `ui` 마커가 `TicketPackage`·`REQUIRED`·`pricing-guide`에 걸려 무관한 FR을 브라우저 주장으로 오분류했다. 오탐이 잦은 게이트는 꺼지므로 오탐 억제가 곧 강도다 [검증: tooling/__tests__/evidence.test.mjs] |

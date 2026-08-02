@@ -80,3 +80,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-08-02 | 초안 — `scCoveragePolicy`(off\|advisory\|hard) + `verificationKinds`(경로→종류 유도 글롭) + `evidenceManifest`(증거·유예 회계) + `sc-coverage-lib`(라인 파싱·분류) + `check-sc-coverage` 게이트 + sdd-sync R11, Node·Python 바이트 패리티 | 실측 제보: 부하·침투 테스트가 스펙에 자동 귀속되지 못하고 scratchpad에 남았다. 회계가 FR에만 있어 성능·보안 목표는 산문으로 방치돼도 green이었다. 새 태그 문법을 만들지 않고 SPEC-031의 `[검증]`을 재사용하며, 종류는 경로에서 유도해 자기신고를 피한다 |
+| 2026-08-02 | `SC_DECL_RE`가 분류 접미 `(security)`·`(performance)`를 허용 — FR 선언 정규식이 EARS 분류를 받는 것과 일관. Node·Python 동시 | 실측 제보(gsn-aiops-finops-module): `- **NFR-001** (security): …` 형태가 **미회계로도 안 잡히고** 집계에서 조용히 사라졌다. 킷 자신에 적용하니 SC·NFR 항목 수가 110 → 118로 늘어, 회계 게이트가 자기 사각을 8건 갖고 있었음이 드러났다 [검증: tooling/__tests__/sc-coverage.test.mjs] |

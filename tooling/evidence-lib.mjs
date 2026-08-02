@@ -24,6 +24,22 @@ export const DEFAULT_EXECUTION_VERBS = [
 ];
 
 // UI/브라우저 경로 마커 — 이 마커가 있으면 API 단독 증거를 실행 등급으로 인정하지 않는다(실측 교훈).
+// 마커 매칭 — **ASCII 마커는 단어 경계로만** 맞춘다. 부분일치는 흔한 단어를 대량 오탐한다
+// (실측 제보: `page`→`TicketPackage`, `UI`→`REQUIRED`(q-**ui**-red)·`pricing-guide`(g-**ui**-de).
+// 순수 백엔드 스펙의 FR 7건 중 4건이 "UI 대상인데 증거가 브라우저 등급 아님"으로 표면화됐다).
+// 한글 마커는 교착어라 단어 경계가 성립하지 않고 실측 충돌도 없으므로 부분일치를 유지한다 —
+// 킷이 `재생`(→재생성 오탐)을 기본에서 뺀 것과 같은 판단이되, 여기선 삭제 대신 경계로 좁힌다
+// (삭제하면 진짜 UI 주장을 놓친다).
+const ASCII_ONLY = /^[\x00-\x7F]+$/;
+export function markerHits(haystack, marker) {
+  const m = String(marker || "").toLowerCase();
+  if (!m) return false;
+  const s = String(haystack || "").toLowerCase();
+  if (!ASCII_ONLY.test(m)) return s.includes(m);
+  const esc = m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`).test(s);
+}
+
 export const DEFAULT_BROWSER_MARKERS = [
   "대시보드", "dashboard", "화면", "브라우저", "browser", "패널", "panel", "페이지", "page", "UI",
 ];
@@ -80,7 +96,7 @@ export function evidenceFindings(units, assetExists, opts = {}) {
   const bmark = opts.browserMarkers && opts.browserMarkers.length ? opts.browserMarkers : DEFAULT_BROWSER_MARKERS;
   const isBrowserClaim = (t) => {
     const s = String(t || "").toLowerCase();
-    return bmark.some((m) => s.includes(String(m).toLowerCase()));
+    return bmark.some((m) => markerHits(s, m));
   };
   const out = [];
   for (const u of units || []) {
