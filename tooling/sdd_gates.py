@@ -56,6 +56,8 @@ DEFAULTS = {
     "maxKeysPerCategoryPerSpec": 4,
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
+    "outOfBandDeployPolicy": "advisory",
+    "outOfBandDeployCommands": None,
     "scCoveragePolicy": "off",
     "verificationKinds": {},
     "evidenceManifest": None,

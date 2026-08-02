@@ -18,6 +18,7 @@
 **슬래시 없이 진행하라(Kiro·Codex 등):** 슬래시 명령(`/sdd-*`·`/speckit.*`)은 Claude Code 편의 래퍼일 뿐이다. 슬래시를 못 쓰는 환경에서 **"슬래시를 못 쓰는데 어쩌죠?"라고 되묻지 말고, 같은 절차를 그대로 수동으로 밟는다:**
 - 최초 채택 / 재채택 / 평상시 sync = `prompts/{adopt,readopt,update}.md` 절차 그대로
 - **완화를 선택지로 내밀지 않는다.** 게이트 위반의 해소안을 제시할 때 강도 하향(`hard→advisory`)·수치 임계 상향(`maxFRsPerSpec` 등)·면제 목록 추가를 **권장안으로 올리지 않는다** — 그건 위반을 없앤 게 아니라 자를 바꿔 잰 것이다. 정당한 해소는 **분할·병합·스펙 편집**이고, 진짜 재조정이 필요하면 `policyRatchetExceptions`로 부채를 표면화한다(래칫이 강도·임계 양쪽을 감시하므로 조용한 완화는 어차피 exit 1이다).
+- **배포하면 그 자리에서 적는다:** `kubectl apply`·`helm upgrade` 등으로 라이브에 반영했다면 **커밋 전에** 소유 스펙 Change Log에 한 행(날짜·무엇을·왜 + `[검증: 경로]`/`[미확인]`)을 남긴다. 배포가 커밋보다 먼저인 궤도에서는 그때 안 적으면 기록이 영영 안 남는다.
 - **비기능 작업 라우팅:** 부하·성능·보안/침투·가용성 작업은 기능 스펙에 욱여넣지 말고 **비기능 TEST 스펙**으로 간다(없으면 생성 — STORAGE.md §비기능 TEST 스펙 아키타입). 산출물 경로(`tests/load/**`·`tests/security/**`)를 그 스펙 Surfaces로 선언해야 커밋 시 소유가 강제된다.
 - **이름 짓기:** 새 entity는 이미 있는 것의 다른 이름이 아닌지 본다 — `order`/`orders`/`pjt_order`는 정규화하면 같은 키라 게이트가 막는다(SPEC-033). 같은 개념을 두 이름으로 부르고 있으면 정본을 하나 정해 `synonymRegistry`에 사유와 함께 선언한다.
 - 첫 스펙 / 신규 스펙 = `templates/module-spec.md` 복사 → `sdd/specs/SPEC-NNN-<slug>.md` → FR(EARS)·Ownership·SC·Review Log 채움 → 셀프리뷰(`SPEC_REVIEW.md`) → 게이트 green → 사용자 승인

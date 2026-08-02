@@ -109,7 +109,8 @@
     "execution-evidence": "실행 증거 등급 — [검증] 태그를 실행 가능한 증거 경로로 강제(산문 자기신고 차단, SPEC-031)",
     "live-reality": "라이브 대조 — 저장소 밖 진실(클라우드·클러스터 실물)과 선언의 일치 판정(SPEC-032)",
     "entity-synonym": "동의어·형태 변이 판정 — 정규화 충돌·선언 별칭(결정적) + 유사 후보(확률적, 비차단, SPEC-033)",
-    "sc-coverage": "SC·NFR 검증 회계 — 성공기준·비기능 목표를 검증 바인딩(태그·증거·유예)에 묶는다(FR 전용 회계의 사각, SPEC-034)"
+    "sc-coverage": "SC·NFR 검증 회계 — 성공기준·비기능 목표를 검증 바인딩(태그·증거·유예)에 묶는다(FR 전용 회계의 사각, SPEC-034)",
+    "deploy-guard": "out-of-band 배포 가드 — spec-first 발화 지점을 커밋에서 배포 행위까지 앞당긴다(PostToolUse, 비차단, SPEC-035)"
   },
   "relationTypes": [
     "references"
@@ -190,7 +191,10 @@
     "sc-coverage::verification-accounting": "007은 **FR**의 검증 클래스 회계(unit·e2e·smoke·deferred), 034는 **SC·NFR** 축. 회계라는 형식은 같고 대상이 요구 vs 성공기준으로 갈린다 — 한 스펙으로 합치면 FR 회계와 SC 회계의 강도를 따로 졸업시킬 수 없다",
     "execution-evidence::sc-coverage": "031은 `[검증]` 태그가 실행 가능한 것을 지목하는가(증거의 **질**), 034는 모든 SC·NFR이 바인딩을 갖는가(**전수성**). 034는 031의 태그 문법을 재사용할 뿐 판정 축이 다르다",
     "sc-coverage::smoke-scan": "010은 `@verifies` 태그 수집·매니페스트 자동 채움(수집 실행), 034는 SC·NFR 회계 규칙. 수집 vs 규칙이다(007↔010과 같은 경계)",
-    "derivation-accounting::sc-coverage": "accounting은 공통 접미사일 뿐 — 009는 재도출 소스 클래스, 034는 성공기준의 검증 바인딩. 회계 대상이 다르다"
+    "derivation-accounting::sc-coverage": "accounting은 공통 접미사일 뿐 — 009는 재도출 소스 클래스, 034는 성공기준의 검증 바인딩. 회계 대상이 다르다",
+    "deploy-guard::spec-sync": "003은 **커밋** 시점에 소유 코드 변경의 스펙 동반을 차단하고, 035는 그보다 앞선 **배포** 시점에 비차단으로 상기시킨다. 시점과 강도가 다르며 차단은 003이 계속 담당한다",
+    "deploy-guard::live-reality": "032는 이미 벌어진 선언↔실물 차이를 측정하고, 035는 차이가 **생기는 순간**을 잡는다. 사후 측정 vs 발생 시점이다",
+    "deploy-guard::semantic-drift": "019는 리네임·소유 이동으로 옛 의미가 남는 것을 리뷰로 승격, 035는 라이브 반영이 기록 없이 지나가는 것을 상기. 드리프트의 원인이 이름 vs 배포로 다르다"
   },
   "scCoveragePolicy": "advisory",
   "verificationKinds": {

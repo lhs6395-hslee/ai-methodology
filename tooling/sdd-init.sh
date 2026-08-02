@@ -78,7 +78,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs; do
+                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -108,8 +108,9 @@ if [ "$GATE" = "node" ]; then
   # ── hook 세트 배선: 채택 순간 = 상시 강제 궤도 ─────────────────
   copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
   copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
+  copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
   copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
-  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-pre-commit.sh"
+  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-pre-commit.sh"
 
   # git pre-commit + pre-merge-commit 훅 연결 (.git 있을 때만).
   # pre-merge-commit(M5): 무충돌 git merge는 pre-commit을 타지 않는다 — 두 브랜치가 각자 같은
@@ -153,7 +154,7 @@ if [ "$GATE" = "node" ]; then
   # .claude/settings.json 병합 — 기존 hooks 보존; jq 있으면 merge, 없으면 신규 생성
   mkdir -p "$T/.claude"
   SETTINGS="$T/.claude/settings.json"
-  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]}]}}'
+  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]}],"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-check.sh"}]}]}}'
   if [ -f "$SETTINGS" ]; then
     if command -v jq >/dev/null 2>&1; then
       # jq merge — 기존 SDD hook 항목 제거 후 신규 추가(idempotency 보장)
@@ -169,6 +170,10 @@ if [ "$GATE" = "node" ]; then
         .hooks.PreToolUse = (
           [ ($old.hooks.PreToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-edit-check") | not) ]
           + ($new.hooks.PreToolUse // [])
+        ) |
+        .hooks.PostToolUse = (
+          [ ($old.hooks.PostToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-deploy-check") | not) ]
+          + ($new.hooks.PostToolUse // [])
         )
       ' "$SETTINGS" - <<_JQ > "$tmp" && mv "$tmp" "$SETTINGS"
 $NEW_HOOKS

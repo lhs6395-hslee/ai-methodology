@@ -73,6 +73,11 @@ export const DEFAULTS = {
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도
   // 프로브(e2ePrecheck)로 판정한다: 프로브 실패 = skipped(사유), 프로브 통과 후 비-0 = 실패.
   // SC·NFR 검증 회계(SPEC-034) — FR만 회계하던 사각을 닫는다. off|advisory|hard.
+  // out-of-band 배포 가드(SPEC-035) — 배포가 커밋보다 먼저인 궤도에서 spec-first 발화 지점을
+  // 커밋에서 **배포 행위**까지 앞당긴다. PostToolUse라 항상 비차단(이미 실행된 뒤에 돈다).
+  // off|advisory. 감지 패턴은 deploy-guard-lib의 기본값을 쓰거나 아래로 대체한다.
+  outOfBandDeployPolicy: "advisory",
+  outOfBandDeployCommands: null,
   scCoveragePolicy: "off",
   // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
   // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).
