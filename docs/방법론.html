@@ -567,7 +567,7 @@
   <span class="eyebrow">조종석</span>
   <h2>하네스 — 이 모든 걸 "수시로" 돌린다</h2>
   <p>지금까지는 <em>규칙·구조</em>였다. 하지만 규칙이 있다고 사람이 매번 "아 이제 게이트 돌리고, 중복 보고, 명세 맞춰야지"를 기억할까? 안 한다. <strong>하네스</strong>는 그 운영을 <strong>사람과 대화하며 자동으로</strong> 끌고 가는 층이다. 핵심은 — 새 판정 로직을 만드는 게 아니라, <strong>이미 있는 게이트를 트리거하고(detect), 사람에게 묻고(ask), 행동을 잇는다(act).</strong></p>
-  <figure><div class="figscroll"><svg viewBox="0 0 820 230" role="img" aria-label="하네스 루프: detect 게이트, ask 사람, act 방법론을 순환하며 R1부터 R4가 트리거">
+  <figure><div class="figscroll"><svg viewBox="0 0 820 230" role="img" aria-label="하네스 루프: detect 게이트, ask 사람, act 방법론을 순환하며 R1부터 R12가 트리거">
     <defs><marker id="ar3" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#3a57d6"/></marker></defs>
     <rect x="40" y="70" width="180" height="70" rx="10" fill="#fcefe2" stroke="#e2620a"/><text x="130" y="100" font-size="14" font-weight="800" fill="#e2620a" text-anchor="middle">detect</text><text x="130" y="122" font-size="11.5" fill="#7a3b10" text-anchor="middle">게이트 일괄 실행</text>
     <rect x="320" y="70" width="180" height="70" rx="10" fill="#eef1fd" stroke="#3a57d6"/><text x="410" y="100" font-size="14" font-weight="800" fill="#3a57d6" text-anchor="middle">ask</text><text x="410" y="122" font-size="11.5" fill="#33406e" text-anchor="middle">사람에게 의사 확인</text>
@@ -576,16 +576,25 @@
     <line x1="500" y1="105" x2="598" y2="105" stroke="#3a57d6" stroke-width="2" marker-end="url(#ar3)"/>
     <path d="M690,140 C690,195 130,195 130,142" fill="none" stroke="#c9cee3" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#ar3)"/>
     <text x="410" y="188" font-size="11.5" fill="#5a6489" text-anchor="middle">재검증 루프 — clean이거나 사람이 멈출 때까지</text>
-    <text x="410" y="40" font-size="11.5" fill="#5a6489" text-anchor="middle">트리거: R1 spec변경 · R2 코드변경 · R3 spec직후 · R4 push/수시</text>
+    <text x="410" y="40" font-size="11.5" fill="#5a6489" text-anchor="middle">트리거: R1 spec변경 · R2 코드변경 · R3 spec직후 · R4 push/수시 · R5~R12 실행·증거·라이브·중복·회계·배선</text>
   </svg></div>
-  <figcaption>이 4칸짜리 규칙표가 <strong>포터블 계약</strong>(<code>HARNESS.md</code>)이다. Claude Code 실행기는 이 표를 해석할 뿐 — 다른 에이전트도 같은 표로 자기 실행기를 만들 수 있다.</figcaption></figure>
+  <figcaption>이 규칙표가 <strong>포터블 계약</strong>(<code>HARNESS.md</code>)이다. Claude Code 실행기는 이 표를 해석할 뿐 — 다른 에이전트도 같은 표로 자기 실행기를 만들 수 있다.</figcaption></figure>
   <div class="tablewrap"><table>
     <tr><th>규칙</th><th>언제(trigger)</th><th>무엇을 묻나(ask) → 행동(act)</th></tr>
     <tr><td><strong>R1</strong> spec→code</td><td>spec 바뀜</td><td>"이 FR들 코드 만들/고칠까요?" → TDD 구현</td></tr>
     <tr><td><strong>R2</strong> code→spec</td><td>코드만 바뀜</td><td>"기존 고칠까 / 새로 만들까 / 무시?" → specify 갱신</td></tr>
     <tr><td><strong>R3</strong> dedup+입도</td><td>spec 생긴 직후</td><td>"중복 합칠까 / 과대 spec 쪼갤까?" → 통합·분할</td></tr>
     <tr><td><strong>R4</strong> 상시 sync</td><td>push·수시</td><td>위를 일괄 점검 → drift면 해당 규칙으로 라우팅</td></tr>
+    <tr><td><strong>R5</strong> test 실행</td><td>push·CI·완료 주장</td><td>"스위트가 red다 — 완료라고 말하기 전에 green으로?" → 태깅됐다는 것과 <em>돌아간다</em>는 것은 다르다</td></tr>
+    <tr><td><strong>R6</strong> 정책 래칫</td><td>config 변경</td><td>"강도를 왜 낮췄나 / 캡을 왜 올렸나?" → 자를 늘려 재는 것은 해소가 아니다</td></tr>
+    <tr><td><strong>R7</strong> Engine·Event</td><td>spec 변경</td><td>"이 엔진·신호가 실재하나, 발신 entity가 맞나?" → 코드-모듈·카탈로그 대조</td></tr>
+    <tr><td><strong>R8</strong> 실행 증거</td><td>저술·리뷰·CI</td><td>"이 주장을 무엇으로 재현하나 — 경로가 있나?" → <code>[검증: 경로]</code> 또는 정직한 <code>[미확인]</code></td></tr>
+    <tr><td><strong>R9</strong> 라이브 대조</td><td>배포 전·가오픈</td><td>"선언과 실물이 어긋났다 — 어느 쪽이 정본인가?" → 저장소 밖 진실과의 diff</td></tr>
+    <tr><td><strong>R10</strong> 동의어</td><td>spec 변경·수시</td><td>"이 둘이 같은 개념인가?" → 정본 통합 또는 기각 원장에 <em>사유와 함께</em></td></tr>
+    <tr><td><strong>R11</strong> SC·NFR 회계</td><td>저술·리뷰·CI</td><td>"이 성능·보안 목표를 무엇이 검증하나?" → FR만 회계하던 사각을 닫는 축</td></tr>
+    <tr><td><strong>R12</strong> 훅 배선 실재</td><td>채택·update·수시</td><td>"강제가 실제로 걸려 있나?" → 게이트가 다 있어도 훅이 없으면 <strong>한 번도 발동하지 않는다</strong></td></tr>
   </table></div>
+  <p class="note">R1~R4가 spec↔code 루프라면, R5 이후는 <strong>"선언이 실제로 그러한가"</strong> 축이다 — 돌아가는가(R5)·강도가 유지되나(R6)·실재하나(R7·R9·R12)·재현 가능한가(R8)·같은 것을 두 번 말하지 않나(R10)·빠짐없이 회계되나(R11). 전부 <code>sdd-sync</code> 한 번에 집계된다.</p>
 </div></section>
 
 <section id="run"><div class="wrap">
@@ -968,7 +977,7 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
       <div class="tag push">⑤ 푸시<small style="display:block;font-weight:600;color:var(--muted);font-size:.68rem;margin-top:2px">pre-push</small></div>
       <div class="body">
         <b>sdd-sync drift 점검 (기본 비차단 — 안내)</b>
-        <p><code>git push</code> 시 pre-push 훅이 <code>sdd-sync</code>로 R1~R4 drift를 점검. drift가 있으면 push는 계속되고 안내가 출력된다:</p>
+        <p><code>git push</code> 시 pre-push 훅이 <code>sdd-sync</code>로 drift를 점검(<code>syncHookRules</code>로 선언한 규칙 집합 — 훅은 몇 초 안에 끝나야 하므로 무거운 규칙은 CI에 <em>담당자를 밝혀</em> 위임한다). drift가 있으면 push는 계속되고 안내가 출력된다:</p>
         <pre>SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)
 
 ● R1 spec→code: <span class="g">✓ clean</span>

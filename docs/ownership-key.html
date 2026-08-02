@@ -228,7 +228,7 @@
     <div class="step" style="--c:var(--event)"><i>6</i>
       <h4>강제 — 훅·CI에서 되돌릴 수 없게</h4>
       <p>pre-commit·pre-push·CI가 게이트를 돌리고, <b>정책 래칫</b>(SPEC-027)이 강도 하향을 막는다. <code>hard→advisory</code>로 내려 회피하는 길이 닫혀 있다.</p>
-      <span class="io">sdd-sync R1–R10  →  전부 sync ✓ | 확인 필요 → exit 1</span>
+      <span class="io">sdd-sync R1–R12  →  전부 sync ✓ | 확인 필요 → exit 1</span>
     </div>
   </div>
   <div class="callout reveal"><b>판정했음의 증거가 남는다.</b> 게이트는 조용히 <code>exit 0</code>하지 않는다 — 판정 대상 수와 결과를 항상 stdout에 찍는다(“출력 없는 통과”는 미판정으로 간주). 5단계의 맵은 그 증거를 키 단위로 모은 회계다.</div>
