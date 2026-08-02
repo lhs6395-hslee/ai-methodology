@@ -258,31 +258,32 @@
     </div>
   </div>
 
-  <h3 class="sub">③에 꽂을 수 있는 툴 (선택지와 성격)</h3>
+  <h3 class="sub">③의 생성기는 무엇인가 — 실측으로 세션 LLM을 택했다 (2026-08-02)</h3>
+  <p class="reveal">외부 임베딩(Ollama·HuggingFace·model2vec)을 붙일지 재봤다. 킷 entity 34건의 <b>561쌍을 전수 판정</b>하고(열거는 기계, 판정은 LLM), 같은 쌍에 값싼 어휘 유사도 툴이 매긴 순위를 대조했다.</p>
   <div class="scrollx reveal"><table>
-    <tr><th>부류</th><th>구체적 툴</th><th>성격</th><th>이런 중복을 잡는다</th></tr>
-    <tr><td>문장 임베딩</td><td><b>SBERT</b>(sentence-transformers) · <b>fastembed</b>(ONNX, 경량) · <b>Ollama</b> 로컬 임베딩(<code>nomic-embed-text</code>)</td><td>로컬 실행 · 오프라인 가능 · 임계값 조정 필요</td><td>이름 + <code>entityRegistry</code> 설명문이 의미상 가까운 쌍</td></tr>
-    <tr><td>어휘 DB</td><td><b>WordNet</b>(NLTK) · 도메인 시소러스</td><td>결정적이지만 <b>도메인 무지</b> — 사전상 동의어가 여기서도 같다는 보장은 없음</td><td><code>user</code>/<code>member</code>, <code>vendor</code>/<code>supplier</code> 류 일반 어휘</td></tr>
-    <tr><td>스키마 매칭</td><td><b>Valentine</b> · <b>COMA</b> 계열</td><td>이름이 아니라 <b>컬럼 구조·값 분포</b>로 비교</td><td>이름은 전혀 다른데 같은 테이블을 감싼 쌍</td></tr>
-    <tr><td>LLM judge</td><td>Claude · GPT 등 API 호출 스크립트</td><td>맥락 이해가 가장 넓고 <b>오탐도 가장 넓다</b> — 그래서 차단력을 주지 않는 설계의 직접적 이유</td><td>완전히 재서술된(reworded) 개념 중복</td></tr>
+    <tr><th>LLM이 지목한 축</th><th>툴 상위 20 진입</th><th>툴 중앙 순위(561쌍 중)</th></tr>
+    <tr><td><b>이름 축</b> — 이름만 비슷 (7쌍)</td><td><b>7 / 7</b></td><td>7위</td></tr>
+    <tr><td><b>기능 축</b> — 이름 다른데 하는 일 겹침 (11쌍)</td><td><b>0 / 11</b></td><td>84위 (최악 353위)</td></tr>
   </table></div>
-  <p class="muted reveal">계약은 하나뿐이다 — <b>stdout 한 줄 = 후보 쌍 하나</b>. 탭·파이프·콤마 구분, 3번째 칸은 선택적 점수. 주석(<code>#</code>)과 자기쌍은 무시하고, 순서는 정렬해 중복을 접는다. 실행 실패(오프라인·바이너리 없음·타임아웃)는 “후보 없음”이 아니라 <code>skipped(사유)</code>로 찍힌다.</p>
-  <div class="cmd reveal"><span class="c">// sdd.config.json — 무엇을 쓰든 계약만 지키면 된다</span>
+  <p class="reveal">가장 중요한 쌍(<code>live-reality</code> ↔ <code>runtime-schema-drift</code> — 둘 다 “저장소 밖 진실과 대조”)에 툴은 <b>353위·점수 -0.000</b>을 줬다. 어떤 임계값으로도 안 걸린다. 반대로 툴의 1~3위는 전부 이름만 비슷한 쌍이고 <b>그건 ①이 이미 결정적으로 보는 영역</b>이다. 즉 외부 모델을 설치해 얻는 순증이 없어 <b>제외</b>했다.</p>
+  <p class="reveal">대신 생성기는 <b>이미 세션에 있는 LLM</b>이다. 설치할 것이 0이고, <code>entitySimilarityCommand</code>는 <code>cat sdd/similarity-candidates.tsv</code> 한 줄이라 로컬·CI·Jenkins·GitLab runner 어디에도 준비물이 없다. 무거운 판정은 로컬 세션에서 가끔 돌고, 게이트는 그 결과 파일을 읽기만 한다.</p>
+  <div class="callout reveal"><b>단, 전수성은 LLM에게 맡기지 않는다.</b> “34개 중 비슷한 거 찾아봐”라고 던지면 눈에 띄는 몇 개만 집고 가운데를 흘린다 — 그건 모델 능력이 아니라 <b>루프 구조</b>의 문제다. 쌍 열거는 기계(<code>docs/examples/entity-pairs.mjs</code>)가 하고 LLM은 <b>쌍 하나씩만</b> 판정한다. 그러면 커버리지가 결정적으로 보장되고, LLM은 자기가 잘하는 것(스펙 본문을 읽고 의미를 비교)만 한다.</p></div>
+  <p class="muted reveal">프로젝트가 원하면 외부 유사도 툴을 꽂을 수 있다 — 계약은 하나뿐이다: <b>stdout 한 줄 = 후보 쌍 하나</b>(탭·파이프·콤마 구분, 3번째 칸은 선택적 점수). 실행 실패는 “후보 없음”이 아니라 <code>skipped(사유)</code>로 찍힌다. 다만 entity가 수십 개 규모면 필터 없이 LLM 전수로 충분하고, 툴은 N²를 K로 줄이는 <b>비용 절감 장치</b>이지 발견 확률을 올리는 장치가 아니다.</p>
+  <div class="cmd reveal"><span class="c">// sdd.config.json — 설치할 것이 없는 기본 경로</span>
 "synonymPolicy": "hard",
-"entitySimilarityCommand": "python tools/entity-sim.py --threshold 0.82",
+"entitySimilarityCommand": "cat sdd/similarity-candidates.tsv",
 
-<span class="c">// 그 명령의 stdout (한 줄 = 한 쌍, 3번째 칸은 선택적 점수)</span>
-user	member	0.91
-order	purchase_request	0.84
+<span class="c">// sdd/similarity-candidates.tsv — LLM 판정 결과(한 줄 = 한 쌍)</span>
+# entity-set: 34 e00615914d44        <span class="c">← 이 목록이 본 entity 집합. 바뀌면 게이트가 "낡음"을 알린다</span>
+live-reality	runtime-schema-drift	0.8
+entity-schema-backing	ownership-reality	0.7
 
-<span class="c">// 게이트 출력 — 차단하지 않는다. 사람이 결정할 때까지 매 실행 재부상.</span>
-동의어 게이트(synonymPolicy=hard): entity 34건 — 형태 충돌 0·선언 별칭 0·미결 후보 2
-  ⚠ 미결 후보: "member" ↔ "user" (score 0.91) — 사람이 결정하라
-  · 미결 후보는 **차단하지 않는다** — 다만 결정 전까지 매 실행 재부상한다.</div>
-  <div class="loop reveal">
-    <span class="cyc">↻</span> 미결 후보 <span class="arrow">→</span> <b>사람의 결정</b> <span class="arrow">→</span>
-    같음: <code>synonymRegistry</code>(정본+사유) <span class="arrow">|</span> 다름: <code>synonymReviewLedger</code>(기각+사유) <span class="arrow">→</span> 소멸
-  </div>
+<span class="c">// 게이트 출력 — hard인데도 exit 0</span>
+동의어 게이트(synonymPolicy=hard): entity 34건 — 형태 충돌 0·선언 별칭 0·미결 후보 3
+  ⚠ 미결 후보: "live-reality" ↔ "runtime-schema-drift" (score 0.8) — 사람이 결정하라
+  · 후보 중 이미 결정됨: 정본 통합 0건 · 기각 원장 15건
+  · 후보 목록 신선도: 최신 (entity-set 34 e00615914d44)</div>
+
   <div class="callout reveal"><b>LLM은 “무엇을 볼지”만 정하고, “무엇이 참인지”는 사람이 결정적 층에 착지시킨다.</b> 둘 다 사유가 필수라 config 리뷰 관문을 거치고, 결정 전까지 후보는 매 실행 재부상한다 — 조용한 소실이 없다. 생성기 실행 실패는 “후보 없음”이 아니라 <code>skipped(사유)</code>로 명시한다(오프라인에서 하드 실패 금지).</div>
 
   <h2><span class="n">6</span>“중복·과분류·예외 없이”의 실제 장치</h2>

@@ -116,6 +116,23 @@
   .s div>span{font-size:14.5px;color:var(--muted)}
   .foot{margin-top:70px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
   a{color:var(--blue)}
+  .legend{font-size:12.5px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .sw{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:-1px}
+  .sw.ok{background:color-mix(in srgb,var(--blue) 22%,transparent)}
+  .sw.cand{background:var(--orange)}.sw.open{background:var(--pink)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(13px,1fr));gap:3px;margin:4px 0 14px}
+  .cell{aspect-ratio:1;border-radius:3px;background:color-mix(in srgb,var(--blue) 22%,transparent);
+    opacity:0;animation:cellIn .5s cubic-bezier(.2,.8,.3,1) both}
+  .cell.cand{background:var(--orange)}
+  .cell.open{background:var(--pink);animation:cellIn .5s both,openPulse 1.9s 1.4s infinite}
+  @keyframes cellIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+  @keyframes openPulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pink) 60%,transparent)}
+    55%{box-shadow:0 0 0 6px transparent}}
+  .gstat{display:flex;gap:22px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px}
+  .gstat span{display:flex;flex-direction:column}
+  .gstat b{font-size:20px;font-variant-numeric:tabular-nums}
+  .gstat em{font-style:normal;font-size:12.5px;color:var(--muted)}
+  .gstat .hot b{color:var(--pink)}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
     .reveal,.hero h1,.hero .sub,.hero .tag{opacity:1;transform:none}}
 </style>
@@ -196,7 +213,35 @@
   </div>
   <div class="note warn reveal"><b>왜 AI에게 최종 결정권을 안 줄까요?</b> 틀리기 때문입니다. 간단한 유사도 방식으로 실제 실험을 해봤더니, 진짜 같은 짝 두 개를 찾아내려면 <b>엉뚱한 짝 열다섯 개가 먼저 딸려 왔습니다</b>. 이런 걸로 작업을 막으면 사람들은 곧 “또 헛소리네” 하며 장치 전체를 꺼버립니다. 그래서 AI는 <b>“어디를 봐야 하는지”만 알려주고</b>, “무엇이 맞는지”는 사람이 정합니다. 그리고 사람이 정한 것만 기계가 기억하고 강제합니다.</div>
 
-  <h2><span class="n">6</span>그래서 무엇이 남나</h2>
+  <h2><span class="n">6</span>AI는 어떻게 돕나 — 그리고 왜 결정은 안 맡기나</h2>
+  <p class="lede reveal">③번(AI가 후보를 내는 층)이 실제로 어떻게 돌아가는지가 이 방법의 핵심입니다. 우리 프로젝트에는 실체가 <b>34개</b> 있습니다. 둘씩 짝지으면 <b>561쌍</b>입니다. 사람이 561번 비교하지는 않습니다.</p>
+
+  <div class="cards">
+    <div class="c reveal" style="--k:var(--pink)"><div class="ico">🙅</div>
+      <div><h3>이렇게 하면 안 됩니다</h3><p>AI에게 “이 34개 중에 비슷한 거 찾아봐”라고 던지는 것. 눈에 띄는 몇 개만 집고 <b>가운데를 흘립니다</b>. 그런데 흘린 게 뭔지 아무도 모릅니다 — 목록에 안 나오니까요.</p></div></div>
+    <div class="c reveal" style="--k:var(--green)"><div class="ico">✅</div>
+      <div><h3>이렇게 합니다</h3><p><b>짝을 나열하는 건 기계</b>가 합니다(561개, 하나도 안 빠짐). <b>AI는 짝 하나씩만</b> 봅니다 — “이 둘은 같은 건가요?” 561번. 빠뜨림은 AI의 능력 문제가 아니라 <b>일 시키는 방식</b>의 문제였습니다.</p></div></div>
+  </div>
+
+  <div class="demo reveal">
+    <div class="head"><b>🔍 561쌍 전부 본 결과</b>
+      <span class="legend"><i class="sw ok"></i>다름 <i class="sw cand"></i>후보 <i class="sw open"></i>미결</span></div>
+    <div class="grid" id="grid" aria-label="561개 쌍 판정 결과 격자"></div>
+    <div class="gstat">
+      <span><b id="gn">0</b><em>전체 쌍</em></span>
+      <span><b>18</b><em>AI가 지목</em></span>
+      <span><b>15</b><em>사람이 “다르다” 판정</em></span>
+      <span class="hot"><b>3</b><em>아직 미결</em></span>
+    </div>
+  </div>
+
+  <p class="reveal">AI가 “비슷해 보인다”고 한 18쌍 중 <b>15쌍은 사람이 “다르다”고 판정</b>하고 이유를 적었습니다. 예를 들면 — <em>“reality라는 말이 겹칠 뿐, 하나는 저장소 안 코드가 있는지, 다른 하나는 클라우드에 실물이 있는지를 본다.”</em> 이렇게 적어두면 <b>다시는 묻지 않습니다.</b> 남은 3쌍은 아직 답을 안 정해서, 실행할 때마다 계속 올라옵니다.</p>
+
+  <div class="note reveal"><b>AI는 질문을 만들고, 사람이 답하고, 기계가 기억합니다.</b> AI는 아무것도 확정하지 못합니다 — 작업을 막지도 않습니다. 대신 사람이 한 번 답하면 그 답은 <b>기계가 영원히 강제</b>합니다(누가 옛 이름을 다시 쓰면 그때는 진짜로 막힙니다). 사람의 판단을 AI가 대신하는 게 아니라, <b>사람이 판단할 거리를 AI가 찾아다 주는</b> 구조입니다.</div>
+
+  <div class="note warn reveal"><b>목록은 낡습니다 — 그것도 기계가 알려줍니다.</b> 실체가 34개일 때 만든 목록이 47개가 된 뒤에도 그대로면, 화면엔 “미결 0”이 뜨고 사람은 다 봤다고 믿습니다. 그 사이 늘어난 것들은 <b>아무도 안 본 건데</b> 말이죠. 그래서 목록에 “나는 34개를 보고 만들었다”는 표시를 남기고, 숫자가 달라지면 <b>“목록이 낡았으니 다시 만드세요”</b>라고 알려줍니다. 이것도 <b>막지는 않습니다</b> — 실체를 추가할 때마다 AI를 돌려야 한다면, 사람들은 이 기능을 통째로 꺼버릴 테니까요.</div>
+
+  <h2><span class="n">7</span>그래서 무엇이 남나</h2>
   <div class="sum">
     <div class="s reveal"><div class="q">1</div><div><b>만들기 전에 등기한다</b><span>명세마다 “내가 가진 것” 목록을 적는다. 안 적은 명세는 레이더 밖이라 중복이 안 걸린다.</span></div></div>
     <div class="s reveal"><div class="q">2</div><div><b>기계가 대조한다</b><span>사람 눈이 아니라 프로그램이 목록을 맞춰 본다. 겹치면 저장(커밋)이 막힌다.</span></div></div>
@@ -258,6 +303,28 @@
   nextBtn.addEventListener('click',step);
   resetBtn.addEventListener('click',reset);
   reset();
+
+  // 561쌍 격자 — 실제 판정 결과(기계가 열거한 인덱스 그대로)
+  const CAND = [25,26,47,84,125,137,192,260,353,358,447,463,470,483,515,519,535,558];
+  const OPEN = [137,192,358];
+  const grid = document.getElementById('grid');
+  const cand = new Set(CAND), open = new Set(OPEN);
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 561; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell' + (open.has(i) ? ' open' : cand.has(i) ? ' cand' : '');
+    d.style.animationDelay = (i * 0.0022 + (cand.has(i) ? 0.9 : 0)).toFixed(3) + 's';
+    frag.appendChild(d);
+  }
+  grid.appendChild(frag);
+  const gn = document.getElementById('gn');
+  new IntersectionObserver((es, o) => {
+    for (const e of es) if (e.isIntersecting) {
+      o.unobserve(e.target);
+      let n = 0;
+      const t = setInterval(() => { n = Math.min(561, n + 17); gn.textContent = n; if (n >= 561) clearInterval(t); }, 22);
+    }
+  }, { threshold: .2 }).observe(grid);
 </script>
 </body>
 </html>
