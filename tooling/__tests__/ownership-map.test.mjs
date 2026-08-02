@@ -158,3 +158,25 @@ test("유일성 위반은 소유 스펙을 함께 적어 어느 스펙끼리 겹
     assert.match(map, /- 유일성 위반 \*\*2건\*\*/);   // 두 스펙 각 행
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── 드리프트 강제점(2026-07-30): 스윕 배선 회귀 고정 ──
+// `--check`는 있었으나 호출처가 0곳이라 "사람이 기억해야" 했다 — sdd-sync R3에 배선하면서
+// 미채택 프로젝트 소급 범람을 막는 `--if-present` 분기를 함께 넣었다. 둘 다 고정한다.
+// @covers SPEC-028/FR-005
+test("--check --if-present: 맵 파일 없으면 미채택 고지 후 exit 0(소급 범람 금지)", () => {
+  const root = repo({ specs: { "SPEC-001.md": SPEC("SPEC-001") } });
+  const r = genCode(root, ["--check", "--if-present"]);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /미채택/);
+  assert.doesNotMatch(r.out, /✗/); // 위반 표기 없음 — 고지일 뿐(문구엔 "드리프트 감시 시작" 안내가 포함된다)
+});
+
+// @covers SPEC-028/FR-005
+test("--check --if-present: 맵이 있는데 낡았으면 드리프트로 exit 1(강제점 유지)", () => {
+  const root = repo({ specs: { "SPEC-001.md": SPEC("SPEC-001") } });
+  writeFileSync(join(root, "sdd/OWNERSHIP_MAP.md"), "# 낡은 맵\n");
+  const r = genCode(root, ["--check", "--if-present"]);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /드리프트/);
+});
+

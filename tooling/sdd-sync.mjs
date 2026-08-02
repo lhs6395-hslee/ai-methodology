@@ -22,7 +22,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const RULES = [
   { rule: "R1 spec→code", gates: ["check-fr-coverage.mjs"] },
   { rule: "R2 code→spec", gates: ["check-converge-drift.mjs", "check-orphan-surfaces.mjs", "check-spec-sync.mjs"] },
-  { rule: "R3 dedup+입도+완전성+일관성", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs", "check-spec-completeness.mjs", "check-spec-consistency.mjs"] },
+  { rule: "R3 dedup+입도+완전성+일관성", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs", "check-spec-completeness.mjs", "check-spec-consistency.mjs",
+    // 보증 맵 드리프트(SPEC-028) — 맵이 현재 소유 선언과 갈라지면 "미판정" 가시성이 낡은 사실을
+    // 보여준다. `--check`는 읽기 전용(재생성 안 함) — 강제점이 없어 사람이 기억해야 하던 구멍을 닫는다.
+    { file: "gen-ownership-map.mjs", args: ["--check", "--if-present"] }] },
   // R5(감사 M1): 테스트 실행 결과 — runTestsPolicy가 off(기본)면 게이트가 스스로 no-op라 비용 0.
   // SPEC-021이 선언한 "CI·pre-push" 발동 지점의 실제 배선(선언만 있고 호출처 0곳이던 결함 봉합).
   { rule: "R5 test 실행(commands.test)", gates: ["check-test-run.mjs"] },
@@ -56,12 +59,18 @@ export function gateOutcome({ file, missing = false, crashed = false, stdout = "
   return { flagged: /[⚠✗]/.test(stdout), summary: lastLine(stdout) };
 }
 
-function runGate(file) {
+// 게이트 항목은 문자열이거나 {file, args} — 일부 detector는 읽기 전용 모드 인자가 필요하다
+// (예: gen-ownership-map은 무인자면 파일을 **재생성**하므로 스윕에선 반드시 `--check`).
+const gateFile = (g) => (typeof g === "string" ? g : g.file);
+const gateArgs = (g) => (typeof g === "string" ? [] : (g.args || []));
+
+function runGate(g) {
+  const file = gateFile(g);
   const path = join(HERE, file);
   if (!existsSync(path)) return gateOutcome({ file, missing: true });
   try {
     // stdio: stderr를 캡처(부모로 inherit 금지) — 게이트가 크래시해도 누출 없이 리포트에 담는다.
-    const out = execFileSync("node", [path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const out = execFileSync("node", [path, ...gateArgs(g)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     return gateOutcome({ file, stdout: out });
   } catch (e) {
     return gateOutcome({ file, crashed: true, stdout: e.stdout || "", stderr: e.stderr || "" });
@@ -76,7 +85,7 @@ function collect() {
     const title = rule.slice(sp + 1); // "spec→code"
     const gateResults = gates.map((g) => {
       const r = runGate(g);
-      return { gate: g, flagged: r.flagged, summary: r.summary };
+      return { gate: gateFile(g), flagged: r.flagged, summary: r.summary };
     });
     return { id, title, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
   });
