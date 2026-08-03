@@ -20,6 +20,7 @@ export const DEFAULT_DEPLOY_PATTERNS = [
   "kubectl\\s+rollout\\s+restart\\b",
   "helm\\s+(install|upgrade|uninstall)\\b",
   "terraform\\s+apply\\b",
+  "terraform\\s+destroy\\b",
   "aws\\s+\\S+\\s+(create|update|put|delete)\\S*\\b",
   "gcloud\\s+\\S+\\s+(create|update|deploy|delete)\\b",
   "az\\s+\\S+\\s+(create|update|delete)\\b",
@@ -124,14 +125,69 @@ export function deployPreconditionFindings(gitFacts, deployedPaths = []) {
   return out;
 }
 
+// ── 승인 우회와 파괴적 변경 — "적용되는 것이 사람이 승인한 것과 같은가" ──
+// 실측 사고(2026-08-03, 프로덕션 전면 403 두 번): terraform이 **코드에 없는** CloudFront 커스텀
+// 헤더를 "관리 대상 외 잔여물"로 보고 삭제했고, 앱 proxy는 그 헤더가 없으면 전 요청을 403으로
+// 막는다. `terraform apply`는 exit 0, 로그에 실패 없음, 사이트만 죽었다.
+//
+// 그 삭제는 **plan에 있었다.** 아무도 보지 않았을 뿐이다. 그래서 두 가지를 사전에 본다:
+//   ⓐ 승인 우회 — `-auto-approve`인데 **저장된 plan 파일이 없다**. 대화형 승인이 diff를 보는
+//      유일한 지점인데 그것을 건너뛰면 "승인한 것"이라는 개념 자체가 없다. 반대로 저장된 plan을
+//      적용하는 `-auto-approve`는 정당하다(승인한 것 = 적용되는 것) — CI가 이 형태다.
+//   ⓑ 파괴적 명령 — destroy·delete·uninstall. 감지 목록에 있어도 **다른 명령과 같은 강도로**
+//      다뤄지면 삭제가 갱신과 구분되지 않는다. 명시적 동의(`SDD_DESTROY_OK=1`)를 요구한다.
+//
+// 순수 함수 — 명령 문자열과 주입된 환경만 본다(plan 내용 파싱은 하지 않는다: 그건 terraform의
+// 일이고, 여기서 흉내내면 도구별 포맷을 킷이 떠안는다).
+const AUTO_APPROVE_RE = /(?:^|\s)--?auto-approve\b|(?:^|\s)--force\b/;
+const DESTRUCTIVE_RE = /terraform\s+destroy\b|kubectl\s+delete\b|helm\s+uninstall\b|(?:aws|gcloud|az)\s+\S+\s+delete\S*\b/;
+
+// `terraform apply <plan>` 의 저장된 plan 파일(위치 인자) 추정 — 플래그도 `key=value`도 아닌 토큰.
+// 있으면 "승인한 계획을 적용하는 것"이라 auto-approve가 정당해진다.
+export function hasSavedPlanArg(command) {
+  const m = String(command || "").match(/terraform\s+apply\b(.*)$/);
+  if (!m) return false;
+  for (const raw of m[1].split(/\s+/)) {
+    const t = raw.trim().replace(/^["']|["']$/g, "");
+    if (!t || t.startsWith("-") || t.includes("=")) continue;
+    return true;
+  }
+  return false;
+}
+
+// 반환 [{kind, detail}] — kind: unapproved-apply | destructive | destructive-consented(위반 아님, 흔적)
+export function deployApprovalFindings(command, opts = {}) {
+  const cmd = String(command || "");
+  const out = [];
+  if (AUTO_APPROVE_RE.test(cmd) && !hasSavedPlanArg(cmd)) {
+    out.push({
+      kind: "unapproved-apply",
+      detail: "승인 없이 적용한다(`-auto-approve`인데 저장된 plan 파일이 없다) — **적용되는 diff를 아무도 보지 않는다**. 실측 사고: plan에 있던 커스텀 헤더 삭제가 그대로 나가 프로덕션이 전면 403이 됐다. `terraform plan -out=<파일>` 후 그 파일을 적용하라(승인한 것 = 적용되는 것)",
+    });
+  }
+  if (DESTRUCTIVE_RE.test(cmd)) {
+    // 명시적 동의는 **우회가 아니라 선언**이다 — 매 실행마다 사람이 다시 적어야 하고 흔적이 남는다.
+    if (opts.destroyOk) {
+      out.push({ kind: "destructive-consented", detail: "파괴적 명령이지만 `SDD_DESTROY_OK=1`로 명시 동의됨 — 삭제 대상을 확인했다는 선언으로 기록한다" });
+    } else {
+      out.push({
+        kind: "destructive",
+        detail: "파괴적 명령이다(destroy·delete·uninstall) — 삭제는 갱신과 같은 강도로 다뤄지면 안 된다. 무엇이 지워지는지 확인한 뒤 `SDD_DESTROY_OK=1`을 붙여 다시 실행하라",
+      });
+    }
+  }
+  return out;
+}
+
 // 전제 조건 판정 결과 → 강도별 처분. blocking은 hard일 때 **위반이 있을 때만** 참이다.
 // no-upstream(미판정)은 hard에서도 차단하지 않는다 — 알 수 없는 것을 위반으로 세면 오탐이고,
 // 오탐이 잦은 사전 차단은 사람이 훅을 꺼버린다(우회를 유발하는 강제는 강제가 아니다).
 export function deployPreconditionVerdict(policy, findings) {
   const pol = String(policy || "off");
   if (pol === "off") return { judged: false, blocking: false, violations: [], unknowns: [] };
-  const violations = (findings || []).filter((f) => f.kind !== "no-upstream");
-  const unknowns = (findings || []).filter((f) => f.kind === "no-upstream");
+  const INFO = new Set(["no-upstream", "destructive-consented"]);
+  const violations = (findings || []).filter((f) => !INFO.has(f.kind));
+  const unknowns = (findings || []).filter((f) => INFO.has(f.kind));
   return { judged: true, blocking: pol === "hard" && violations.length > 0, violations, unknowns };
 }
 

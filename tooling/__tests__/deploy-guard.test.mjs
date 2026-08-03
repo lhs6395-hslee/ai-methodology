@@ -9,6 +9,7 @@
 // @covers SPEC-035/FR-005
 // @covers SPEC-035/FR-006
 // @covers SPEC-035/FR-007
+// @covers SPEC-035/FR-008
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -19,6 +20,7 @@ import {
   DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, changeLogAdded, changeLogRowShape, deployGuardFindings,
   debtLine, parseDebt, settleDebt,
   deployPreconditionFindings, deployPreconditionVerdict, deploySmokeVerdict,
+  deployApprovalFindings, hasSavedPlanArg,
 } from "../deploy-guard-lib.mjs";
 
 const GATE = new URL("../check-deploy-guard.mjs", import.meta.url).pathname;
@@ -293,4 +295,70 @@ test("게이트 e2e(스모크): 미선언은 경로 없는 배포에서도 발�
     assert.match(ok.out, /스모크를 재실행했다 — 통과/);
     assert.match(ok.out, /스모크 계약 충족 — 해소/);
   } finally { rmSync(h.root, { recursive: true, force: true }); }
+});
+
+// ── 승인 우회·파괴적 변경 (FR-008) ──
+// 실측 사고(2026-08-03, 프로덕션 전면 403 두 번): terraform이 코드에 없는 CloudFront 커스텀 헤더를
+// "관리 대상 외 잔여물"로 보고 삭제했고 앱 proxy는 그 헤더가 없으면 전 요청을 403으로 막는다.
+// `terraform apply` exit 0, 로그에 실패 없음, 사이트만 죽었다.
+// **그 삭제는 plan에 있었다 — 아무도 보지 않았을 뿐이다.**
+
+test("파괴적 명령이 감지 목록에 있다 — `terraform destroy`가 아예 안 잡히던 것이 결함이었다", () => {
+  assert.equal(parseDeployCommand("terraform destroy").matched, true);
+  assert.equal(parseDeployCommand("terraform destroy -auto-approve").tool, "terraform destroy");
+  assert.equal(parseDeployCommand("terraform plan -destroy").matched, false); // plan은 여전히 제외
+});
+
+test("hasSavedPlanArg: 저장된 plan을 적용하면 승인한 것 = 적용되는 것", () => {
+  assert.equal(hasSavedPlanArg("terraform apply tfplan"), true);
+  assert.equal(hasSavedPlanArg("terraform apply -auto-approve out/plan.bin"), true);
+  assert.equal(hasSavedPlanArg("terraform apply -auto-approve"), false);
+  assert.equal(hasSavedPlanArg("terraform apply -var-file=x.tfvars -auto-approve"), false); // key=value는 plan 아님
+  assert.equal(hasSavedPlanArg("kubectl apply -f x.yaml"), false);
+});
+
+test("deployApprovalFindings: 승인 없는 적용과 파괴적 명령 · 저장된 plan·명시 동의는 통과", () => {
+  assert.deepEqual(deployApprovalFindings("terraform apply -auto-approve").map((f) => f.kind), ["unapproved-apply"]);
+  // 저장된 plan을 적용하는 auto-approve는 정당하다(CI가 이 형태다)
+  assert.deepEqual(deployApprovalFindings("terraform apply -auto-approve tfplan"), []);
+  assert.deepEqual(deployApprovalFindings("terraform apply -var-file=x.tfvars").map((f) => f.kind), []);
+  // 삭제는 갱신과 같은 강도로 다뤄지면 안 된다
+  assert.deepEqual(deployApprovalFindings("kubectl delete -f k8s/x.yaml").map((f) => f.kind), ["destructive"]);
+  assert.deepEqual(deployApprovalFindings("helm uninstall app").map((f) => f.kind), ["destructive"]);
+  assert.deepEqual(deployApprovalFindings("terraform destroy -auto-approve").map((f) => f.kind),
+    ["unapproved-apply", "destructive"]);
+  // 명시 동의는 우회가 아니라 선언이다 — 위반이 아니되 흔적으로 남는다
+  const ok = deployApprovalFindings("terraform destroy", { destroyOk: true });
+  assert.deepEqual(ok.map((f) => f.kind), ["destructive-consented"]);
+  assert.equal(deployPreconditionVerdict("hard", ok).blocking, false);
+  assert.equal(deployPreconditionVerdict("hard", ok).unknowns.length, 1);
+});
+
+test("게이트 e2e(승인): git이 없어도 승인·파괴 축은 판정된다 · 동의는 매 실행 선언", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-appr-"));   // git 저장소 아님
+  mkdirSync(join(root, "sdd/specs"), { recursive: true });
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", deployPreconditionPolicy: "hard" }));
+    const run = (cmd, env) => {
+      try { return { code: 0, out: execFileSync("node", [PRE_GATE, "--command", cmd], { cwd: root, encoding: "utf8", env: { ...process.env, ...env } }) }; }
+      catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+    };
+    // git 조회가 불가능해도 명령 문자열 판정은 성립한다 — 조기 종료가 이 축을 삼키면 안 된다
+    const unapproved = run("terraform apply -auto-approve");
+    assert.equal(unapproved.code, 2);
+    assert.match(unapproved.out, /적용되는 diff를 아무도 보지 않는다/);
+
+    const destroy = run("terraform destroy -auto-approve");
+    assert.equal(destroy.code, 2);
+    assert.match(destroy.out, /파괴적 명령이다/);
+    assert.match(destroy.out, /SDD_DESTROY_OK=1/);
+
+    // 동의하면 차단하지 않되 흔적은 남는다
+    const consented = run("terraform destroy tfplan", { SDD_DESTROY_OK: "1" });
+    assert.equal(consented.code, 0);
+    assert.match(consented.out, /명시 동의됨/);
+
+    // 저장된 plan + 동의 없는 일반 apply는 조용하다(오탐 금지)
+    assert.equal(run("terraform apply tfplan").out.trim(), "");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
