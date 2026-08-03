@@ -6,7 +6,7 @@
 
 | 규칙 | Trigger | Detect (게이트) | Ask (사람) | Act |
 |---|---|---|---|---|
-| **R1 spec→code** | spec 생성/변경 | `check-fr-coverage`(테스트 없는 FR ≈ 미구현 + 접두어↔클래스(SPEC-012, hard)·번호 무결성(SPEC-014)·TEST 인프라 격리(SPEC-015)) | "이 FR들 코드 생성/업데이트?" | TDD(RED→GREEN) → 재검증 |
+| **R1 spec→code** | spec 생성/변경 | `check-fr-coverage`(테스트 없는 FR ≈ 미구현 + 접두어↔클래스(SPEC-012, hard)·번호 무결성(SPEC-014)·TEST 인프라 격리(SPEC-015)·**Change Log가 선언한 FR의 실재**(SPEC-037 — `FR-018 신규`라고 적었으면 본문이 있어야 한다, `changeLogFrRefPolicy`)) | "이 FR들 코드 생성/업데이트?" | TDD(RED→GREEN) → 재검증 |
 | **R2 code→spec** | 코드 변경·spec 무변경 | `check-converge-drift`·`check-orphan-surfaces`·`check-spec-sync`(range — Draft 소유 차단·unowned 정책 포함) | "기존 spec 개정 / 새 spec / 의도적 무시?" | `/converge`→intent→`/specify`(update·new)→`/analyze`→bless |
 | **R3 dedup+입도+완전성+일관성** | spec 생성/변경 직후 | `check-ownership`(+`entityRegistry`·Files 카테고리 금지·Entity 관계(SPEC-017 — 실재 hard·순환 advisory)·Capability 귀속(SPEC-024 — entity 기준 스펙 경계))·`check-spec-cohesion`·`check-spec-completeness`(SC·인수조건 + 수명주기 기록 + Change Log 근거 + 문법 규범: Module 존재·단일성·SHALL·Dedup 참조 실재 + 오브젝트 스토리지 결정(SPEC-016 advisory))·`check-spec-consistency`(+FR 키 앵커 — bold↔소유·참조 키 대조, `frKeyAnchorPolicy`, SPEC-023) | "중복 통합 / 과대 spec 분할 / SC·인수조건·리뷰 기록·근거·문법 보강 / 근거 없는 키 정렬?" | 통합·분할·보강 → 재검증 |
 | **R2′ code→deployed-runtime** | 배포 전(preflight) | `check-schema-drift`(코드 기대 스키마 ↔ 배포 DB 실측 diff — opt-in `schemaDriftManifest`, SPEC-022) | "배포 전 마이그레이션 적용 / baseline?" | migrate-on-deploy 또는 배포전 스키마 preflight |

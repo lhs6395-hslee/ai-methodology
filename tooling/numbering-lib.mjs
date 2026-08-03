@@ -96,7 +96,11 @@ export function numberingIssues(specIds, retiredIds = []) {
 // 식별자는 `<SPEC-ID>/FR-NNN`이고 앞의 스펙 ID가 이미 네임스페이스라 번호는 스펙 안에서만
 // 유일하면 된다 — 그래서 판정은 스펙 단위로 독립이고, 스펙 A의 FR-001과 B의 FR-001은 중복이 아니다.
 // 중복은 정당한 케이스가 없어 정책 knob 없이 항상 hard(spec-ID 중복과 동형).
-export function frNumberingIssues(specId, frIds) {
+// declaredNums: Change Log가 **신규·개정으로 선언한** 기저 번호 집합(SPEC-037 changeLogFrRefs).
+// 결번 문구가 여기서 갈린다 — 그동안 "FR 폐기 잔분일 수 있음" 한 문장이 의미가 정반대인 두 상태를
+// 덮었다: 폐기 흔적(정당)과 "신규라 선언했는데 본문을 안 씀"(결함). 매 실행 로그에 섞여 흘러가
+// 실측 사례에서 3개 FR이 몇 달간 SSOT 밖에 있었다. 판정 소스는 SPEC-037 코어 하나다.
+export function frNumberingIssues(specId, frIds, declaredNums = new Set()) {
   const hard = [], advisory = [];
   for (const g of groupNumbers(frIds)) {
     for (const d of g.dupIds) {
@@ -106,8 +110,13 @@ export function frNumberingIssues(specId, frIds) {
     if (g.min !== 1) {
       advisory.push(`${specId}: ${g.prefix} 번호가 001부터 시작하지 않음 — 최소 ${g.prefix}-${pad3(g.min)} (스펙별 001 연번 규칙, SPEC-014)`);
     }
-    if (g.missing.length) {
-      advisory.push(`${specId}: ${g.prefix} 번호 중간 결번: ${g.missing.map((n) => `${g.prefix}-${pad3(n)}`).join(", ")} — FR 폐기 잔분일 수 있음(SPEC-018)`);
+    const declaredGap = g.missing.filter((n) => declaredNums.has(n));
+    const plainGap = g.missing.filter((n) => !declaredNums.has(n));
+    if (declaredGap.length) {
+      advisory.push(`${specId}: ${g.prefix} 번호 중간 결번: ${declaredGap.map((n) => `${g.prefix}-${pad3(n)}`).join(", ")} — **Change Log가 선언했으나 본문 없음**(폐기 잔분이 아니다, SPEC-037)`);
+    }
+    if (plainGap.length) {
+      advisory.push(`${specId}: ${g.prefix} 번호 중간 결번: ${plainGap.map((n) => `${g.prefix}-${pad3(n)}`).join(", ")} — FR 폐기 잔분일 수 있음(SPEC-018)`);
     }
   }
   return { hard, advisory };

@@ -1,8 +1,8 @@
 # SPEC-033 ③층 유사 후보 — 생성기: 세션 LLM(전수 열거는 entity-pairs.mjs가 수행)
-# 생성 2026-08-02(4차: hook-wiring 추가) · 판정 대상 entity 37건 · 후보 26건
+# entity-set: 38 01b650d8cdc3
+# 생성 2026-08-02(5차: changelog-fr-ref 추가) · 판정 대상 entity 38건 · 후보 32건
 # 계약: 한 줄 = 한 쌍(탭 구분, 3번째 칸은 확신도). 이 파일은 판정이 아니라 "사람이 봐야 할 목록"이다.
 # 아래 한 줄이 신선도 선언 — 이 목록이 본 entity 집합이다. 집합이 바뀌면 게이트가 "낡음"을 알린다.
-# entity-set: 37 e89e2df82977
 # 결정된 쌍은 sdd.config.json의 synonymRegistry(같음) 또는 synonymReviewLedger(다름+사유)로 소멸한다.
 #
 # ── 기능 축: 이름은 안 비슷한데 하는 일이 겹칠 수 있는 쌍 ──
@@ -36,3 +36,10 @@ deploy-guard	live-reality	0.7
 deploy-guard	semantic-drift	0.5
 # ── 4차: 신규 entity hook-wiring의 36쌍 전수 판정 결과 ──
 harness-install	hook-wiring	0.8
+# ── 5차: 신규 entity changelog-fr-ref의 35쌍 전수 판정 결과 ──
+changelog-fr-ref	derivation-accounting	0.7
+changelog-fr-ref	spec-sync	0.7
+changelog-fr-ref	spec-id-numbering	0.6
+changelog-fr-ref	execution-evidence	0.5
+changelog-fr-ref	spec-retirement	0.5
+changelog-fr-ref	cross-spec-change	0.4

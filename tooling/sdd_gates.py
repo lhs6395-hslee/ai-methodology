@@ -57,6 +57,10 @@ DEFAULTS = {
     "maxFRsPerSpec": 8,
     "maxAggregateRootsPerSpec": 1,
     "supportLayerSpecs": {},
+    "changeLogFrRefPolicy": "advisory",
+    "changeLogNewVerbs": None,
+    "changeLogReviseVerbs": None,
+    "changeLogRetireVerbs": None,
     "hooksInstalledPolicy": "advisory",
     "syncHookRules": None,
     "syncHookDelegatedTo": "",
@@ -558,7 +562,65 @@ def numbering_issues(spec_ids, retired_ids=None):
     return hard, advisory
 
 
-def fr_numbering_issues(spec_id, fr_ids):
+# ─── Change Log ↔ FR 실재 대조 (SPEC-037) — changelog-fr-lib.mjs 미러 ───
+DEFAULT_CHANGELOG_NEW_VERBS = ["신규", "신설", "추가", "도입"]
+DEFAULT_CHANGELOG_REVISE_VERBS = ["개정", "변경", "수정"]
+DEFAULT_CHANGELOG_RETIRE_VERBS = ["폐기", "삭제", "제거", "철회"]
+
+
+def change_log_fr_refs(text, req_alt="FR", id_alt="SPEC", verbs=None):
+    """Change Log 표 행의 **선언성** FR 참조를 뽑는다. 반환 (declared: dict[int]->(id,verb), retired: set[int]).
+    declared = 신규∨개정(본문이 있어야 하는 것) / retired = 폐기(없어도 정당).
+    타 스펙 참조(`SPEC-013/FR-003`·`SPEC-017 FR-004b`)는 내 FR이 아니므로 판정 전에 지운다."""
+    verbs = verbs or {}
+    neu = verbs.get("neu") or DEFAULT_CHANGELOG_NEW_VERBS
+    rev = verbs.get("rev") or DEFAULT_CHANGELOG_REVISE_VERBS
+    ret = verbs.get("ret") or DEFAULT_CHANGELOG_RETIRE_VERBS
+    declared, retired = {}, set()
+    block = section_block(str(text or ""), "Change Log")
+    if block is None:
+        return declared, retired
+    decl_verb = "|".join(re.escape(v) for v in list(neu) + list(rev))
+    ret_verb = "|".join(re.escape(v) for v in ret)
+    cross_re = re.compile(rf"(?:{id_alt})-\d{{3}}[a-z]?\s*(?:/|의\s*|\s+)(?:{req_alt})-\d{{3}}[a-z]?")
+    ref_re = re.compile(
+        rf"(?:{req_alt})-(\d{{3}})([a-z]?)((?:\s*[/·,]\s*\d{{3}}[a-z]?)*)\s*\**\s*({decl_verb}|{ret_verb})")
+    head = str(req_alt).split("|")[0]
+    for raw in block.split("\n"):
+        line = raw.strip()
+        if not line.startswith("|"):
+            continue
+        scrubbed = cross_re.sub(" ", re.sub(r"`[^`]*`", " ", line))
+        for m in ref_re.finditer(scrubbed):
+            nums = [int(m.group(1))]
+            for part in re.split(r"[/·,]", m.group(3) or ""):
+                part = part.strip()
+                if part:
+                    nums.append(int(re.sub(r"[a-z]", "", part)))
+            verb = m.group(4)
+            is_retire = verb in ret
+            for n in nums:
+                if is_retire:
+                    retired.add(n)
+                    declared.pop(n, None)
+                    continue
+                if n in retired:
+                    continue
+                declared.setdefault(n, (f"{head}-{n:03d}", verb))
+    return declared, retired
+
+
+def change_log_fr_findings(spec_id, declared, fr_ids):
+    """선언된 번호가 FR 절에 실재하는가. 반환 [(spec_id, id, verb)] — 번호 순(결정적)."""
+    present = set()
+    for raw in fr_ids or []:
+        m = re.search(r"-(\d{3})[a-z]?$", str(raw).strip())
+        if m:
+            present.add(int(m.group(1)))
+    return [(spec_id, declared[n][0], declared[n][1]) for n in sorted(declared) if n not in present]
+
+
+def fr_numbering_issues(spec_id, fr_ids, declared_nums=None):
     """FR 번호(스펙별 001 연번) 무결성 (SPEC-014, numbering-lib.mjs frNumberingIssues 미러 — 바이트 동일).
     입력은 **한 스펙의** FR 선언 목록(중복 판정에 중복이 필요하므로 set이 아니라 list).
     식별자는 `<SPEC-ID>/FR-NNN`이고 스펙 ID가 이미 네임스페이스라 번호는 스펙 안에서만 유일하면 된다.
@@ -574,8 +636,14 @@ def fr_numbering_issues(spec_id, fr_ids):
         if g["min"] != 1:
             advisory.append(f"{spec_id}: {pfx} 번호가 001부터 시작하지 않음 — 최소 {pfx}-{g['min']:03d} "
                             f"(스펙별 001 연번 규칙, SPEC-014)")
-        if g["missing"]:
-            joined = ", ".join(f"{pfx}-{n:03d}" for n in g["missing"])
+        dn = declared_nums or set()
+        declared_gap = [n for n in g["missing"] if n in dn]
+        plain_gap = [n for n in g["missing"] if n not in dn]
+        if declared_gap:
+            joined = ", ".join(f"{pfx}-{n:03d}" for n in declared_gap)
+            advisory.append(f"{spec_id}: {pfx} 번호 중간 결번: {joined} — **Change Log가 선언했으나 본문 없음**(폐기 잔분이 아니다, SPEC-037)")
+        if plain_gap:
+            joined = ", ".join(f"{pfx}-{n:03d}" for n in plain_gap)
             advisory.append(f"{spec_id}: {pfx} 번호 중간 결번: {joined} — FR 폐기 잔분일 수 있음(SPEC-018)")
     return hard, advisory
 
@@ -664,6 +732,7 @@ def cmd_fr(cfg, strict):
     #    전문 스캔은 Change Log의 이관·흡수 이력을 선언으로 집계해 거짓 중복 hard를 냈다(PM 실측 12건).
     specs = {}     # SPEC-ID -> set(FR-ID)
     fr_decls = {}  # SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — set은 중복을 삼킨다)
+    cl_refs = {}   # SPEC-ID -> (declared, retired) — SPEC-037 판정 소스(새 검사·결번 문구 공용)
     for f in spec_names:
         if not (f.endswith(".md") and any(f.startswith(p + "-") for p in cfg["__prefixes"])):
             continue
@@ -674,14 +743,26 @@ def cmd_fr(cfg, strict):
         lst = fr_declarations(text, cfg["__frDecl"], cfg["__reqAlt"])
         fr_decls[m.group(0)] = lst
         specs[m.group(0)] = set(lst)
+        cl_refs[m.group(0)] = change_log_fr_refs(text, cfg["__reqAlt"], cfg["__idAlt"], {
+            "neu": cfg.get("changeLogNewVerbs"), "rev": cfg.get("changeLogReviseVerbs"),
+            "ret": cfg.get("changeLogRetireVerbs")})
 
     # 1b. FR 번호 무결성(SPEC-014 FR-005/006): 스펙별 001 연번 — 중복 hard, 001미시작·결번 advisory.
     #     FR 선언 파싱은 __frDecl 단일 문법(SPEC-001 FR-009)을 그대로 소비한다(자체 정규식 없음).
     fr_num_hard, fr_num_advisory = [], []
+    cl_findings = []
+    cl_policy = str(cfg.get("changeLogFrRefPolicy") or "advisory")
+    if cl_policy not in ("off", "advisory", "hard"):
+        print(f'✗ changeLogFrRefPolicy 값 위반 "{cl_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     for sid in sorted(fr_decls):
-        h, a = fr_numbering_issues(sid, fr_decls[sid])
+        declared, _retired = cl_refs.get(sid, ({}, set()))
+        h, a = fr_numbering_issues(sid, fr_decls[sid], set() if cl_policy == "off" else set(declared))
         fr_num_hard.extend(h)
         fr_num_advisory.extend(a)
+        if cl_policy != "off":
+            cl_findings.extend(change_log_fr_findings(sid, declared, fr_decls[sid]))
 
     # 2. 테스트 파일의 @covers 수집.
     covered = {}
@@ -705,6 +786,10 @@ def cmd_fr(cfg, strict):
     errors.extend(fr_num_hard)
     for a in fr_num_advisory:
         (errors if strict else warnings).append(a)
+    for sid, fid, verb in cl_findings:
+        msg = (f"[{sid}] Change Log가 {fid} {verb}를 선언했으나 FR 절에 본문 없음 — "
+               f'계약을 FR로 착지시키거나, 폐기라면 "{fid} 폐기"로 표기하라(changeLogFrRefPolicy={cl_policy})')
+        (errors if (cl_policy == "hard" or strict) else warnings).append(msg)
     for file, spec, fr in bad_refs:
         errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
 

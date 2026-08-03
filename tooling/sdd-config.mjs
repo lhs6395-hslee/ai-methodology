@@ -77,6 +77,17 @@ export const DEFAULTS = {
   // (b) 없는 스펙 ID 등록은 낡은 등록부라 에러, (c) 등록 목록은 clean일 때도 **항상 표면화**한다
   // (schema-backing 면제와 같은 경계 — 면제는 조용히 '완료'가 되지 않는다).
   supportLayerSpecs: {},
+  // Change Log ↔ FR 실재 대조(SPEC-037). off|advisory(기본)|hard.
+  // 실측 공백: Change Log가 "FR-018 신규"라고 선언했는데 FR 절에 본문이 없어도 아무도 안 막았다
+  // (check-spec-sync는 FR/Edge Cases/Change Log **택1**로 만족되고 — 그 탈출구 자체는 설계다 —
+  // 결번 advisory는 "폐기 잔분일 수 있음"이라 결함을 정당한 흔적과 같은 문장으로 말했다).
+  // 기본 advisory: hard로 두면 레거시 스펙이 많은 저장소가 첫 동기화에서 전부 멈춘다.
+  changeLogFrRefPolicy: "advisory",
+  // 선언 어휘 — **프로젝트마다 다르다**(킷은 `신설`, 제보 프로젝트는 `신규`). 어휘를 못 박으면
+  // 표현이 한 글자 다른 저장소에서 게이트가 통째로 inert가 된다. 미선언이면 킷 기본 어휘.
+  changeLogNewVerbs: null,
+  changeLogReviseVerbs: null,
+  changeLogRetireVerbs: null,
   // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도

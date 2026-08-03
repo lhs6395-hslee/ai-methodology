@@ -31,6 +31,7 @@ import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
 import { numberingIssues, frNumberingIssues } from "./numbering-lib.mjs";
+import { changeLogFrRefs, changeLogFrFindings } from "./changelog-fr-lib.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 
@@ -151,7 +152,8 @@ if (prefixErrors.length) {
 //    선언으로 집계해 거짓 "FR 번호 중복" hard를 냈다(PM tool 실측 12건). 문법(cfg.__frDeclRe)은
 //    SPEC-001 FR-009 공유 자산이라 손대지 않는다 — 좁힌 것은 범위뿐.
 const specs = new Map();    // SPEC-ID -> Set(FR-ID)
-const frDecls = new Map();  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
+const frDecls = new Map();
+const clRefs = new Map();  // SPEC-ID -> {declared:Map, retired:Set} (SPEC-037)  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md") || !PREFIXES.some((p) => f.startsWith(p + "-"))) continue;
   const id = f.match(SPEC_ID)?.[0];
@@ -160,15 +162,30 @@ for (const f of readdirSync(SPEC_DIR)) {
   const list = frDeclarations(text, FR_DECL, cfg.__reqAlt);
   frDecls.set(id, list);
   specs.set(id, new Set(list));
+  // Change Log가 **선언한** FR 집합(SPEC-037) — 새 검사와 결번 advisory가 같은 소스를 쓴다.
+  clRefs.set(id, changeLogFrRefs(text, cfg.__reqAlt, cfg.__idAlt, {
+    neu: cfg.changeLogNewVerbs, rev: cfg.changeLogReviseVerbs, ret: cfg.changeLogRetireVerbs,
+  }));
 }
 
 // 1b. FR 번호 무결성(SPEC-014 FR-005/006): 스펙별 001 연번 — 중복 hard, 001미시작·결번 advisory.
 //     FR 선언 파싱은 cfg.__frDeclRe 단일 문법(SPEC-001 FR-009)을 그대로 소비한다(자체 정규식 없음).
 const frNumHard = [], frNumAdvisory = [];
+const clFindings = [];
+const CL_POLICY = String(cfg.changeLogFrRefPolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(CL_POLICY)) {
+  console.error(`✗ changeLogFrRefPolicy 값 위반 "${CL_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
 for (const id of [...frDecls.keys()].sort()) {
-  const { hard, advisory } = frNumberingIssues(id, frDecls.get(id));
+  const refs = clRefs.get(id) || { declared: new Map(), retired: new Set() };
+  // 결번 advisory는 선언 집합을 참조해 문구가 갈린다(SPEC-037 FR-003) — 폐기 흔적(정당)과
+  // "선언했는데 본문 없음"(결함)이 같은 문장으로 나오던 것을 끊는다. 판정 소스는 하나다.
+  const { hard, advisory } = frNumberingIssues(id, frDecls.get(id),
+    CL_POLICY === "off" ? new Set() : new Set(refs.declared.keys()));
   frNumHard.push(...hard);
   frNumAdvisory.push(...advisory);
+  if (CL_POLICY !== "off") clFindings.push(...changeLogFrFindings(id, refs.declared, frDecls.get(id)));
 }
 
 // 2. Collect @covers tags from test files.
@@ -202,6 +219,12 @@ const warnings = [...prefixClassWarnings]; // 0b의 advisory(미사용 면제·I
 // FR 번호 무결성(1b) 배선 — 중복은 정책 knob 없이 항상 hard, advisory는 `--strict`에서만 승격.
 errors.push(...frNumHard);
 for (const a of frNumAdvisory) (STRICT ? errors : warnings).push(a);
+// Change Log ↔ FR 실재(SPEC-037): 선언만 하고 본문을 안 쓴 것. 처방을 함께 낸다 —
+// 계약을 FR로 착지시키거나, 진짜 폐기라면 폐기로 표기해 정당한 흔적으로 만든다.
+for (const f of clFindings) {
+  const msg = `[${f.specId}] Change Log가 ${f.id} ${f.verb}를 선언했으나 FR 절에 본문 없음 — 계약을 FR로 착지시키거나, 폐기라면 "${f.id} 폐기"로 표기하라(changeLogFrRefPolicy=${CL_POLICY})`;
+  (CL_POLICY === "hard" || STRICT ? errors : warnings).push(msg);
+}
 
 // R1: bad references
 for (const { file, spec, fr } of badRefs) {

@@ -111,7 +111,8 @@
     "entity-synonym": "동의어·형태 변이 판정 — 정규화 충돌·선언 별칭(결정적) + 유사 후보(확률적, 비차단, SPEC-033)",
     "sc-coverage": "SC·NFR 검증 회계 — 성공기준·비기능 목표를 검증 바인딩(태그·증거·유예)에 묶는다(FR 전용 회계의 사각, SPEC-034)",
     "deploy-guard": "out-of-band 배포 가드 — spec-first 발화 지점을 커밋에서 배포 행위까지 앞당긴다(PostToolUse, 비차단, SPEC-035)",
-    "hook-wiring": "훅 배선 실재 — .git/hooks에 킷 훅이 설치·실행 가능·킷 소유인가(미설치를 green으로 읽지 않는다, SPEC-036)"
+    "hook-wiring": "훅 배선 실재 — .git/hooks에 킷 훅이 설치·실행 가능·킷 소유인가(미설치를 green으로 읽지 않는다, SPEC-036)",
+    "changelog-fr-ref": "Change Log 행이 FR에 대해 하는 **선언** — 그 FR 자체와 구분되는 실체다(\"FR-018을 추가했다\"는 주장 vs FR-018이라는 요구). 선언이 실물과 어긋나면 계약이 SSOT 밖에 산다(SPEC-037)"
   },
   "relationTypes": [
     "references"
@@ -197,7 +198,13 @@
     "deploy-guard::spec-sync": "003은 **커밋** 시점에 소유 코드 변경의 스펙 동반을 차단하고, 035는 그보다 앞선 **배포** 시점에 비차단으로 상기시킨다. 시점과 강도가 다르며 차단은 003이 계속 담당한다",
     "deploy-guard::live-reality": "032는 이미 벌어진 선언↔실물 차이를 측정하고, 035는 차이가 **생기는 순간**을 잡는다. 사후 측정 vs 발생 시점이다",
     "deploy-guard::semantic-drift": "019는 리네임·소유 이동으로 옛 의미가 남는 것을 리뷰로 승격, 035는 라이브 반영이 기록 없이 지나가는 것을 상기. 드리프트의 원인이 이름 vs 배포로 다르다",
-    "harness-install::hook-wiring": "004는 훅을 **설치**하고 스윕을 배선하는 행위, 036은 설치 결과가 **실재하는지** 판정. 행위 vs 검증이며, 004가 입도 캡을 넘긴 것을 캡 상향이 아니라 이 분할로 해소했다"
+    "harness-install::hook-wiring": "004는 훅을 **설치**하고 스윕을 배선하는 행위, 036은 설치 결과가 **실재하는지** 판정. 행위 vs 검증이며, 004가 입도 캡을 넘긴 것을 캡 상향이 아니라 이 분할로 해소했다",
+    "changelog-fr-ref::derivation-accounting": "둘 다 Change Log 표 행을 읽지만 보는 칸이 다르다 — 009는 '근거 칸이 비었나'(기록의 완전성), 037은 '이 행이 선언한 FR이 실재하나'(기록의 진위). 완전성 vs 진위다",
+    "changelog-fr-ref::spec-sync": "003은 코드가 바뀌면 스펙이 **동반됐는가**(동반 여부), 037은 그 동반 기록이 **참인가**(선언↔실물). 037은 003의 택1 탈출구를 없애지 않고 그 위에 거짓 선언만 얹어 잡는다",
+    "changelog-fr-ref::spec-id-numbering": "014는 번호 집합의 **형태**(중복·연번·결번), 037은 결번의 **의미**(폐기냐 미작성이냐)를 Change Log에서 읽는다. 014의 결번 advisory가 037의 판정을 소비하되 소유는 갈린다 — 소비 관계는 중복이 아니다",
+    "changelog-fr-ref::execution-evidence": "형태가 같다(선언이 실물을 지목하는가) — 그래서 후보로 올라온다. 대상이 다르다: 031은 `[검증]` 주장이 **실행 가능한 자산**을 지목하는가, 037은 Change Log 선언이 **FR 본문**을 지목하는가. 증거 등급 vs 계약 실재다",
+    "changelog-fr-ref::spec-retirement": "018은 폐기를 **수행**하고 번호 재사용을 막는다(쓰기), 037은 폐기 표기를 **읽어** 정당한 결번과 결함을 가른다(읽기). 037은 018이 남긴 표기의 소비자다",
+    "changelog-fr-ref::cross-spec-change": "이름 축 혼동 — 둘 다 'Change'가 붙지만 020은 커밋 메시지의 `Change-Driver` 트레일러(변경 동인 추적), 037은 스펙 본문의 `Change Log` 표(이력 기록)다. 사는 곳도 대상도 다르다"
   },
   "scCoveragePolicy": "hard",
   "verificationKinds": {
