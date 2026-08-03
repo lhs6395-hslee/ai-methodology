@@ -88,6 +88,31 @@ export const DEFAULTS = {
   changeLogNewVerbs: null,
   changeLogReviseVerbs: null,
   changeLogRetireVerbs: null,
+  // 구현 중복 판정(SPEC-038) — dedup이 못 보는 축. off|advisory(기본)|hard.
+  // 실측 제보: 병렬 서브에이전트가 같은 규칙을 세 갈래로 구현했고(같은 파일에 이름만 다른 export
+  // 두 개 포함) 게이트 4종이 전부 green이었다. dedup은 **선언 단위**(같은 파일을 두 스펙이
+  // 주장하는가)만 보므로 *구현 중복*은 사각이었다. 유발 조건(격리 지시 + 동시 upstream + 각자
+  // 성실한 헬퍼 생성)은 병렬 실행을 권장하는 방법론에서 예외가 아니라 **정상 경로**다.
+  duplicateLogicPolicy: "advisory",
+  // ① 결정적 층 — 리터럴 추출 패턴(캡처그룹 1 = 비교 본문). 기본은 JS/TS 정규식 리터럴.
+  // 언어별 교체 예: Python `re\.compile\(r?["']([^"']+)["']\)` · Go 백틱 리터럴.
+  duplicateLiteralPatterns: null,
+  // 사소한 정규식은 정당하게 반복된다(`\s+`·`,`) — 길이 하한으로 가른다.
+  duplicateLiteralMinLength: 8,
+  // 판정 대상 파일 — 기본 패턴이 JS/TS 정규식 문법이므로 그 계열만. 언어를 바꾸면 함께 바꾼다.
+  duplicateLiteralFileRegex: null,
+  // 정당한 중복의 면제 등록부 — `{ "<리터럴 본문>": "<사유>" }`. 사유 빈 값 금지.
+  // 낡은 면제(더 이상 중복 아님)는 매 실행 표면화한다 — 등록부는 최신일 때만 등록부다.
+  duplicateLogicAllow: {},
+  // 테스트 파일은 기본 제외 — 단언이 같은 문자열을 대량 반복하는 것은 중복이 아니다(오탐의 주 원인).
+  duplicateLogicIncludeTests: false,
+  // ② 확률적 층 — 프로젝트가 주입하는 중복 탐지 도구(jscpd·similarity-ts 등). **비차단**.
+  // AST 해시를 킷이 직접 하지 않는 이유: TS 파서를 번들하면 의존성 0과 언어 무관을 동시에 잃는다.
+  // 계약: stdout 한 줄 = `<경로>:<라인>\t<경로>:<라인>\t<설명>`. 비-0 종료 = skipped(사유).
+  duplicateLogicCommand: null,
+  duplicateLogicTimeoutMs: 120000,
+  // 중복 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
+  duplicateLogicListCap: 12,
   // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도

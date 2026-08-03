@@ -11,7 +11,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
-import { compileGlob } from "./spec-sync-lib.mjs";
+import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 
 const target = process.argv[2];
 if (!target) process.exit(0);
@@ -30,9 +30,8 @@ try { names = readdirSync(SPEC_DIR).sort().filter((n) => /\.md$/.test(n)); } cat
 const owners = [];
 for (const n of names) {
   let text; try { text = readFileSync(join(SPEC_DIR, n), "utf8"); } catch { continue; }
-  const m = text.match(/^\s*-\s*\*\*Files\*\*:\s*(.+)$/m);
-  if (!m) continue;
-  const globs = m[1].split(",").map((s) => s.split("#")[0].trim()).filter(Boolean);
+  const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
+  if (!globs.length) continue;
   if (globs.some((g) => { try { return compileGlob(g).test(rel); } catch { return false; } })) {
     owners.push({ specId: (text.match(cfg.__specIdRe) || [n])[0], file: `${cfg.specDir}/${n}` });
   }

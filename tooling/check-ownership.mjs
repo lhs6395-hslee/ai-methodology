@@ -34,7 +34,7 @@ import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings, exemptGlobFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
-import { compileGlob } from "./spec-sync-lib.mjs";
+import { compileGlob , parseFilesLine} from "./spec-sync-lib.mjs";
 import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
 import { specSlug, specSlugSourceDeclared, symbolRealityActive, symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface } from "./ownership-reality-lib.mjs";
 
@@ -145,9 +145,8 @@ for (const file of files) {
 
   // G3: Files glob 수집(Ownership 선언 유무와 무관 — Files만 있는 스펙도 겹침 대상).
   // 인라인 주석(#) 제거, 쉼표 분리. Files는 관례상 Ownership 블록에만 나타난다.
-  const filesLine = text.match(/^\s*-\s*\*\*Files\*\*:\s*(.+)$/m);
-  if (filesLine) {
-    const globs = filesLine[1].split(",").map((s) => s.split("#")[0].trim()).filter(Boolean);
+  {
+    const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
     if (globs.length) filesBySpec.push({ specId, globs });
   }
 

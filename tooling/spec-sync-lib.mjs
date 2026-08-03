@@ -56,6 +56,17 @@ export function scanFilesLineIssues(rawLine) {
 }
 
 // §4.1: parseSection 반환값의 trailing " # …" strip (공유 파서는 불변).
+// `- **Files**: a, b, c` 한 줄에서 glob 토큰을 뽑는다 — **세 게이트가 같은 정규식을 각자 갖고 있었다**
+// (deploy-guard·ownership·pre-edit). 구현 중복 게이트(SPEC-038)가 킷 자기적용에서 실수확한 첫 건이라,
+// 규칙을 여기 하나로 모은다: Files 라인의 문법은 스펙 문법이고, 사이트마다 정규식을 두면 문법이
+// 바뀔 때 한 곳만 고쳐지고 나머지는 조용히 뒤처진다(자체 정규식 금지 규칙과 같은 이유).
+// 반환 [] — 라인이 없으면 빈 배열. 인라인 주석은 잘라낸다.
+export function parseFilesLine(text) {
+  const m = String(text || "").match(/^\s*-\s*\*\*Files\*\*:\s*(.+)$/m);
+  if (!m) return [];
+  return m[1].split(",").map((t) => stripInlineComment(t).trim()).filter(Boolean);
+}
+
 export function stripInlineComment(value) {
   return value.replace(/\s+#.*$/, "").trim();
 }

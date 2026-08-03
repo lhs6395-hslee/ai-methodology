@@ -50,6 +50,10 @@ const RULES = [
   // R12(SPEC-004 FR-013): 훅 배선 실재 — 게이트가 다 있어도 .git/hooks가 비어 있으면 아무것도
   // 발동하지 않는다. 게이트의 inert만 보고 훅의 inert를 안 보면 미설치가 green으로 읽힌다.
   { rule: "R12 훅 배선 실재", gates: ["check-hooks-installed.mjs"] },
+  // R13(SPEC-038): 구현 중복 — dedup은 **선언 단위**(같은 파일을 두 스펙이 주장하는가)를 보고
+  // 이 규칙은 **구현 단위**(같은 규칙을 두 곳이 구현하는가)를 본다. 실측: 병렬 서브에이전트가
+  // 같은 규칙을 세 갈래로 만들었고 게이트 4종이 전부 green이었다.
+  { rule: "R13 구현 중복(선언 아닌 구현)", gates: ["check-duplicate-logic.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";

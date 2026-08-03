@@ -61,6 +61,15 @@ DEFAULTS = {
     "changeLogNewVerbs": None,
     "changeLogReviseVerbs": None,
     "changeLogRetireVerbs": None,
+    "duplicateLogicPolicy": "advisory",
+    "duplicateLiteralPatterns": None,
+    "duplicateLiteralMinLength": 8,
+    "duplicateLiteralFileRegex": None,
+    "duplicateLogicAllow": {},
+    "duplicateLogicIncludeTests": False,
+    "duplicateLogicCommand": None,
+    "duplicateLogicTimeoutMs": 120000,
+    "duplicateLogicListCap": 12,
     "hooksInstalledPolicy": "advisory",
     "syncHookRules": None,
     "syncHookDelegatedTo": "",
@@ -172,6 +181,7 @@ RATCHETED_POLICIES = [
     "outOfBandDeployPolicy",
     "deployPreconditionPolicy",
     "changeLogFrRefPolicy",
+    "duplicateLogicPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).

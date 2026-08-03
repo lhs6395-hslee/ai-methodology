@@ -17,7 +17,7 @@ import { readdirSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
-import { compileGlob } from "./spec-sync-lib.mjs";
+import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
 
 function readCommand() {
@@ -86,9 +86,8 @@ try { names = readdirSync(SPEC_DIR).sort().filter((n) => /\.md$/.test(n)); } cat
 const index = [];
 for (const n of names) {
   let text; try { text = readFileSync(join(SPEC_DIR, n), "utf8"); } catch { continue; }
-  const m = text.match(/^\s*-\s*\*\*Files\*\*:\s*(.+)$/m);
-  if (!m) continue;
-  const globs = m[1].split(",").map((s) => s.split("#")[0].trim()).filter(Boolean);
+  const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
+  if (!globs.length) continue;
   const res = [];
   for (const g of globs) { try { res.push(compileGlob(g)); } catch { /* 잘못된 글롭은 문법 게이트 소관 */ } }
   index.push({ specId: (text.match(cfg.__specIdRe) || [n])[0], file: `${cfg.specDir}/${n}`, res });
