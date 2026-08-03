@@ -78,7 +78,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs hooks-install-lib.mjs check-hooks-installed.mjs; do
+                 gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -109,6 +109,7 @@ if [ "$GATE" = "node" ]; then
   copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
   copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
   copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
+  copy "$KIT/tooling/harness/sdd-deploy-precheck.sh"  "$T/scripts/sdd-deploy-precheck.sh"
   copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
   copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
   # 배포 부채 파일은 **로컬 세션 기억 장치**다(SPEC-035) — 커밋 대상이 아니다.
@@ -117,7 +118,7 @@ if [ "$GATE" = "node" ]; then
     printf '\n# SDD 로컬 세션 상태(배포 부채 등) — 커밋 대상 아님\n.sdd/\n' >> "$T/.gitignore"
     say "  → .gitignore에 .sdd/ 추가(배포 부채 파일)"
   fi
-  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-pre-commit.sh"
+  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-deploy-precheck.sh" "$T/scripts/sdd-pre-commit.sh"
 
   # git pre-commit + pre-merge-commit 훅 연결 (.git 있을 때만).
   # pre-merge-commit(M5): 무충돌 git merge는 pre-commit을 타지 않는다 — 두 브랜치가 각자 같은
@@ -165,7 +166,7 @@ if [ "$GATE" = "node" ]; then
   # .claude/settings.json 병합 — 기존 hooks 보존; jq 있으면 merge, 없으면 신규 생성
   mkdir -p "$T/.claude"
   SETTINGS="$T/.claude/settings.json"
-  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]}],"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-check.sh"}]}]}}'
+  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]},{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-precheck.sh"}]}],"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-check.sh"}]}]}}'
   if [ -f "$SETTINGS" ]; then
     if command -v jq >/dev/null 2>&1; then
       # jq merge — 기존 SDD hook 항목 제거 후 신규 추가(idempotency 보장)
@@ -179,7 +180,7 @@ if [ "$GATE" = "node" ]; then
           + ($new.hooks.SessionStart // [])
         ) |
         .hooks.PreToolUse = (
-          [ ($old.hooks.PreToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-edit-check") | not) ]
+          [ ($old.hooks.PreToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-edit-check|sdd-deploy-precheck") | not) ]
           + ($new.hooks.PreToolUse // [])
         ) |
         .hooks.PostToolUse = (

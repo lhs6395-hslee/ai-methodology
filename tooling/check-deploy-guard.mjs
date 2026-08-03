@@ -18,7 +18,7 @@ import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
-import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine } from "./deploy-guard-lib.mjs";
+import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
 
 function readCommand() {
   const i = process.argv.indexOf("--command");
@@ -38,7 +38,24 @@ const POLICY = String(cfg.outOfBandDeployPolicy ?? "advisory");
 if (POLICY === "off") process.exit(0);
 
 const parsed = parseDeployCommand(command, cfg.outOfBandDeployCommands || DEFAULT_DEPLOY_PATTERNS);
-if (!parsed.matched || !parsed.paths.length) process.exit(0);
+if (!parsed.matched) process.exit(0);
+
+// ── 축 ①: 배포판 거짓 안전(SPEC-035 FR-007) — 명령의 성공은 서비스의 생존이 아니다.
+// 경로 유무와 **무관하게** 판정한다: 경로가 없는 배포(`kubectl rollout restart` 등)도 서비스를
+// 죽일 수 있고, 실측 사례가 정확히 "apply 성공 · CI 초록 · 전 요청 403"이었다.
+// 스펙 드리프트 축(아래)이 경로 없음으로 조기 종료하던 자리에 이 축이 먼저 발화한다.
+const SMOKE_TAG = "[SDD 배포 스모크]";
+const smoke = deploySmokeVerdict(cfg.deploySmokeCommand, (cmd) => {
+  try {
+    execSync(cmd, { cwd: cfg.__root, encoding: "utf8", timeout: Number(cfg.deploySmokeTimeoutMs) || 60000, stdio: ["ignore", "pipe", "pipe"] });
+    return { exitCode: 0, stderr: "" };
+  } catch (e) { return { exitCode: e.status ?? 1, stderr: String(e.stderr || e.message || "") }; }
+});
+// 출력은 미룬다 — **스모크가 통과했고 드리프트도 없으면 조용할 자격이 있다**(오탐이 잦은 훅은
+// 꺼진다). 반대로 통과하지 못했으면 침묵은 "살아 있음"과 구분되지 않으므로 반드시 말한다.
+const smokeLine = smoke.status === "dead" ? `${SMOKE_TAG} ✗ ${smoke.detail}`
+  : smoke.status === "undeclared" ? `${SMOKE_TAG} ⚠ ${smoke.detail}`
+  : "";
 
 const ROOT = cfg.__root;
 const git = (args) => {
@@ -53,6 +70,13 @@ const dirty = new Set();
 for (const line of status.split("\n")) {
   const p = line.slice(3).trim().split(" -> ").pop();
   if (p) dirty.add(p.replace(/^"|"$/g, ""));
+}
+
+// ── 축 ②: 스펙 드리프트. 경로가 없으면 소유 판정이 성립하지 않으므로 여기서 끝낸다
+// (스모크 축은 경로와 무관하다 — 조기 종료가 그 축까지 삼키던 것이 결함이었다).
+if (!parsed.paths.length) {
+  if (smokeLine) console.log(smokeLine);
+  process.exit(0);
 }
 
 // 스펙 Files glob → 소유 스펙 색인
@@ -87,7 +111,13 @@ const specTouched = (specId) => {
 
 const deployed = parsed.paths.map(norm);
 const findings = deployGuardFindings(deployed, dirty, ownerOf, specTouched);
-if (!findings.length) process.exit(0); // 배포 소스가 커밋됐거나 스펙이 이미 착지 — 침묵
+// 스모크 결과도 부채 대상이다 — 죽은 배포와 아무도 확인 안 한 배포는 커밋 전에 갚아야 한다.
+if (POLICY === "hard" && smoke.status !== "alive") {
+  findings.push({ kind: smoke.status === "dead" ? "smoke-dead" : "smoke-undeclared", path: parsed.tool, specId: "" });
+}
+if (!findings.length && !smokeLine) process.exit(0); // 소스가 커밋됐고 스모크도 통과 — 조용할 자격이 있다
+if (smokeLine) console.log(smokeLine);
+if (!findings.length) process.exit(0);
 
 console.log(`[SDD 배포 가드] out-of-band 배포 감지 — \`${parsed.tool}\` (미커밋 소스가 라이브에 반영됨)`);
 console.log("  라이브에 반영된 것은 **커밋 전이라도** spec Change Log에 먼저 착지해야 한다 — 커밋을 미루는 동안 spec↔live 드리프트가 누적된다.");
@@ -98,6 +128,10 @@ for (const f of findings) {
     console.log(`  ⚠ ${f.path} → 소유 ${f.specId} 미수정 — 배포했는데 스펙이 그대로다. ${specFileOf(f.specId)}의 Change Log에 이번 반영을 먼저 적어라.`);
   } else if (f.kind === "no-changelog") {
     console.log(`  ⚠ ${f.path} → ${f.specId}는 수정됐지만 **Change Log 행이 추가되지 않았다** — 본문만 고치면 "언제 무엇을 왜 라이브에 넣었나"가 남지 않는다.`);
+  } else if (f.kind === "smoke-dead") {
+    console.log(`  ✗ ${f.path} — 배포는 성공했으나 스모크 실패(위 참조). 라이브가 죽었을 수 있다 — 지금 확인하라.`);
+  } else if (f.kind === "smoke-undeclared") {
+    console.log(`  ⚠ ${f.path} — \`deploySmokeCommand\` 미선언(위 참조). 배포 계약에 생존 확인을 넣어라.`);
   } else if (f.kind === "thin-record") {
     console.log(`  ⚠ ${f.path} → ${f.specId} Change Log ${f.rows}행이 최소 기록 형식 미달 — {날짜 | 무엇을 | 왜}를 채우고 실측 여부를 \`[검증: <경로>]\` 또는 \`[미확인]\`으로 표기하라.`);
   }

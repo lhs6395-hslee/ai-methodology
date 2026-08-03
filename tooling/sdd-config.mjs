@@ -113,6 +113,18 @@ export const DEFAULTS = {
   // 비차단이다(PostToolUse는 이미 실행된 뒤에 돈다 — 되돌릴 수 없는 것을 막는 척하지 않는다).
   // 로컬 세션 기억 장치라 커밋 대상이 아니다(sdd-init가 .gitignore에 넣는다).
   outOfBandDeployDebtFile: ".sdd/deploy-debt.jsonl",
+  // 배포 **전제 조건**(SPEC-035 FR-006) — off|advisory|hard. `outOfBandDeployPolicy`와 다른 축이다:
+  // 그쪽은 "이 배포가 스펙에 반영됐나"(사후 상기), 이쪽은 **"이 배포가 재현 가능한 리비전에서
+  // 나오는가"**(사전 차단). 실측 제보: 가드가 `terraform apply`를 정확히 감지하고도 막지 못했다 —
+  // 물은 것이 스펙 반영 여부뿐이었고, 사후 상기는 같은 세션의 **두 번째 apply**도 막지 못했다.
+  // 판정은 순수 git 조회(미커밋 트리·upstream 뒤처짐)라 오탐이 거의 없고 배포 **전에** 가능하다.
+  // hard면 PreToolUse에서 실제로 차단한다(막을 수 있는 것을 사후로 미루면 그냥 늦는 것이다).
+  deployPreconditionPolicy: "off",
+  // 배포 직후 서비스 생존 확인 명령(SPEC-035 FR-007). **미선언 자체가 부채로 계상된다** —
+  // 배포 명령의 성공은 서비스의 생존이 아니다(실측: apply 성공·CI 초록·전 요청 403).
+  // 비-0은 skip이 아니라 **실패**다(테스트·e2ePrecheck와 같은 반전 규약).
+  deploySmokeCommand: null,
+  deploySmokeTimeoutMs: 60000,
   scCoveragePolicy: "off",
   // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
   // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).

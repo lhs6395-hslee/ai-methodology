@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
-import { parseDebt, settleDebt, changeLogAdded } from "./deploy-guard-lib.mjs";
+import { parseDebt, settleDebt, changeLogAdded, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
 
 let cfg;
 try { cfg = loadConfig(); } catch { process.exit(0); }
@@ -49,14 +49,36 @@ try {
   }
 } catch { /* 스펙 디렉토리 없음 — 해소 판정 불가, 부채는 그대로 남는다 */ }
 
-// 해소 = 이번 커밋(스테이징)에서 소유 스펙에 Change Log 행이 **추가**됐는가.
+// 부채 종류마다 갚는 길이 다르다 — 도달 불가능한 해소 조건은 강제가 아니라 벽돌이다.
 const resolvedSpec = (specId) => {
   const f = specFileOf.get(specId);
   if (!f) return false;
   const diff = git(`diff --cached -- "${f}"`);
   return diff ? changeLogAdded(diff) : false;
 };
-const { settled, remaining } = settleDebt(open, resolvedSpec);
+// 스모크 부채는 **지금 다시 판정**해서 갚는다(스펙 편집으로는 갚을 수 없는 종류다).
+// 죽은 배포 부채가 있을 때만 명령을 실제로 돌린다 — 드물고 긴급한 경우에만 비용을 낸다.
+let smokeNow = null;
+const smokeSettles = (kind) => {
+  const declared = String(cfg.deploySmokeCommand || "").trim();
+  if (kind === "smoke-undeclared") return declared.length > 0;   // 계약 공백이 닫혔다
+  if (kind !== "smoke-dead") return false;
+  if (!declared) return false;                                    // 확인할 방법이 없으면 갚아지지 않는다
+  if (smokeNow === null) {
+    smokeNow = deploySmokeVerdict(declared, (cmd) => {
+      try {
+        execSync(cmd, { cwd: ROOT, encoding: "utf8", timeout: Number(cfg.deploySmokeTimeoutMs) || 60000, stdio: ["ignore", "pipe", "pipe"] });
+        return { exitCode: 0, stderr: "" };
+      } catch (e) { return { exitCode: e.status ?? 1, stderr: String(e.stderr || e.message || "") }; }
+    });
+    console.log(`  · 죽은 배포 부채가 있어 스모크를 재실행했다 — ${smokeNow.status === "alive" ? "통과(서비스 생존 확인)" : "여전히 실패"}`);
+  }
+  return smokeNow.status === "alive";
+};
+const { settled, remaining } = settleDebt(open, (d) => {
+  if (String(d.kind || "").startsWith("smoke-")) return smokeSettles(d.kind);
+  return !!d.specId && resolvedSpec(d.specId);
+});
 
 // 해소분만 지운다 — 남은 것은 파일에 그대로 보존(깨진 줄 포함: 파싱 실패로 부채를 지우면 그게 세탁이다).
 if (settled.length) {
@@ -65,18 +87,25 @@ if (settled.length) {
 }
 
 console.log(`배포 부채 게이트 — ${rel}: 해소 ${settled.length}건 · 잔여 ${remaining.length}건${malformed.length ? ` · 파싱 불가 ${malformed.length}건` : ""}`);
-for (const d of settled) console.log(`  ✓ ${d.specId} ← ${d.path} (Change Log 행 착지 — 해소)`);
+for (const d of settled) {
+  console.log(String(d.kind || "").startsWith("smoke-")
+    ? `  ✓ ${d.kind} ← ${d.path} (스모크 계약 충족 — 해소)`
+    : `  ✓ ${d.specId} ← ${d.path} (Change Log 행 착지 — 해소)`);
+}
 
 if (!remaining.length && !malformed.length) {
   console.log("✓ 미기록 배포 부채 없음.");
   process.exit(0);
 }
 for (const d of remaining) {
-  const where = d.specId ? `소유 ${d.specId}(${specFileOf.get(d.specId) || "파일 미발견"})` : "소유 스펙 없음";
+  const where = String(d.kind || "").startsWith("smoke-")
+    ? (d.kind === "smoke-dead" ? "**서비스가 죽어 있을 수 있다**" : "`deploySmokeCommand` 미선언")
+    : (d.specId ? `소유 ${d.specId}(${specFileOf.get(d.specId) || "파일 미발견"})` : "소유 스펙 없음");
   console.log(`  ✗ ${d.date} \`${d.tool}\` → ${d.path} — ${where} [${d.kind}]`);
 }
 for (const s of malformed) console.log(`  ✗ 파싱 불가한 부채 줄(지우지 않고 보존): ${s.slice(0, 120)}`);
 console.error(`\n✗ 라이브에 반영됐지만 기록되지 않은 배포가 ${remaining.length + malformed.length}건 남아 있다 — spec↔live 드리프트는 커밋을 미룰수록 커진다.`);
-console.error(`  갚는 방법: 소유 스펙 Change Log에 {날짜 | 무엇을 | 왜} 행을 추가하고 실측 여부를 \`[검증: <경로>]\`/\`[미확인]\`으로 표기한 뒤 함께 스테이징하라 — 그 순간 자동 해소된다.`);
+console.error(`  갚는 방법: 소유 스펙 Change Log에 {날짜 | 무엇을 | 왜} 행을 추가하고 실측 여부를 \`[검증: <경로>]\`/\`[미확인]\`으로 표기한 뒤 함께 스테이징하라 — 그 순간 자동 해소된다.
+  스모크 부채는 스펙 편집으로 갚아지지 않는다: \`smoke-undeclared\`는 \`deploySmokeCommand\`를 선언하면, \`smoke-dead\`는 그 명령이 다시 통과하면(=서비스가 살아나면) 해소된다.`);
 console.error(`  부채 파일을 손으로 지우는 것은 갚는 것이 아니다(기록은 여전히 없다).`);
 process.exit(1);

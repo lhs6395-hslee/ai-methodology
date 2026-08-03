@@ -31,6 +31,8 @@
 - **FR-002** (event): WHERE a deployed source path is uncommitted, **check-deploy-guard.mjs** (S) SHALL resolve its owning spec through the Files globs and report the spec as untouched, as touched without a new Change Log row, or as carrying a row that misses the minimum record shape.
 - **FR-003** (unwanted): IF a deployed source path is owned by no spec, THEN THE SYSTEM SHALL report it as unowned so the deploy does not stay outside the drift radar.
 - **FR-004** (state): WHILE the guard runs from the **sdd-deploy-check.sh** (S) hook wrapper, THE SYSTEM SHALL exit zero in every branch, and SHALL stay silent when the source is committed, when the policy is off, or when the repository has no git directory.
+- **FR-006** (unwanted): IF a deploy command is about to run while the working tree has uncommitted changes or the branch is behind its upstream, THEN **check-deploy-precheck.mjs** (S), invoked from the **sdd-deploy-precheck.sh** (S) wrapper that must not swallow its exit code, SHALL report that the deploy is not reproducible from any revision — warning under advisory and exiting with the PreToolUse block code under hard — and SHALL classify a missing upstream as unjudged rather than as a violation, never blocking on it.
+- **FR-007** (event): WHEN a deploy is detected, THE SYSTEM SHALL judge service survival separately from command success: WHERE `deploySmokeCommand` is declared, it SHALL be executed with a non-zero exit read as failure rather than as skip; WHERE it is undeclared, that absence SHALL itself be reported, and under hard both outcomes SHALL be recorded as debt settled only by a passing smoke or by declaring the command — never by editing a spec.
 - **FR-005** (state): WHILE `outOfBandDeployPolicy` is hard, **check-deploy-guard.mjs** (S) SHALL append each unrecorded deploy to `outOfBandDeployDebtFile` as one JSON line while still exiting zero, and **check-deploy-debt.mjs** (S) SHALL — at pre-commit — settle every debt whose owning spec has a Change Log row added in the staged change, rewrite the file with only the unsettled lines (preserving unparseable lines), and exit non-zero while any debt remains; WHERE the policy is not hard or the file is absent, THE gate SHALL exit zero in silence.
 
 ### Key Entities
@@ -41,10 +43,10 @@
 ## Ownership (중복 방지 — 강제됨)
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: deploy-guard
-- **Symbols**: deploy-guard-lib.mjs, check-deploy-guard.mjs, check-deploy-debt.mjs, sdd-deploy-check.sh
+- **Symbols**: deploy-guard-lib.mjs, check-deploy-guard.mjs, check-deploy-debt.mjs, check-deploy-precheck.mjs, sdd-deploy-check.sh, sdd-deploy-precheck.sh
 - **Artifacts**: —
 - **Capabilities**: deploy-guard.gate
-- **Files**: tooling/deploy-guard-lib.mjs, tooling/check-deploy-guard.mjs, tooling/check-deploy-debt.mjs, tooling/harness/sdd-deploy-check.sh, tooling/__tests__/deploy-guard.test.mjs
+- **Files**: tooling/deploy-guard-lib.mjs, tooling/check-deploy-guard.mjs, tooling/check-deploy-debt.mjs, tooling/check-deploy-precheck.mjs, tooling/harness/sdd-deploy-check.sh, tooling/harness/sdd-deploy-precheck.sh, tooling/__tests__/deploy-guard.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > config knob·설치 배선은 각 소유 스펙(001/004). 커밋 시점 spec-first는 SPEC-003이 소유하고 이 spec은 그보다 **앞선 발화 지점**만 담당한다. 라이브 실물 대조는 SPEC-032.
@@ -55,6 +57,8 @@
 ## Success Criteria (측정형)
 - **SC-001**: `deploy-guard.test.mjs` 전 케이스 green — 명령 파싱 5분기·기록 판정·findings 4종·게이트 e2e(경고 후 exit 0, 커밋 후 침묵). [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **SC-002**: 재현 픽스처에서 스펙 미수정·Change Log 행 없음·형식 미달·충족(침묵)의 4단계가 각각 구분돼 출력된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
+- **SC-004**: 미커밋 트리에서 `deployPreconditionPolicy: hard`가 배포를 exit 2로 막고, 커밋 후에는 위반이 사라지며, upstream 없음은 hard에서도 차단하지 않고 미판정으로 표기된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
+- **SC-005**: `deploySmokeCommand` 미선언이 경로 인자 없는 배포에서도 표면화되고, 스모크 실패가 부채로 적재돼 커밋을 막으며, 스모크가 다시 통과하면 그 부채가 해소된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **SC-003**: 같은 픽스처에서 advisory는 부채 파일을 만들지 않고, hard는 부채를 적재해 후속 커밋을 exit 1로 막으며, 소유 스펙 Change Log 행을 스테이징하면 해소돼 exit 0이 된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
 
 ## Non-Functional Requirements
@@ -63,6 +67,13 @@
 ## Assumptions / Clarifications Retained
 - 감지 패턴은 프로젝트가 `outOfBandDeployCommands`로 대체한다 — 킷 기본값은 kubectl·helm·terraform·클라우드 CLI의 상태 변경 서브커맨드다(도구를 못 박지 않는다).
 - "같은 세션 내"를 시간으로 판정하지 않고 **워킹트리 상태**로 판정한다 — 세션 경계는 기계가 알 수 없고, 미커밋 여부는 결정적이다.
+- **두 축은 묻는 질문이 다르다.** `outOfBandDeployPolicy`는 "이 배포가 스펙에 반영됐나"(사후 상기), `deployPreconditionPolicy`는 **"이 배포가 재현 가능한 리비전에서 나오는가"**(사전 차단). 실측 제보: 가드가 `terraform apply`를 정확히 감지하고도 막지 못한 이유가 첫 질문만 물었기 때문이다.
+- **전제 조건만 PreToolUse로 앞당긴다.** 스펙 드리프트를 사후에 두는 것은 "되돌릴 수 없는 것을 막는 척하지 않는다"는 원칙이지만, 미커밋 트리·upstream 뒤처짐은 순수 git 조회라 배포 **전에** 알 수 있다 — 막을 수 있는 것을 사후로 미루면 원칙이 아니라 그냥 늦는 것이다(실측: 사후 상기는 같은 세션의 **두 번째 apply**도 막지 못했다).
+- **미판정은 hard에서도 차단하지 않는다.** upstream이 없으면 뒤처짐을 알 수 없는데, 모르는 것을 위반으로 세면 오탐이고 오탐이 잦은 사전 차단은 사람이 훅을 꺼버린다. 대신 침묵하지도 않는다 — "판정하지 못했다"를 명시한다.
+- **명령의 성공은 서비스의 생존이 아니다.** 정본 §7이 다루는 "판정 없이 exit 0"의 배포판 사촌이다 — 실측: apply 성공 · CI 초록 · **전 요청 403**. 그래서 `deploySmokeCommand` **미선언 자체를 부채로 계상**한다(아무도 확인하지 않은 것과 확인해서 살아 있는 것이 같은 침묵으로 보이면 안 된다). 스모크의 비-0은 skip이 아니라 실패다(테스트·`e2ePrecheck`와 같은 반전 규약).
+- **스모크 축은 경로 인자와 무관하다** — `kubectl rollout restart`처럼 소스 경로가 없는 배포도 서비스를 죽인다. 드리프트 축이 경로 없음으로 조기 종료하던 자리에서 스모크 축까지 함께 삼켜지던 것이 결함이었다.
+- **부채는 종류마다 갚는 길이 달라야 한다** — 도달 불가능한 해소 조건은 강제가 아니라 벽돌이다. 스모크 부채는 스펙 편집으로 갚아지지 않고, `smoke-undeclared`는 선언으로 `smoke-dead`는 스모크 통과로 해소된다.
+- 스모크가 통과했고 드리프트도 없으면 **조용할 자격이 있다** — 매 배포에 확인 메시지를 찍으면 그 소음이 훅을 꺼지게 한다.
 - advisory와 hard의 차이는 **부채 적재**다(실측 제보: 둘이 출력도 동작도 같아 승격이 장식이었다). 배포 시점은 여전히 비차단이다 — 되돌릴 수 없는 것을 막는 척하지 않는다. 대신 막을 수 있는 유일한 지점, 아직 오지 않은 커밋에서 막는다.
 - 부채는 **자동으로만** 해소된다 — 소유 스펙 Change Log에 행이 스테이징되는 순간이다. 사람이 파일을 지워 갚게 두면 "지우기"가 갚는 방법이 되고, 그러면 부채 파일은 기록 장치가 아니라 성가신 알림이 된다. 파싱 불가한 줄도 지우지 않는다(파싱 실패로 부채를 지우는 것이 곧 세탁이다).
 - 부채 파일은 **로컬 세션 상태**라 커밋 대상이 아니다(sdd-init가 `.gitignore`에 `.sdd/`를 넣는다) — 추적하면 "커밋해서 없앤다"가 또 하나의 갚는 방법이 된다.
@@ -87,3 +98,4 @@
 | 2026-08-02 | 초안 — `outOfBandDeployPolicy`·`outOfBandDeployCommands` + `deploy-guard-lib`(명령 파싱·기록 판정) + `check-deploy-guard` + PostToolUse(Bash) 훅 `sdd-deploy-check.sh` + sdd-init 배선 | 실측 제보: 배포가 커밋보다 먼저인 궤도에서 commit-msg 훅만으로는 커밋을 미루는 동안 신호가 0이라 spec↔live 드리프트가 누적됐다(INFRA-005 역방향 흡수). 발화 지점을 배포 행위까지 앞당기되, PostToolUse는 이미 실행된 뒤라 **비차단**이 유일하게 정직한 강도다 — 되돌릴 수 없는 것을 막는 척하지 않는다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
 | 2026-08-02 | 경로 인자 인식이 **단일 대시 옵션**(`-var-file=`·`-backend-config=`)을 수용하도록 확장 | 실측 제보(gsn-aiops-finops-module): Terraform 공식 문법은 단일 대시라 `terraform apply -var-file=stages/dev/x.tfvars`에서 경로가 하나도 안 잡혔고, 경로가 없으면 소비 게이트가 조기 종료해 **판정 자체가 성립하지 않았다** — terraform이 주 배포 수단인 프로젝트에서 이 게이트는 사실상 kubectl·helm 전용이었다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
 | 2026-08-02 | `outOfBandDeployPolicy=hard`에 실체 부여 — 미기록 배포를 `outOfBandDeployDebtFile`(JSONL)에 적재 + pre-commit의 `check-deploy-debt`가 잔여 부채로 커밋 차단, 소유 스펙 Change Log 행 스테이징 시 자동 해소. FR-005·SC-003 신설, sdd-init가 `.sdd/`를 .gitignore에 배선 | 실측 제보(gsn-aiops-finops-module): advisory와 hard가 **출력도 동작도 구분되지 않아** 승격이 무의미했다. 배포 시점은 여전히 못 막지만(이미 실행된 뒤) 아직 오지 않은 커밋은 막을 수 있다 — 터미널 스크롤은 죽고 파일은 남는다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
+| 2026-08-02 | 두 축 신설 — FR-006 배포 전제 조건(`deployPreconditionPolicy` + `check-deploy-precheck` PreToolUse, hard면 exit 2로 **실제 차단**)과 FR-007 배포판 거짓 안전(`deploySmokeCommand` 미선언=부채, 비-0=실패, 스모크 축은 경로 무관). 부채 해소를 종류별로 분기(`settleDebt(open, isSettled)`) | 실측 제보: 킷 가드가 `terraform apply`를 **정확히 감지하고도 막지 못했다** — 감지 후 묻는 것이 "스펙에 반영됐나" 하나뿐이었기 때문이다. 물었어야 하는 것은 "재현 가능한 리비전에서 나오는가"이고, 그건 순수 git 조회라 사전 판정이 가능하다(사후 상기는 같은 세션의 두 번째 apply도 못 막았다). 그리고 apply 성공·CI 초록·전 요청 403이 동시에 참일 수 있다 — 명령의 성공은 서비스의 생존이 아니다 [검증: tooling/__tests__/deploy-guard.test.mjs] |

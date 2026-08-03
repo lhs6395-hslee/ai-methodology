@@ -8,7 +8,9 @@
 //   off/silent(0, 비활성) < advisory/warn(1, 경고) < hard/error(2, 차단).
 export const POLICY_RANK = { off: 0, silent: 0, advisory: 1, warn: 1, hard: 2, error: 2 };
 
-// 래칫 대상 정책 knob — 강제 강도를 갖는 9종(sdd-config.mjs DEFAULTS 기준).
+// 래칫 대상 정책 knob — 강제 강도를 갖는 **전부**(sdd-config.mjs DEFAULTS 기준).
+// 목록에서 빠진 knob은 하향이 조용히 통과한다 — 새 정책을 만들면 여기에도 등재한다
+// (실측: outOfBandDeployPolicy·changeLogFrRefPolicy가 도입 시 누락돼 감시 밖이었다).
 // **자기포함**(`policyRatchetPolicy`가 목록의 첫 항목): 래칫 자신의 강도가 감시 밖이면
 // `policyRatchetPolicy:"off"` 한 줄로 래칫 전체가 자폭한다 — 게이트가 워킹트리 config로 자기
 // 정책을 읽고 off면 base 비교 전에 exit 0하기 때문(감사 A-2 실측: 대상 knob 하향 + 이 한 줄을
@@ -35,6 +37,9 @@ export const RATCHETED_POLICIES = [
   "e2eTestsPolicy",
   "scCoveragePolicy",
   "hooksInstalledPolicy",
+  "outOfBandDeployPolicy",
+  "deployPreconditionPolicy",
+  "changeLogFrRefPolicy",
 ];
 
 // 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다.

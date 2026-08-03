@@ -7,6 +7,8 @@
 // @covers SPEC-035/FR-003
 // @covers SPEC-035/FR-004
 // @covers SPEC-035/FR-005
+// @covers SPEC-035/FR-006
+// @covers SPEC-035/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -16,10 +18,12 @@ import { join } from "node:path";
 import {
   DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, changeLogAdded, changeLogRowShape, deployGuardFindings,
   debtLine, parseDebt, settleDebt,
+  deployPreconditionFindings, deployPreconditionVerdict, deploySmokeVerdict,
 } from "../deploy-guard-lib.mjs";
 
 const GATE = new URL("../check-deploy-guard.mjs", import.meta.url).pathname;
 const DEBT_GATE = new URL("../check-deploy-debt.mjs", import.meta.url).pathname;
+const PRE_GATE = new URL("../check-deploy-precheck.mjs", import.meta.url).pathname;
 
 test("parseDeployCommand: 상태 변경 명령만 감지, dry-run·조회는 제외, 소스 경로 추출", () => {
   const a = parseDeployCommand("kubectl apply -f k8s/dashboard.yaml");
@@ -72,7 +76,8 @@ test("게이트 e2e: 미커밋 소스 배포 → 경고하되 **항상 exit 0**(
   mkdirSync(join(root, "k8s"), { recursive: true });
   const sh = (c) => execFileSync("sh", ["-c", c], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   try {
-    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
+    // 스모크를 선언해 둔다 — 미선언 자체가 발화 사유이므로(FR-007), 그러면 "깨끗하면 침묵"을 못 본다
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", deploySmokeCommand: "sh -c 'exit 0'" }));
     writeFileSync(join(root, "sdd/specs/INFRA-001.md"),
       "**Spec**: `INFRA-001`\n## Ownership\n- **Files**: k8s/**\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n");
     writeFileSync(join(root, "k8s/x.yaml"), "apiVersion: v1\n");
@@ -106,11 +111,11 @@ test("parseDebt / settleDebt: 깨진 줄은 보존, 소유 스펙 Change Log 착
   const { open, malformed } = parseDebt(text);
   assert.equal(open.length, 3);
   assert.deepEqual(malformed, ["{깨진 줄"]);   // 파싱 실패로 부채를 지우면 그게 세탁이다
-  const { settled, remaining } = settleDebt(open, (s) => s === "INFRA-001");
+  const { settled, remaining } = settleDebt(open, (d) => d.specId === "INFRA-001");
   assert.deepEqual(settled.map((d) => d.specId), ["INFRA-001"]);
   assert.deepEqual(remaining.map((d) => d.path), ["chart/values.yaml", "k8s/z.yaml"]);
   // 소유 없는 부채는 해소 판정 대상이 아니다 — 소유가 생겨야 갚힌다
-  assert.equal(settleDebt(open, () => true).remaining.length, 1);
+  assert.equal(settleDebt(open, (d) => !!d.specId).remaining.length, 1);
 });
 
 function debtFixture(policy) {
@@ -118,7 +123,7 @@ function debtFixture(policy) {
   mkdirSync(join(root, "sdd/specs"), { recursive: true });
   mkdirSync(join(root, "k8s"), { recursive: true });
   const sh = (c) => execFileSync("sh", ["-c", c], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", outOfBandDeployPolicy: policy }));
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", outOfBandDeployPolicy: policy, deploySmokeCommand: "sh -c 'exit 0'" }));
   writeFileSync(join(root, "sdd/specs/INFRA-001.md"),
     "**Spec**: `INFRA-001`\n## Ownership\n- **Files**: k8s/**\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n");
   writeFileSync(join(root, "k8s/x.yaml"), "apiVersion: v1\n");
@@ -166,5 +171,126 @@ test("게이트 e2e: 소유 스펙 Change Log 행이 스테이징되면 부채�
     assert.match(r.out, /해소 1건/);
     assert.match(r.out, /미기록 배포 부채 없음/);
     assert.equal(readFileSync(join(h.root, ".sdd/deploy-debt.jsonl"), "utf8").trim(), ""); // 해소분만 제거
+  } finally { rmSync(h.root, { recursive: true, force: true }); }
+});
+
+// ── 배포 전제 조건 (FR-006) ──
+// 실측 제보: 가드가 `terraform apply`를 정확히 감지하고도 막지 못했다 — 감지 후 묻는 것이
+// "스펙에 반영됐나" 하나뿐이었다. 물었어야 하는 것: **"재현 가능한 리비전에서 나오는가."**
+// 그리고 사후 상기는 같은 세션의 **두 번째 apply**도 막지 못했다.
+
+test("deployPreconditionFindings: 미커밋·뒤처짐은 위반 / upstream 없음은 미판정(위반 아님)", () => {
+  const clean = deployPreconditionFindings({ dirty: [], behind: 0, upstream: "origin/main", branch: "main" }, []);
+  assert.deepEqual(clean, []);
+
+  const dirtySrc = deployPreconditionFindings(
+    { dirty: ["stages/dev/x.tfvars"], behind: 0, upstream: "origin/main", branch: "main" }, ["stages/dev/x.tfvars"]);
+  assert.deepEqual(dirtySrc.map((f) => f.kind), ["dirty-tree"]);
+  assert.match(dirtySrc[0].detail, /어떤 커밋으로도 재현되지 않는다/);
+
+  // 배포 소스는 깨끗한데 트리가 더러운 경우도 재현되지 않는다(주변 모듈·변수 파일)
+  const dirtyTree = deployPreconditionFindings(
+    { dirty: ["other.tf"], behind: 0, upstream: "origin/main", branch: "main" }, ["a.tfvars"]);
+  assert.match(dirtyTree[0].detail, /주변 모듈·변수 파일/);
+
+  assert.deepEqual(
+    deployPreconditionFindings({ dirty: [], behind: 3, upstream: "origin/main", branch: "main" }, []).map((f) => f.kind),
+    ["behind-upstream"]);
+  // 판정 못 함과 위반 없음을 섞지 않는다
+  const noUp = deployPreconditionFindings({ dirty: [], behind: null, upstream: null, branch: "wip" }, []);
+  assert.deepEqual(noUp.map((f) => f.kind), ["no-upstream"]);
+  assert.match(noUp[0].detail, /미판정/);
+});
+
+test("deployPreconditionVerdict: hard만 차단하고, 미판정은 hard에서도 차단하지 않는다", () => {
+  const viol = deployPreconditionFindings({ dirty: ["a"], behind: 0, upstream: "o/m", branch: "m" }, []);
+  assert.equal(deployPreconditionVerdict("off", viol).judged, false);
+  assert.equal(deployPreconditionVerdict("advisory", viol).blocking, false);
+  assert.equal(deployPreconditionVerdict("hard", viol).blocking, true);
+  // 알 수 없는 것을 위반으로 세면 오탐이고, 오탐이 잦은 사전 차단은 훅을 꺼지게 만든다
+  const unknown = deployPreconditionFindings({ dirty: [], behind: null, upstream: null, branch: "wip" }, []);
+  const v = deployPreconditionVerdict("hard", unknown);
+  assert.equal(v.blocking, false);
+  assert.equal(v.unknowns.length, 1);
+});
+
+test("게이트 e2e(전제): 깨끗하면 침묵 · advisory는 통과 · hard는 exit 2로 배포를 막는다", () => {
+  const h = debtFixture("advisory");   // 워킹트리에 미커밋 k8s/x.yaml이 남아 있는 픽스처
+  try {
+    const cfgPath = join(h.root, "sdd.config.json");
+    const run = (pol) => {
+      writeFileSync(cfgPath, JSON.stringify({ specDir: "sdd/specs", deployPreconditionPolicy: pol }));
+      try { return { code: 0, out: execFileSync("node", [PRE_GATE, "--command", "kubectl apply -f k8s/x.yaml"], { cwd: h.root, encoding: "utf8" }) }; }
+      catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+    };
+    assert.equal(run("off").out.trim(), "");                    // off = 판정 안 함
+
+    const adv = run("advisory");
+    assert.equal(adv.code, 0);
+    assert.match(adv.out, /배포 소스가 미커밋이다/);
+    assert.match(adv.out, /advisory — 차단하지 않는다/);
+
+    const hard = run("hard");
+    assert.equal(hard.code, 2, "PreToolUse 규약 — 비-0이 도구 실행을 막는다");
+    assert.match(hard.out, /배포 전제 조건 미충족/);
+    assert.match(hard.out, /advisory로 내리지 말고/);           // 완화를 처방으로 내밀지 않는다
+
+    // 커밋하면 dirty 위반은 사라진다. 이 픽스처엔 upstream이 없어 뒤처짐은 **미판정**으로 남는데,
+    // 그것은 hard에서도 차단하지 않는다(모르는 것을 위반으로 세면 오탐이고, 오탐은 훅을 꺼지게 한다).
+    h.sh("git add -A && git -c user.name=t -c user.email=t@t commit -qm deploy");
+    const after = run("hard");
+    assert.equal(after.code, 0);
+    assert.doesNotMatch(after.out, /미커밋/);
+    assert.match(after.out, /판정하지 못한 것.*'통과'와 같지 않다/);
+
+    // upstream이 있고 최신이면 완전히 침묵한다 — 조용할 자격이 있는 상태
+    h.sh("git init -q --bare ../up.git 2>/dev/null || true; git remote add origin ../up.git 2>/dev/null || true; git push -q -u origin HEAD 2>/dev/null || true");
+    const clean = run("hard");
+    if (/upstream/.test(clean.out)) return;   // 원격 배선 불가 환경이면 위 판정으로 충분
+    assert.equal(clean.out.trim(), "", clean.out);
+  } finally { rmSync(h.root, { recursive: true, force: true }); }
+});
+
+// ── 배포판 거짓 안전 (FR-007) ──
+// 정본 §7은 "게이트가 판정 없이 exit 0"을 다루는데, 배포엔 사촌이 있다:
+// **배포 명령이 성공해도 서비스는 죽을 수 있다**(실측: apply 성공 · CI 초록 · 전 요청 403).
+
+test("deploySmokeVerdict: 미선언은 부채 · 통과는 alive · 비-0은 skip이 아니라 dead", () => {
+  assert.equal(deploySmokeVerdict("", null).status, "undeclared");
+  assert.match(deploySmokeVerdict(null, null).detail, /배포 성공이 서비스 생존을 뜻하지 않는데/);
+  assert.equal(deploySmokeVerdict("curl -f https://x/health", () => ({ exitCode: 0 })).status, "alive");
+  const dead = deploySmokeVerdict("curl -f https://x/health", () => ({ exitCode: 22, stderr: "HTTP 403" }));
+  assert.equal(dead.status, "dead");
+  assert.match(dead.detail, /HTTP 403/);
+  assert.match(dead.detail, /명령의 성공은 서비스의 생존이 아니다/);
+  // 실행 자체가 던져도 dead다 — 확인 못 한 것을 살아있음으로 세지 않는다
+  assert.equal(deploySmokeVerdict("x", () => { throw new Error("spawn fail"); }).status, "dead");
+});
+
+test("게이트 e2e(스모크): 미선언은 경로 없는 배포에서도 발화 · 죽으면 부채로 적재되고 살아나면 해소", () => {
+  const h = debtFixture("hard");
+  const cfgPath = join(h.root, "sdd.config.json");
+  const setCfg = (extra) => writeFileSync(cfgPath, JSON.stringify({
+    specDir: "sdd/specs", outOfBandDeployPolicy: "hard", ...extra,
+  }));
+  try {
+    // 경로 인자가 없는 배포(rollout restart) — 예전엔 조기 종료로 축 전체가 삼켜졌다
+    setCfg({});
+    const noPath = execFileSync("node", [GATE, "--command", "kubectl rollout restart deploy/api"], { cwd: h.root, encoding: "utf8" });
+    assert.match(noPath, /deploySmokeCommand` 미선언/);
+
+    // 스모크가 죽으면 부채로 적재되고 커밋이 막힌다
+    setCfg({ deploySmokeCommand: "sh -c 'exit 22'" });
+    const dead = execFileSync("node", [GATE, "--command", "kubectl apply -f k8s/x.yaml"], { cwd: h.root, encoding: "utf8" });
+    assert.match(dead, /배포는 성공했는데 스모크가 실패했다/);
+    const blocked = runDebt(h.root);
+    assert.equal(blocked.code, 1);
+    assert.match(blocked.out, /smoke-dead/);
+
+    // 스펙 편집으로는 갚아지지 않는다 — 서비스가 살아나야 해소된다
+    setCfg({ deploySmokeCommand: "sh -c 'exit 0'" });
+    const ok = runDebt(h.root);
+    assert.match(ok.out, /스모크를 재실행했다 — 통과/);
+    assert.match(ok.out, /스모크 계약 충족 — 해소/);
   } finally { rmSync(h.root, { recursive: true, force: true }); }
 });

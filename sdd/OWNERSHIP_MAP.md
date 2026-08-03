@@ -67,7 +67,7 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 72건
+## Surface 키 — 74건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -76,6 +76,7 @@
 | `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-deploy-debt.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
+| `check-deploy-precheck.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
@@ -127,6 +128,7 @@
 | `sdd_gates.sh` | SPEC-006 | ✓ | ✓ | ✓ |
 | `sdd-config.mjs` | SPEC-001 | ✓ | ✓ | ✓ |
 | `sdd-deploy-check.sh` | SPEC-035 | ✓ | ✓ | ✓ |
+| `sdd-deploy-precheck.sh` | SPEC-035 | ✓ | ✓ | ✓ |
 | `sdd-edit-check.sh` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-init.sh` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-migrate.skill.md` | SPEC-025 | ✓ | ✓ | ✓ |
@@ -210,7 +212,7 @@
 
 ## 집계
 
-- 소유 키 총 **164건** (entity 38 · surface 72 · capability 38 · 역할없음 16)
+- 소유 키 총 **166건** (entity 38 · surface 74 · capability 38 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

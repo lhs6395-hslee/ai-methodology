@@ -87,6 +87,75 @@ export function changeLogRowShape(diffText) {
   return rows;
 }
 
+// ── 배포 전제 조건 — "이 배포가 재현 가능한 리비전에서 나오는가" ──
+// 실측 제보: 킷 가드가 `terraform apply`를 정확히 감지하고도 막지 못했다. 감지 후 묻는 것이
+// **"스펙에 반영됐나"** 하나뿐이었기 때문이다. 물었어야 하는 것은 하나 더 있다 —
+// **"이 배포가 재현 가능한 리비전에서 나오는가."** 커밋되지 않은 트리에서 나간 배포는 어떤
+// 커밋으로도 재현되지 않고, upstream보다 뒤진 트리에서 나간 배포는 남의 변경을 조용히 되돌린다.
+//
+// 이 판정은 **사전 가능**하다(순수 git 조회, 오탐 거의 없음) — 그래서 발화 지점이 PostToolUse가
+// 아니라 PreToolUse다. 스펙 드리프트는 사후 상기가 맞지만(되돌릴 수 없는 것을 막는 척하지 않는다),
+// 전제 조건은 배포 **전에** 알 수 있으므로 사후 상기로 미루면 그냥 늦는 것이다.
+// 실측: 사후 상기는 같은 세션의 **두 번째 apply**를 막지 못했다.
+//
+// gitFacts: {dirty:[경로], behind:number|null, upstream:string|null, branch:string}
+// 반환 [{kind, detail}] — kind: dirty-tree | behind-upstream | no-upstream(판정 불가, 위반 아님)
+export function deployPreconditionFindings(gitFacts, deployedPaths = []) {
+  const f = gitFacts || {};
+  const out = [];
+  const dirty = f.dirty || [];
+  if (dirty.length) {
+    // 배포 소스가 특정됐으면 그것만, 아니면 트리 전체 — 소스가 깨끗해도 트리가 더러우면
+    // terraform이 읽는 주변 모듈·tfvars가 미커밋일 수 있어 여전히 재현되지 않는다.
+    const owned = (deployedPaths || []).filter((p) => dirty.includes(p));
+    out.push({
+      kind: "dirty-tree",
+      detail: owned.length
+        ? `배포 소스가 미커밋이다(${owned.slice(0, 3).join(", ")}${owned.length > 3 ? ` 외 ${owned.length - 3}건` : ""}) — 이 배포는 **어떤 커밋으로도 재현되지 않는다**`
+        : `워킹트리에 미커밋 변경 ${dirty.length}건 — 배포 소스가 깨끗해도 주변 모듈·변수 파일이 미커밋이면 같은 결과가 재현되지 않는다`,
+    });
+  }
+  if (f.upstream === null || f.upstream === undefined || f.upstream === "") {
+    // 판정 못 함과 위반 없음을 섞지 않는다(SPEC-032 동형) — upstream이 없으면 behind를 알 수 없다.
+    out.push({ kind: "no-upstream", detail: `현재 브랜치(${f.branch || "?"})에 upstream이 없어 뒤처짐을 판정할 수 없다 — 위반 없음이 아니라 **미판정**이다` });
+  } else if (Number(f.behind) > 0) {
+    out.push({ kind: "behind-upstream", detail: `${f.upstream}보다 ${f.behind}커밋 뒤처져 있다 — 남의 변경을 되돌리는 배포가 된다(pull 후 재배포)` });
+  }
+  return out;
+}
+
+// 전제 조건 판정 결과 → 강도별 처분. blocking은 hard일 때 **위반이 있을 때만** 참이다.
+// no-upstream(미판정)은 hard에서도 차단하지 않는다 — 알 수 없는 것을 위반으로 세면 오탐이고,
+// 오탐이 잦은 사전 차단은 사람이 훅을 꺼버린다(우회를 유발하는 강제는 강제가 아니다).
+export function deployPreconditionVerdict(policy, findings) {
+  const pol = String(policy || "off");
+  if (pol === "off") return { judged: false, blocking: false, violations: [], unknowns: [] };
+  const violations = (findings || []).filter((f) => f.kind !== "no-upstream");
+  const unknowns = (findings || []).filter((f) => f.kind === "no-upstream");
+  return { judged: true, blocking: pol === "hard" && violations.length > 0, violations, unknowns };
+}
+
+// ── 배포판 거짓 안전 — "명령이 성공했다"와 "서비스가 살아 있다"는 다른 사실 ──
+// 정본 §7은 "게이트가 판정 없이 exit 0"을 다루는데, 배포에는 사촌이 있다:
+// **배포 명령이 성공해도 서비스는 죽을 수 있다.** 실측: apply 성공 · CI 초록 · 전 요청 403.
+// 그래서 배포 계약에 `deploySmokeCommand`를 넣고, **미선언 자체를 부채로 계상**한다 —
+// "아무도 확인하지 않았다"와 "확인했고 살아 있다"가 같은 침묵으로 보이면 안 된다.
+//
+// 반전 주의: 테스트·스모크에서 비-0은 skip이 아니라 **실패**다(어댑터 일반 규약의 예외 —
+// e2ePrecheck와 같은 판단). 그래서 실행 실패는 skipped가 아니라 위반으로 분류한다.
+// 반환 {status, detail} — status: undeclared | alive | dead | error
+export function deploySmokeVerdict(command, run) {
+  const cmd = String(command || "").trim();
+  if (!cmd) {
+    return { status: "undeclared", detail: "`deploySmokeCommand` 미선언 — 배포 성공이 서비스 생존을 뜻하지 않는데(실측: apply 성공·CI 초록·전 요청 403) 아무도 확인하지 않았다. 이 침묵은 '살아 있음'과 구분되지 않는다" };
+  }
+  let r;
+  try { r = run(cmd); } catch (e) { r = { exitCode: 1, stderr: String((e && e.message) || e) }; }
+  if (r && r.exitCode === 0) return { status: "alive", detail: `스모크 통과 — \`${cmd}\`` };
+  const why = String((r && r.stderr) || "").trim().split("\n").filter(Boolean).pop() || `exit ${r && r.exitCode}`;
+  return { status: "dead", detail: `**배포는 성공했는데 스모크가 실패했다** — \`${cmd}\` → ${why}. 명령의 성공은 서비스의 생존이 아니다` };
+}
+
 // ── 세션 부채(JSONL) — hard 정책의 실체 ──
 // advisory와 hard가 출력만 같으면 승격이 이름뿐이다(실측 제보: 둘이 구분 불가능했다).
 // hard는 미기록 배포를 부채 파일에 적재하고, pre-commit이 그 부채가 남아 있으면 커밋을 막는다.
@@ -115,15 +184,21 @@ export function parseDebt(text) {
   return { open, malformed };
 }
 
-// 부채 해소 판정 — 소유 스펙의 Change Log에 행이 착지했으면 그 부채는 갚아진 것이다.
-//   resolvedSpec(specId) -> boolean (게이트가 staged diff로 판정해 주입)
-// specId 없는 부채(unowned)는 스펙이 없으므로 해소 판정 대상이 아니다 — 소유가 생겨야 갚힌다.
-export function settleDebt(open, resolvedSpec) {
+// 부채 해소 판정 — 부채 종류마다 "갚는다"의 뜻이 다르므로 판정은 게이트가 주입한다.
+//   isSettled(debt) -> boolean
+// 갚는 길이 **없는** 부채를 만들면 그건 강제가 아니라 벽돌이다(우회를 유발하는 강제는 강제가
+// 아니다) — 그래서 종류별로 실제로 도달 가능한 해소 조건이 있어야 한다:
+//   spec-untouched·no-changelog·thin-record → 소유 스펙 Change Log 행이 이번 커밋에 착지
+//   smoke-undeclared                        → `deploySmokeCommand`가 선언됨(계약 공백이 닫힘)
+//   smoke-dead                              → 지금 스모크가 통과함(서비스가 살아남)
+//   unowned                                 → 소유 스펙이 생겨 그 경로를 Files로 덮음
+export function settleDebt(open, isSettled) {
   const settled = [];
   const remaining = [];
   for (const d of open || []) {
-    if (d.specId && resolvedSpec(d.specId)) settled.push(d);
-    else remaining.push(d);
+    let ok = false;
+    try { ok = !!isSettled(d); } catch { ok = false; }   // 판정 실패는 해소가 아니다
+    (ok ? settled : remaining).push(d);
   }
   return { settled, remaining };
 }

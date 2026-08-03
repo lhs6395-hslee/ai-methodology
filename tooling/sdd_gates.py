@@ -67,6 +67,9 @@ DEFAULTS = {
     "outOfBandDeployPolicy": "advisory",
     "outOfBandDeployCommands": None,
     "outOfBandDeployDebtFile": ".sdd/deploy-debt.jsonl",
+    "deployPreconditionPolicy": "off",
+    "deploySmokeCommand": None,
+    "deploySmokeTimeoutMs": 60000,
     "scCoveragePolicy": "off",
     "verificationKinds": {},
     "evidenceManifest": None,
@@ -166,6 +169,9 @@ RATCHETED_POLICIES = [
     "e2eTestsPolicy",
     "scCoveragePolicy",
     "hooksInstalledPolicy",
+    "outOfBandDeployPolicy",
+    "deployPreconditionPolicy",
+    "changeLogFrRefPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
