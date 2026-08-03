@@ -113,6 +113,15 @@ export const DEFAULTS = {
   duplicateLogicTimeoutMs: 120000,
   // 중복 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
   duplicateLogicListCap: 12,
+  // `@covers` 양방향 결속(SPEC-039) — off|advisory(기본)|hard.
+  // 기존 R1(dangling)은 **단방향**이다: 태그가 가리키는 FR이 실재하는지만 본다. 실재는 동일성이
+  // 아니다 — 실측 제보: 태그가 없는 FR-085를 가리켜 R1이 잡았는데, **다른 세션이 무관한 기능**을
+  // FR-085로 착지시킨 순간 위반이 사라지고 초록이 됐다. 태그는 returnTo 테스트를, FR-085는
+  // 메일주소 필드를 말하는데 회계는 "unit으로 커버됨"이라고 보고한다. 번호가 겹치면 통과한다.
+  // 대조 축은 FR 쪽 `[검증: <경로>]` 관습을 그대로 쓴다(새 문법 없음).
+  coversBacklinkPolicy: "advisory",
+  // 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
+  coversBacklinkListCap: 12,
   // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도

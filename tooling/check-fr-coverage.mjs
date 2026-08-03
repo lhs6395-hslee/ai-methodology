@@ -24,6 +24,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile} from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
@@ -32,6 +33,7 @@ import { parseSection } from "./ownership-keys.mjs";
 import { INFRA_SOURCE_CLASSES, prefixClassFinding, validateExemptions } from "./prefix-class-lib.mjs";
 import { numberingIssues, frNumberingIssues } from "./numbering-lib.mjs";
 import { changeLogFrRefs, changeLogFrFindings } from "./changelog-fr-lib.mjs";
+import { evidencePathsOf, coversBacklinkFindings, coversBacklinkVerdict } from "./covers-backlink-lib.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 
@@ -153,7 +155,9 @@ if (prefixErrors.length) {
 //    SPEC-001 FR-009 공유 자산이라 손대지 않는다 — 좁힌 것은 범위뿐.
 const specs = new Map();    // SPEC-ID -> Set(FR-ID)
 const frDecls = new Map();
-const clRefs = new Map();  // SPEC-ID -> {declared:Map, retired:Set} (SPEC-037)  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
+const clRefs = new Map();  // SPEC-ID -> {declared:Map, retired:Set} (SPEC-037)
+const frEvidence = new Map(); // "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
+const coverTags = [];         // {file, specId, frId} — 양방향 결속 판정 입력  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md") || !PREFIXES.some((p) => f.startsWith(p + "-"))) continue;
   const id = f.match(SPEC_ID)?.[0];
@@ -162,6 +166,17 @@ for (const f of readdirSync(SPEC_DIR)) {
   const list = frDeclarations(text, FR_DECL, cfg.__reqAlt);
   frDecls.set(id, list);
   specs.set(id, new Set(list));
+  // FR 선언 라인별 `[검증: 경로]` — @covers 양방향 결속의 대조 축(SPEC-039). 새 문법 없음.
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (t.startsWith("|")) continue;                 // 표 행(Change Log)은 이력이지 선언이 아니다
+    cfg.__frDeclRe.lastIndex = 0;
+    const fr = cfg.__frDeclRe.exec(t);
+    cfg.__frDeclRe.lastIndex = 0;
+    if (!fr) continue;
+    const paths = evidencePathsOf(t);
+    if (paths.length) frEvidence.set(`${id}/${fr[1]}`, paths);
+  }
   // Change Log가 **선언한** FR 집합(SPEC-037) — 새 검사와 결번 advisory가 같은 소스를 쓴다.
   clRefs.set(id, changeLogFrRefs(text, cfg.__reqAlt, cfg.__idAlt, {
     neu: cfg.changeLogNewVerbs, rev: cfg.changeLogReviseVerbs, ret: cfg.changeLogRetireVerbs,
@@ -203,6 +218,7 @@ for (const dir of SCAN_DIRS) {
       // e2e-only 판정용: FR별로 "e2e가 아닌 커버 파일"이 하나라도 있었는지 기록.
       const key = `${spec}/${fr}`;
       coverSeen.add(key);
+      coverTags.push({ file: file.replace(ROOT + "/", ""), specId: spec, frId: fr });
       if (!isE2eFile(file, cfg)) runnableCovered.add(key);
       const declared = specs.get(spec);
       if (!declared || !declared.has(fr)) {
@@ -211,6 +227,15 @@ for (const dir of SCAN_DIRS) {
     }
   }
 }
+
+// 커밋 스테이징 집합(있으면) — 위반의 **귀속**을 가르는 데만 쓴다. 판정 집합은 워킹트리 전역이다.
+// null = 알 수 없음(커밋 밖 실행·git 없음·CI) → 종전대로 전부 hard.
+let commitScope = null;
+try {
+  const out = execSync("git diff --cached --name-only", { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  const staged = out.split("\n").map((x) => x.trim()).filter(Boolean);
+  if (staged.length) commitScope = new Set(staged);
+} catch { /* git 없음·저장소 아님 — 귀속 판정 불가 */ }
 
 // 3. Evaluate rules.
 const errors = [];
@@ -228,7 +253,55 @@ for (const f of clFindings) {
 
 // R1: bad references
 for (const { file, spec, fr } of badRefs) {
-  errors.push(`R1 dangling @covers ${spec}/${fr} in ${file.replace(ROOT + "/", "")} — no such FR in ${spec}`);
+  // 귀속 분리(제보 곁가지 판정): 판정 집합은 **워킹트리 전역**을 유지한다 — 범위를 staged로 좁히면
+  // 커밋 밖 파일의 dangling 태그가 영구히 안 보이고, 그 손실을 선택지로 내미는 것은 완화를 권장으로
+  // 올리는 것과 같다(HARNESS 불변). 대신 **강도를 귀속으로 가른다**: 이 커밋이 건드리지 않은 파일의
+  // 위반은 advisory로 낮춘다. 실측 제보: 커밋과 무관한 untracked 파일이 커밋을 막아 "파일을 잠시
+  // 옮겨 커밋"이라는 우회를 유발했다 — 우회를 유발하는 강제는 강제가 아니다.
+  // 스테이징 집합을 알 수 없으면(커밋 밖 실행·git 없음·CI) 종전대로 hard다 — CI는 전부 막는다.
+  const relFile = file.replace(ROOT + "/", "");
+  const msg = `R1 dangling @covers ${spec}/${fr} in ${relFile} — no such FR in ${spec}`;
+  if (commitScope && !commitScope.has(relFile)) {
+    warnings.push(`${msg} · **이 커밋 범위 밖**이라 차단하지 않는다(남아 있다 — 그 파일을 커밋할 때 막힌다)`);
+  } else {
+    errors.push(msg);
+  }
+}
+
+// R1b: `@covers` 양방향 결속(SPEC-039) — 태그가 가리키는 FR과 FR이 인정하는 증거가 서로를 아는가.
+// R1(dangling)은 **실재**만 본다: 번호가 겹치기만 하면 통과한다(실측 제보: 다른 세션이 무관한 기능을
+// 같은 번호로 착지시킨 순간 위반이 사라지고 초록이 됐다). 실재는 동일성이 아니다.
+const BL_POLICY = String(cfg.coversBacklinkPolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(BL_POLICY)) {
+  console.error(`✗ coversBacklinkPolicy 값 위반 "${BL_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+if (BL_POLICY !== "off") {
+  const declaredKeys = new Set();
+  for (const [sid, frs] of specs) for (const f of frs) declaredKeys.add(`${sid}/${f}`);
+  const bl = coversBacklinkFindings(coverTags, frEvidence, declaredKeys,
+    (pattern, path) => { try { return compileGlob(pattern).test(path); } catch { return false; } });
+  const v = coversBacklinkVerdict(BL_POLICY, bl.counts);
+  const cap = Number(cfg.coversBacklinkListCap) || 12;
+  // 헤더는 **버킷 합과 맞아야 한다** — 태그 총량만 적으면 (파일,FR) 중복분이 사라진 것처럼 읽히고,
+  // 그 외형이 곧 "조용한 누락"이다. 유일 건수와 총량을 함께 적어 차이를 설명한다.
+  const uniq = bl.counts.matched + bl.counts.mismatch + bl.counts.unlabeled;
+  const dedup = coverTags.length - uniq;
+  console.log(`@covers 결속(coversBacklinkPolicy=${BL_POLICY}): 태그 ${coverTags.length}건 → 판정 ${uniq}건`
+    + (dedup > 0 ? `(같은 파일이 같은 FR을 재태깅한 ${dedup}건은 1건으로 셈)` : "")
+    + ` — 일치 ${bl.counts.matched}·불일치 ${bl.counts.mismatch}·미표기 ${bl.counts.unlabeled}`);
+  const mism = bl.findings.filter((f) => f.kind === "mismatch");
+  for (const f of mism.slice(0, cap)) {
+    const msg = `[${f.specId}/${f.frId}] ${f.file} — FR의 검증 목록(${f.evidence.join(", ")})이 이 파일을 인정하지 않는다: **번호 충돌 의심**(태그와 FR이 서로 다른 것을 말하고 있다)`;
+    (v.blocking ? errors : warnings).push(msg);
+  }
+  if (mism.length > cap) (v.blocking ? errors : warnings).push(`@covers 결속 불일치 … 외 ${mism.length - cap}건 (coversBacklinkListCap 상향으로 확인)`);
+  // 미표기는 **위반이 아니다** — 표기 부채라 어떤 강도에서도 차단하지 않는다.
+  // 섞으면 도입 첫날 수백 건이 쏟아져 본 신호(불일치)가 묻히고, 그러면 사람이 정책을 끈다.
+  if (bl.counts.unlabeled) {
+    console.log(`  · backlink 미표기 ${bl.counts.unlabeled}건(부채·비차단) — 해당 FR에 \`[검증: <경로>]\`가 없어 대조할 축이 없다. 표기하면 그 FR은 이 검사의 보호를 받는다.`);
+  }
+  if (!mism.length) console.log("  ✓ 결속 불일치 0건 — 태그와 FR이 서로를 인정한다(미표기는 위 별도 집계).");
 }
 
 // 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.

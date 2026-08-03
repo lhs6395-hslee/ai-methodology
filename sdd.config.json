@@ -113,7 +113,8 @@
     "deploy-guard": "out-of-band 배포 가드 — spec-first 발화 지점을 커밋에서 배포 행위까지 앞당긴다(PostToolUse, 비차단, SPEC-035)",
     "hook-wiring": "훅 배선 실재 — .git/hooks에 킷 훅이 설치·실행 가능·킷 소유인가(미설치를 green으로 읽지 않는다, SPEC-036)",
     "changelog-fr-ref": "Change Log 행이 FR에 대해 하는 **선언** — 그 FR 자체와 구분되는 실체다(\"FR-018을 추가했다\"는 주장 vs FR-018이라는 요구). 선언이 실물과 어긋나면 계약이 SSOT 밖에 산다(SPEC-037)",
-    "duplicate-logic": "같은 규칙이 두 곳에 구현된 상태 — 선언 중복(dedup)의 거울 밖이다. 같은 파일을 두 스펙이 주장하는 것과, 같은 동작을 두 함수가 실현하는 것은 다른 사실이다(SPEC-038)"
+    "duplicate-logic": "같은 규칙이 두 곳에 구현된 상태 — 선언 중복(dedup)의 거울 밖이다. 같은 파일을 두 스펙이 주장하는 것과, 같은 동작을 두 함수가 실현하는 것은 다른 사실이다(SPEC-038)",
+    "covers-backlink": "테스트 태그와 FR 검증 목록의 **상호 인정** — FR이 실재하는 것과 그 FR이 이 테스트를 인정하는 것은 다른 사실이다(번호가 겹치면 실재는 성립하고 동일성은 깨진다, SPEC-039)"
   },
   "relationTypes": [
     "references"
@@ -208,6 +209,10 @@
     "duplicate-logic::spec-quality-gates": "002의 dedup은 **선언**(같은 파일·같은 키를 두 스펙이 주장), 038은 **구현**(같은 규칙을 두 코드가 실현). 거울의 안과 밖이며 038은 002가 못 보는 쪽만 담당한다",
     "duplicate-logic::semantic-drift": "019는 리네임·소유 이동으로 **옛 의미가 남는** 것, 038은 애초에 **둘이 동시에 생긴** 것이다. 시간축이 반대다",
     "duplicate-logic::spec-grammar-hardening": "013은 스펙 **문장**의 문법(Module·SHALL·글롭), 038은 **소스 코드**의 중복이다. 판정 대상이 문서 vs 코드다",
+    "covers-backlink::execution-evidence": "031은 FR 쪽 주장이 **실행 가능한 자산**을 지목하는지(증거 등급), 039는 그 자산 목록과 **테스트 쪽 태그**가 일치하는지(결속 방향). 039가 031이 만든 표기를 대조 축으로 소비한다 — 소비 관계는 중복이 아니다",
+    "covers-backlink::verification-accounting": "007은 FR이 어느 클래스로 **회계**되는가(unit/smoke/deferred), 039는 그 회계의 **입력이 참인가**. 분류 vs 입력 진위다",
+    "covers-backlink::changelog-fr-ref": "둘 다 두 선언을 대조하지만 짝이 다르다 — 037은 Change Log↔FR 본문, 039는 테스트 태그↔FR 검증 목록",
+    "covers-backlink::duplicate-logic": "뿌리(병렬 세션)는 같고 대상이 다르다 — 038은 같은 규칙이 두 곳에 **구현**된 것, 039는 한 번호를 두 관심사가 **주장**하는 것. 코드 vs 태그다",
     "changelog-fr-ref::derivation-accounting": "둘 다 Change Log 표 행을 읽지만 보는 칸이 다르다 — 009는 '근거 칸이 비었나'(기록의 완전성), 037은 '이 행이 선언한 FR이 실재하나'(기록의 진위). 완전성 vs 진위다",
     "changelog-fr-ref::spec-sync": "003은 코드가 바뀌면 스펙이 **동반됐는가**(동반 여부), 037은 그 동반 기록이 **참인가**(선언↔실물). 037은 003의 택1 탈출구를 없애지 않고 그 위에 거짓 선언만 얹어 잡는다",
     "changelog-fr-ref::spec-id-numbering": "014는 번호 집합의 **형태**(중복·연번·결번), 037은 결번의 **의미**(폐기냐 미작성이냐)를 Change Log에서 읽는다. 014의 결번 advisory가 037의 판정을 소비하되 소유는 갈린다 — 소비 관계는 중복이 아니다",

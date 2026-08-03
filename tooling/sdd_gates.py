@@ -70,6 +70,8 @@ DEFAULTS = {
     "duplicateLogicCommand": None,
     "duplicateLogicTimeoutMs": 120000,
     "duplicateLogicListCap": 12,
+    "coversBacklinkPolicy": "advisory",
+    "coversBacklinkListCap": 12,
     "hooksInstalledPolicy": "advisory",
     "syncHookRules": None,
     "syncHookDelegatedTo": "",
@@ -182,6 +184,7 @@ RATCHETED_POLICIES = [
     "deployPreconditionPolicy",
     "changeLogFrRefPolicy",
     "duplicateLogicPolicy",
+    "coversBacklinkPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -636,6 +639,58 @@ def change_log_fr_findings(spec_id, declared, fr_ids):
     return [(spec_id, declared[n][0], declared[n][1]) for n in sorted(declared) if n not in present]
 
 
+# ─── @covers 양방향 결속 (SPEC-039) — covers-backlink-lib.mjs 미러 ───
+def evidence_paths_of(line):
+    """FR 선언 라인의 `[검증: a, b]` 경로 목록. `[미확인]`·서술형·코드 스팬은 []."""
+    s2 = re.sub(r"`[^`]*`", " ", str(line or ""))
+    m = re.search(r"\[검증\s*[:：]\s*([^\]]*)\]", s2)
+    if not m:
+        return []
+    return [p.strip() for p in str(m.group(1) or "").split(",") if p.strip()]
+
+
+def covers_backlink_findings(tags, evidence, declared, matcher):
+    """태그와 FR 검증 목록의 상호 인정 판정. 반환 (findings, counts).
+    kind: mismatch(위반) | unlabeled(표기 부채, 위반 아님). 실재하지 않는 FR은 R1의 몫이라 제외."""
+    findings = []
+    counts = {"matched": 0, "mismatch": 0, "unlabeled": 0}
+    seen = set()
+    for t in sorted(tags or [], key=lambda x: x["file"] + x["specId"] + x["frId"]):
+        key = f"{t['specId']}/{t['frId']}"
+        if declared is not None and key not in declared:
+            continue
+        dedup = f"{t['file']} {key}"
+        if dedup in seen:
+            continue
+        seen.add(dedup)
+        paths = (evidence or {}).get(key) or []
+        if not paths:
+            counts["unlabeled"] += 1
+            findings.append({"file": t["file"], "specId": t["specId"], "frId": t["frId"],
+                             "kind": "unlabeled", "evidence": []})
+            continue
+        hit = False
+        for p in paths:
+            base = p.rstrip("/")
+            if p == t["file"] or matcher(p, t["file"]) or t["file"] == base or t["file"].startswith(base + "/"):
+                hit = True
+                break
+        if hit:
+            counts["matched"] += 1
+            continue
+        counts["mismatch"] += 1
+        findings.append({"file": t["file"], "specId": t["specId"], "frId": t["frId"],
+                         "kind": "mismatch", "evidence": paths})
+    return findings, counts
+
+
+def covers_backlink_verdict(policy, counts):
+    pol = str(policy or "off")
+    if pol == "off":
+        return {"judged": False, "blocking": False}
+    return {"judged": True, "blocking": pol == "hard" and (counts.get("mismatch") or 0) > 0}
+
+
 def fr_numbering_issues(spec_id, fr_ids, declared_nums=None):
     """FR 번호(스펙별 001 연번) 무결성 (SPEC-014, numbering-lib.mjs frNumberingIssues 미러 — 바이트 동일).
     입력은 **한 스펙의** FR 선언 목록(중복 판정에 중복이 필요하므로 set이 아니라 list).
@@ -749,6 +804,8 @@ def cmd_fr(cfg, strict):
     specs = {}     # SPEC-ID -> set(FR-ID)
     fr_decls = {}  # SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — set은 중복을 삼킨다)
     cl_refs = {}   # SPEC-ID -> (declared, retired) — SPEC-037 판정 소스(새 검사·결번 문구 공용)
+    fr_evidence = {}   # "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
+    cover_tags = []    # {file, specId, frId} — 양방향 결속 판정 입력
     for f in spec_names:
         if not (f.endswith(".md") and any(f.startswith(p + "-") for p in cfg["__prefixes"])):
             continue
@@ -759,6 +816,16 @@ def cmd_fr(cfg, strict):
         lst = fr_declarations(text, cfg["__frDecl"], cfg["__reqAlt"])
         fr_decls[m.group(0)] = lst
         specs[m.group(0)] = set(lst)
+        for line in text.split("\n"):
+            t2 = line.strip()
+            if t2.startswith("|"):
+                continue
+            fr2 = cfg["__frDecl"].search(t2)
+            if not fr2:
+                continue
+            paths2 = evidence_paths_of(t2)
+            if paths2:
+                fr_evidence[f"{m.group(0)}/{fr2.group(1)}"] = paths2
         cl_refs[m.group(0)] = change_log_fr_refs(text, cfg["__reqAlt"], cfg["__idAlt"], {
             "neu": cfg.get("changeLogNewVerbs"), "rev": cfg.get("changeLogReviseVerbs"),
             "ret": cfg.get("changeLogRetireVerbs")})
@@ -791,6 +858,7 @@ def cmd_fr(cfg, strict):
             for spec, fr in cfg["__covers"].findall(text):
                 covered.setdefault(spec, set()).add(fr)
                 key = f"{spec}/{fr}"
+                cover_tags.append({"file": rel_from_root(cfg, file), "specId": spec, "frId": fr})
                 cover_seen.add(key)
                 if not is_e2e_file(file, cfg):
                     runnable_covered.add(key)
@@ -806,8 +874,63 @@ def cmd_fr(cfg, strict):
         msg = (f"[{sid}] Change Log가 {fid} {verb}를 선언했으나 FR 절에 본문 없음 — "
                f'계약을 FR로 착지시키거나, 폐기라면 "{fid} 폐기"로 표기하라(changeLogFrRefPolicy={cl_policy})')
         (errors if (cl_policy == "hard" or strict) else warnings).append(msg)
+    # 귀속 분리 — 판정 집합은 워킹트리 전역을 유지하되 커밋 밖 위반은 강도를 낮춘다(오귀속 차단 제거).
+    commit_scope = None
+    try:
+        out2 = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=cfg["__root"],
+                              capture_output=True, text=True, check=True).stdout
+        staged2 = [x.strip() for x in out2.split("\n") if x.strip()]
+        if staged2:
+            commit_scope = set(staged2)
+    except Exception:  # noqa: BLE001
+        commit_scope = None
     for file, spec, fr in bad_refs:
-        errors.append(f"R1 dangling @covers {spec}/{fr} in {rel_from_root(cfg, file)} — no such FR in {spec}")
+        rel_file = rel_from_root(cfg, file)
+        msg = f"R1 dangling @covers {spec}/{fr} in {rel_file} — no such FR in {spec}"
+        if commit_scope is not None and rel_file not in commit_scope:
+            warnings.append(f"{msg} · **이 커밋 범위 밖**이라 차단하지 않는다(남아 있다 — 그 파일을 커밋할 때 막힌다)")
+        else:
+            errors.append(msg)
+
+    # R1b: @covers 양방향 결속(SPEC-039) — 실재는 동일성이 아니다.
+    bl_policy = str(cfg.get("coversBacklinkPolicy") or "advisory")
+    if bl_policy not in ("off", "advisory", "hard"):
+        print(f'✗ coversBacklinkPolicy 값 위반 "{bl_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if bl_policy != "off":
+        declared_keys = set()
+        for sid2, frs2 in specs.items():
+            for f2 in frs2:
+                declared_keys.add(f"{sid2}/{f2}")
+
+        def _bl_match(pattern, path):
+            try:
+                return compile_glob(pattern).search(path) is not None
+            except Exception:  # noqa: BLE001
+                return False
+
+        bl_findings, bl_counts = covers_backlink_findings(cover_tags, fr_evidence, declared_keys, _bl_match)
+        bl_v = covers_backlink_verdict(bl_policy, bl_counts)
+        bl_cap = int(cfg.get("coversBacklinkListCap") or 12)
+        uniq = bl_counts["matched"] + bl_counts["mismatch"] + bl_counts["unlabeled"]
+        dedup2 = len(cover_tags) - uniq
+        print(f"@covers 결속(coversBacklinkPolicy={bl_policy}): 태그 {len(cover_tags)}건 → 판정 {uniq}건"
+              + (f"(같은 파일이 같은 FR을 재태깅한 {dedup2}건은 1건으로 셈)" if dedup2 > 0 else "")
+              + f" — 일치 {bl_counts['matched']}·불일치 {bl_counts['mismatch']}·미표기 {bl_counts['unlabeled']}")
+        mism = [f for f in bl_findings if f["kind"] == "mismatch"]
+        for f in mism[:bl_cap]:
+            msg2 = (f"[{f['specId']}/{f['frId']}] {f['file']} — FR의 검증 목록({', '.join(f['evidence'])})이 "
+                    "이 파일을 인정하지 않는다: **번호 충돌 의심**(태그와 FR이 서로 다른 것을 말하고 있다)")
+            (errors if bl_v["blocking"] else warnings).append(msg2)
+        if len(mism) > bl_cap:
+            (errors if bl_v["blocking"] else warnings).append(
+                f"@covers 결속 불일치 … 외 {len(mism) - bl_cap}건 (coversBacklinkListCap 상향으로 확인)")
+        if bl_counts["unlabeled"]:
+            print(f"  · backlink 미표기 {bl_counts['unlabeled']}건(부채·비차단) — 해당 FR에 `[검증: <경로>]`가 "
+                  "없어 대조할 축이 없다. 표기하면 그 FR은 이 검사의 보호를 받는다.")
+        if not mism:
+            print("  ✓ 결속 불일치 0건 — 태그와 FR이 서로를 인정한다(미표기는 위 별도 집계).")
 
     # 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
     #     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
