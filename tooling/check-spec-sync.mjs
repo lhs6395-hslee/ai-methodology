@@ -74,6 +74,22 @@ const collectRenames = (raw) => lines(raw).forEach((ln) => {
 if (branchDiffOk) collectRenames(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
 if (STAGED) collectRenames(shOk("git diff --cached --name-status --find-renames"));
 
+// ②c 삭제 경로 수집(SPEC-003 FR-010 개정) — 두 검사가 changeset을 "추가·수정만"으로 가정하던 결함.
+// 실측 제보: 소유 파일을 저장소에서 **없애는** 변경은 어떤 순서로도 통과하지 못했다.
+//   ⓐ 선언 제거 + 삭제를 한 커밋에 → Files 리터럴 부재(스펙을 index ∪ HEAD로 읽으니 HEAD가 아직 선언)
+//   ⓑ 두 커밋으로 쪼갬 → 삭제된 파일이 unowned closed-world에 걸림
+// **정답 경로가 아예 없었다.** 그래서 사람이 `--no-verify`로 훅을 건너뛰었고, 그 순간 이 게이트가
+// 존재하는 이유 자체가 물러진다. `specSyncExemptGlobs`로 빼는 것도 답이 아니다 — 지우는 파일 때문에
+// **영구 예외**가 config에 남아 부채가 반대 방향으로 쌓인다.
+// 삭제는 "잘못 적힌 경로"도 "소유 없는 파일"도 아니다 — 세 번째 상태이므로 따로 센다.
+const deleted = new Set();
+const collectDeleted = (raw) => lines(raw).forEach((ln) => {
+  const m = /^D\d*\t(.+)$/.exec(ln);
+  if (m) deleted.add(m[1].trim());
+});
+if (branchDiffOk) collectDeleted(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
+if (STAGED) collectDeleted(shOk("git diff --cached --name-status --find-renames"));
+
 // ③ 스펙 로드(§5.1): HEAD ∪ index 합집합(삭제 가시화).
 const specPaths = new Set([
   ...lines(shOk(`git ls-files -- ${cfg.specDir}`) || ""),
@@ -108,7 +124,10 @@ for (const p of specPaths) {
   // **소유가 조용히 사라진다**. 글롭 문법 위반과 같은 계열이라 같은 강도로 다룬다
   // (staged=✗ hard / range=⚠). 삭제 중 스펙은 제외(수명 종료 경로).
   if (!(idx === null && head !== null)) {
-    const missing = filesLineMissingPaths([...globs], (rel) => existsSync(join(cfg.__root, rel)));
+    // 이번 changeset에서 **삭제 중인** 경로는 "잘못 적힌 것"이 아니라 "지우는 것"이다.
+    // 원래부터 틀린 경로(오타·리네임 누락)를 잡으려던 검사인데 삭제까지 함께 잡고 있었다.
+    const missing = filesLineMissingPaths([...globs], (rel) => existsSync(join(cfg.__root, rel)))
+      .filter((rel) => !deleted.has(rel));
     if (missing.length) {
       console.log(`${STAGED ? "✗" : "⚠"} [${id}] Files 리터럴 경로 부재 ${missing.join(" ")} — 그 경로는 어떤 변경 파일과도 매치하지 않으므로 이 스펙의 소유가 조용히 사라진다(리네임됐으면 스펙을 실물 이름에 맞춰라)`);
       if (STAGED) filesMissingHard = true;
@@ -198,7 +217,9 @@ for (const f of changed) {
       else violations.push({ file: f, spec: s.id });
     }
   }
-  if (!owned && POLICY !== "silent") unowned.push(f);
+  // 삭제된 파일에 소유를 요구하는 것은 모순이다 — 선언은 이미(또는 동시에) 사라졌으므로
+  // 정의상 매치될 수 없다. 삭제를 unowned로 세면 "지우는 커밋"이 영구히 막힌다.
+  if (!owned && POLICY !== "silent" && !deleted.has(f)) unowned.push(f);
 }
 
 // ④b semantic drift 승격(SPEC-019): 리네임된 소유 파일의 스펙은 FR 라인 변경 ∨ Spec-Impact 필요.

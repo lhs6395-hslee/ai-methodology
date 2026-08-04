@@ -590,6 +590,51 @@ test("py specsync: unowned 정책 warn=⚠ 통과 · error(staged)=✗ exit 1 ·
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ── Files 리터럴 경로 부재(SPEC-013 패리티) + 삭제 경로 제외(SPEC-003 FR-010) ──
+// 실측 결함: 이 축이 Node판에만 있었다 — Python 런타임 프로젝트는 같은 위반을 **조용히 통과**시켰다
+// (동반 요구가 충족되면 exit 0). 판정 게이트의 한쪽만 있는 축은 축이 아니다.
+test("py specsync: Files 리터럴 경로 부재 → Node와 바이트 동일하게 차단(staged=hard)", skip, () => {
+  const { root, g } = gitFixture();
+  try {
+    const specPath = join(root, "sdd/specs/SPEC-001.md");
+    const spec = execFileSync("cat", [specPath], { encoding: "utf8" });
+    // 실재하지 않는 리터럴 경로를 Files에 추가 + 스펙 의미 변경 동반(동반 요구는 충족 → 이 축만 남는다)
+    writeFileSync(specPath, spec.replace("- **Files**: src/lib/**", "- **Files**: src/lib/**, src/lib/gone.ts")
+      + "| 2026-08-04 | gone 추가 | 근거 |\n");
+    writeFileSync(join(root, "src/lib/a.ts"), "export const v = 2;\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore\n");
+    const p = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    const n = runNode(root, "check-spec-sync.mjs", ["--staged", "--message-file", "msg"]);
+    assert.equal(p.code, 1, p.out);
+    assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(p.out, /Files 리터럴 경로 부재 src\/lib\/gone\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("py specsync: 소유 파일 삭제 + 같은 커밋의 Files 항목 제거 → 양판 통과(삭제 경로 제외)", skip, () => {
+  const { root, g } = gitFixture();
+  try {
+    const specPath = join(root, "sdd/specs/SPEC-001.md");
+    writeFileSync(join(root, "src/lib/old.ts"), "export const old = 1;\n");
+    const spec = execFileSync("cat", [specPath], { encoding: "utf8" });
+    writeFileSync(specPath, spec.replace("- **Files**: src/lib/**", "- **Files**: src/lib/a.ts, src/lib/old.ts"));
+    g("add", "-A"); g("commit", "-qm", "own old");
+    // 선언 제거 + 실물 삭제를 한 커밋에 — 삭제는 "잘못 적힌 경로"도 "미소유"도 아니다.
+    const spec2 = execFileSync("cat", [specPath], { encoding: "utf8" });
+    writeFileSync(specPath, spec2.replace(", src/lib/old.ts", "") + "| 2026-08-04 | old 제거 | 사용처 없음 |\n");
+    g("rm", "-q", "src/lib/old.ts"); g("add", "-A");
+    writeFileSync(join(root, "msg"), "chore: remove old\n");
+    const p = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    const n = runNode(root, "check-spec-sync.mjs", ["--staged", "--message-file", "msg"]);
+    assert.equal(p.code, 0, p.out);
+    assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.doesNotMatch(p.out, /리터럴 경로 부재/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── 수명주기(SPEC-008 패리티): completeness Status·리뷰 기록 + specsync Draft 차단 ──
 
 test("py specsync staged: Draft 스펙 소유 코드 → 스펙 동반해도 exit 1 (Draft 차단 패리티)", skip, () => {

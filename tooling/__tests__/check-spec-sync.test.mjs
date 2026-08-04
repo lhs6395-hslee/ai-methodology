@@ -606,3 +606,82 @@ test("specSyncBase: config로 base 선언 → 멀티커밋 브랜치(스펙 선�
     assert.doesNotMatch(r.out, /해석 불가/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── 소유 파일 제거 경로 (SPEC-003 FR-010 개정) ──
+// 실측 제보(operations-dashboard 2026-08-04): 소유 파일을 저장소에서 **없애는** 변경이 어떤 순서로도
+// 통과하지 못했다 — 선언 제거+삭제를 한 커밋에 넣으면 Files 리터럴 부재(스펙을 index ∪ HEAD로 읽으니
+// HEAD가 아직 선언), 두 커밋으로 쪼개면 삭제 파일이 unowned closed-world. **정답 경로가 아예 없어서**
+// 사람이 `--no-verify`로 훅을 건너뛰었고, 그 순간 이 게이트가 존재하는 이유가 물러진다.
+
+test("삭제: 선언 제거 + 파일 삭제를 한 커밋에 → 통과(이것이 정답 경로다)", () => {
+  const { root, g } = repo();
+  try {
+    // closed-world를 base 커밋에 심는다 — config를 같은 커밋에 바꾸면 자기보호가 HEAD config로 판정한다
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: "error" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts, src/lib/pdf/fold.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    writeFileSync(join(root, "src/lib/pdf/fold.ts"), "export const f = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 한 커밋에: Files 항목 제거 + git rm
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/parse.ts", "| 2026-08-04 | fold 제거 | 배포에서 기능 제외 |\n"));
+    g("rm", "-q", "src/lib/pdf/fold.ts");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: fold 제거\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, /리터럴 경로 부재/);
+    assert.doesNotMatch(r.out, /unowned: src\/lib\/pdf\/fold\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("삭제: 파일만 삭제하고 Files 항목은 **그대로** → 여전히 차단(선언↔실물 어긋남이 이 검사의 목적)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts, src/lib/pdf/fold.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    writeFileSync(join(root, "src/lib/pdf/fold.ts"), "export const f = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("rm", "-q", "src/lib/pdf/fold.ts");   // 선언은 손대지 않는다
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: fold 제거\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    // 삭제분은 리터럴 부재에서 빠지지만, 스펙이 안 바뀌었으므로 동반 요구가 그대로 막는다
+    assert.match(r.out, /spec-first 위반|SPEC-001/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("삭제와 무관: 존재한 적 없는 경로를 Files에 적음(오타·리네임 누락) → 여전히 차단", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 없는 경로를 새로 적는다 — 삭제가 아니므로 deleted 집합에 없다
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/parse.ts, src/lib/pdf/typo-never-existed.ts", "| 2026-08-04 | 오타 | x |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "docs: spec\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /리터럴 경로 부재 src\/lib\/pdf\/typo-never-existed\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("삭제와 무관: 신규 미소유 파일 → 여전히 차단(closed-world 유지)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: "error" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    mkdirSync(join(root, "src/other"), { recursive: true });
+    writeFileSync(join(root, "src/other/new.ts"), "export const n = 1;\n");   // 추가 = 삭제 아님
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "feat: new\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /unowned: src\/other\/new\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

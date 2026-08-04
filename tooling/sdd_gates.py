@@ -2901,6 +2901,25 @@ def compile_glob(glob):
     return re.compile(f"^{out}$")
 
 
+def files_line_missing_paths(tokens, exists):
+    """Files 리터럴 경로 실재(spec-sync-lib.mjs 패리티, SPEC-013).
+
+    글롭은 대상에서 뺀다 — 오늘 0건 매치가 정당할 수 있다. 리터럴엔 그 정당성이 없다.
+    exists: (relPath) -> bool 주입(파일 IO는 호출자가 한다)."""
+    out = []
+    for raw in tokens or []:
+        t = str(raw or "").strip()
+        if not t or t in ("—", "-"):
+            continue
+        if re.search(r"[*?{}]", t):
+            continue
+        if t.startswith("["):
+            continue
+        if not exists(t):
+            out.append(t)
+    return out
+
+
 def scan_files_line_issues(raw_line):
     """§4.1: 원시 `- **Files**:` 라인의 미지원 glob 문법 스캔(경고용)."""
     value = re.sub(r"^.*?\*\*Files\*\*\s*:", "", raw_line)
@@ -3083,6 +3102,21 @@ def cmd_specsync(cfg, staged, msg_file, base):
     if staged:
         collect_renames(_git(cfg, ["diff", "--cached", "--name-status", "--find-renames"]))
 
+    # ②c 삭제 경로(SPEC-003 FR-010 개정) — 삭제는 "잘못 적힌 경로"도 "소유 없는 파일"도 아닌 세 번째 상태다.
+    # 두 검사가 changeset을 추가·수정만으로 가정해 **소유 파일을 지우는 정답 경로가 아예 없었다**.
+    deleted_paths = set()
+
+    def collect_deleted(raw):
+        for ln in lines(raw):
+            m = re.match(r"^D\d*\t(.+)$", ln)
+            if m:
+                deleted_paths.add(m.group(1).strip())
+
+    if branch_diff_ok:
+        collect_deleted(_git(cfg, ["diff", "--name-status", "--find-renames", f"{base}...HEAD"]))
+    if staged:
+        collect_deleted(_git(cfg, ["diff", "--cached", "--name-status", "--find-renames"]))
+
     # ③ 스펙 로드(§5.1): HEAD ∪ index 합집합(삭제 가시화).
     spec_paths = set(
         p for p in lines(_git(cfg, ["ls-files", "--", cfg["specDir"]])) +
@@ -3090,6 +3124,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
         if p.endswith(".md"))
     specs = []  # (id, path, [(glob, re)], deleted_in_index)
     warned_glob_spec = set()
+    files_missing_hard = False  # Files 리터럴 경로 부재(staged=hard)
     for p in sorted(spec_paths):
         idx = _git(cfg, ["show", f":{p}"])
         head = _git(cfg, ["show", f"HEAD:{p}"])
@@ -3114,6 +3149,21 @@ def cmd_specsync(cfg, staged, msg_file, base):
                     globs.add(g)
         specs.append((spec_id, p, [(g, compile_glob(g)) for g in sorted(globs)],
                       idx is None and head is not None, parse_status(text)))
+
+        # Files의 리터럴 경로 실재(SPEC-013) — 없는 경로는 아무 변경 파일과도 매치하지 않아
+        # **소유가 조용히 사라진다**. 글롭 문법 위반과 같은 계열이라 같은 강도로 다룬다
+        # (staged=✗ hard / range=⚠). 삭제 중 스펙은 제외(수명 종료 경로).
+        if not (idx is None and head is not None):
+            # 이번 changeset에서 **삭제 중인** 경로는 "잘못 적힌 것"이 아니라 "지우는 것"이다.
+            missing_lit = [rel for rel in files_line_missing_paths(
+                sorted(globs), lambda rel: os.path.exists(resolve(cfg, rel)))
+                if rel not in deleted_paths]
+            if missing_lit:
+                print(f"{'✗' if staged else '⚠'} [{spec_id}] Files 리터럴 경로 부재 {' '.join(missing_lit)} — "
+                      f"그 경로는 어떤 변경 파일과도 매치하지 않으므로 이 스펙의 소유가 조용히 사라진다"
+                      f"(리네임됐으면 스펙을 실물 이름에 맞춰라)")
+                if staged:
+                    files_missing_hard = True
 
     # ④ 판정: 변경 코드 파일 → 소유 스펙(AND, §6.1) → 의미 변경(두-이미지 합집합, §5.4·§5.8).
     # 미소유 파일은 specSyncUnownedPolicy가 선언한 대로 — silent(현행)/warn/error(closed-world).
@@ -3197,7 +3247,9 @@ def cmd_specsync(cfg, staged, msg_file, base):
                     print(f"· cross-spec: {f} → 소유 {spec_id} 변경 동인 {', '.join(ids)}(Change-Driver 선언, 참조 완화)")
                 else:
                     violations.append((f, spec_id, False, None))
-        if not owned and policy != "silent":
+        # 삭제된 파일에 소유를 요구하는 것은 모순이다 — 선언은 이미(또는 동시에) 사라졌으므로
+        # 정의상 매치될 수 없다. 삭제를 unowned로 세면 "지우는 커밋"이 영구히 막힌다(SPEC-003 FR-010 개정).
+        if not owned and policy != "silent" and f not in deleted_paths:
             unowned.append(f)
 
     # ④b semantic drift 승격(SPEC-019): 리네임된 소유 파일의 스펙은 FR 라인 변경 ∨ Spec-Impact 필요.
@@ -3247,6 +3299,11 @@ def cmd_specsync(cfg, staged, msg_file, base):
     glob_hard = staged and len(warned_glob_spec) > 0
     if glob_hard and not violations:
         print("\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).",
+              file=sys.stderr)
+        sys.exit(1)
+    # Files 리터럴 경로 부재도 같은 계열의 "소유가 조용히 풀림"이라 같은 강도로 차단한다.
+    if files_missing_hard and not violations:
+        print("\n✗ Files 리터럴 경로 부재: 존재하지 않는 경로는 어떤 변경 파일과도 매치하지 않는다 — 스펙을 실물 경로에 맞추거나(리네임 반영) 그 항목을 지워라.",
               file=sys.stderr)
         sys.exit(1)
     # semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
