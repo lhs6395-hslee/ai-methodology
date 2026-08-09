@@ -273,14 +273,40 @@
   <p class="kicker reveal">덤으로 이런 것도 잡힙니다 — <b>도구가 자기 언어만 볼 때</b>.</p>
   <p class="reveal">중복 검사 도구는 자바스크립트로 만들어져서, 기본 설정이 자바스크립트 파일만 봅니다. 파이썬으로 짠 프로젝트가 이 검사를 켜면 <b>파일을 하나도 안 보고 “중복 0건”</b>이라고 말합니다. 그 0은 진짜 0이 아닙니다. 그래서 이제는 이렇게 말합니다 — <i>“기본 설정으로 33개만 봤고 .py 파일은 안 봤습니다.”</i> 이 검사를 켜자마자 <b>우리 자신의 파이썬 파일</b>이 그동안 한 번도 검사되지 않았다는 게 드러났습니다.</p>
 
-  <h2><span class="n">8</span>그래서 무엇이 남나</h2>
+  <h2><span class="n">8</span>“검사표에 적혀 있다”와 “검사를 했다”는 다릅니다</h2>
+  <p class="lede reveal">앞 절이 <b>검사 장치</b>에 대한 이야기였다면, 이건 <b>검사하는 사람</b>에 대한 이야기입니다.</p>
+  <p class="reveal">명세에는 “이건 이 테스트로 확인합니다”라고 적혀 있습니다. 그 테스트 파일도 실제로 있습니다. 그런데 <b>그 테스트가 돌았는지는 아무도 안 봤습니다.</b> 실제로 이런 일이 세 번 있었습니다:</p>
+  <div class="cards">
+    <div class="c reveal" style="--k:var(--pink)"><div class="ico">🚪</div>
+      <div><h3>중간에 그만둠</h3><p>“확인할 데이터가 없어서” 검증을 중도 포기했는데, 포기했다는 기록이 어디에도 없었습니다.
+      <span class="ex">아무도 몰랐다</span></p></div></div>
+    <div class="c reveal" style="--k:var(--orange)"><div class="ico">0️⃣</div>
+      <div><h3>0건 검사하고 “성공”</h3><p>검사 대상이 하나도 없었는데 프로그램은 “성공”으로 끝났습니다.
+      <span class="ex">아무것도 안 함 = 성공</span></p></div></div>
+    <div class="c reveal" style="--k:var(--purple)"><div class="ico">👻</div>
+      <div><h3>한 번도 안 뜬 검사</h3><p>필요한 준비물이 없어 검사 작업이 아예 시작되지 않았는데, “실패해도 넘어가는” 설정이라 전체는 초록이었습니다.
+      <span class="ex">없는 검사 = 통과</span></p></div></div>
+  </div>
+  <p class="kicker reveal">그래서 <b>검사 일지</b>를 씁니다.</p>
+  <p class="reveal">검사를 한 쪽이 스스로 한 줄 남깁니다 — <i>“했다”</i>거나 <i>“못 했다 + 왜”</i>. 그리고 장치는 명세에 적힌 검사 항목과 일지를 맞춰 봅니다. <b>일지에 아무 줄도 없는 항목</b>이 문제입니다. 그건 “안 했다”와 구분이 안 되니까요.</p>
+  <div class="scene reveal">
+    <div style="flex:1"><div class="who">검사 일지</div><div class="box" style="border-color:var(--line);color:var(--ink);font-size:13.5px;text-align:left;line-height:1.9">
+      로그인 테스트 — <b style="color:var(--green)">했음</b> (12개 통과)<br>
+      배포 점검 — <b style="color:var(--orange)">못 함</b> (이미지 저장소가 없어 작업이 안 뜸)<br>
+      결제 테스트 — <b style="color:var(--pink)">기록 없음</b> ← 이게 문제
+    </div></div>
+  </div>
+  <p class="reveal"><b>중요한 건 “못 했다”를 벌주지 않는다는 점입니다.</b> 데이터가 없어서, 권한이 없어서 못 하는 일은 정말로 일어납니다. 그걸 막으면 사람들은 <b>이유를 지어내기 시작하고</b>, 그 순간 일지 자체가 거짓말이 됩니다. 막는 것은 <b>말 없이 사라지는 것</b>뿐입니다 — 그리고 <b>이유 없이 “못 했다”만 적은 줄</b>도 기록으로 쳐주지 않습니다.</p>
+
+  <h2><span class="n">9</span>그래서 무엇이 남나</h2>
   <div class="sum">
     <div class="s reveal"><div class="q">1</div><div><b>만들기 전에 등기한다</b><span>명세마다 “내가 가진 것” 목록을 적는다. 안 적은 명세는 레이더 밖이라 중복이 안 걸린다.</span></div></div>
     <div class="s reveal"><div class="q">2</div><div><b>기계가 대조한다</b><span>사람 눈이 아니라 프로그램이 목록을 맞춰 본다. 겹치면 저장(커밋)이 막힌다.</span></div></div>
     <div class="s reveal"><div class="q">3</div><div><b>확실한 것만 막는다</b><span>글자 규칙과 사람이 적어둔 판단은 막고, AI의 추측은 절대 막지 않는다.</span></div></div>
     <div class="s reveal"><div class="q">4</div><div><b>느슨하게 되돌릴 수 없다</b><span>위반이 많이 뜬다고 규칙 강도를 낮춰 빠져나가는 길이 닫혀 있다. 미룰 순 있어도 없앨 순 없다.</span></div></div>
     <div class="s reveal"><div class="q">5</div><div><b>못 잡는 것도 솔직히 적는다</b><span>완전히 다른 단어로 다시 쓴 중복은 여전히 사람 몫이다. 장치가 만능인 척하지 않는다.</span></div></div>
-    <div class="s reveal"><div class="q">6</div><div><b>안 본 것을 초록으로 세지 않는다</b><span>검사마다 “봤다/껐다/볼 게 없다/건너뛰었다”를 먼저 말한다. 초록의 분모를 늘 함께 적어서, 통과 개수만 보고 다 검사됐다고 읽는 일이 없다.</span></div></div>
+    <div class="s reveal"><div class="q">6</div><div><b>했다는 기록이 없으면 안 한 것이다</b><span>검사한 쪽이 “했다/못 했다+왜”를 일지에 남긴다. 못 한 건 벌주지 않고, 말 없이 사라지는 것만 막는다.</span></div></div>
+    <div class="s reveal"><div class="q">7</div><div><b>안 본 것을 초록으로 세지 않는다</b><span>검사마다 “봤다/껐다/볼 게 없다/건너뛰었다”를 먼저 말한다. 초록의 분모를 늘 함께 적어서, 통과 개수만 보고 다 검사됐다고 읽는 일이 없다.</span></div></div>
   </div>
 
   <div class="foot">더 자세히 — 기술 문서: <a href="ownership-key.html">Ownership Key 모델과 동작 방식</a> · 전체 방법론: <a href="방법론.html">방법론.html</a></div>

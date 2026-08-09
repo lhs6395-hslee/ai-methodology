@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
-import { parseSection } from "./ownership-keys.mjs";
+import { parseSection, bodyBeforeOwnership } from "./ownership-keys.mjs";
 import { buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "./key-anchor-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
@@ -55,10 +55,9 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
     for (const m of unanchoredOwnedKeyFindings(lines, buildKeyKindMap(own, {}, cfg.__roles), MARKERS, cfg.__reqAlt)) markers.unanchored.push({ specId, ...m });
   }
   // Extract body (FR text) — everything before the Ownership section
-  const ownershipStart = text.search(/^##\s+Ownership\b/m);
   // Only the FR body BEFORE ## Ownership grounds keys; the Ownership block (and any
   // post-Ownership sections) are intentionally excluded so a key isn't grounded by its own declaration.
-  const body = ownershipStart === -1 ? text : text.slice(0, ownershipStart);
+  const body = bodyBeforeOwnership(text);
   const hay = body.toLowerCase();
   specCount++;
   for (const cat of CATEGORIES) {

@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 41건
+## Entity 키 (aggregate root) — 42건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -69,8 +69,9 @@
 | `test-domain` | SPEC-015 | ✓ | ✓ | ✓ |
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
+| `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 78건
+## Surface 키 — 80건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -100,6 +101,7 @@
 | `check-synonym.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
 | `check-test-adequacy.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | ✓ |
+| `check-verification-executed.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `covers-backlink-lib.mjs` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard-lib.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -152,8 +154,9 @@
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
 | `verdict-lib.mjs` | SPEC-040 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
+| `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 42건
+## Capability 키 — 44건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -199,6 +202,8 @@
 | `test-domain.judge` | SPEC-015 | ✓ | ✓ | ✓ |
 | `test-execution.run` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting.account` | SPEC-007 | ✓ | ✓ | ✓ |
+| `verification-run.account` | SPEC-041 | ✓ | ✓ | ✓ |
+| `verification-run.record` | SPEC-041 | ✓ | ✓ | ✓ |
 
 ## 역할 없는 카테고리 키 — 16건
 
@@ -223,7 +228,7 @@
 
 ## 집계
 
-- 소유 키 총 **177건** (entity 41 · surface 78 · capability 42 · 역할없음 16)
+- 소유 키 총 **182건** (entity 42 · surface 80 · capability 44 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

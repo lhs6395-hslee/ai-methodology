@@ -114,11 +114,19 @@
     "hook-wiring": "훅 배선 실재 — .git/hooks에 킷 훅이 설치·실행 가능·킷 소유인가(미설치를 green으로 읽지 않는다, SPEC-036)",
     "changelog-fr-ref": "Change Log 행이 FR에 대해 하는 **선언** — 그 FR 자체와 구분되는 실체다(\"FR-018을 추가했다\"는 주장 vs FR-018이라는 요구). 선언이 실물과 어긋나면 계약이 SSOT 밖에 산다(SPEC-037)",
     "duplicate-logic": "같은 규칙이 두 곳에 구현된 상태 — 선언 중복(dedup)의 거울 밖이다. 같은 파일을 두 스펙이 주장하는 것과, 같은 동작을 두 함수가 실현하는 것은 다른 사실이다(SPEC-038)",
+    "verification-run": "선언된 검증 자산이 **실제로 돌았다는 사실** — 그 자산이 저장소에 존재하는 것과 다른 층이다. 존재는 실행이 아니고, 기록이 없으면 안 돈 것과 구분되지 않는다(SPEC-041)",
     "gate-verdict": "게이트가 무엇을 했는지의 **종류**(판정함·정책 off·판정 입력 없음·사유 있는 생략) — 게이트가 내는 문장과 다른 층이다. 문장은 사람이 읽고 종류는 집계기가 읽는데, 둘이 어긋나 \"판정 안 함\"이 \"✓ clean\"으로 집계되던 것이 이 entity의 신설 사유다(SPEC-040)",
     "covers-backlink": "테스트 태그와 FR 검증 목록의 **상호 인정** — FR이 실재하는 것과 그 FR이 이 테스트를 인정하는 것은 다른 사실이다(번호가 겹치면 실재는 성립하고 동일성은 깨진다, SPEC-039)"
   },
   "relationTypes": [
     "references"
+  ],
+  "verificationRunLedger": ".sdd/verification-runs.jsonl",
+  "verificationRunTestAssets": [
+    "tooling/__tests__"
+  ],
+  "surfaceGlobs": [
+    "^tooling/[^/]+\\.mjs$"
   ],
   "specSyncExemptGlobs": [
     "*.md",
@@ -164,6 +172,7 @@
     "migrate",
     "mirror",
     "parse",
+    "record",
     "resolve",
     "retire",
     "run",
@@ -187,6 +196,10 @@
   "synonymPolicy": "hard",
   "entitySimilarityCommand": "cat sdd/similarity-candidates.tsv",
   "synonymReviewLedger": {
+    "verification-run::execution-evidence": "031은 `[검증]`이 실행 가능한 **자산을 지목하는가**(문서 축), 041은 그 자산이 **돌았는가**(실행 축)다. 031이 만든 표기를 041이 대조 대상으로 소비한다 — 존재는 실행이 아니다",
+    "verification-run::test-execution": "021은 `commands.test`를 **실행**하고, 041은 그 실행이 **기록됐는지** 회계한다. 실행 vs 회계이고 021의 게이트가 041의 기록기를 호출하는 것이 접점이다",
+    "verification-run::verification-accounting": "007은 FR이 어느 클래스로 회계되는가(계획), 041은 그 계획이 실제로 집행됐는가(실행)다. 분류 vs 집행이다",
+    "verification-run::gate-verdict": "040은 **킷 게이트 자신**이 무엇을 했는지, 041은 **게이트 밖 검증 절차**가 무엇을 했는지다. 같은 다섯 종류를 쓰되 묻는 대상이 다르다(어휘 재사용이 설계다)",
     "gate-verdict::ownership-map": "028은 **소유 키별**로 어느 가드가 발화하지 않았는지를 표로 보이고, 040은 **게이트 실행 단위**로 무엇을 했는지를 타입으로 말한다. 축이 키 vs 실행이라 서로의 입력이 아니다",
     "gate-verdict::live-reality": "032가 `skipped(사유)`를 한 게이트 안에서 도입한 선례이고, 040은 그 개념을 전 게이트의 반환 타입으로 일반화한다. 특수 사례 vs 공통 계약이다",
     "gate-verdict::execution-evidence": "031은 스펙 문장의 주장이 실행 가능한 증거를 지목하는지(문서 축), 040은 게이트가 실제로 판정했는지(실행 축)다. 둘 다 주장 vs 실재지만 대상이 스펙 vs 게이트 실행이다",

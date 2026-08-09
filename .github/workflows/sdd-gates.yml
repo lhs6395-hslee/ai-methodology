@@ -31,6 +31,13 @@ jobs:
           node-version: 22
       - name: unit suite (runTestsPolicy=hard와 동일 스위트 — 커버리지 회계 ≠ 실행 결과)
         run: node --test tooling/__tests__/*.mjs
+      # ⚠ 스테이지는 자기 결과를 **기록**한다(SPEC-041). 초록으로 끝난 것과 "돌았다는 기록이 남은 것"은
+      # 다른 사실이고, 후자가 없으면 아래 R14가 이 자산을 "기록 없음"으로 센다. 실측 제보에서
+      # 배포 훅 Job이 전제 자원 부재로 한 번도 안 떴는데 비차단이라 파이프라인은 SUCCESS였다.
+      - name: 검증 실행 기록 (unit suite)
+        run: |
+          node tooling/check-verification-executed.mjs --record "tooling/__tests__" JUDGED "CI unit suite green (node --test)"
+          node tooling/check-verification-executed.mjs --record ".github/workflows/sdd-gates.yml" JUDGED "이 워크플로가 지금 돌고 있다(자기 기록)"
       - name: quality gates (fr·ownership·cohesion·completeness·consistency)
         run: |
           node tooling/check-fr-coverage.mjs
@@ -48,6 +55,7 @@ jobs:
           node tooling/check-engine-event.mjs
           node tooling/check-evidence.mjs
           node tooling/check-sc-coverage.mjs
+          node tooling/check-verification-executed.mjs
           node tooling/check-live-reality.mjs
           node tooling/check-schema-drift.mjs
           node tooling/gen-ownership-map.mjs --check

@@ -95,3 +95,4 @@
 | 2026-08-02 | `RATCHETED_POLICIES`에 `outOfBandDeployPolicy`·`deployPreconditionPolicy`·`changeLogFrRefPolicy` 3종 등재(21→24). Node·Python 동시 | **감시 밖 knob은 하향이 조용히 통과한다.** SPEC-035 전제 조건 축을 추가하며 목록을 보니 배포·Change Log 정책 2종이 도입 시 등재를 빠뜨린 상태였다 — 래칫은 목록이 전수일 때만 래칫이다. 헤더 주석의 "9종"도 실제 수와 어긋나 있어 "전부"로 교정하고 신설 시 등재 규칙을 명시 |
 | 2026-08-03 | `RATCHETED_POLICIES`에 `duplicateLogicPolicy` 등재(24→25). Node·Python 동시 | SPEC-038 신설 동반. 앞 라운드에 명시한 규칙("새 정책을 만들면 여기에도 등재한다")을 같은 커밋에서 지킨다 — 감시 밖 knob은 하향이 조용히 통과한다 |
 | 2026-08-04 | `RATCHETED_POLICIES`에 `coversBacklinkPolicy` 등재(25→26). Node·Python 동시 | SPEC-039 신설 동반 — "새 정책을 만들면 여기에도 등재한다"를 같은 커밋에서 지킨다 |
+| 2026-08-09 | 래칫 목록에 `verificationRunPolicy` 추가(26→27) | SPEC-041 동반. 래칫 목록은 **판정 데이터**라 새 강도 knob이 등재되지 않으면 그 knob만 조용히 하향 가능해진다(도입 시 누락이 실측으로 두 번 있었다 — `outOfBandDeployPolicy`·`changeLogFrRefPolicy`) |

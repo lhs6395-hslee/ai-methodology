@@ -117,6 +117,11 @@ DEFAULTS = {
     "duplicateLogicCommand": None,
     "duplicateLogicTimeoutMs": 120000,
     "duplicateLogicListCap": 12,
+    # 검증 **실행** 회계(SPEC-041) — Node DEFAULTS 미러. 값이 갈라지면 런타임에 따라 판정이 달라진다.
+    "verificationRunPolicy": "advisory",
+    "verificationRunLedger": None,
+    "verificationRunListCap": 12,
+    "verificationRunTestAssets": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
     "hooksInstalledPolicy": "advisory",
@@ -232,6 +237,7 @@ RATCHETED_POLICIES = [
     "changeLogFrRefPolicy",
     "duplicateLogicPolicy",
     "coversBacklinkPolicy",
+    "verificationRunPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -432,6 +438,14 @@ def split_keys(raw):
         buf += ch
     parts.append(buf)
     return [k.strip() for k in parts if k.strip() and not is_placeholder(k.strip())]
+
+
+def body_before_ownership(text, heading="Ownership"):
+    """Ownership 선언 **앞** 본문만 (ownership-keys.mjs bodyBeforeOwnership 패리티, SPEC-001).
+
+    키가 자기 선언으로 근거를 얻는 것을 막는 공유 경계 — 소비처가 늘면 정본이 하나여야 한다."""
+    h = re.search(rf"^##\s+{heading}\b", text or "", re.MULTILINE)
+    return (text or "")[: h.start()] if h else (text or "")
 
 
 def parse_section(text, heading, categories):
@@ -694,6 +708,90 @@ def evidence_paths_of(line):
     if not m:
         return []
     return [p.strip() for p in str(m.group(1) or "").split(",") if p.strip()]
+
+
+# ── 검증 실행 회계 (verification-run-lib.mjs 패리티, SPEC-041) ──
+# SPEC-031이 "선언된 증거가 실재하는가"까지 본다면 이 층은 "그것이 돌았는가"를 본다.
+# 존재는 실행이 아니다 — 실측 제보에서 검증이 세 번 조용히 사라졌고 게이트는 전부 초록이었다.
+
+def _utc_now_iso():
+    """기록 시각(ISO8601 UTC) — 코어는 시계를 읽지 않고 기록기만 읽는다(순수성 경계)."""
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_run_line(raw):
+    """원장 한 줄 → {asset,outcome,detail,at} | {malformed,raw,why} | None(빈 줄·주석).
+
+    깨진 줄을 **버리지 않는다** — 버리면 '형식 틀림'이 '기록 안 함'과 같아진다."""
+    line = str(raw or "").strip()
+    if not line or line.startswith("#"):
+        return None
+    try:
+        o = json.loads(line)
+    except Exception:  # noqa: BLE001
+        return {"malformed": True, "raw": line, "why": "JSON 아님"}
+    if not isinstance(o, dict):
+        return {"malformed": True, "raw": line, "why": "객체 아님"}
+    asset = str(o.get("asset") or "").strip()
+    outcome = str(o.get("outcome") or "").strip().upper()
+    detail = str(o.get("detail") or "").strip()
+    if not asset:
+        return {"malformed": True, "raw": line, "why": "asset 없음"}
+    if outcome not in VERDICT_KINDS:
+        return {"malformed": True, "raw": line,
+                "why": f'outcome "{o.get("outcome")}" — {"|".join(VERDICT_KINDS)} 중 하나'}
+    # 포기는 허용하되 침묵은 금지 — 안 본 것을 기록하면서 사유를 안 적으면 기록이 아니다.
+    if outcome != "JUDGED" and not detail:
+        return {"malformed": True, "raw": line,
+                "why": f"{outcome}에 detail(사유) 없음 — 포기는 허용하되 사유 없는 포기는 기록이 아니다"}
+    return {"asset": asset, "outcome": outcome, "detail": detail, "at": str(o.get("at") or "").strip()}
+
+
+def parse_run_ledger(text):
+    entries, malformed = [], []
+    for raw in str(text or "").split("\n"):
+        p = parse_run_line(raw)
+        if p is None:
+            continue
+        (malformed if p.get("malformed") else entries).append(p)
+    return entries, malformed
+
+
+def _run_covers(entry_asset, path, matcher):
+    """매칭 폭은 SPEC-031의 증거 경로 인정 폭과 같다 — 정확·디렉토리·글롭."""
+    a = entry_asset.rstrip("/")
+    if a == path or path.startswith(a + "/"):
+        return True
+    if re.search(r"[*?\[\]]", entry_asset):
+        try:
+            return bool(matcher(entry_asset).search(path))
+        except Exception:  # noqa: BLE001
+            return False
+    return False
+
+
+def classify_runs(evidence_paths, entries, matcher):
+    """반환 (executed, debt, silent). 같은 자산에 여러 기록이면 **마지막이 유효**하다."""
+    executed, debt, silent = [], [], []
+    for path in evidence_paths:
+        hit = None
+        for e in entries:
+            if _run_covers(e["asset"], path, matcher):
+                hit = e
+        if hit is None:
+            silent.append(path)
+        elif hit["outcome"] == "JUDGED":
+            executed.append((path, hit))
+        else:
+            debt.append((path, hit))
+    return executed, debt, silent
+
+
+def verification_run_verdict(policy, silent, malformed):
+    """차단하는 것은 침묵과 깨진 기록뿐 — 사유 있는 포기는 어떤 강도에서도 막지 않는다."""
+    blocking = policy == "hard" and (len(silent) > 0 or len(malformed) > 0)
+    return blocking, len(silent) + len(malformed)
 
 
 def covers_backlink_findings(tags, evidence, declared, matcher):
@@ -2874,18 +2972,26 @@ def cmd_orphan(cfg, strict):
         print("Orphan-surface gate: surfaceGlobs 미설정 — no-op")
         return
 
+    # ⚠ 카테고리 **이름**이 아니라 **역할**로 찾는다(SPEC-001 FR-010, check-orphan-surfaces.mjs 패리티).
+    # `**Surfaces**:` 하드코딩은 카테고리를 `Symbols`로 부르는 저장소에서 선언 집합을 항상 비운다.
+    surface_cat = (cfg.get("__roles") or {}).get("surface") or "Surfaces"
     declared = set()
+    decl_re = re.compile(rf"-\s*\*\*{re.escape(surface_cat)}\*\*\s*:\s*([^\n]+)", re.IGNORECASE)
     for file in spec_md_files(cfg, missing_fatal=False):
         text = read_text(file)
-        m = re.search(r"-\s*\*\*Surfaces\*\*\s*:\s*([^\n]+)", text, re.IGNORECASE)
+        m = decl_re.search(text)
         if m:
             for k in m.group(1).split(","):
                 v = k.strip().lower()
                 if v and not v.startswith("[") and v != "—":
                     declared.add(v)
 
+    # 소유 스펙을 갖지 않기로 **선언된** 파일은 고아가 아니다 — 선언 자리를 새로 만들지 않고
+    # specSyncExemptGlobs를 재사용한다(같은 사실에 목록이 둘이면 두 게이트가 다른 답을 낸다).
+    exempt = [compile_glob(g) for g in (cfg.get("specSyncExemptGlobs") or [])]
     orphans = []
     surfaces = 0
+    exempted = 0
     for p in walk_files(cfg["__root"], cfg):
         rel = rel_from_root(cfg, p)
         if not any(rx.search(rel) for rx in globs):
@@ -2893,12 +2999,17 @@ def cmd_orphan(cfg, strict):
         surfaces += 1
         nrel = rel.strip().lower()
         claimed = any(d == nrel or d in nrel or nrel in d for d in declared)
-        if not claimed:
-            orphans.append(rel)
+        if claimed:
+            continue
+        if any(rx.match(rel) for rx in exempt):
+            exempted += 1
+            continue
+        orphans.append(rel)
 
     mode = "strict" if strict else "advisory"
     judged(len(orphans))
-    print(f"Orphan-surface gate — surfaces:{surfaces} declared:{len(declared)} orphans:{len(orphans)} mode:{mode}")
+    ex_tag = f" · 선언된 예외 {exempted}건(specSyncExemptGlobs — 부채로 표면화)" if exempted else ""
+    print(f"Orphan-surface gate — 역할:{surface_cat} surfaces:{surfaces} declared:{len(declared)} orphans:{len(orphans)}{ex_tag} mode:{mode}")
     for o in orphans:
         print(f"  · {o}: 어떤 스펙 Ownership(Surfaces)에도 없음 → 스펙 누락 의심")
     if orphans and strict:
@@ -4091,7 +4202,7 @@ def cmd_sccoverage(cfg):
     sys.exit(0)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -4537,6 +4648,103 @@ def cmd_synonym(cfg):
     sys.exit(0)
 
 
+# ── verifyrun — 검증 실행 회계 (check-verification-executed.mjs) ──
+
+def cmd_verifyrun(cfg, record_args=None):
+    policy = str(cfg.get("verificationRunPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ verificationRunPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    ledger_rel = cfg.get("verificationRunLedger")
+    ledger_abs = resolve(cfg, ledger_rel) if ledger_rel else None
+
+    # 기록 모드 — 러너·CI 스테이지·에이전트가 자기 결과를 남긴다.
+    if record_args is not None:
+        if len(record_args) < 2:
+            verdict("SKIPPED", "인자 부족 — 판정을 요청받지 못했다(usage)")
+            print("usage: sdd_gates.py verifyrun --record <asset> <JUDGED|OFF|INERT|SKIPPED> [사유...]",
+                  file=sys.stderr)
+            sys.exit(2)
+        asset, outcome = record_args[0], record_args[1]
+        detail = " ".join(record_args[2:]).strip()
+        if not ledger_abs:
+            verdict("INERT", "verificationRunLedger 미선언 — 기록할 원장이 없다")
+            print("✗ verificationRunLedger가 선언되지 않아 기록할 곳이 없다 — sdd.config.json에 경로를 선언하라.",
+                  file=sys.stderr)
+            sys.exit(1)
+        if outcome.upper() != "JUDGED" and not detail:
+            judged(1)
+            print(f"✗ {outcome} 기록에 사유가 없다 — 포기는 허용하되 **사유 없는 포기는 기록이 아니다**(SPEC-041).",
+                  file=sys.stderr)
+            sys.exit(1)
+        os.makedirs(os.path.dirname(ledger_abs), exist_ok=True)
+        row = json.dumps({"asset": asset, "outcome": outcome.upper(), "detail": detail,
+                          "at": _utc_now_iso()}, ensure_ascii=False)
+        with open(ledger_abs, "a", encoding="utf-8") as fh:
+            fh.write(row + "\n")
+        judged(0)
+        print(f"검증 실행 기록 — {asset}: {outcome.upper()}{f' ({detail})' if detail else ''} → {ledger_rel}")
+        sys.exit(0)
+
+    if policy == "off":
+        verdict("OFF", "verificationRunPolicy")
+        print("검증 실행 회계 게이트 — verificationRunPolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = policy == "hard"
+
+    if not ledger_abs:
+        verdict("INERT", "verificationRunLedger 미선언 — 무엇이 실제로 돌았는지 볼 원장이 없다")
+        print(f"검증 실행 회계 게이트(verificationRunPolicy={policy}): 판정 불가(inert) — verificationRunLedger 미선언(검증 절차가 결과를 기록할 곳이 없다)")
+        if hard:
+            print("\n✗ verificationRunPolicy=hard인데 원장이 없다 — hard 선언 + 무판정은 거짓 안전이다(SPEC-040). verificationRunLedger를 선언하고 러너·CI 스테이지가 --record로 남기게 하라.",
+                  file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
+    declared = set()
+    for file in spec_md_files(cfg, missing_fatal=False):
+        for line in read_text(file).split("\n"):
+            for p in evidence_paths_of(line):
+                declared.add(p)
+    paths = sorted(declared)
+    if not paths:
+        verdict("INERT", "선언된 실행 증거 경로 0건 — 대조할 축이 없다(SPEC-031 표기 부채)")
+        print(f"검증 실행 회계 게이트(verificationRunPolicy={policy}): 판정 불가(inert) — 스펙에 `[검증: <경로>]` 표기가 0건이라 대조 대상이 없다")
+        sys.exit(0)
+
+    text = read_text(ledger_abs) if os.path.exists(ledger_abs) else ""
+    entries, malformed = parse_run_ledger(text)
+    executed, debt, silent = classify_runs(paths, entries, compile_glob)
+    blocking, violations = verification_run_verdict(policy, silent, malformed)
+    judged(violations)
+
+    cap = int(cfg.get("verificationRunListCap") or 12)
+    tag = "✗" if hard else "⚠"
+    mal_tag = f"·깨진 기록 {len(malformed)}" if malformed else ""
+    print(f"검증 실행 회계 게이트(verificationRunPolicy={policy}): 선언 증거 {len(paths)}건 — "
+          f"실행됨 {len(executed)}·사유 있는 미실행 {len(debt)}·기록 없음 {len(silent)}{mal_tag} | 원장 {ledger_rel}")
+    for path, e in debt[:cap]:
+        print(f"  · [{e['outcome']}] {path} — {e['detail']}")
+    if len(debt) > cap:
+        print(f"  · … 외 {len(debt) - cap}건")
+    for p in silent[:cap]:
+        print(f"  {tag} 기록 없음: {p} — 이 자산이 돌았다는 기록이 원장에 없다(안 돈 것과 구분되지 않는다). 러너·CI 스테이지가 --record로 남기게 하라")
+    if len(silent) > cap:
+        print(f"  {tag} … 외 {len(silent) - cap}건")
+    for m in malformed[:cap]:
+        print(f"  {tag} 깨진 기록: {m['why']} — {m['raw'][:120]}")
+
+    if blocking:
+        print(f"\n✗ verificationRunPolicy=hard: 선언된 증거가 돌았다는 기록이 없다({len(silent)}건)"
+              f"{f' · 깨진 기록 {len(malformed)}건' if malformed else ''} — **존재는 실행이 아니다**. "
+              f"돌렸으면 기록하고, 못 돌렸으면 사유와 함께 남겨라(포기는 허용, 침묵은 금지).", file=sys.stderr)
+        sys.exit(1)
+    if not silent and not malformed:
+        print(f"검증 실행 회계 게이트: OK — 침묵 0건(사유 있는 미실행 {len(debt)}건은 부채로 표면화 중)."
+              if debt else "검증 실행 회계 게이트: OK — 선언된 증거가 모두 실행 기록을 갖는다.")
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -4610,6 +4818,11 @@ def main():
         cmd_livereality(cfg)
     elif sub == "synonym":
         cmd_synonym(cfg)
+    elif sub == "verifyrun":
+        rec = None
+        if "--record" in args:
+            rec = args[args.index("--record") + 1:]
+        cmd_verifyrun(cfg, rec)
     elif sub == "sccoverage":
         cmd_sccoverage(cfg)
     else:

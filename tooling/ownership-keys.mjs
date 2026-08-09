@@ -26,6 +26,14 @@ export function resolveCategoryRoles(categories, roles) {
   return out;
 }
 
+// Ownership 선언 **앞** 본문만 — 키가 자기 선언으로 근거를 얻는 것을 막는 공유 규칙.
+// consistency(키 근거 대조)와 ownership-map(FR 라인 수집)이 같은 경계를 봐야 하므로 정본은 하나다
+// (R13 실측: 두 게이트에 같은 정규식이 복제돼 있었다 — 한쪽만 고치면 두 판정의 경계가 어긋난다).
+export function bodyBeforeOwnership(text, heading = "Ownership") {
+  const at = String(text || "").search(new RegExp(`^##\\s+${heading}\\b`, "m"));
+  return at === -1 ? String(text || "") : String(text).slice(0, at);
+}
+
 // `## <heading>` 섹션을 잘라 카테고리별 키 배열로. 헤더 다음~다음 ## 전까지.
 export function parseSection(text, heading, categories) {
   const start = text.search(new RegExp(`^##\\s+${escapeRegExp(heading)}\\b`, "m"));

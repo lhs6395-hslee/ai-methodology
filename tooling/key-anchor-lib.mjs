@@ -11,6 +11,10 @@
 // 정책: frKeyAnchorPolicy off(기본 — 판정 안 함)|advisory(미매치 경고)|hard(미매치 exit 1).
 // 판정은 문자열 파싱·집합 대조만(git·파일시스템 비의존). Python판 sdd_gates.py 미러(SPEC-006).
 
+// 카테고리 역할 해석의 **정본**은 key-pipeline(SPEC-001)이다 — 이름 폴백 정규식을 여기 복제하면
+// 두 사이트가 갈라진다(R13이 실측으로 잡은 중복). ownership-keys는 이 파일을 참조하지 않아 순환 없음.
+import { resolveCategoryRoles } from "./ownership-keys.mjs";
+
 // 코드 스팬 제거 — `...` 안은 리터럴(강조 아님). 짝 안 맞는 홀 백틱은 그대로 둔다(안전).
 export function stripCodeSpans(line) {
   return String(line).replace(/`[^`]*`/g, "");
@@ -109,9 +113,13 @@ export function buildKeyKindMap(ownSections, depSections, roles = null) {
         .filter(([c]) => c)
         .map(([c, k]) => [String(c).trim().toLowerCase(), k]))
     : null;
-  const kindOf = (cat) => byRole
-    ? (byRole.get(String(cat).trim().toLowerCase()) || null)
-    : (/entit/i.test(cat) ? "entity" : /surface/i.test(cat) ? "surface" : /capabilit/i.test(cat) ? "capability" : null);
+  // 역할 미전달 시의 이름 폴백은 **정본이 하나**여야 한다 — 여기 복제돼 있던 정규식이
+  // resolveCategoryRoles의 것과 갈라지면 같은 카테고리를 두 사이트가 다르게 읽는다(R13 실측).
+  const nameFallback = (cat) => {
+    const r = resolveCategoryRoles([cat], null);
+    return r.entity ? "entity" : r.surface ? "surface" : r.capability ? "capability" : null;
+  };
+  const kindOf = (cat) => (byRole ? (byRole.get(String(cat).trim().toLowerCase()) || null) : nameFallback(cat));
   const add = (raw, kind) => {
     const k = bareKey(raw);
     if (k && k !== "—" && k !== "-" && !map.has(k)) map.set(k, kind);

@@ -119,6 +119,19 @@ export const DEFAULTS = {
   // FR-085로 착지시킨 순간 위반이 사라지고 초록이 됐다. 태그는 returnTo 테스트를, FR-085는
   // 메일주소 필드를 말하는데 회계는 "unit으로 커버됨"이라고 보고한다. 번호가 겹치면 통과한다.
   // 대조 축은 FR 쪽 `[검증: <경로>]` 관습을 그대로 쓴다(새 문법 없음).
+  // 검증 **실행** 회계(SPEC-041) — 선언된 증거가 실재하는가(SPEC-031)의 다음 질문: 그것이 돌았는가.
+  // 실측 제보: 중도 포기·대상 0건 exit 0·전제 자원 부재로 미실행 — 셋 다 초록으로 읽혔다.
+  // off|advisory(기본)|hard. 차단하는 것은 **침묵과 깨진 기록**뿐이고 사유 있는 포기는 막지 않는다.
+  verificationRunPolicy: "advisory",
+  // 실행 원장(JSONL) 경로. null이면 판정 입력이 없으므로 게이트가 INERT를 선언한다(SPEC-040).
+  // 러너·CI 스테이지·에이전트가 `--record <asset> <outcome> [사유]`로 append한다.
+  verificationRunLedger: null,
+  verificationRunListCap: 12,
+  // `commands.test`가 **무엇을 커버하는가** — 러너만 아는 사실이라 프로젝트가 선언한다.
+  // 선언하면 check-test-run이 자기 실행 결과를 원장에 남긴다: green→JUDGED, 명령 미선언→INERT,
+  // 전제 미충족→SKIPPED(사유). 제보 ②("대상 0건으로 exit 0 — 성공과 무행동이 동형")가 닫히는 자리다.
+  // null이면 기록하지 않는다(원치 않는 프로젝트에 결합 0).
+  verificationRunTestAssets: null,
   coversBacklinkPolicy: "advisory",
   // 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
   coversBacklinkListCap: 12,
@@ -402,17 +415,18 @@ function buildConfig(user, path, root) {
   cfg.__root = root; // 모든 상대경로의 기준
   cfg.__testRegex = cfg.testFileRegex.map((s) => new RegExp(s));
   cfg.__e2eRegex = (cfg.e2eFileRegex || []).map((s) => new RegExp(s));
-  // spec ID 접두어 파생값(게이트 공통). 예: ["SPEC","TEST","INFRA"] → "SPEC|TEST|INFRA"
-  const alt = (cfg.specIdPrefixes && cfg.specIdPrefixes.length ? cfg.specIdPrefixes : DEFAULTS.specIdPrefixes)
+  // 접두어 목록 → 정규식 대안 문자열. spec ID와 요구 ID가 **같은 규칙**을 쓰므로 한 곳에 둔다
+  // (R13 실측: 두 사이트에 같은 정규식 안전화가 복제돼 있었다 — 한쪽만 고치면 문법이 갈라진다).
+  const altOf = (list, fallback) => (list && list.length ? list : fallback)
     .map((p) => String(p).replace(/[^A-Za-z0-9_]/g, "")) // 정규식 안전
     .join("|");
+  // spec ID 접두어 파생값(게이트 공통). 예: ["SPEC","TEST","INFRA"] → "SPEC|TEST|INFRA"
+  const alt = altOf(cfg.specIdPrefixes, DEFAULTS.specIdPrefixes);
   cfg.__idAlt = alt;
   cfg.__specIdRe = new RegExp(`(?:${alt})-\\d{3}`);                 // 본문/파일명에서 ID 추출
   // 요구 ID 접두어 파생값 — 전 파싱 사이트(coverage 선언·cohesion/completeness 집계·
   // spec-sync FR 라인·@covers)가 이 한 곳에서 파생된 문법을 공유한다(사이트 간 불일치 금지).
-  const reqAlt = (cfg.requirementIdPrefixes && cfg.requirementIdPrefixes.length ? cfg.requirementIdPrefixes : DEFAULTS.requirementIdPrefixes)
-    .map((p) => String(p).replace(/[^A-Za-z0-9_]/g, ""))
-    .join("|");
+  const reqAlt = altOf(cfg.requirementIdPrefixes, DEFAULTS.requirementIdPrefixes);
   cfg.__reqAlt = reqAlt;
   cfg.__frDeclRe = new RegExp(`\\*\\*((?:${reqAlt})-\\d{3}[a-z]?)\\*\\*`, "g"); // spec 본문의 **FR-NNN[a]** 선언
   cfg.__frTokenRe = new RegExp(`\\b(?:${reqAlt})-\\d{3}[a-z]?\\b`, "g");        // 집계/면제용 토큰

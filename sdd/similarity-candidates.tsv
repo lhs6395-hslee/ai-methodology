@@ -1,6 +1,6 @@
 # SPEC-033 ③층 유사 후보 — 생성기: 세션 LLM(전수 열거는 entity-pairs.mjs가 수행)
-# entity-set: 41 5e87d2b4607c
-# 생성 2026-08-09(8차: gate-verdict 추가) · 판정 대상 entity 41건 · 후보 44건
+# entity-set: 42 ff645916c1bc
+# 생성 2026-08-09(9차: verification-run 추가) · 판정 대상 entity 42건 · 후보 48건
 # 계약: 한 줄 = 한 쌍(탭 구분, 3번째 칸은 확신도). 이 파일은 판정이 아니라 "사람이 봐야 할 목록"이다.
 # 아래 한 줄이 신선도 선언 — 이 목록이 본 entity 집합이다. 집합이 바뀌면 게이트가 "낡음"을 알린다.
 # 결정된 쌍은 sdd.config.json의 synonymRegistry(같음) 또는 synonymReviewLedger(다름+사유)로 소멸한다.
@@ -58,3 +58,8 @@ gate-verdict	ownership-map	0.7
 gate-verdict	live-reality	0.6
 gate-verdict	execution-evidence	0.5
 gate-verdict	harness-install	0.5
+# ── 9차: 신규 entity verification-run의 41쌍 전수 판정 결과 ──
+verification-run	execution-evidence	0.8
+verification-run	test-execution	0.7
+verification-run	verification-accounting	0.7
+verification-run	gate-verdict	0.6

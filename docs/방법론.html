@@ -485,6 +485,25 @@
   <p class="note">이전 화면에서 R7은 <code>✓ clean</code>이었다. 줄 수만 세면 18종이 전부 검증된 것처럼 읽힌다 — 실제로 검증된 것은 15종이다. <strong>"전부 sync ✓"라는 문장은 분모를 밝히지 않으면 거짓말에 가깝다.</strong></p>
   <p>강제의 세기는 신중히 골랐다. <code>--strict</code>가 막는 것은 <strong>위반</strong>과 <strong>미판정</strong>뿐이다. <code>OFF</code>·<code>INERT</code>·<code>SKIPPED</code>는 막지 않는다 — 채택 중인 프로젝트는 소스·매니페스트를 아직 안 갖췄고, 그 상태를 벽으로 막으면 사람이 정책을 통째로 끈다(<em>우회를 유발하는 강제는 강제가 아니다</em>). 대신 <strong>매 실행 집계에 남아</strong> 조용히 사라지지 않는다.</p>
 
+  <h4>존재는 실행이 아니다 — 조용히 사라진 검증</h4>
+  <p>같은 함정이 게이트 <em>밖에서도</em> 일어난다. 소비 프로젝트 실측에서 검증 절차가 <strong>세 번 조용히 사라졌다</strong>:</p>
+  <div class="tablewrap"><table>
+    <tr><th>무슨 일이 있었나</th><th>화면에는</th><th>왜 안 잡혔나</th></tr>
+    <tr><td>에이전트가 "재현 데이터가 없다"며 실측을 <strong>중도 포기</strong></td><td class="pass">아무 일 없음</td><td>포기했다는 산출물이 없다</td></tr>
+    <tr><td>검증 러너가 처리 대상 <strong>0건으로 <code>exit 0</code></strong></td><td class="pass">성공</td><td>"성공"과 "아무것도 안 함"이 같은 신호</td></tr>
+    <tr><td>배포 훅 Job이 참조 이미지 부재로 <strong>한 번도 안 뜸</strong></td><td class="pass">파이프라인 SUCCESS</td><td>비차단 스테이지라 초록에 묻힘</td></tr>
+  </table></div>
+  <p><code>[검증: &lt;경로&gt;]</code>가 <strong>실재하는 자산</strong>을 지목하는지는 이미 본다(SPEC-031). 그다음 질문이 없었다 — <strong>그 자산이 돌았는가.</strong> spec↔code 정합만 보는 층에서는 무행동과 성공이 동형이다.</p>
+  <p>그래서 <strong>실행 원장</strong>을 판정 입력으로 둔다. 러너·CI 스테이지·에이전트가 자기 결과를 남기고, 게이트는 선언된 증거와 대조한다. <code>outcome</code>은 위 다섯 종류를 <strong>그대로</strong> 쓴다 — 게이트와 검증 절차가 다른 어휘로 말하면 "안 봤다"가 두 뜻을 갖고, 두 뜻은 언젠가 갈라진다.</p>
+  <pre><span class="c">// 러너·스테이지가 남긴다 — 못 돌았으면 <b>사유와 함께</b></span>
+{"asset":"tests/e2e/login.spec.ts","outcome":<span class="g">"JUDGED"</span>,"detail":"12 passed"}
+{"asset":"deploy/smoke.sh","outcome":<span class="w">"INERT"</span>,"detail":"ECR 리포지토리 없음 — Job이 뜨지 못함"}
+
+<span class="c">// 게이트 판정</span>
+선언 증거 53건 — 실행됨 52·사유 있는 미실행 1·<span class="r">기록 없음 0</span></pre>
+  <p><strong>차단하는 것은 침묵과 깨진 기록뿐이다.</strong> 기록이 아예 없으면(=안 돈 것과 구분되지 않으면) 위반이고, 사유 없이 "못 했다"만 적은 줄도 기록이 아니다. 반대로 <strong>사유가 붙은 미실행은 어떤 강도에서도 막지 않는다</strong> — 포기는 정당하게 일어나고, 그것까지 막으면 사람이 사유를 지어내 원장이 거짓말을 담기 시작한다. <em>막을 것은 포기가 아니라 말 없이 사라지는 것이다.</em></p>
+  <p class="note">원장은 세션·CI 로컬 상태라 커밋하지 않는다. 신선한 체크아웃에서 비어 있는 것이 정상이고, 그 비어 있음이 곧 <strong>"이 실행에서는 아직 아무것도 안 돌았다"</strong>는 참인 진술이다 — 남의 실행 기록이 내 체크아웃에서 "돌았다"로 읽히는 것이 정확히 이 층이 막으려는 거짓이다.</p>
+
   <h4>"0건"은 무엇의 0건인가 — 기본값은 만든 사람의 언어다</h4>
   <p>같은 함정의 다른 얼굴이 있다. 구현 중복 게이트의 기본 파일 패턴은 <code>\.(m|c)?[jt]sx?$</code>다 — 킷이 JavaScript로 쓰였기 때문이다. Python·Terraform으로 된 프로젝트가 이 게이트를 켜면 <strong>아무 파일도 잡히지 않아 "중복 0건"이 나온다.</strong> 그 0은 진짜 0과 구분되지 않는다.</p>
   <p>그래서 게이트는 언어를 선언하지 않은 채 저장소 일부만 본 상태를 <strong>판정으로 치지 않는다</strong>. 무엇을 안 봤는지 지목한다:</p>

@@ -635,6 +635,54 @@ test("py specsync: 소유 파일 삭제 + 같은 커밋의 Files 항목 제거 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ── 검증 실행 회계(SPEC-041 패리티) ──────────────────────────────────────────
+test("py verifyrun: 원장 미선언 INERT · 침묵 차단 · 사유 있는 포기 통과 — Node와 바이트 동일", skip, () => {
+  const mk = (config) => {
+    const root = fixture({
+      "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Success Criteria\n- **SC-001**: x. [검증: src/a.test.mjs]\n- **SC-002**: y. [검증: src/b.test.mjs]\n",
+      "src/a.test.mjs": "//\n", "src/b.test.mjs": "//\n",
+    }, config);
+    return root;
+  };
+  // ① 원장 미선언 → INERT(양판 동일)
+  const a = mk({ verificationRunPolicy: "advisory" });
+  const b = mk({ verificationRunPolicy: "advisory" });
+  try {
+    const p = runPy(a, ["verifyrun"]);
+    const n = runNode(b, "check-verification-executed.mjs");
+    assert.equal(p.code, n.code, `exit 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(p.out, /판정: INERT — verificationRunLedger 미선언/);
+  } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+
+  // ② 침묵(기록 없음) → hard 차단, 양판 동일
+  const c = mk({ verificationRunPolicy: "hard", verificationRunLedger: ".sdd/runs.jsonl" });
+  const d = mk({ verificationRunPolicy: "hard", verificationRunLedger: ".sdd/runs.jsonl" });
+  try {
+    const p = runPy(c, ["verifyrun"]);
+    const n = runNode(d, "check-verification-executed.mjs");
+    assert.equal(p.code, 1, p.out);
+    assert.equal(p.code, n.code);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(p.out, /존재는 실행이 아니다/);
+  } finally { rmSync(c, { recursive: true, force: true }); rmSync(d, { recursive: true, force: true }); }
+
+  // ③ 기록 후 → 통과. 사유 있는 포기는 hard에서도 부채일 뿐 차단이 아니다(양판 동일).
+  const e = mk({ verificationRunPolicy: "hard", verificationRunLedger: ".sdd/runs.jsonl" });
+  const f2 = mk({ verificationRunPolicy: "hard", verificationRunLedger: ".sdd/runs.jsonl" });
+  try {
+    runPy(e, ["verifyrun", "--record", "src/a.test.mjs", "JUDGED", "ok"]);
+    runPy(e, ["verifyrun", "--record", "src/b.test.mjs", "INERT", "전제 자원 없음"]);
+    runNode(f2, "check-verification-executed.mjs", ["--record", "src/a.test.mjs", "JUDGED", "ok"]);
+    runNode(f2, "check-verification-executed.mjs", ["--record", "src/b.test.mjs", "INERT", "전제 자원 없음"]);
+    const p = runPy(e, ["verifyrun"]);
+    const n = runNode(f2, "check-verification-executed.mjs");
+    assert.equal(p.code, 0, p.out);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.match(p.out, /침묵 0건/);
+  } finally { rmSync(e, { recursive: true, force: true }); rmSync(f2, { recursive: true, force: true }); }
+});
+
 // ── 수명주기(SPEC-008 패리티): completeness Status·리뷰 기록 + specsync Draft 차단 ──
 
 test("py specsync staged: Draft 스펙 소유 코드 → 스펙 동반해도 exit 1 (Draft 차단 패리티)", skip, () => {

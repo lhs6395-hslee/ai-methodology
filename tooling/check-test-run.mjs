@@ -7,11 +7,14 @@
 // 실행이 느려 pre-commit엔 배선하지 않는다(완료 시점·CI·pre-push opt-in).
 // 설계: SPEC-021 (Python판 sdd_gates.py testrun이 동일 동작을 미러 — SPEC-006 패리티).
 import { execSync } from "node:child_process";
-import { loadConfig } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { formatRunLine } from "./verification-run-lib.mjs";
 
 export const RUN_TESTS_ENUM = ["off", "advisory", "hard"];
 
@@ -121,10 +124,32 @@ if (isMainEntry(import.meta.url)) {
   const ve = e2eRunVerdict(e2ePolicy, !!e2eCmd, { skipped, exitCode: e2eExit });
   // 이 게이트의 원래 결함이 정확히 여기였다 — 정책이 hard인데 명령이 없으면 아무것도 안 돌고
   // exit 0으로 끝났다(여러 라운드 거짓 green). 이제 그 상태는 INERT로 자백된다.
-  if (policy === "off") verdict(VERDICT_KINDS.OFF, "runTestsPolicy");
-  else if (!cmd) verdict(VERDICT_KINDS.INERT, "commands.test 미선언 — 돌릴 스위트가 없다");
-  else if (skipped) verdict(VERDICT_KINDS.SKIPPED, `e2e 전제 미충족 — ${skipped}`);
-  else judged((v.exit ? 1 : 0) + (ve.exit ? 1 : 0));
+  let kind, why;
+  if (policy === "off") { kind = VERDICT_KINDS.OFF; why = "runTestsPolicy"; }
+  else if (!cmd) { kind = VERDICT_KINDS.INERT; why = "commands.test 미선언 — 돌릴 스위트가 없다"; }
+  else if (skipped) { kind = VERDICT_KINDS.SKIPPED; why = `e2e 전제 미충족 — ${skipped}`; }
+  else { kind = VERDICT_KINDS.JUDGED; why = ""; }
+  if (kind === VERDICT_KINDS.JUDGED) judged((v.exit ? 1 : 0) + (ve.exit ? 1 : 0));
+  else verdict(kind, why);
+
+  // ── 러너는 자기 실행을 **기록**한다(SPEC-041) ────────────────────────────
+  // 실측 제보 ②: 러너가 대상 0건으로 exit 0 종료해 "성공"과 "아무것도 안 함"이 구분되지 않았다.
+  // 여기서 원장에 남기는 종류가 그 구분이다 — green은 JUDGED, 명령 없음은 INERT, 전제 미충족은
+  // SKIPPED(사유). 기록하지 않으면 R14가 이 자산을 "기록 없음"으로 센다(침묵 = 안 돈 것).
+  const assets = Array.isArray(cfg.verificationRunTestAssets) ? cfg.verificationRunTestAssets : [];
+  const ledgerRel = cfg.verificationRunLedger || null;
+  if (assets.length && ledgerRel) {
+    const outcome = kind === VERDICT_KINDS.JUDGED && !v.exit && !ve.exit ? VERDICT_KINDS.JUDGED : (kind === VERDICT_KINDS.JUDGED ? VERDICT_KINDS.SKIPPED : kind);
+    const detail = outcome === VERDICT_KINDS.JUDGED
+      ? `commands.test green (runTestsPolicy:${policy})`
+      : (why || `스위트 실패(exit ${v.exit || ve.exit}) — 통과 기록으로 남기지 않는다`);
+    const abs = resolveFromRoot(cfg, ledgerRel);
+    try {
+      mkdirSync(dirname(abs), { recursive: true });
+      const at = new Date().toISOString();
+      for (const a of assets) appendFileSync(abs, formatRunLine({ asset: a, outcome, detail, at }) + "\n");
+    } catch (e) { console.error(`· 검증 실행 기록 실패(${ledgerRel}): ${e.message}`); }
+  }
   // 출력 순서: e2e 축 먼저, 스위트 판정 마지막 — 하네스(sdd-sync)가 게이트 stdout의 **마지막 줄**을
   // 요약으로 쓰기 때문이다. 위반은 ⚠/✗ 스캔으로 잡히므로 순서와 무관하게 flagged된다.
   (ve.valid && ve.exit === 0 ? console.log : console.error)(ve.line);

@@ -55,6 +55,9 @@ const RULES = [
   // 이 규칙은 **구현 단위**(같은 규칙을 두 곳이 구현하는가)를 본다. 실측: 병렬 서브에이전트가
   // 같은 규칙을 세 갈래로 만들었고 게이트 4종이 전부 green이었다.
   { rule: "R13 구현 중복(선언 아닌 구현)", gates: ["check-duplicate-logic.mjs"] },
+  // R14(SPEC-041): 선언된 증거가 **돌았는가**. R8이 "증거가 실재하는가"까지 보고, 여기서 실행을 본다 —
+  // 존재는 실행이 아니다. 원장 미선언이면 스스로 inert를 선언한다(SPEC-040).
+  { rule: "R14 검증 실행(존재 아닌 실행)", gates: ["check-verification-executed.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
