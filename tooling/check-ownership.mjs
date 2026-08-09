@@ -29,7 +29,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, specMdFiles, walkFiles } from "./sdd-config.mjs";
 import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings, exemptGlobFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
@@ -126,14 +126,11 @@ if (exemptErrors.length) {
   process.exit(1);
 }
 
-function specFiles() {
-  let names;
-  try { names = readdirSync(SPEC_DIR); } catch {
-    console.error(`✗ spec 디렉토리를 찾을 수 없음: ${SPEC_DIR}`);
-    process.exit(1);
-  }
-  return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
-}
+// 정본은 sdd-config의 specMdFiles — 세 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
+  console.error(`✗ spec 디렉토리를 찾을 수 없음: ${d}`);
+  process.exit(1);
+});
 
 const files = specFiles();
 const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
@@ -240,15 +237,8 @@ const filesOverlap = [];
 if (FOV_POLICY !== "off" && filesBySpec.length) {
   const IGNORE = new Set(cfg.ignoreDirs);
   const allRel = [];
-  (function walk(dir, rel = "") {
-    let entries; try { entries = readdirSync(dir).sort(); } catch { return; }
-    for (const name of entries) {
-      const p = join(dir, name), r = rel ? `${rel}/${name}` : name;
-      let st; try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) { if (!IGNORE.has(name)) walk(p, r); }
-      else allRel.push(r);
-    }
-  })(ROOT);
+  // 정본은 sdd-config의 walkFiles — 두 게이트에 본문 동일로 있던 것(R13 구조 중복).
+  walkFiles(ROOT, IGNORE, "", allRel);
   const fileToSpecs = new Map();
   for (const { specId, globs } of filesBySpec) {
     const rxs = globs.map(compileGlob);

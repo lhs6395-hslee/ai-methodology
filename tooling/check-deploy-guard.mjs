@@ -18,19 +18,13 @@ import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
-import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
+import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine, deploySmokeVerdict, commandFromHookInput } from "./deploy-guard-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
 
-function readCommand() {
-  const i = process.argv.indexOf("--command");
-  if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1];
-  let raw = "";
-  try { raw = readFileSync(0, "utf8"); } catch { return ""; }
-  if (!raw.trim()) return "";
-  try { const j = JSON.parse(raw); return String((j.tool_input || {}).command || ""); } catch { return ""; }
-}
+// 정본은 deploy-guard-lib의 commandFromHookInput — 두 게이트에 본문 동일로 있던 것(R13 구조 중복).
+const readCommand = () => commandFromHookInput(process.argv, () => readFileSync(0, "utf8"));
 
 const command = readCommand();
 if (!command.trim()) process.exit(0);

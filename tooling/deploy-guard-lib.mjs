@@ -101,6 +101,18 @@ export function changeLogRowShape(diffText) {
 //
 // gitFacts: {dirty:[경로], behind:number|null, upstream:string|null, branch:string}
 // 반환 [{kind, detail}] — kind: dirty-tree | behind-upstream | no-upstream(판정 불가, 위반 아님)
+// 훅 입력에서 명령 문자열 추출 — PreToolUse/PostToolUse는 stdin으로 JSON을 준다.
+// R13 구조 중복 실측: check-deploy-guard와 check-deploy-precheck에 **본문 동일**로 있었다.
+// readStdin: () => string 을 주입받는다(파일 IO는 소비 게이트가 — 코어 순수성 유지).
+export function commandFromHookInput(argv, readStdin) {
+  const i = argv.indexOf("--command");
+  if (i >= 0 && argv[i + 1]) return argv[i + 1];
+  let raw = "";
+  try { raw = readStdin(); } catch { return ""; }
+  if (!raw.trim()) return "";
+  try { const j = JSON.parse(raw); return String((j.tool_input || {}).command || ""); } catch { return ""; }
+}
+
 export function deployPreconditionFindings(gitFacts, deployedPaths = []) {
   const f = gitFacts || {};
   const out = [];

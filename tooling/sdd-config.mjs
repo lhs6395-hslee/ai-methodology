@@ -132,6 +132,10 @@ export const DEFAULTS = {
   // 전제 미충족→SKIPPED(사유). 제보 ②("대상 0건으로 exit 0 — 성공과 무행동이 동형")가 닫히는 자리다.
   // null이면 기록하지 않는다(원치 않는 프로젝트에 결합 0).
   verificationRunTestAssets: null,
+  // 환경 결속 — { <glob>: <사유> }. "이 체크아웃에서는 이 자산이 돌 수 없다"는 **항구적** 사실을
+  // config에 둔다(원장은 gitignore라 체크아웃마다 사라진다). 실행됨으로 세지 않고 사유 있는 부채로
+  // 계상하므로 면제가 아니다 — 침묵을 사유 있는 미실행으로 바꿀 뿐이고, 실제 기록이 있으면 그쪽이 이긴다.
+  verificationRunEnvBound: {},
   coversBacklinkPolicy: "advisory",
   // 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
   coversBacklinkListCap: 12,
@@ -446,6 +450,42 @@ function buildConfig(user, path, root) {
 }
 
 // 루트 기준 상대경로("a/b")를 절대경로로.
+// ── 파일 순회·스펙 목록의 정본 ────────────────────────────────────────────────
+// R13 확률적 층(구조 중복)이 실측으로 잡은 복제: `walkAll`이 4개 게이트에, `walk`이 4개에,
+// `specFiles`가 3개에 **본문 동일**로 복붙돼 있었다. 리터럴 층은 정규식만 보므로 이 계열을
+// 못 본다 — 같은 규칙을 다른 이름의 함수가 구현한 것이기 때문이다.
+// ⚠ Python판(sdd_gates.py)은 처음부터 `walk_files`·`spec_md_files` 공유 함수를 갖고 있었다.
+// 즉 이것은 런타임 간 **구조 비대칭**이기도 했다 — 한쪽만 고치면 순회 규칙이 갈라진다.
+import { readdirSync, statSync } from "node:fs";
+import { join as joinPath } from "node:path";
+
+// 디렉토리 전수 순회 → 루트 상대 경로 배열. ignore 디렉토리는 이름으로 가른다.
+export function walkFiles(absDir, ignore, relBase = "", acc = []) {
+  let entries;
+  try { entries = readdirSync(absDir).sort(); } catch { return acc; }
+  for (const name of entries) {
+    const p = joinPath(absDir, name);
+    const r = relBase ? `${relBase}/${name}` : name;
+    let st;
+    try { st = statSync(p); } catch { continue; }
+    if (st.isDirectory()) {
+      if (ignore.has(name)) continue;
+      walkFiles(p, ignore, r, acc);
+    } else acc.push(r);
+  }
+  return acc;
+}
+
+// 스펙 디렉토리의 `.md` 절대 경로 목록. onMissing 미전달 시 빈 배열(호출자가 처분을 정한다).
+export function specMdFiles(specDirAbs, onMissing = null) {
+  let names;
+  try { names = readdirSync(specDirAbs); } catch {
+    if (onMissing) onMissing(specDirAbs);
+    return [];
+  }
+  return names.filter((n) => /\.md$/.test(n)).sort().map((n) => joinPath(specDirAbs, n));
+}
+
 export function resolveFromRoot(cfg, rel) {
   return join(cfg.__root, ...String(rel).split("/").filter(Boolean));
 }

@@ -88,3 +88,4 @@ ownership 게이트가 각 스펙의 소유 entity를, config `entitySchemaSourc
 | 2026-07-27 | `schemaBackingActive`·`schemaBackingInertReasons`가 역할(`{entity,…}`)을 받는다 | SPEC-001 FR-010 동반: 이름 추측 제거(개명 시 무음 inert 봉쇄의 구조적 짝) |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
 | 2026-07-28 | `schemaBackingFindings`에 선택 파라미터 `slugBySpec` 추가 — 모듈 문법(SPEC-029 ①)의 스펙별 슬러그를 실재 근거로 인정. 미전달 시 종전 동작과 완전 동일 | entity 실재의 정본이 스키마인 레포와 코드 모듈인 레포가 공존한다. 정책·면제·어댑터는 이 spec 소유로 유지하고 소스 종류만 늘렸다 — 판정 knob을 둘로 쪼개지 않기 위해 |
+| 2026-08-09 | `schemaBackingInertReasons`를 `inertReasons`(verdict-lib) 위임으로 — 사유 문구만 보유 | 위와 같은 R13 구조 중복. 판정 형태를 공유하고 사유 문구는 이 축이 유지한다 — 출력 바이트 동일 확인 |

@@ -14,7 +14,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, specMdFiles } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 
@@ -27,14 +27,11 @@ const STRICT = process.argv.includes("--strict");
 const CATEGORIES = cfg.ownershipCategories;
 const MAX_KEYS = cfg.maxKeysPerCategoryPerSpec;
 const MAX_FRS = cfg.maxFRsPerSpec;
-function specFiles() {
-  let names;
-  try { names = readdirSync(SPEC_DIR); } catch {
-    console.error(`✗ spec 디렉토리를 찾을 수 없음: ${SPEC_DIR}`);
-    process.exit(1);
-  }
-  return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
-}
+// 정본은 sdd-config의 specMdFiles — 세 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
+  console.error(`✗ spec 디렉토리를 찾을 수 없음: ${d}`);
+  process.exit(1);
+});
 
 // aggregate root 카테고리: config의 **역할 선언**(ownershipCategoryRoles)이 정본이고,
 // 미선언이면 이름 정규식 폴백(`__roles`가 이미 수행) → 그것도 실패하면 첫 카테고리.

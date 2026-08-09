@@ -170,6 +170,39 @@ test("깨진 기록은 hard에서 차단 — '기록했는데 형식이 틀림'�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("환경 결속 선언은 면제가 아니다 — 침묵을 사유 있는 부채로 바꿀 뿐이고 실제 기록이 이긴다", () => {
+  // 실측 교착: 킷의 CI 워크플로는 GitHub Actions에서만 돌아 로컬 스윕이 영구히 붉었다.
+  // 원장은 gitignore라 "여기선 못 돈다"는 항구적 사실을 담지 못한다 → config에 durable하게 선언.
+  const root = repo({
+    verificationRunLedger: ".sdd/runs.jsonl", verificationRunPolicy: "hard",
+    verificationRunEnvBound: { "tests/dash.test.ts": "CI 전용 — 로컬에 판정 입력 없음" },
+  });
+  try {
+    run(root, ["--record", "tests/login.test.ts", "JUDGED", "ok"]);
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /실행됨 1·사유 있는 미실행 1·기록 없음 0/);
+    assert.match(r.out, /\[INERT\] tests\/dash\.test\.ts — CI 전용 — 로컬에 판정 입력 없음 \(환경 결속 선언\)/);
+    // **실행됨으로 세지 않는다** — 선언은 부채를 만들지 면제를 만들지 않는다.
+    assert.doesNotMatch(r.out, /실행됨 2/);
+    // 실제 기록이 있으면 그쪽이 이긴다.
+    run(root, ["--record", "tests/dash.test.ts", "JUDGED", "CI에서 돌았다"]);
+    assert.match(run(root).out, /실행됨 2·사유 있는 미실행 0/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("사유 없는 환경 결속은 무시된다 — 사유 없는 결속은 조용한 면제이고 그건 이 게이트가 막는 것이다", () => {
+  const root = repo({
+    verificationRunLedger: ".sdd/runs.jsonl", verificationRunPolicy: "hard",
+    verificationRunEnvBound: { "tests/**": "   " },
+  });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /기록 없음 2/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("증거 표기가 0건이면 INERT — 대조할 축이 없는 것을 '다 돌았다'로 세지 않는다", () => {
   const root = repo({ verificationRunLedger: ".sdd/runs.jsonl" }, "**Spec**: `SPEC-001`\n## Success Criteria\n- **SC-001**: 뭔가 된다.\n");
   try {

@@ -82,6 +82,19 @@ test("위반은 판정 안에서만 성립한다 — 안 본 게이트는 위반
   assert.equal(judged.violation, true);
 });
 
+test("위반 건수도 게이트가 선언한 것을 읽는다 — 비차단 층의 ⚠를 위반으로 세지 않는다", () => {
+  // 실측: R13 확률적 층은 어떤 강도에서도 차단하지 않는데, 본문의 ⚠를 세던 이전 판이
+  // 그 경고만으로 규칙을 붉게 칠했다. 무엇이 위반인지는 게이트가 알고 집계기는 읽기만 한다.
+  const r = gateOutcome({
+    file: "check-duplicate-logic.mjs",
+    stdout: "⚠ a ↔ b — 확률적 후보(비차단)\n" + formatVerdict(VERDICT_KINDS.JUDGED, "위반 0건"),
+  });
+  assert.equal(r.violation, false, "비차단 경고가 위반으로 집계됐다");
+  assert.equal(r.flagged, false);
+  const bad = gateOutcome({ file: "x.mjs", stdout: "조용한 본문\n" + formatVerdict(VERDICT_KINDS.JUDGED, "위반 3건") });
+  assert.equal(bad.violation, true, "선언된 위반 건수를 놓쳤다");
+});
+
 test("집계는 다섯 갈래를 각자 센다 — 요약이 초록의 분모를 밝힌다", () => {
   const t = tallyGates([{ gates: [
     { kind: "JUDGED", violation: false }, { kind: "JUDGED", violation: true },

@@ -14,7 +14,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, walkFiles } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { SOURCE_CLASSES, GLOB_DETECTABLE, validateManifest } from "./derivation-lib.mjs";
 
@@ -58,21 +58,8 @@ for (const cls of GLOB_DETECTABLE) {
 
 // 레포 실재 검출 — 루트 1회 순회(ignoreDirs 제외, 정렬 순회로 결정성).
 const IGNORE = new Set(cfg.ignoreDirs);
-function walkAll(dir, relBase = "", acc = []) {
-  let entries;
-  try { entries = readdirSync(dir).sort(); } catch { return acc; }
-  for (const name of entries) {
-    const p = join(dir, name);
-    const r = relBase ? `${relBase}/${name}` : name;
-    let st;
-    try { st = statSync(p); } catch { continue; }
-    if (st.isDirectory()) {
-      if (IGNORE.has(name)) continue;
-      walkAll(p, r, acc);
-    } else acc.push(r);
-  }
-  return acc;
-}
+// 정본은 sdd-config의 walkFiles — 네 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const walkAll = (dir, relBase = "", acc = []) => walkFiles(dir, IGNORE, relBase, acc);
 const allFiles = walkAll(ROOT);
 const detected = {}; // class -> { count, example }
 for (const cls of GLOB_DETECTABLE) {

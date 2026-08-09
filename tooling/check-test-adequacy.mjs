@@ -5,8 +5,8 @@
 // 이 게이트가 그 틈을 메운다. 파일 단위 coarse 검사(단언 토큰 ≥1).
 // 기본 advisory(warn, exit 0), --strict에서 exit 1. config: assertionPatterns.
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
+import { join, basename } from "node:path";
+import { loadConfig, resolveFromRoot, isTestFile, walkFiles } from "./sdd-config.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -18,16 +18,8 @@ const IGNORE = new Set(cfg.ignoreDirs);
 const STRICT = process.argv.includes("--strict");
 const ASSERT = cfg.assertionPatterns.map((s) => new RegExp(s));
 
-function walk(dir, acc = []) {
-  let entries;
-  try { entries = readdirSync(dir); } catch { return acc; }
-  for (const name of entries) {
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) { if (!IGNORE.has(name)) walk(p, acc); }
-    else if (isTestFile(name, cfg)) acc.push(p);
-  }
-  return acc;
-}
+// 정본 순회 + 테스트 파일 필터 — 순회 규칙 복제 대신 필터만 호출자가 갖는다(R13 구조 중복).
+const walk = (dir) => walkFiles(dir, IGNORE).filter((r) => isTestFile(basename(r), cfg)).map((r) => join(dir, r));
 
 const offenders = [];
 let withCovers = 0;

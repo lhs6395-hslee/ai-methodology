@@ -69,12 +69,27 @@ function covers(entryAsset, path, matcher) {
 //   debt      — 안 봤다는 기록이 **사유와 함께** 있다(포기는 허용 — 표면화하되 차단 않음)
 //   silent    — 아무 기록도 없다. **이것이 ①이다** — 조용히 사라진 검증.
 // 같은 자산에 여러 기록이 있으면 **마지막이 유효**하다(원장은 append-only 로그다).
-export function classifyRuns(evidencePaths, entries, matcher) {
+// envBound: { <glob>: <사유> } — **이 환경에서는 돌 수 없다**고 config에 durable하게 선언한 자산.
+// 원장은 세션·CI 로컬 상태(gitignore)라 "여기선 못 돈다"는 항구적 사실을 담을 수 없다: 체크아웃마다
+// 다시 적어야 하고, 그 번거로움이 곧 사람이 정책을 끄는 이유가 된다(실측 교착: 킷의 CI 워크플로는
+// GitHub Actions에서만 돌아 로컬 스윕이 영구히 붉었다).
+// ⚠ 이것은 **면제가 아니다** — 실행됨으로 세지 않고 사유 있는 부채로 계상해 매 실행 표면화한다.
+// 바뀌는 것은 "침묵 → 사유 있는 미실행"뿐이고, 실제 실행 기록이 있으면 그쪽이 이긴다.
+export function classifyRuns(evidencePaths, entries, matcher, envBound = {}) {
   const executed = [], debt = [], silent = [];
+  const bounds = Object.entries(envBound || {});
   for (const path of evidencePaths) {
     let hit = null;
     for (const e of entries) if (covers(e.asset, path, matcher)) hit = e;   // 마지막 승
-    if (!hit) { silent.push(path); continue; }
+    if (!hit) {
+      const b = bounds.find(([glob]) => covers(glob, path, matcher));
+      if (b && String(b[1] || "").trim()) {
+        debt.push({ path, entry: { asset: b[0], outcome: VERDICT_KINDS.INERT, detail: `${String(b[1]).trim()} (환경 결속 선언)`, at: "" } });
+        continue;
+      }
+      silent.push(path);
+      continue;
+    }
     if (hit.outcome === VERDICT_KINDS.JUDGED) executed.push({ path, entry: hit });
     else debt.push({ path, entry: hit });
   }

@@ -14,7 +14,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, specMdFiles } from "./sdd-config.mjs";
 import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupReview, LIFECYCLE_ENUM, parseLifecycle } from "./lifecycle-lib.mjs";
 import { changeLogRationaleFindings } from "./derivation-lib.mjs";
 import { parseModule, frLinesMissingShall, frDeclStyleFindings, dedupReviewDanglingIds } from "./grammar-lib.mjs";
@@ -27,14 +27,11 @@ const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
 
-function specFiles() {
-  let names;
-  try { names = readdirSync(SPEC_DIR); } catch {
-    console.error(`✗ spec 디렉토리를 찾을 수 없음: ${SPEC_DIR}`);
-    process.exit(1);
-  }
-  return names.filter((n) => /\.md$/.test(n)).map((n) => join(SPEC_DIR, n));
-}
+// 정본은 sdd-config의 specMdFiles — 세 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
+  console.error(`✗ spec 디렉토리를 찾을 수 없음: ${d}`);
+  process.exit(1);
+});
 const countIds = (re, t) => { const s = new Set(); for (const m of t.matchAll(re)) s.add(m[0]); return s.size; };
 
 const files = specFiles();

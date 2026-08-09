@@ -46,9 +46,9 @@
 > 이 spec이 유일하게 소유하는 키(카테고리 = Modules/Symbols/Artifacts/Capabilities).
 - **Modules**: duplicate-logic
 - **Symbols**: duplicate-logic-lib.mjs, check-duplicate-logic.mjs
-- **Artifacts**: —
+- **Artifacts**: sdd/duplicate-candidates.tsv
 - **Capabilities**: duplicate-logic.judge
-- **Files**: tooling/duplicate-logic-lib.mjs, tooling/check-duplicate-logic.mjs, tooling/__tests__/duplicate-logic.test.mjs
+- **Files**: tooling/duplicate-logic-lib.mjs, tooling/check-duplicate-logic.mjs, tooling/__tests__/duplicate-logic.test.mjs, sdd/duplicate-candidates.tsv
 
 ## Dependencies (참조 — dedup 제외)
 > 선언 단위 dedup은 SPEC-002 소유 — 이 spec은 그 거울 밖(구현 단위)만 담당한다. config knob·설치 배선·sync 규칙표는 각 소유 스펙(001/004).
@@ -89,3 +89,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-08-03 | 초안 — `duplicateLogicPolicy`(off\|advisory\|hard, 기본 advisory) + knob 7종 + `duplicate-logic-lib`(리터럴 추출·중복 판정·면제 무결성·어댑터 파싱) + `check-duplicate-logic` 게이트 + sdd-sync R13 | 실측 제보: 병렬 서브에이전트가 같은 규칙을 세 갈래로 구현했고(같은 파일에 이름만 다른 export 두 개 포함) 게이트 4종이 전부 green이었다. dedup은 선언 단위만 보므로 구현 중복은 사각이었고, 유발 조건(격리 지시 + 동시 upstream + 각자 성실한 헬퍼)은 병렬 실행을 권장하는 방법론에서 정상 경로다. 오탐 억제 3겹으로 킷 자기적용 20 → 5건(전부 진짜) [검증: tooling/__tests__/duplicate-logic.test.mjs] |
+| 2026-08-09 | 확률적 층(`duplicateLogicCommand`) 인스턴스화 — 설치 0 패턴(`cat sdd/duplicate-candidates.tsv`, SPEC-033 ③층 선례) + 킷 자기적용 1차 전수 판정 | 리터럴 층은 정규식만 보므로 **같은 본문·다른 이름**을 원리적으로 못 본다. 켜자마자 함수 146개 중 완전 동형 5계열이 드러났다 — `walkAll`×4·`walk`×4·`specFiles`×3·`readCommand`×2·`*InertReasons`×3. 전부 **정본 통합으로 소멸**시켰고(면제 아님) 근사 2건은 사유와 함께 후보 파일에 남겼다. ⚠ 그리고 이 층을 켜면서 하네스의 마지막 추측이 드러났다: 집계기가 본문의 `⚠`를 세어 **비차단으로 설계된 층의 경고를 위반으로 집계**했다 — 위반 건수도 게이트 선언(`위반 N건`)을 읽도록 교정(SPEC-040) [검증: tooling/__tests__/verdict-contract.test.mjs] |

@@ -5,7 +5,7 @@
 // surfaceGlobs 비면 no-op. 기본 advisory(exit 0), --strict에서 exit 1.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, walkFiles } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
@@ -41,15 +41,8 @@ for (const f of (() => { try { return readdirSync(specDir); } catch { return [];
 
 // 2. 표면 파일 수집(ROOT 상대경로, surfaceGlobs 매칭).
 const IGNORE = new Set(cfg.ignoreDirs);
-function walk(dir, acc = []) {
-  let entries; try { entries = readdirSync(dir); } catch { return acc; }
-  for (const name of entries) {
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) { if (!IGNORE.has(name)) walk(p, acc); }
-    else acc.push(p);
-  }
-  return acc;
-}
+// 정본 순회 위에서 절대경로로 되돌린다 — 순회 규칙은 하나, 표현만 호출자 몫이다(R13 구조 중복).
+const walk = (dir) => walkFiles(dir, IGNORE).map((r) => join(dir, r));
 // 소유 스펙을 갖지 않기로 **선언된** 파일은 고아가 아니다 — 선언된 예외다.
 // ⚠ 이 목록을 새로 만들지 않고 `specSyncExemptGlobs`를 재사용한다: 같은 사실("이 파일엔 소유
 // 스펙이 없다")에 선언 자리가 둘이면 한쪽만 갱신돼 두 게이트가 다른 답을 낸다(R13이 잡는 중복의

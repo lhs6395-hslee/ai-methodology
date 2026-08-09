@@ -84,6 +84,15 @@ export const KIND_LABEL = Object.freeze({
   UNTYPED: "미판정(판정 종류 미선언 — 배선 누락)",
 });
 
+// 판정 입력 점검의 정본 — "정책이 켜졌는데 볼 것이 없으면 inert"는 축마다 반복되는 **같은 규칙**이다.
+// R13 구조 중복 실측: engine-event-lib·ownership-reality-lib·schema-backing-lib에 같은 형태가 셋
+// 있었다. 규칙은 여기 하나로 두고 **사유 문구는 축이 갖는다**(문구는 규칙이 아니라 데이터다).
+//   inertReasons(policy, [{ ok, reason }, …]) → 충족되지 않은 것들의 사유 배열(off면 빈 배열)
+export function inertReasons(policy, checks) {
+  if (policy === "off") return [];
+  return (checks || []).filter((c) => c && !c.ok).map((c) => c.reason);
+}
+
 // ── 방출기(게이트가 쓰는 유일한 진입점) ──────────────────────────────────────
 // 설계: 게이트의 **모든 종료 경로**에서 정확히 한 줄이 나와야 한다. 분기마다 print를 심으면
 // 반드시 빠뜨리는 분기가 생기고(그 분기가 곧 조용한 clean이다), 그래서 종료 훅에서 낸다.

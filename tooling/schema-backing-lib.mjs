@@ -25,16 +25,15 @@ export function schemaBackingActive(policy, sources, roles) {
 // 동형으로, *정책 전체의 inert*도 매 실행 표면화한다 — "hard 선언 + 무판정"은 거짓 안전이므로
 // 소비 게이트가 차단하고, 스키마 없는 프로젝트는 정책을 명시적 off(기본값)로 두어 조용히 통과한다.
 // 반환: 사유 문자열 배열(빈 배열 = 판정 성립 ∨ off). 순수 — 출력·exit은 소비 게이트.
+import { inertReasons } from "./verdict-lib.mjs";
+
 export function schemaBackingInertReasons(policy, sources, roles) {
-  if (policy === "off") return [];
-  const reasons = [];
-  if (!Array.isArray(sources) || sources.length === 0) {
-    reasons.push("entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)");
-  }
-  if (!(roles && roles.entity)) {
-    reasons.push("entity 역할 카테고리 미해석(ownershipCategoryRoles에 entity 선언 없음 + 이름 폴백 실패)");
-  }
-  return reasons;
+  // 규칙 정본은 verdict-lib의 inertReasons — 축 셋에 같은 형태가 복제돼 있었다(R13 구조 중복).
+  // 여기 남는 것은 **이 축의 사유 문구**뿐이다(문구는 규칙이 아니라 데이터다). 출력 불변.
+  return inertReasons(policy, [
+    { ok: Array.isArray(sources) && sources.length > 0, reason: "entitySchemaSources 비어 있음(구조 SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)" },
+    { ok: Boolean(roles && roles.entity), reason: "entity 역할 카테고리 미해석(ownershipCategoryRoles에 entity 선언 없음 + 이름 폴백 실패)" },
+  ]);
 }
 
 // 스키마 소스별 패턴 문자열의 정규식 유효성 검사 — 잘못된 정규식은 {index, pattern}로 수집한다

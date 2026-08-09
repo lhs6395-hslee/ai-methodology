@@ -14,7 +14,7 @@
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, walkFiles } from "./sdd-config.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -40,21 +40,8 @@ for (const f of specNames) {
 
 // 2. 태그 수집 — smokeScanDirs(기본 scanDirs)의 전 파일(테스트 한정 아님).
 const IGNORE = new Set(cfg.ignoreDirs);
-function walkAll(dir, relBase = "", acc = []) {
-  let entries;
-  try { entries = readdirSync(dir).sort(); } catch { return acc; }
-  for (const name of entries) {
-    const p = join(dir, name);
-    const r = relBase ? `${relBase}/${name}` : name;
-    let st;
-    try { st = statSync(p); } catch { continue; }
-    if (st.isDirectory()) {
-      if (IGNORE.has(name)) continue;
-      walkAll(p, r, acc);
-    } else acc.push(r);
-  }
-  return acc;
-}
+// 정본은 sdd-config의 walkFiles — 네 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const walkAll = (dir, relBase = "", acc = []) => walkFiles(dir, IGNORE, relBase, acc);
 const scanDirs = cfg.smokeScanDirs || cfg.scanDirs;
 const manifestRel = cfg.smokeManifest ? String(cfg.smokeManifest) : null;
 // 유효 키가 따라오는 태그만 캡처(산문 언급은 무시 — @covers와 동일 관례).

@@ -96,7 +96,12 @@ export function gateOutcome({ file, missing = false, crashed = false, stdout = "
       : `(미판정: 게이트가 판정 종류를 선언하지 않음 — 배선 누락, exit 0 ≠ 판정함) ${summary}`.trim());
   }
   // 위반은 **JUDGED 안에서만** 성립한다 — 안 본 게이트는 위반을 낼 수 없다(그게 위험한 이유다).
-  const violation = isJudged(v.kind) && (crashed || /[⚠✗]/.test(body));
+  // ⚠ 건수도 **게이트가 선언한 것**을 읽는다(`judged(n)` → "위반 N건"). 본문의 `⚠`·`✗`를 세던
+  // 이전 판은 **비차단으로 설계된 층의 경고까지 위반으로 집계**했다(실측: R13 확률적 층은 어떤
+  // 강도에서도 차단하지 않는데 스윕이 ⚠ 한 줄을 보고 규칙을 붉게 칠했다). 같은 계열의 마지막
+  // 추측이라 함께 제거한다 — 무엇이 위반인지는 게이트가 알고, 집계기는 읽기만 한다.
+  const declaredViolations = Number((/위반\s+(\d+)\s*건/.exec(v.detail || "") || [, 0])[1]);
+  const violation = isJudged(v.kind) && (crashed || declaredViolations > 0);
   return {
     kind: v.kind,
     violation,

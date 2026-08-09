@@ -1,0 +1,13 @@
+# SPEC-038 ②층 구조 중복 후보 — 생성기: 세션 LLM(전수 열거는 정규화 본문 해시가 수행)
+# 계약: 한 줄 = 한 쌍(탭 구분) — <a>\t<b>\t<사유·판정>. 이 파일은 판정이 아니라 "사람이 봐야 할 목록"이다.
+# 설치 0(SPEC-033 ③층과 같은 패턴): jscpd 등 외부 도구를 깔지 않고 세션 LLM이 후보를 남긴다.
+# ⚠ 이 층은 **어떤 강도에서도 차단하지 않는다** — 확률적 판정에 차단력을 주면 오탐이 방법론의 오류가 된다.
+#
+# ── 2026-08-09 1차 전수 판정: 함수 134개 · 정규화 본문(문자열·식별자 치환) 유일 134개 ──
+# 완전 동형 5건은 이 라운드에서 **정본 통합으로 소멸**했다(면제 아님):
+#   walkAll×4·walk×4 → sdd-config.walkFiles / specFiles×3 → sdd-config.specMdFiles
+#   readCommand×2 → deploy-guard-lib.commandFromHookInput
+#   *InertReasons×3 → verdict-lib.inertReasons
+# 아래는 근사 동형이라 사람 판정이 필요한 잔여 2건이다.
+check-evidence.mjs:walk	check-ownership.mjs:walk	근사 0.77 — **정당한 차이**: evidence의 순회는 디렉토리 집합(DIRS)도 함께 모으고(증거 경로가 디렉토리 지목일 수 있다) ownership의 것은 파일만 모은다. 공유 walkFiles는 파일만 반환하므로 디렉토리 수집을 얹으면 반환 계약이 두 갈래가 된다. 재검토 조건: 세 번째 소비처가 디렉토리 집합을 요구하면 walkFiles에 디렉토리 콜백을 더한다
+engine-event-lib.mjs:realityFindings	ownership-reality-lib.mjs:symbolRealityFindings	근사 0.64 — **정당한 차이**: 전자는 키를 SSOT 집합과 정확 대조(engine/event 실재), 후자는 basename 집합과 대조하며 확장자·경로 변형을 흡수한다(surface 실재). 대조 축의 정규화 규칙이 달라 하나로 합치면 한쪽이 느슨해진다. 재검토 조건: 정규화 규칙이 같아지는 순간 통합한다

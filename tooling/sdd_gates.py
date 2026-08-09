@@ -122,6 +122,7 @@ DEFAULTS = {
     "verificationRunLedger": None,
     "verificationRunListCap": 12,
     "verificationRunTestAssets": None,
+    "verificationRunEnvBound": {},
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
     "hooksInstalledPolicy": "advisory",
@@ -771,16 +772,27 @@ def _run_covers(entry_asset, path, matcher):
     return False
 
 
-def classify_runs(evidence_paths, entries, matcher):
-    """반환 (executed, debt, silent). 같은 자산에 여러 기록이면 **마지막이 유효**하다."""
+def classify_runs(evidence_paths, entries, matcher, env_bound=None):
+    """반환 (executed, debt, silent). 같은 자산에 여러 기록이면 **마지막이 유효**하다.
+
+    env_bound: {glob: 사유} — "이 환경에서는 돌 수 없다"는 항구적 선언(config). 원장은 gitignore라
+    체크아웃마다 사라지므로 그 사실을 담지 못한다. **면제가 아니다** — 실행됨으로 세지 않고
+    사유 있는 부채로 계상하며, 실제 기록이 있으면 그쪽이 이긴다."""
     executed, debt, silent = [], [], []
+    bounds = list((env_bound or {}).items())
     for path in evidence_paths:
         hit = None
         for e in entries:
             if _run_covers(e["asset"], path, matcher):
                 hit = e
         if hit is None:
-            silent.append(path)
+            bound = next((b for b in bounds
+                          if _run_covers(b[0], path, matcher) and str(b[1] or "").strip()), None)
+            if bound:
+                debt.append((path, {"asset": bound[0], "outcome": "INERT",
+                                    "detail": f"{str(bound[1]).strip()} (환경 결속 선언)", "at": ""}))
+            else:
+                silent.append(path)
         elif hit["outcome"] == "JUDGED":
             executed.append((path, hit))
         else:
@@ -4715,7 +4727,11 @@ def cmd_verifyrun(cfg, record_args=None):
 
     text = read_text(ledger_abs) if os.path.exists(ledger_abs) else ""
     entries, malformed = parse_run_ledger(text)
-    executed, debt, silent = classify_runs(paths, entries, compile_glob)
+    # 환경 결속 선언(config, durable) — 사유 없는 항목은 무시한다(사유 없는 결속은 조용한 면제다).
+    env_bound = cfg.get("verificationRunEnvBound")
+    if not isinstance(env_bound, dict):
+        env_bound = {}
+    executed, debt, silent = classify_runs(paths, entries, compile_glob, env_bound)
     blocking, violations = verification_run_verdict(policy, silent, malformed)
     judged(violations)
 

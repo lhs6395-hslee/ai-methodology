@@ -9,7 +9,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, walkFiles } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import {
@@ -55,15 +55,8 @@ function specUnits() {
 function ssotSet(sources) {
   const IGNORE = new Set(cfg.ignoreDirs);
   const all = [];
-  (function walk(dir, rel = "") {
-    let entries; try { entries = readdirSync(dir).sort(); } catch { return; }
-    for (const name of entries) {
-      const p = join(dir, name), r = rel ? `${rel}/${name}` : name;
-      let st; try { st = statSync(p); } catch { continue; }
-      if (st.isDirectory()) { if (!IGNORE.has(name)) walk(p, r); }
-      else all.push(r);
-    }
-  })(ROOT);
+  // 정본은 sdd-config의 walkFiles — 두 게이트에 본문 동일로 있던 것(R13 구조 중복).
+  walkFiles(ROOT, IGNORE, "", all);
   const units = [];
   for (const src of sources || []) {
     const globs = (src.globs || []).map(compileGlob);

@@ -121,7 +121,11 @@
   "relationTypes": [
     "references"
   ],
+  "verificationRunPolicy": "hard",
   "verificationRunLedger": ".sdd/verification-runs.jsonl",
+  "verificationRunEnvBound": {
+    ".github/workflows/**": "GitHub Actions에서만 실행 — 로컬 체크아웃에는 이 자산을 돌릴 판정 입력이 없다. CI 실행 시 실제 기록이 이 선언을 대체한다"
+  },
   "verificationRunTestAssets": [
     "tooling/__tests__"
   ],
@@ -190,6 +194,7 @@
   "duplicateLiteralPatterns": [
     "(?<![\\w$)\\]])/((?:[^/\\\\\\n\\[]|\\\\.|\\[(?:[^\\]\\\\]|\\\\.)*\\])+)/[gimsuyd]*"
   ],
+  "duplicateLogicCommand": "cat sdd/duplicate-candidates.tsv",
   "duplicateLogicAllow": {
     "[.*+?^${}()|[\\]\\\\]": "정규식 이스케이프 관용구 — **규칙이 아니라 어휘**다. 네 순수 코어(changelog-fr·evidence·object-storage·ownership-keys)가 각자 독립이어야 하는데 한 줄 관용구를 위해 공유 모듈로 묶으면 결합이 이득을 넘는다. 재검토 조건: 이스케이프 대상 문자 집합이 바뀌어야 하는 사유가 생기면(그때는 규칙이 된다) 단일 사이트로 모은다"
   },

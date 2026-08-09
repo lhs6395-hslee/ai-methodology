@@ -25,7 +25,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile} from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile, walkFiles } from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
@@ -100,21 +100,8 @@ const classGlobs = {};
   for (const cls of INFRA_SOURCE_CLASSES) classGlobs[cls] = (userGlobs[cls] || DEFAULTS.derivationClassGlobs[cls] || []).map(compileGlob);
 }
 // 레포 실재 순회 — ignoreDirs 제외·정렬(check-derivation과 동형, 결정성).
-function walkAll(dir, relBase = "", acc = []) {
-  let entries;
-  try { entries = readdirSync(dir).sort(); } catch { return acc; }
-  for (const name of entries) {
-    const p = join(dir, name);
-    const r = relBase ? `${relBase}/${name}` : name;
-    let st;
-    try { st = statSync(p); } catch { continue; }
-    if (st.isDirectory()) {
-      if (IGNORE.has(name)) continue;
-      walkAll(p, r, acc);
-    } else acc.push(r);
-  }
-  return acc;
-}
+// 정본은 sdd-config의 walkFiles — 네 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
+const walkAll = (dir, relBase = "", acc = []) => walkFiles(dir, IGNORE, relBase, acc);
 const allRepoFiles = walkAll(ROOT);
 const testInfraGlobs = (cfg.testInfraGlobs || []).map(compileGlob); // SPEC-015: 테스트 인프라 네임스페이스
 const prefixClassWarnings = [];

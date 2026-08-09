@@ -101,7 +101,11 @@ if (!paths.length) {
 
 const ledgerText = existsSync(LEDGER_ABS) ? readFileSync(LEDGER_ABS, "utf8") : "";
 const { entries, malformed } = parseRunLedger(ledgerText);
-const { executed, debt, silent } = classifyRuns(paths, entries, compileGlob);
+// 환경 결속 선언(config, durable) — 원장이 담을 수 없는 "여기선 못 돈다"를 사유와 함께 고정한다.
+// 사유 없는 항목은 무시한다: 사유 없는 결속은 조용한 면제이고, 그건 이 게이트가 막는 것이다.
+const ENV_BOUND = (cfg.verificationRunEnvBound && typeof cfg.verificationRunEnvBound === "object" && !Array.isArray(cfg.verificationRunEnvBound))
+  ? cfg.verificationRunEnvBound : {};
+const { executed, debt, silent } = classifyRuns(paths, entries, compileGlob, ENV_BOUND);
 const v = verificationRunVerdict(POLICY, { silent, malformed });
 judged(v.violations);
 

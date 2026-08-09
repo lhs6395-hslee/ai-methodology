@@ -18,14 +18,17 @@ export function roleActive(policy, sources, roleCat) {
 }
 
 // 정책이 off가 아닌데 판정 불가(inert)인 사유 — 침묵 금지(schemaBackingInertReasons 동형).
+import { inertReasons } from "./verdict-lib.mjs";
+
 export function roleInertReasons(policy, sources, roleCat, sourcesKnob, roleName) {
-  if (policy === "off") return [];
-  const reasons = [];
-  if (!Array.isArray(sources) || sources.length === 0)
-    reasons.push(`${sourcesKnob} 비어 있음(${roleName} SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)`);
-  if (!roleCat)
-    reasons.push(`${roleName} 역할 카테고리 미해석(ownershipCategoryRoles에 ${roleName} 선언 없음 — engine/event는 선언 전용)`);
-  return reasons;
+  // 규칙 정본은 verdict-lib의 inertReasons — 축 셋에 같은 형태가 복제돼 있었다(R13 구조 중복).
+  // 여기 남는 것은 **이 축의 사유 문구**뿐이다(문구는 규칙이 아니라 데이터다). 출력 불변.
+  return inertReasons(policy, [
+    { ok: Array.isArray(sources) && sources.length > 0,
+      reason: `${sourcesKnob} 비어 있음(${roleName} SSOT 어댑터 미선언 — 대조할 실재 집합이 없음)` },
+    { ok: Boolean(roleCat),
+      reason: `${roleName} 역할 카테고리 미해석(ownershipCategoryRoles에 ${roleName} 선언 없음 — engine/event는 선언 전용)` },
+  ]);
 }
 
 // SSOT 실재 대조: 소유 키(raw, 여기서 정규화)가 SSOT 집합 ∪ 면제에 없으면 위반.

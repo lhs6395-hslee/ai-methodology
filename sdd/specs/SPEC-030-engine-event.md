@@ -80,3 +80,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-29 | 초안 — `engine`·`event` 역할(선언 전용) + `enginesSources`·`engineRealityPolicy`·`engineExemptKeys`·`eventCatalogSources`·`eventAttributionPolicy`·`eventExemptKeys` knob + `engine-event-lib`(실재·귀속 판정) + `check-engine-event` 게이트 + sdd-sync R7, Node·Python 바이트 패리티 | 감사(#21) 전수성 구멍: 순수 엔진·배치 job·이벤트가 E/S/C 어디에도 안 맞아 유령 entity 날조·40건 일괄 면제·`job:` Surface 개명으로 우회. owner가 감사 후 "A. Engines+Events 신설" 선택. 옵트인이라 미선언 프로젝트·킷 자신은 inert |
+| 2026-08-09 | `roleInertReasons`를 `inertReasons`(verdict-lib) 위임으로 — 사유 문구만 보유 | 같은 규칙의 세 번째 사이트였다(R13 구조 중복). 이 함수가 이미 파라미터화된 형태였으므로 규칙 정본의 후보였으나, INERT 판정 형태의 소유는 그 개념을 세운 SPEC-040이 갖는 것이 귀속상 옳다(SPEC-030 lib을 다른 두 축이 import하는 구조를 피한다) |

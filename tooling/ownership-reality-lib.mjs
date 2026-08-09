@@ -44,16 +44,15 @@ export function symbolRealityActive(policy, roots, roles) {
 
 // 정책이 off가 아닌데 판정이 성립하지 않는 사유 — 침묵 금지(schemaBackingInertReasons와 동형).
 // "hard 선언 + 무판정"은 거짓 안전이므로 소비 게이트가 차단한다.
+import { inertReasons } from "./verdict-lib.mjs";
+
 export function symbolRealityInertReasons(policy, roots, roles) {
-  if (policy === "off") return [];
-  const reasons = [];
-  if (!Array.isArray(roots) || roots.length === 0) {
-    reasons.push("ownershipSourceRoots 비어 있음(소스 루트 미선언 — 대조할 실재 집합이 없음)");
-  }
-  if (!(roles && roles.surface)) {
-    reasons.push("surface 역할 카테고리 미해석(ownershipCategoryRoles에 surface 선언 없음 + 이름 폴백 실패)");
-  }
-  return reasons;
+  // 규칙 정본은 verdict-lib의 inertReasons — 축 셋에 같은 형태가 복제돼 있었다(R13 구조 중복).
+  // 여기 남는 것은 **이 축의 사유 문구**뿐이다(문구는 규칙이 아니라 데이터다). 출력 불변.
+  return inertReasons(policy, [
+    { ok: Array.isArray(roots) && roots.length > 0, reason: "ownershipSourceRoots 비어 있음(소스 루트 미선언 — 대조할 실재 집합이 없음)" },
+    { ok: Boolean(roles && roles.surface), reason: "surface 역할 카테고리 미해석(ownershipCategoryRoles에 surface 선언 없음 + 이름 폴백 실패)" },
+  ]);
 }
 
 // 소유 surface 키가 실재 basename 집합에 없으면 위반. 키는 raw(여기서 트림·소문자).
