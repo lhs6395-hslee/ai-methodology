@@ -34,6 +34,53 @@ import unicodedata
 import subprocess
 import sys
 
+# ── 판정 타입(verdict-lib.mjs 패리티, SPEC-040) ────────────────────────────────
+# 게이트는 "무엇을 했는지"를 산문이 아니라 **타입**으로 말한다. 이 미러가 없으면 Python 런타임
+# 프로젝트의 스윕은 여전히 문자열로 추측하고, "off (판정 안 함)"을 초록으로 읽는다.
+# 종류는 다섯 개뿐이다 — 늘리면 "이건 어디에 넣지"가 생기고 그 자리가 예외가 된다.
+VERDICT_KINDS = ("JUDGED", "OFF", "INERT", "SKIPPED", "UNTYPED")
+VERDICT_PREFIX = "판정:"
+_VERDICT = None
+_VERDICT_QUIET = False
+
+
+def format_verdict(kind, detail=""):
+    k = kind if kind in VERDICT_KINDS else "UNTYPED"
+    d = str(detail or "").strip()
+    return f"{VERDICT_PREFIX} {k} — {d}" if d else f"{VERDICT_PREFIX} {k}"
+
+
+def verdict(kind, detail=""):
+    global _VERDICT
+    _VERDICT = (kind, detail)
+
+
+def judged(violations=0):
+    verdict("JUDGED", f"위반 {violations}건" if violations > 0 else "위반 0건")
+
+
+def arm_verdict(quiet_when_silent=False):
+    """모든 종료 경로에서 판정 줄 하나. sys.exit도 atexit를 탄다.
+
+    os.write(1, …)를 쓰는 이유는 Node판과 같다 — print는 버퍼를 타서 종료 훅에서 유실될 수 있다."""
+    global _VERDICT_QUIET
+    _VERDICT_QUIET = bool(quiet_when_silent)
+    import atexit
+
+    def _emit():
+        if _VERDICT is None and _VERDICT_QUIET:
+            return
+        kind, detail = _VERDICT if _VERDICT else (
+            "UNTYPED", "게이트가 판정 종류를 선언하지 않았다(배선 누락 — verdict() 호출 없음)")
+        try:
+            sys.stdout.flush()
+            os.write(1, (format_verdict(kind, detail) + "\n").encode("utf-8"))
+        except Exception:
+            pass
+
+    atexit.register(_emit)
+
+
 # Node판 sdd-config.mjs DEFAULTS의 미러 — 값이 다르면 런타임 간 동작이 갈라진다.
 DEFAULTS = {
     "specDir": "sdd/specs",
@@ -999,6 +1046,10 @@ def cmd_fr(cfg, strict):
     acct_tag = (f" accounted(unit:{acct_counts['unit']} e2e:{acct_counts['e2e']} smoke:{acct_counts['smoke']}"
                 f" deferred:{acct_counts['deferred']} planned:{acct_counts['planned']} unaccounted:{acct_counts['unaccounted']})"
                 if accounting_active else "")
+    if not specs:
+        verdict("INERT", "판정 대상 스펙 0건 — specDir에서 FR 선언을 찾지 못했다")
+    else:
+        judged(len(errors))
     print(f"FR coverage gate — specs:{len(specs)} FRs:{total_fr} covered:{total_cov}{acct_tag} mode:{mode} config:{cfg_tag(cfg)}")
     for w in warnings:
         print(f"  · {w}")
@@ -1751,6 +1802,10 @@ def cmd_ownership(cfg, strict):
         relation_errors.append(f'[{spec_id}] 관계 대상 Entity "{entity}" ({rel_type}) — 어느 spec의 Ownership에도 없음(오타·삭제 확인)')
     relation_cycles = find_cycles(relation_edges)
 
+    if not files:
+        verdict("INERT", "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다")
+    else:
+        judged(0)
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
     if missing:
         tag = "✗" if (strict or orq_policy == "hard") else "⚠"
@@ -1991,6 +2046,10 @@ def cmd_cohesion(cfg, strict):
                 elif len(own[cat]) > max_keys:
                     violations.append((spec_id, cat, len(own[cat]), max_keys))
 
+    if not files:
+        verdict("INERT", "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다")
+    else:
+        judged(len(violations))
     print(f"Spec 입도(cohesion) 게이트: spec {len(files)}개 검사 (키>{max_keys}/카테고리, FR>{max_frs}).")
     if violations:
         tag = "✗" if strict else "⚠"
@@ -2480,6 +2539,10 @@ def cmd_completeness(cfg, strict):
         names = sorted(module_values.keys())
         findings.append(("(전 스펙)", f"Module 값 {len(names)}개({', '.join(names)}) — 1 레포 = 1 모듈(STRUCTURE.md): 모듈이 더 필요하면 레포를 나눈다"))
 
+    if not files:
+        verdict("INERT", "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다")
+    else:
+        judged(len(findings))
     print(f"Spec 완전성 게이트: spec {len(files)}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요).")
     if findings:
         tag = "✗" if strict else "⚠"
@@ -2766,6 +2829,7 @@ def cmd_consistency(cfg, strict):
         # 소유 키 앵커 강제(FR-007) — 소유 키는 FR에 굵게 앵커돼야 한다(산문·백틱에만 있으면 위반).
         for spec_id, key, kind, exp in marker_unanchored:
             print(f'  {tag} [{spec_id}] 소유 {kind} 키 "{key}" — 어느 FR에도 굵게 앵커되지 않음: 이 키를 세우는 FR에서 **{key}** ({exp})로 표기')
+    judged(len(findings) + (1 if anchor_hard else 0))
     if findings and strict:
         print("\n✗ --strict: 근거 없는 키.", file=sys.stderr)
         sys.exit(1)
@@ -2791,6 +2855,7 @@ def cmd_adequacy(cfg, strict):
                 offenders.append(rel_from_root(cfg, f))
 
     mode = "strict" if strict else "advisory"
+    judged(len(offenders))
     print(f"Test adequacy gate — @covers files:{with_covers} no-assertion:{len(offenders)} mode:{mode} config:{cfg_tag(cfg)}")
     for o in offenders:
         print(f"  · {o}: @covers 있으나 단언 없음(빈 껍데기 의심)")
@@ -2805,6 +2870,7 @@ def cmd_adequacy(cfg, strict):
 def cmd_orphan(cfg, strict):
     globs = [re.compile(s) for s in (cfg.get("surfaceGlobs") or [])]
     if not globs:
+        verdict("INERT", "surfaceGlobs 미설정 — 표면으로 볼 파일 집합이 없다")
         print("Orphan-surface gate: surfaceGlobs 미설정 — no-op")
         return
 
@@ -2831,6 +2897,7 @@ def cmd_orphan(cfg, strict):
             orphans.append(rel)
 
     mode = "strict" if strict else "advisory"
+    judged(len(orphans))
     print(f"Orphan-surface gate — surfaces:{surfaces} declared:{len(declared)} orphans:{len(orphans)} mode:{mode}")
     for o in orphans:
         print(f"  · {o}: 어떤 스펙 Ownership(Surfaces)에도 없음 → 스펙 누락 의심")
@@ -2860,6 +2927,7 @@ def _in_dir(p, d):
 def cmd_converge(cfg, strict, base):
     out = _git(cfg, ["diff", "--name-only", f"{base}...HEAD"])
     if out is None:
+        verdict("SKIPPED", f"git diff({base}) 불가 — 비교 기준을 해석하지 못했다")
         print(f"· converge-drift: git diff({base}) 불가 — 건너뜀")
         return
     changed = [s.strip() for s in out.splitlines() if s.strip()]
@@ -2867,6 +2935,7 @@ def cmd_converge(cfg, strict, base):
     spec_changed = any(_in_dir(p, cfg["specDir"]) for p in changed)
 
     mode = "strict" if strict else "advisory"
+    judged(len(code_changed) if (code_changed and not spec_changed) else 0)
     print(f"Converge-drift gate — base:{base} changed:{len(changed)} code:{len(code_changed)} "
           f"spec-changed:{str(spec_changed).lower()} mode:{mode}")
     if code_changed and not spec_changed:
@@ -3288,6 +3357,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
     # ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
     unowned_hard = policy == "error" and staged and len(unowned) > 0
     mode = "staged(hard)" if staged else f"range(advisory, base:{base})"
+    judged(len(violations) + (len(unowned) if unowned_hard else 0) + (len(drift_violations) if drift_hard else 0))
     print(f"spec-sync 게이트 — mode:{mode} changed:{len(changed)} specs:{len(specs)}")
     for f in unowned:
         print(f"  {'✗' if unowned_hard else '⚠'} unowned: {f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy={policy})")
@@ -3350,6 +3420,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
 
 def cmd_derivation(cfg):
     if not cfg.get("derivationManifest"):
+        verdict("INERT", "derivationManifest 미설정 — 파생 관계를 볼 매니페스트가 없다")
         print("Derivation 게이트: derivationManifest 미설정 — no-op")
         return
     rel = str(cfg["derivationManifest"])
@@ -3426,6 +3497,7 @@ def cmd_derivation(cfg):
         elif status == "mapped" and n == 0:
             warnings.append(f"{cls}: mapped 선언이나 레포 내 검출 0건 — 레포 밖 실체(evidence로 확인) 또는 정리 대상")
 
+    judged(len(errors))
     print(f"Derivation 게이트 — classes:{len(SOURCE_CLASSES)} accounted:{accounted} "
           f"(mapped:{counts['mapped']} none:{counts['none']} deferred:{counts['deferred']}) config:{cfg_tag(cfg)}")
     for w in warnings:
@@ -3517,7 +3589,9 @@ def cmd_smokescan(cfg, write):
             print(f"✗ {_VTAG} 태그 {tag_count}건 발견인데 smokeManifest 미설정 — sdd.config.json에 매니페스트 경로 선언 필요",
                   file=sys.stderr)
             sys.exit(1)
+        verdict("INERT", "smoke 태그 0건 · 매니페스트 미설정 — 볼 대상이 없다")
         print(f"Smoke-scan — tags:0 keys:0 manifest:미설정 mode:{'write' if write else 'check'} config:{cfg_tag(cfg)}")
+        verdict("INERT", "smoke 태그도 매니페스트도 없음 — 볼 대상이 없다")
         print("Smoke-scan: no-op — 태그도 매니페스트도 없음.")
         sys.exit(0)
     manifest = {}
@@ -3539,6 +3613,7 @@ def cmd_smokescan(cfg, write):
             errors.append(f"S1 매니페스트 파일 없음({manifest_rel})인데 태그 파생 엔트리 {len(tag_entries)}건 — --write로 생성")
         manifest = {}
 
+    verdict("SKIPPED", "스캐너(판정 게이트 아님) — 매니페스트를 산출·대조한다")
     print(f"Smoke-scan — tags:{tag_count} keys:{len(tag_entries)} manifest:{0 if manifest_missing else len(manifest)} "
           f"mode:{'write' if write else 'check'} config:{cfg_tag(cfg)}")
 
@@ -3590,6 +3665,7 @@ _CTAG = "@cov" + "ers"  # 자기 소스가 fr 게이트 스캔에 걸리지 않�
 
 def cmd_retag(cfg, map_path, write):
     if not map_path:
+        verdict("SKIPPED", "인자 없음 — 판정을 요청받지 못했다(usage)")
         print("usage: sdd-retag <map.json> [--write]", file=sys.stderr)
         sys.exit(2)
     try:
@@ -3617,6 +3693,7 @@ def cmd_retag(cfg, map_path, write):
             errors.append(f'T2 dangling 대상 "{old_key}" → "{new_key}" — no such FR(현재 spec에 실재해야 함)')
 
     if errors:
+        judged(len(errors))
         print(f"Retag — map:{len(mapping)}키 mode:{'write' if write else 'dry-run'} config:{cfg_tag(cfg)}")
         print("\nRetag violations:", file=sys.stderr)
         for e in errors:
@@ -3666,6 +3743,7 @@ def cmd_retag(cfg, map_path, write):
 
     rewrites = len(plans) + sum(1 for _, nk in manifest_plans if nk is not None)
     manual = len(removals) + sum(1 for _, nk in manifest_plans if nk is None)
+    verdict("SKIPPED", "리팩터 도구(판정 게이트 아님) — 키 치환을 산출한다")
     print(f"Retag — map:{len(mapping)}키 rewrites:{rewrites} manual-removal:{manual} "
           f"mode:{'write' if write else 'dry-run'} config:{cfg_tag(cfg)}")
     for path, line, tag, old_key, new_key in plans:
@@ -3712,6 +3790,7 @@ def cmd_retag(cfg, map_path, write):
 def cmd_run(cfg, stage):
     cmd = cfg["commands"].get(stage)
     if not cmd:
+        verdict("INERT", f"'{stage}' 명령 미설정 — 실행할 것이 없다")
         print(f"· sdd-run: '{stage}' 명령 미설정 — 건너뜀")
         return
     print(f"▶ sdd-run {stage}: {cmd}")
@@ -3790,6 +3869,16 @@ def cmd_testrun(cfg):
         if not skipped:
             e2e_exit = subprocess.run(str(e2e_cmd), shell=True, cwd=cfg["__root"], stdout=sys.stderr).returncode
     e_valid, e_code, e_line = e2e_run_verdict(e2e_policy, bool(e2e_cmd), skipped, e2e_exit)
+    # 이 게이트의 원래 결함이 정확히 여기였다 — 정책이 hard인데 명령이 없으면 아무것도 안 돌고
+    # exit 0으로 끝났다(여러 라운드 거짓 green). 이제 그 상태는 INERT로 자백된다.
+    if policy == "off":
+        verdict("OFF", "runTestsPolicy")
+    elif not cmd:
+        verdict("INERT", "commands.test 미선언 — 돌릴 스위트가 없다")
+    elif skipped:
+        verdict("SKIPPED", f"e2e 전제 미충족 — {skipped}")
+    else:
+        judged((1 if code else 0) + (1 if e_code else 0))
     # 출력 순서: e2e 축 먼저, 스위트 판정 마지막 (check-test-run.mjs 미러 — 집계기가 마지막 줄을 요약으로 쓴다).
     print(e_line, file=(sys.stdout if (e_valid and e_code == 0) else sys.stderr))
     print(line, file=(sys.stdout if valid else sys.stderr))
@@ -3818,6 +3907,7 @@ def cmd_schemadrift(cfg):
     """프로젝트가 선언한 expected/deployed 조회 명령을 실행해 스키마 드리프트를 판정 (SPEC-022). DB/ORM 중립."""
     m = cfg.get("schemaDriftManifest")
     if not m or not m.get("expected") or not m.get("deployed"):
+        verdict("INERT", "schemaDriftManifest 미설정 — expected/deployed를 조회할 명령이 없다")
         print("런타임 스키마 드리프트 게이트 — schemaDriftManifest 미설정(비활성; DB 스키마 SSOT 프로젝트는 배포 preflight에 expected/deployed 조회 명령 설정 권장)")
         sys.exit(0)
     policy = cfg.get("migrationStatePolicy") or "advisory"
@@ -3834,6 +3924,13 @@ def cmd_schemadrift(cfg):
         except Exception:  # noqa: BLE001
             ran = False
     valid, code, _drift, line = schema_drift_verdict(expected, deployed, ran, policy)
+    # 조회가 실패했으면(ran=False) 본 것이 없다 — exit 0이어도 판정이 아니다.
+    if not ran:
+        verdict("SKIPPED", "expected/deployed 조회 실패 — 라이브 스키마를 읽지 못했다")
+    elif policy == "off":
+        verdict("OFF", "migrationStatePolicy")
+    else:
+        judged(1 if code else 0)
     print(line, file=(sys.stdout if valid else sys.stderr))
     sys.exit(code)
 
@@ -3919,6 +4016,7 @@ def cmd_sccoverage(cfg):
         print(f'✗ scCoveragePolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
         sys.exit(1)
     if policy == "off":
+        verdict("OFF", "scCoveragePolicy")
         print("SC·NFR 회계 게이트 — scCoveragePolicy:off (판정 안 함)")
         sys.exit(0)
     hard = policy == "hard"
@@ -3967,6 +4065,11 @@ def cmd_sccoverage(cfg):
           f"verified {counts['verified']}·evidence {counts['evidence']}·deferred {counts['deferred']}·미회계 {counts['unaccounted']} | 종류({kind_tag})")
     tag = "✗" if hard else "⚠"
     bad = sorted((k, v) for k, v in classes.items() if v["cls"] == "unaccounted")
+    # 항목 0건은 "깨끗함"이 아니라 "볼 것이 없었음"이다 — SC 문법이 안 잡힌 상태와 구분되지 않는다.
+    if not items:
+        verdict("INERT", "SC·NFR 선언 라인이 0건 — 판정 대상을 찾지 못했다")
+    else:
+        judged(len(bad))
     cap = int(cfg.get("scCoverageListCap") or 12)
     for k, v in bad[:cap]:
         why = ("`[미확인]`은 정직한 자기신고지만 회계가 아니다 — evidenceManifest에 사유와 함께 착지시켜라"
@@ -4000,6 +4103,7 @@ def cmd_ratchet(cfg, base_arg):
     base = base_arg or os.environ.get("SDD_DIFF_BASE") or cfg.get("specSyncBase") or "origin/main"
 
     def off_notice():
+        verdict("OFF", "policyRatchetPolicy")
         print("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)")
 
     # base config를 off 단락보다 먼저 읽는다 — 래칫 자신의 강도도 base 시점 값으로 판정(감사 A-2).
@@ -4011,6 +4115,7 @@ def cmd_ratchet(cfg, base_arg):
         if cur_policy == "off":
             off_notice()
             sys.exit(0)
+        verdict("SKIPPED", f"base({base}) config 조회 불가 — 비교 대상이 없다(git 없음·최초 채택)")
         print(f"정책 래칫 게이트 — base({base}) config 조회 불가(git 없음·최초 채택) — 건너뜀")
         sys.exit(0)
     base_cfg = config_from_string(base_raw, cfg["__root"])
@@ -4018,6 +4123,7 @@ def cmd_ratchet(cfg, base_arg):
         if cur_policy == "off":
             off_notice()
             sys.exit(0)
+        verdict("SKIPPED", f"base({base}) config 파싱 실패 — 비교 대상을 읽지 못했다")
         print(f"정책 래칫 게이트 — base({base}) config 파싱 실패 — 건너뜀")
         sys.exit(0)
     policy = effective_ratchet_policy(base_cfg.get("policyRatchetPolicy"), cur_policy)
@@ -4036,6 +4142,7 @@ def cmd_ratchet(cfg, base_arg):
         why = ("임계 완화 금지 — 캡 초과는 **분할 또는 병합**으로 해소하는 것이지 자를 늘려 재는 것이 아니다"
                if v.get("kind") == "limit" else "강도 하향 금지(단조 증가만)")
         print(f'  · {v["knob"]}: {v["from"]} → {v["to"]} — {why}. 정당한 재조정이면 policyRatchetExceptions에 "{v["knob"]}" 선언(부채로 표면화)')
+    judged(len(violations))
     if violations:
         msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지)."
         if hard:
@@ -4090,6 +4197,7 @@ def cmd_engineevent(cfg):
             print(f'✗ {name} 값 위반 "{val}" — off|advisory|hard 중 하나', file=sys.stderr)
             sys.exit(1)
     if eng_policy == "off" and ev_policy == "off":
+        verdict("OFF", "engineRealityPolicy·eventAttributionPolicy")
         print("Engines/Events 게이트 — engineRealityPolicy·eventAttributionPolicy 모두 off (판정 안 함)")
         sys.exit(0)
     # 스펙별 소유 키 수집
@@ -4100,11 +4208,16 @@ def cmd_engineevent(cfg):
         spec_id = m.group(0) if m else os.path.basename(file)
         units.append((spec_id, parse_section(text, "Ownership", categories)))
     failed = False
+    # 축이 둘이라 판정 종류도 축별로 갈린다 — 하나라도 실제로 봤으면 JUDGED, 둘 다 못 봤으면 INERT.
+    viol_count = 0
+    judged_axes = 0
+    inert_axes = []
 
     if eng_policy != "off":
         eng_cat = roles["engine"]
         inert = role_inert_reasons(eng_policy, cfg.get("enginesSources"), eng_cat, "enginesSources", "engine")
         if inert:
+            inert_axes.append(f"engine: {' · '.join(inert)}")
             print(f"Engine 실재(engineRealityPolicy={eng_policy}): 판정 불가 — {' · '.join(inert)}")
             if eng_policy == "hard":
                 print("\n✗ engineRealityPolicy=hard인데 무판정(거짓 안전) — enginesSources·engine 역할을 선언하거나 정책을 off로.", file=sys.stderr)
@@ -4122,6 +4235,8 @@ def cmd_engineevent(cfg):
             print(f"Engine 실재(engineRealityPolicy={eng_policy}): 위반 {len(f)}건 — 소유 engine이 코드-모듈 SSOT에 없음")
             for sid, key in f:
                 print(f'  {tag} {sid}: engine "{key}" — enginesSources에 실재하지 않음(코드-모듈로 실재시키거나 데이터 교정; 순수 로직이 아니면 entity/surface로 재분류)')
+            judged_axes += 1
+            viol_count += len(f)
             if f and eng_policy == "hard":
                 failed = True
 
@@ -4130,6 +4245,7 @@ def cmd_engineevent(cfg):
         ent_cat = roles["entity"]
         inert = role_inert_reasons(ev_policy, cfg.get("eventCatalogSources"), ev_cat, "eventCatalogSources", "event")
         if inert:
+            inert_axes.append(f"event: {' · '.join(inert)}")
             print(f"Event 귀속(eventAttributionPolicy={ev_policy}): 판정 불가 — {' · '.join(inert)}")
             if ev_policy == "hard":
                 print("\n✗ eventAttributionPolicy=hard인데 무판정(거짓 안전) — eventCatalogSources·event 역할을 선언하거나 정책을 off로.", file=sys.stderr)
@@ -4151,9 +4267,15 @@ def cmd_engineevent(cfg):
                 print(f'  {tag} {sid}: event "{key}" — 발신 entity({entity or "없음"})를 이 스펙이 소유하지 않음. `entity.event-name` 형식으로 소유 entity에 귀속(capability 귀속 동형)')
             for sid, key in real:
                 print(f'  {tag} {sid}: event "{key}" — eventCatalogSources에 실재하지 않음(이벤트 카탈로그에 등록하거나 데이터 교정)')
+            judged_axes += 1
+            viol_count += len(attr) + len(real)
             if (attr or real) and ev_policy == "hard":
                 failed = True
 
+    if not judged_axes:
+        verdict("INERT", " / ".join(inert_axes) or "판정 가능한 축 없음")
+    else:
+        judged(viol_count)
     if failed:
         sys.exit(1)
     print("Engines/Events 게이트: OK.")
@@ -4166,6 +4288,7 @@ def cmd_evidence(cfg):
         print(f'✗ executionEvidencePolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
         sys.exit(1)
     if policy == "off":
+        verdict("OFF", "executionEvidencePolicy")
         print("실행 증거 게이트 — executionEvidencePolicy:off (판정 안 함)")
         sys.exit(0)
     hard = policy == "hard"
@@ -4240,6 +4363,7 @@ def cmd_evidence(cfg):
 
     findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of)
     claim_count = sum(len(u["claims"]) for u in units)
+    judged(len(findings))
     print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")
     tag = "✗" if hard else "⚠"
     for spec_id, claim_id, _kind, finding, detail in findings:
@@ -4259,6 +4383,7 @@ def cmd_livereality(cfg):
         sys.exit(1)
     checks = cfg.get("liveRealityChecks") or []
     if policy == "off":
+        verdict("OFF", "liveRealityPolicy")
         print("라이브 대조 게이트 — liveRealityPolicy:off (판정 안 함)")
         sys.exit(0)
     cfg_errors = validate_checks(checks)
@@ -4269,6 +4394,7 @@ def cmd_livereality(cfg):
         sys.exit(1)
     hard = policy == "hard"
     if not checks:
+        verdict("INERT", "liveRealityChecks 비어 있음 — 저장소 밖 진실을 볼 명령이 없다")
         print(f"라이브 대조 게이트(liveRealityPolicy={policy}): 판정 불가(inert) — liveRealityChecks 비어 있음(저장소 밖 진실을 볼 명령이 주입되지 않음)")
         if hard:
             print("\n✗ liveRealityPolicy=hard인데 검사가 0건이다 — hard 선언 + 무판정은 거짓 안전이다. liveRealityChecks를 주입하거나 정책을 off로 명시하라(SPEC-032).", file=sys.stderr)
@@ -4317,6 +4443,7 @@ def cmd_synonym(cfg):
         print(f'✗ synonymPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
         sys.exit(1)
     if policy == "off":
+        verdict("OFF", "synonymPolicy")
         print("동의어 게이트 — synonymPolicy:off (판정 안 함)")
         sys.exit(0)
     hard = policy == "hard"
@@ -4337,6 +4464,7 @@ def cmd_synonym(cfg):
             for raw in own.get(ent_cat) or []:
                 owned.append({"specId": spec_id, "category": ent_cat, "key": normalize_key(ent_cat, raw, cfg)})
     else:
+        verdict("INERT", "entity 역할 카테고리 미해석(ownershipCategoryRoles)")
         print(f"동의어 게이트(synonymPolicy={policy}): 판정 불가(inert) — entity 역할 카테고리 미해석(ownershipCategoryRoles)")
         if hard:
             print("\n✗ synonymPolicy=hard인데 판정 대상이 없다(거짓 안전) — entity 역할을 선언하거나 정책을 off로.", file=sys.stderr)
@@ -4373,6 +4501,11 @@ def cmd_synonym(cfg):
             lines = [l for l in str(e).strip().split("\n") if l.strip()]
             sim_skipped = lines[-1] if lines else "실행 실패"
 
+    # 유사 후보 층(③)이 돌지 못했으면 전수를 본 것이 아니다 — 결정적 층에 위반이 없어도 SKIPPED다.
+    if sim_skipped and not collisions and not declared:
+        verdict("SKIPPED", f"유사 후보 층 미실행 — {sim_skipped}")
+    else:
+        judged(len(collisions) + len(declared))
     tag = "✗" if hard else "⚠"
     print(f"동의어 게이트(synonymPolicy={policy}): entity {len(owned)}건 — 형태 충돌 {len(collisions)}·선언 별칭 {len(declared)}·미결 후보 {len(cand['unresolved'])}")
     for c in collisions:
@@ -4411,6 +4544,9 @@ def main():
         sys.exit(2)
     sub = args[0]
     strict = "--strict" in args
+    # 판정 타입 방출(SPEC-040) — 어떤 종료 경로로 끝나든 한 줄. 선언 안 하면 UNTYPED로 자백된다.
+    # Node판 게이트는 파일마다 armVerdict()를 부르지만 Python판은 단일 엔트리라 여기서 한 번이다.
+    arm_verdict()
     cfg = load_config()
     positional = []
     i = 1
@@ -4456,6 +4592,7 @@ def main():
         cmd_retag(cfg, positional[0] if positional else None, "--write" in args)
     elif sub == "run":
         if len(args) < 2:
+            verdict("SKIPPED", "인자 없음 — 판정을 요청받지 못했다(usage)")
             print("usage: python sdd_gates.py run <stage>", file=sys.stderr)
             sys.exit(2)
         cmd_run(cfg, args[1])

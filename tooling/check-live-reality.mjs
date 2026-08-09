@@ -12,6 +12,9 @@ import { execSync } from "node:child_process";
 import { loadConfig } from "./sdd-config.mjs";
 import { validateChecks, classifyResult, summarize } from "./live-reality-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const POLICY = String(cfg.liveRealityPolicy ?? "off");
 if (!["off", "advisory", "hard"].includes(POLICY)) {
@@ -20,6 +23,7 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
 }
 const CHECKS = cfg.liveRealityChecks || [];
 if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "liveRealityPolicy");
   console.log("라이브 대조 게이트 — liveRealityPolicy:off (판정 안 함)");
   process.exit(0);
 }
@@ -32,6 +36,7 @@ if (cfgErrors.length) {
 const HARD = POLICY === "hard";
 // 정책이 켜졌는데 검사가 하나도 없으면 침묵하지 않는다 — "hard 선언 + 무판정"은 거짓 안전(SPEC-002 FR-010 동형).
 if (!CHECKS.length) {
+  verdict(VERDICT_KINDS.INERT, "liveRealityChecks 비어 있음 — 저장소 밖 진실을 볼 명령이 없다");
   console.log(`라이브 대조 게이트(liveRealityPolicy=${POLICY}): 판정 불가(inert) — liveRealityChecks 비어 있음(저장소 밖 진실을 볼 명령이 주입되지 않음)`);
   if (HARD) {
     console.error("\n✗ liveRealityPolicy=hard인데 검사가 0건이다 — hard 선언 + 무판정은 거짓 안전이다. liveRealityChecks를 주입하거나 정책을 off로 명시하라(SPEC-032).");
@@ -56,6 +61,9 @@ const results = CHECKS.map((c) => {
 });
 
 const sum = summarize(results);
+// skipped는 "위반 없음"이 아니다 — 하나라도 있으면 이 게이트는 전수를 보지 못했다.
+if (sum.skipped && !sum.violations) verdict(VERDICT_KINDS.SKIPPED, `검사 ${sum.skipped}건이 실행되지 못했다(자격증명·네트워크)`);
+else judged(sum.violations);
 console.log(`라이브 대조 게이트(liveRealityPolicy=${POLICY}): 검사 ${results.length}건 — clean ${sum.clean}·위반 ${sum.violations}(항목 ${sum.items})·skipped ${sum.skipped}`);
 const tag = HARD ? "✗" : "⚠";
 for (const r of results) {

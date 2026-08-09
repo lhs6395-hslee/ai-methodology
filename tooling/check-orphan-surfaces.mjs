@@ -7,12 +7,18 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const STRICT = process.argv.includes("--strict");
 const globs = (cfg.surfaceGlobs ?? []).map((s) => new RegExp(s));
 
-if (!globs.length) { console.log("Orphan-surface gate: surfaceGlobs 미설정 — no-op"); process.exit(0); }
+if (!globs.length) {
+  verdict(VERDICT_KINDS.INERT, "surfaceGlobs 미설정 — 표면으로 볼 파일 집합이 없다");
+  console.log("Orphan-surface gate: surfaceGlobs 미설정 — no-op"); process.exit(0);
+}
 
 // 1. 모든 스펙의 Ownership Surfaces 키 수집(소문자 정규화).
 const norm = (s) => s.trim().toLowerCase();
@@ -47,6 +53,7 @@ for (const p of walk(ROOT)) {
   if (!claimed) orphans.push(rel);
 }
 
+judged(orphans.length);
 console.log(`Orphan-surface gate — surfaces:${surfaces} declared:${declared.size} orphans:${orphans.length} mode:${STRICT ? "strict" : "advisory"}`);
 for (const o of orphans) console.log(`  · ${o}: 어떤 스펙 Ownership(Surfaces)에도 없음 → 스펙 누락 의심`);
 if (orphans.length && STRICT) { console.error("\n✗ orphan-surface(strict): 표면을 소유하는 스펙 작성 또는 Ownership 등록"); process.exit(1); }

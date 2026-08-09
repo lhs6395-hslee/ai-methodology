@@ -8,6 +8,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "./key-anchor-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
@@ -93,6 +96,7 @@ if (ANCHOR_POLICY !== "off") {
     console.log(`  ${anchorHard ? "✗" : "⚠"} [${m.specId}] 소유 ${m.kind} 키 "${m.key}" — 어느 FR에도 굵게 앵커되지 않음: 이 키를 세우는 FR에서 **${m.key}** (${m.expected})로 표기`);
   }
 }
+judged(findings.length + (anchorHard ? 1 : 0));
 if (findings.length && STRICT) { console.error("\n✗ --strict: 근거 없는 키."); process.exit(1); }
 if (anchorHard) { console.error("\n✗ frKeyAnchorPolicy=hard: FR 선언 라인의 bold는 키 앵커 전용이며 각 키는 카테고리 마커(E/R/C) 필수 — 위 토큰을 정리하라(SPEC-023)."); process.exit(1); }
 console.log(findings.length ? "일관성: advisory 경고(비차단)" : "일관성: OK — 모든 키에 본문 근거.");

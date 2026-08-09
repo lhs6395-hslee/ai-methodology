@@ -26,6 +26,9 @@ import {
   deployPreconditionFindings, deployPreconditionVerdict, deployApprovalFindings,
 } from "./deploy-guard-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
+
 function readCommand() {
   const i = process.argv.indexOf("--command");
   if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1];
@@ -83,6 +86,9 @@ if (!noGit) {
 const v = deployPreconditionVerdict(POLICY, findings);
 if (!v.violations.length && !v.unknowns.length) process.exit(0); // 깨끗한 리비전에서 나가는 배포 — 침묵
 
+// unknowns는 위반이 아니라 "못 본 것"이다 — 위반 0인데 unknown만 있으면 전수를 본 게 아니다.
+if (!v.violations.length && v.unknowns.length) verdict(VERDICT_KINDS.SKIPPED, `전제 ${v.unknowns.length}건을 판정하지 못했다(upstream 없음 등)`);
+else judged(v.violations.length);
 const tag = v.blocking ? "✗" : "⚠";
 console.log(`[SDD 배포 전제] \`${parsed.tool}\` — 재현 가능한 리비전에서 나오는가 · 승인한 것이 적용되는가(deployPreconditionPolicy=${POLICY})`);
 for (const f of v.violations) console.log(`  ${tag} ${f.detail}`);

@@ -8,6 +8,9 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const SCAN_DIRS = cfg.scanDirs.map((d) => resolveFromRoot(cfg, d));
@@ -38,6 +41,7 @@ for (const dir of SCAN_DIRS) {
 }
 
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
+judged(offenders.length);
 console.log(`Test adequacy gate — @covers files:${withCovers} no-assertion:${offenders.length} mode:${STRICT ? "strict" : "advisory"} config:${cfgTag}`);
 for (const o of offenders) console.log(`  · ${o}: @covers 있으나 단언 없음(빈 껍데기 의심)`);
 if (offenders.length && STRICT) {

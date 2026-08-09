@@ -89,12 +89,13 @@ test("게이트 e2e: 러너 출력은 stdout이 아니라 stderr로 — 판정 �
     const r = spawnSync("node", [join(process.cwd(), "tooling/check-test-run.mjs")],
       { cwd: root, encoding: "utf8" });
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    // stdout = 판정 줄만(러너 텍스트 0). 축이 둘이라 줄 수는 2 — e2e 축(off 명시) + 스위트 판정.
+    // stdout = 판정 줄만(러너 텍스트 0). 축이 둘이라 3줄 — e2e 축(off 명시) + 스위트 판정 + 판정 타입.
     const lines = r.stdout.trim().split("\n");
-    assert.equal(lines.length, 2, `stdout은 판정 줄만이어야 함: ${JSON.stringify(r.stdout)}`);
+    assert.equal(lines.length, 3, `stdout은 판정 줄만이어야 함: ${JSON.stringify(r.stdout)}`);
     assert.match(lines[0], /e2e 실행 축 — e2eTestsPolicy:off/);
-    // 마지막 줄이 요약으로 쓰인다(하네스 lastLine) — 스위트 판정이 마지막이어야 한다.
+    // 사람 요약은 판정 타입 줄 **앞**이 마지막이다 — 하네스가 판정 줄을 걷어내고 요약을 뽑는다(SPEC-040).
     assert.match(lines[1], /green/);
+    assert.equal(lines[2], "판정: JUDGED — 위반 0건");
     assert.ok(!/[⚠✗]/.test(r.stdout), `green 판정의 stdout에 ⚠/✗가 새면 하네스가 오독한다: ${JSON.stringify(r.stdout)}`);
     assert.match(r.stderr, /러너가 낸 경고 텍스트/); // 진단은 stderr에 보존
   } finally { rmSync(root, { recursive: true, force: true }); }

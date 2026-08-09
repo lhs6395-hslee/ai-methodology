@@ -17,6 +17,9 @@ import {
   validateSchemaPatterns, extractSchemaEntities,
 } from "./engine-event-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -33,6 +36,7 @@ for (const [name, val] of [["engineRealityPolicy", ENG_POLICY], ["eventAttributi
   }
 }
 if (ENG_POLICY === "off" && EV_POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "engineRealityPolicy·eventAttributionPolicy");
   console.log("Engines/Events 게이트 — engineRealityPolicy·eventAttributionPolicy 모두 off (판정 안 함)");
   process.exit(0);
 }
@@ -81,12 +85,16 @@ function exemptSet(map, knob) {
 
 const units = specUnits();
 let failed = false;
+// 축이 둘이라 판정 종류도 축별로 갈린다 — 하나라도 실제로 봤으면 JUDGED, 둘 다 못 봤으면 INERT.
+let violCount = 0, judgedAxes = 0;
+const inertAxes = [];
 
 // ── engine 실재 ──
 if (ENG_POLICY !== "off") {
   const ENG_CAT = roles.engine;
   const inert = roleInertReasons(ENG_POLICY, cfg.enginesSources, ENG_CAT, "enginesSources", "engine");
   if (inert.length) {
+    inertAxes.push(`engine: ${inert.join(" · ")}`);
     console.log(`Engine 실재(engineRealityPolicy=${ENG_POLICY}): 판정 불가 — ${inert.join(" · ")}`);
     if (ENG_POLICY === "hard") { console.error("\n✗ engineRealityPolicy=hard인데 무판정(거짓 안전) — enginesSources·engine 역할을 선언하거나 정책을 off로."); failed = true; }
   } else {
@@ -99,6 +107,7 @@ if (ENG_POLICY !== "off") {
     const tag = ENG_POLICY === "hard" ? "✗" : "⚠";
     console.log(`Engine 실재(engineRealityPolicy=${ENG_POLICY}): 위반 ${f.length}건 — 소유 engine이 코드-모듈 SSOT에 없음`);
     for (const v of f) console.log(`  ${tag} ${v.specId}: engine "${v.key}" — enginesSources에 실재하지 않음(코드-모듈로 실재시키거나 데이터 교정; 순수 로직이 아니면 entity/surface로 재분류)`);
+    judgedAxes += 1; violCount += f.length;
     if (f.length && ENG_POLICY === "hard") failed = true;
   }
 }
@@ -109,6 +118,7 @@ if (EV_POLICY !== "off") {
   const ENT_CAT = roles.entity;
   const inert = roleInertReasons(EV_POLICY, cfg.eventCatalogSources, EV_CAT, "eventCatalogSources", "event");
   if (inert.length) {
+    inertAxes.push(`event: ${inert.join(" · ")}`);
     console.log(`Event 귀속(eventAttributionPolicy=${EV_POLICY}): 판정 불가 — ${inert.join(" · ")}`);
     if (EV_POLICY === "hard") { console.error("\n✗ eventAttributionPolicy=hard인데 무판정(거짓 안전) — eventCatalogSources·event 역할을 선언하거나 정책을 off로."); failed = true; }
   } else {
@@ -125,9 +135,12 @@ if (EV_POLICY !== "off") {
     console.log(`Event 귀속(eventAttributionPolicy=${EV_POLICY}): 귀속 위반 ${attr.length}건, 카탈로그 실재 위반 ${real.length}건`);
     for (const v of attr) console.log(`  ${tag} ${v.specId}: event "${v.key}" — 발신 entity(${v.entity || "없음"})를 이 스펙이 소유하지 않음. \`entity.event-name\` 형식으로 소유 entity에 귀속(capability 귀속 동형)`);
     for (const v of real) console.log(`  ${tag} ${v.specId}: event "${v.key}" — eventCatalogSources에 실재하지 않음(이벤트 카탈로그에 등록하거나 데이터 교정)`);
+    judgedAxes += 1; violCount += attr.length + real.length;
     if ((attr.length || real.length) && EV_POLICY === "hard") failed = true;
   }
 }
 
+if (!judgedAxes) verdict(VERDICT_KINDS.INERT, inertAxes.join(" / ") || "판정 가능한 축 없음");
+else judged(violCount);
 if (failed) process.exit(1);
 console.log("Engines/Events 게이트: OK.");

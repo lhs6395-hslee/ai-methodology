@@ -15,13 +15,18 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
 const MAP_PATH = args.filter((a) => !a.startsWith("--"))[0];
-if (!MAP_PATH) { console.error("usage: sdd-retag <map.json> [--write]"); process.exit(2); }
+if (!MAP_PATH) {
+  verdict(VERDICT_KINDS.SKIPPED, "인자 없음 — 판정을 요청받지 못했다(usage)");
+  console.error("usage: sdd-retag <map.json> [--write]"); process.exit(2);
+}
 const COVERS_TOKEN = "@cov" + "ers";   // 자기 소스가 fr 게이트 스캔에 걸리지 않게 분절
 const VERIFIES_TOKEN = "@veri" + "fies";
 
@@ -64,6 +69,7 @@ for (const [oldKey, newKey] of Object.entries(map)) {
 
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
 if (errors.length) {
+  judged(errors.length);
   console.log(`Retag — map:${Object.keys(map).length}키 mode:${WRITE ? "write" : "dry-run"} config:${cfgTag}`);
   console.error("\nRetag violations:");
   for (const e of errors) console.error(`  ✗ ${e}`);
@@ -128,6 +134,7 @@ if (manifestRel) {
   } else manifest = null;
 }
 
+verdict(VERDICT_KINDS.SKIPPED, "리팩터 도구(판정 게이트 아님) — 키 치환을 산출한다");
 console.log(`Retag — map:${Object.keys(map).length}키 rewrites:${plans.length + manifestPlans.filter((p) => p.newKey !== null).length} manual-removal:${removals.length + manifestPlans.filter((p) => p.newKey === null).length} mode:${WRITE ? "write" : "dry-run"} config:${cfgTag}`);
 for (const p of plans) console.log(`  · ${p.path}:${p.line} ${p.tag} ${p.oldKey} → ${p.newKey}`);
 for (const p of manifestPlans) console.log(p.newKey === null

@@ -18,10 +18,14 @@ import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS } from "./sdd-config.
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { SOURCE_CLASSES, GLOB_DETECTABLE, validateManifest } from "./derivation-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 
 if (!cfg.derivationManifest) {
+  verdict(VERDICT_KINDS.INERT, "derivationManifest 미설정 — 파생 관계를 볼 매니페스트가 없다");
   console.log("Derivation 게이트: derivationManifest 미설정 — no-op");
   process.exit(0);
 }
@@ -116,6 +120,7 @@ for (const cls of SOURCE_CLASSES) {
 }
 
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
+judged(errors.length);
 console.log(`Derivation 게이트 — classes:${SOURCE_CLASSES.length} accounted:${accounted} (mapped:${counts.mapped} none:${counts.none} deferred:${counts.deferred}) config:${cfgTag}`);
 for (const w of warnings) console.log(`  ⚠ ${w}`);
 if (errors.length) {

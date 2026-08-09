@@ -108,7 +108,7 @@ test("3-노드 순환(A→B→C→A) 탐지", () => {
 // 킷 자기적용으로는 영구히 안 보인다(킷 entity 키가 이미 소문자다) → e2e로 고정한다.
 const REL_LIBS = ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs",
   "key-anchor-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs",
-  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs"];
+  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs", "verdict-lib.mjs"];
 
 function relRepo(ownedEntity, depEntry) {
   const root = mkdtempSync(join(tmpdir(), "sdd-rel-"));

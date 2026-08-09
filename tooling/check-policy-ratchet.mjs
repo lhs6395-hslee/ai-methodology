@@ -10,6 +10,9 @@ import { execSync } from "node:child_process";
 import { loadConfig, configFromString } from "./sdd-config.mjs";
 import { classifyRatchet, effectiveRatchetPolicy } from "./policy-ratchet-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const curPolicy = cfg.policyRatchetPolicy || "advisory";
 
@@ -20,7 +23,10 @@ if (!["off", "advisory", "hard"].includes(curPolicy)) {
 
 const args = process.argv.slice(2);
 const BASE = args.find((a) => !a.startsWith("--")) || process.env.SDD_DIFF_BASE || cfg.specSyncBase || "origin/main";
-const offNotice = () => console.log("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)");
+const offNotice = () => {
+  verdict(VERDICT_KINDS.OFF, "policyRatchetPolicy");
+  console.log("정책 래칫 게이트 — policyRatchetPolicy:off (판정 안 함)");
+};
 
 const sh = (c) => execSync(c.replace(/^git /, "git -c core.quotepath=off "), { cwd: cfg.__root, encoding: "utf8" });
 const shOk = (c) => { try { return sh(c); } catch { return null; } };
@@ -35,12 +41,14 @@ const baseRaw = shOk(`git show ${BASE}:${cfgRel}`);
 
 if (baseRaw === null) {
   if (curPolicy === "off") { offNotice(); process.exit(0); }
+  verdict(VERDICT_KINDS.SKIPPED, `base(${BASE}) config 조회 불가 — 비교 대상이 없다(git 없음·최초 채택)`);
   console.log(`정책 래칫 게이트 — base(${BASE}) config 조회 불가(git 없음·최초 채택) — 건너뜀`);
   process.exit(0);
 }
 const baseCfg = configFromString(baseRaw, cfg.__root);
 if (!baseCfg) {
   if (curPolicy === "off") { offNotice(); process.exit(0); }
+  verdict(VERDICT_KINDS.SKIPPED, `base(${BASE}) config 파싱 실패 — 비교 대상을 읽지 못했다`);
   console.log(`정책 래칫 게이트 — base(${BASE}) config 파싱 실패 — 건너뜀`);
   process.exit(0);
 }
@@ -68,6 +76,7 @@ for (const v of violations) {
   console.log(`  · ${v.knob}: ${v.from} → ${v.to} — ${why}. 정당한 재조정이면 policyRatchetExceptions에 "${v.knob}" 선언(부채로 표면화)`);
 }
 
+judged(violations.length);
 if (violations.length) {
   const msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).";
   if (HARD) { console.error(`\n✗ ${msg}`); process.exit(1); }

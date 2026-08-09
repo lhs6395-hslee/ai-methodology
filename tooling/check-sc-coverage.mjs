@@ -17,6 +17,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { parseScLine, validateEvidenceManifest, classifyScCoverage } from "./sc-coverage-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const POLICY = String(cfg.scCoveragePolicy ?? "off");
 if (!["off", "advisory", "hard"].includes(POLICY)) {
@@ -24,6 +27,7 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
   process.exit(1);
 }
 if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "scCoveragePolicy");
   console.log("SC·NFR 회계 게이트 — scCoveragePolicy:off (판정 안 함)");
   process.exit(0);
 }
@@ -70,7 +74,10 @@ const kindTag = Object.keys(byKind).sort().map((k) => `${k}:${byKind[k]}`).join(
 console.log(`SC·NFR 회계 게이트(scCoveragePolicy=${POLICY}): 항목 ${items.length}건 — verified ${counts.verified}·evidence ${counts.evidence}·deferred ${counts.deferred}·미회계 ${counts.unaccounted} | 종류(${kindTag})`);
 
 const tag = HARD ? "✗" : "⚠";
+// 항목 0건은 "깨끗함"이 아니라 "볼 것이 없었음"이다 — SC 문법이 안 잡힌 상태와 구분되지 않는다.
 const bad = [...classes].filter(([, v]) => v.cls === "unaccounted").map(([k, v]) => ({ k, v })).sort((a, b) => a.k.localeCompare(b.k));
+if (items.length === 0) verdict(VERDICT_KINDS.INERT, "SC·NFR 선언 라인이 0건 — 판정 대상을 찾지 못했다");
+else judged(bad.length);
 // 목록 상한 — 마이그레이션 초기엔 미회계가 수십~수백 건이라 전량 출력이 다른 게이트 판정을 덮는다.
 // 감추는 게 아니라 "외 N건"으로 총량을 명시한다(헤더의 미회계 카운트가 진실의 원천).
 const CAP = Number(cfg.scCoverageListCap ?? 12);

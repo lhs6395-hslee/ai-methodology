@@ -6,6 +6,9 @@
 import { execSync } from "node:child_process";
 import { loadConfig } from "./sdd-config.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const args = process.argv.slice(2);
 const STRICT = args.includes("--strict");
@@ -17,6 +20,7 @@ try {
   changed = execSync(`git -c core.quotepath=off diff --name-only ${base}...HEAD`, { cwd: cfg.__root, encoding: "utf8" })
     .split("\n").map((s) => s.trim()).filter(Boolean);
 } catch {
+  verdict(VERDICT_KINDS.SKIPPED, `git diff(${base}) 불가 — 비교 기준을 해석하지 못했다`);
   console.log(`· converge-drift: git diff(${base}) 불가 — 건너뜀`);
   process.exit(0);
 }
@@ -25,6 +29,7 @@ const inDir = (p, d) => p === d || p.startsWith(d.replace(/\/$/, "") + "/");
 const codeChanged = changed.filter((p) => cfg.scanDirs.some((d) => inDir(p, d)));
 const specChanged = changed.some((p) => inDir(p, cfg.specDir));
 
+judged(codeChanged.length && !specChanged ? codeChanged.length : 0);
 console.log(`Converge-drift gate — base:${base} changed:${changed.length} code:${codeChanged.length} spec-changed:${specChanged} mode:${STRICT ? "strict" : "advisory"}`);
 if (codeChanged.length && !specChanged) {
   console.log(`  · 코드 ${codeChanged.length}건 변경인데 스펙 무변경 — /converge 로 갭 표면화 후 spec 갱신 검토`);

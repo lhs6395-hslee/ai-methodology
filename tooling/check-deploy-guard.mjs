@@ -20,6 +20,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 import { DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, deployGuardFindings, debtLine, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
+
 function readCommand() {
   const i = process.argv.indexOf("--command");
   if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1];
@@ -75,7 +78,8 @@ for (const line of status.split("\n")) {
 // ── 축 ②: 스펙 드리프트. 경로가 없으면 소유 판정이 성립하지 않으므로 여기서 끝낸다
 // (스모크 축은 경로와 무관하다 — 조기 종료가 그 축까지 삼키던 것이 결함이었다).
 if (!parsed.paths.length) {
-  if (smokeLine) console.log(smokeLine);
+  // 경로가 없어 소유 축은 못 봤다 — 스모크 축만 말했으면 그 사실을 타입으로 밝힌다.
+  if (smokeLine) { verdict(VERDICT_KINDS.SKIPPED, "배포 명령에서 소스 경로를 못 읽어 스펙 드리프트 축은 판정하지 못했다"); console.log(smokeLine); }
   process.exit(0);
 }
 
@@ -115,6 +119,7 @@ if (POLICY === "hard" && smoke.status !== "alive") {
   findings.push({ kind: smoke.status === "dead" ? "smoke-dead" : "smoke-undeclared", path: parsed.tool, specId: "" });
 }
 if (!findings.length && !smokeLine) process.exit(0); // 소스가 커밋됐고 스모크도 통과 — 조용할 자격이 있다
+judged(findings.length);
 if (smokeLine) console.log(smokeLine);
 if (!findings.length) process.exit(0);
 

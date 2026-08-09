@@ -18,6 +18,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
@@ -108,6 +111,8 @@ for (const file of files) {
   }
 }
 
+if (!files.length) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다");
+else judged(violations.length);
 console.log(`Spec 입도(cohesion) 게이트: spec ${files.length}개 검사 (키>${MAX_KEYS}/카테고리, FR>${MAX_FRS}).`);
 
 // 낡은 등록부는 등록부가 아니다 — 없는 스펙 ID가 남아 있으면 다음 면제도 못 믿는다.

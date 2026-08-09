@@ -37,6 +37,9 @@ import { evidencePathsOf, coversBacklinkFindings, coversBacklinkVerdict } from "
 import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -385,6 +388,9 @@ const totalFR = [...specs.values()].reduce((n, s) => n + s.size, 0);
 const totalCov = [...covered.values()].reduce((n, s) => n + s.size, 0);
 const cfgTag = cfg.__path ? cfg.__path.replace(ROOT + "/", "") : "defaults(JS/TS)";
 const acctTag = acct ? ` accounted(unit:${acct.counts.unit} e2e:${acct.counts.e2e} smoke:${acct.counts.smoke} deferred:${acct.counts.deferred} planned:${acct.counts.planned} unaccounted:${acct.counts.unaccounted})` : "";
+// 스펙이 0개면 "커버 완료"가 아니라 "볼 스펙이 없었음"이다.
+if (!specs.size) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — specDir에서 FR 선언을 찾지 못했다");
+else judged(errors.length);
 console.log(`FR coverage gate — specs:${specs.size} FRs:${totalFR} covered:${totalCov}${acctTag} mode:${STRICT ? "strict" : "incremental"} config:${cfgTag}`);
 for (const w of warnings) console.log(`  · ${w}`);
 if (errors.length) {

@@ -20,6 +20,9 @@ import { changeLogRationaleFindings } from "./derivation-lib.mjs";
 import { parseModule, frLinesMissingShall, frDeclStyleFindings, dedupReviewDanglingIds } from "./grammar-lib.mjs";
 import { objectStorageFindings } from "./object-storage-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
@@ -92,6 +95,8 @@ if (moduleValues.size > 1) {
   findings.push({ specId: "(전 스펙)", miss: `Module 값 ${names.length}개(${names.join(", ")}) — 1 레포 = 1 모듈(STRUCTURE.md): 모듈이 더 필요하면 레포를 나눈다` });
 }
 
+if (!files.length) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다");
+else judged(findings.length);
 console.log(`Spec 완전성 게이트: spec ${files.length}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요).`);
 if (findings.length) {
   const tag = STRICT ? "✗" : "⚠";

@@ -38,6 +38,9 @@ import { compileGlob , parseFilesLine} from "./spec-sync-lib.mjs";
 import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
 import { specSlug, specSlugSourceDeclared, symbolRealityActive, symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface } from "./ownership-reality-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -296,6 +299,9 @@ for (const { specId, entity, type } of relationMissing) {
 }
 const relationCycles = findCycles(relationEdges);
 
+// 축이 여럿인 게이트다 — 개별 축의 inert는 각자 줄로 나오고(아래), 게이트 전체 판정은 여기서 낸다.
+if (!files.length) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다");
+else judged(0);  // 위반 건수는 아래 축별 집계 뒤 갱신된다
 console.log(`Ownership 게이트: spec ${files.length}개 중 ${declaredCount}개가 Ownership 선언.`);
 if (missing.length) {
   const tag = (STRICT || ORQ_POLICY === "hard") ? "✗" : "⚠";
@@ -513,3 +519,4 @@ if (STRICT && (missing.length || formatIssues.length)) {
 if (orqHard || xcatHard || fovHard) process.exit(1);
 
 console.log(`✓ 구조적 중복 없음 — 모든 ${CATEGORIES.join("/")} 키가 유일.`);
+

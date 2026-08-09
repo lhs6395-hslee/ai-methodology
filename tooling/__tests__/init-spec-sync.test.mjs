@@ -13,7 +13,7 @@ test("sdd-init: spec-sync 게이트·lib·commit-msg 훅·스킬 배선 + 실제
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
     execFileSync("sh", [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"], { cwd: root, stdio: "ignore" });
-    for (const f of ["scripts/check-spec-sync.mjs", "scripts/spec-sync-lib.mjs", "scripts/sdd-commit-msg.sh", ".git/hooks/commit-msg", ".claude/skills/speckit-fix/SKILL.md"])
+    for (const f of ["scripts/check-spec-sync.mjs", "scripts/verdict-lib.mjs", "scripts/spec-sync-lib.mjs", "scripts/sdd-commit-msg.sh", ".git/hooks/commit-msg", ".claude/skills/speckit-fix/SKILL.md"])
       assert.ok(existsSync(join(root, f)), `${f} 설치`);
     // init-then-execute: 설치물만으로 range 모드 실행 — MODULE_NOT_FOUND 금지
     const r = (() => { try { return { code: 0, out: execFileSync("node", [join(root, "scripts/check-spec-sync.mjs")], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }

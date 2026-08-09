@@ -15,6 +15,9 @@ import { dirname } from "node:path";
 import { loadConfig } from "./sdd-config.mjs";
 import { parseHookList, hookFindings } from "./hooks-install-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 let cfg;
 try { cfg = loadConfig(); } catch { process.exit(0); }
@@ -23,7 +26,10 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
   console.error(`✗ hooksInstalledPolicy 값 위반 "${POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
   process.exit(1);
 }
-if (POLICY === "off") { console.log("훅 배선 게이트 — hooksInstalledPolicy:off (판정 안 함)"); process.exit(0); }
+if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "hooksInstalledPolicy");
+  console.log("훅 배선 게이트 — hooksInstalledPolicy:off (판정 안 함)"); process.exit(0);
+}
 const HARD = POLICY === "hard";
 
 // 탐색 순서 — **프로젝트 선언이 킷 기본값을 이긴다.** HERE(킷 tooling)를 먼저 보면 소비 프로젝트를
@@ -33,12 +39,18 @@ const listPath = [
   join(cfg.__root, "tooling", "harness", "hooks.list"),
   join(HERE, "harness", "hooks.list"),
 ].find(existsSync);
-if (!listPath) { console.log("훅 배선 게이트 — hooks.list 없음(판정 대상 미선언, no-op)"); process.exit(0); }
+if (!listPath) {
+  verdict(VERDICT_KINDS.INERT, "hooks.list 없음 — 어떤 훅이 있어야 하는지 선언이 없다");
+  console.log("훅 배선 게이트 — hooks.list 없음(판정 대상 미선언, no-op)"); process.exit(0);
+}
 const expected = parseHookList(readFileSync(listPath, "utf8"));
 
 const git = (a) => { try { return execSync(`git ${a}`, { cwd: cfg.__root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
 const gitDir = git("rev-parse --git-dir");
-if (!gitDir) { console.log("훅 배선 게이트 — git 저장소 아님(no-op)"); process.exit(0); }
+if (!gitDir) {
+  verdict(VERDICT_KINDS.INERT, "git 저장소 아님 — 훅이 설치될 자리가 없다");
+  console.log("훅 배선 게이트 — git 저장소 아님(no-op)"); process.exit(0);
+}
 const custom = git("config --get core.hooksPath");
 const hooksDir = custom
   ? (isAbsolute(custom) ? custom : join(cfg.__root, custom))
@@ -60,6 +72,7 @@ for (const name of expected) {
 
 const findings = hookFindings(expected, installed);
 const rel = hooksDir.replace(cfg.__root + "/", "");
+judged(findings.length);
 console.log(`훅 배선 게이트(hooksInstalledPolicy=${POLICY}): 선언 ${expected.length}종 · 설치 ${expected.length - findings.length}종 — ${rel}`);
 
 const tag = HARD ? "✗" : "⚠";

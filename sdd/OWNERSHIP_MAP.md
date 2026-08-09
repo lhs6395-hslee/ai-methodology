@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 40건
+## Entity 키 (aggregate root) — 41건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -42,6 +42,7 @@
 | `entity-synonym` | SPEC-033 | ✓ | ✓ | ✓ |
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
+| `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring` | SPEC-036 | ✓ | ✓ | ✓ |
 | `key-pipeline` | SPEC-001 | ✓ | ✓ | ✓ |
@@ -69,7 +70,7 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 77건
+## Surface 키 — 78건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -149,9 +150,10 @@
 | `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `synonym-lib.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
+| `verdict-lib.mjs` | SPEC-040 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 40건
+## Capability 키 — 42건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -169,6 +171,8 @@
 | `entity-synonym.judge` | SPEC-033 | ✓ | ✓ | ✓ |
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
+| `gate-verdict.account` | SPEC-040 | ✓ | ✓ | ✓ |
+| `gate-verdict.emit` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring.gate` | SPEC-036 | ✓ | ✓ | ✓ |
 | `key-pipeline.parse` | SPEC-001 | ✓ | ✓ | ✓ |
@@ -219,7 +223,7 @@
 
 ## 집계
 
-- 소유 키 총 **173건** (entity 40 · surface 77 · capability 40 · 역할없음 16)
+- 소유 키 총 **177건** (entity 41 · surface 78 · capability 42 · 역할없음 16)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

@@ -16,6 +16,8 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
 
 const cfg = loadConfig();
 const ROOT = cfg.__root;
@@ -112,6 +114,7 @@ if (!manifestRel) {
     console.error(`✗ ${TAG_TOKEN} 태그 ${tagCount}건 발견인데 smokeManifest 미설정 — sdd.config.json에 매니페스트 경로 선언 필요`);
     process.exit(1);
   }
+  verdict(VERDICT_KINDS.INERT, "smoke 태그 0건 · 매니페스트 미설정 — 볼 대상이 없다");
   console.log(`Smoke-scan — tags:0 keys:0 manifest:미설정 mode:${WRITE ? "write" : "check"} config:${cfgTag}`);
   console.log("Smoke-scan: no-op — 태그도 매니페스트도 없음.");
   process.exit(0);
@@ -132,6 +135,7 @@ if (manifestMissing && !WRITE) {
   manifest = {};
 }
 
+verdict(VERDICT_KINDS.SKIPPED, "스캐너(판정 게이트 아님) — 매니페스트를 산출·대조한다");
 console.log(`Smoke-scan — tags:${tagCount} keys:${tagEntries.size} manifest:${manifestMissing ? 0 : Object.keys(manifest).length} mode:${WRITE ? "write" : "check"} config:${cfgTag}`);
 
 if (errors.length) {

@@ -241,13 +241,46 @@
 
   <div class="note warn reveal"><b>목록은 낡습니다 — 그것도 기계가 알려줍니다.</b> 실체가 34개일 때 만든 목록이 47개가 된 뒤에도 그대로면, 화면엔 “미결 0”이 뜨고 사람은 다 봤다고 믿습니다. 그 사이 늘어난 것들은 <b>아무도 안 본 건데</b> 말이죠. 그래서 목록에 “나는 34개를 보고 만들었다”는 표시를 남기고, 숫자가 달라지면 <b>“목록이 낡았으니 다시 만드세요”</b>라고 알려줍니다. 이것도 <b>막지는 않습니다</b> — 실체를 추가할 때마다 AI를 돌려야 한다면, 사람들은 이 기능을 통째로 꺼버릴 테니까요.</div>
 
-  <h2><span class="n">7</span>그래서 무엇이 남나</h2>
+  <h2><span class="n">7</span>“이상 없음”과 “아무도 안 봤음”은 다릅니다</h2>
+  <p class="lede reveal">검사 결과 화면이 <b>초록색</b>이면 안심하게 됩니다. 그런데 초록에는 두 가지가 섞여 있었습니다.</p>
+  <div class="scene reveal">
+    <div><div class="who">검진표 A</div><div class="box" style="border-color:var(--green);color:var(--green)">간 수치 — 정상</div></div>
+    <div class="bang">≠</div>
+    <div><div class="who">검진표 B</div><div class="box b" style="border-color:var(--pink);color:var(--pink)">간 수치 — 검사 안 함</div></div>
+  </div>
+  <p class="reveal">두 검진표 모두 “이상 소견 없음”으로 인쇄됩니다. 하지만 B는 <b>피를 안 뽑았습니다.</b> 이상이 없는 게 아니라 <b>본 적이 없는</b> 겁니다. 우리 검사 장치도 정확히 이 상태였습니다 — 어떤 검사는 꺼져 있었는데 화면에는 <b>✓ 통과</b>로 찍혔습니다.</p>
+  <p class="kicker reveal">그래서 검사마다 “내가 무엇을 했는지”를 <b>먼저 말하게</b> 했습니다.</p>
+  <div class="cards">
+    <div class="c reveal" style="--k:var(--green)"><div class="ico">✅</div>
+      <div><h3>봤습니다 <span>judged</span></h3><p>검사했고 결과를 압니다. 이상 0건도 여기 들어갑니다.
+      <span class="ex">초록의 자격은 여기뿐</span></p></div></div>
+    <div class="c reveal" style="--k:var(--blue)"><div class="ico">🔌</div>
+      <div><h3>껐습니다 <span>off</span></h3><p>사람이 이 검사를 꺼뒀습니다.
+      <span class="ex">해결: 켠다</span></p></div></div>
+    <div class="c reveal" style="--k:var(--orange)"><div class="ico">🩹</div>
+      <div><h3>볼 게 없었습니다 <span>inert</span></h3><p>켜져 있는데 검사할 표본이 없습니다.
+      <span class="ex">해결: 표본을 만든다</span></p></div></div>
+    <div class="c reveal" style="--k:var(--purple)"><div class="ico">⏭️</div>
+      <div><h3>건너뛰었습니다 <span>skipped</span></h3><p>이유가 있어 생략했습니다. 이유를 반드시 적습니다.
+      <span class="ex">해결: 이유를 없앤다</span></p></div></div>
+    <div class="c reveal" style="--k:var(--pink)"><div class="ico">❓</div>
+      <div><h3>말 안 했습니다 <span>untyped</span></h3><p>검사가 자기가 뭘 했는지 안 밝혔습니다. 이건 고장이지 통과가 아닙니다.
+      <span class="ex">해결: 검사를 고친다</span></p></div></div>
+  </div>
+  <p class="reveal">그리고 결과 요약이 <b>언제나 분모를 밝힙니다.</b> “18개 전부 이상 없음”이 아니라 이렇게 적습니다:</p>
+  <div class="scene reveal"><div style="flex:1"><div class="who">결과 요약</div><div class="box" style="border-color:var(--line);color:var(--ink);font-size:14px">검사 18종 = <b style="color:var(--green)">봤음 15</b> · <b style="color:var(--orange)">안 봤음 3</b>(껐음 2 · 볼 게 없었음 1) · 말 안 함 0</div></div></div>
+  <p class="reveal">이제 <b>15와 18의 차이</b>가 눈에 보입니다. 안 본 3개를 벌주지는 않습니다 — 이제 막 도입한 팀은 표본을 아직 못 갖췄으니까요. 벌을 주면 사람들은 검사 자체를 꺼버립니다. 대신 <b>매번 숫자에 남아</b> 조용히 사라지지 않습니다.</p>
+  <p class="kicker reveal">덤으로 이런 것도 잡힙니다 — <b>도구가 자기 언어만 볼 때</b>.</p>
+  <p class="reveal">중복 검사 도구는 자바스크립트로 만들어져서, 기본 설정이 자바스크립트 파일만 봅니다. 파이썬으로 짠 프로젝트가 이 검사를 켜면 <b>파일을 하나도 안 보고 “중복 0건”</b>이라고 말합니다. 그 0은 진짜 0이 아닙니다. 그래서 이제는 이렇게 말합니다 — <i>“기본 설정으로 33개만 봤고 .py 파일은 안 봤습니다.”</i> 이 검사를 켜자마자 <b>우리 자신의 파이썬 파일</b>이 그동안 한 번도 검사되지 않았다는 게 드러났습니다.</p>
+
+  <h2><span class="n">8</span>그래서 무엇이 남나</h2>
   <div class="sum">
     <div class="s reveal"><div class="q">1</div><div><b>만들기 전에 등기한다</b><span>명세마다 “내가 가진 것” 목록을 적는다. 안 적은 명세는 레이더 밖이라 중복이 안 걸린다.</span></div></div>
     <div class="s reveal"><div class="q">2</div><div><b>기계가 대조한다</b><span>사람 눈이 아니라 프로그램이 목록을 맞춰 본다. 겹치면 저장(커밋)이 막힌다.</span></div></div>
     <div class="s reveal"><div class="q">3</div><div><b>확실한 것만 막는다</b><span>글자 규칙과 사람이 적어둔 판단은 막고, AI의 추측은 절대 막지 않는다.</span></div></div>
     <div class="s reveal"><div class="q">4</div><div><b>느슨하게 되돌릴 수 없다</b><span>위반이 많이 뜬다고 규칙 강도를 낮춰 빠져나가는 길이 닫혀 있다. 미룰 순 있어도 없앨 순 없다.</span></div></div>
     <div class="s reveal"><div class="q">5</div><div><b>못 잡는 것도 솔직히 적는다</b><span>완전히 다른 단어로 다시 쓴 중복은 여전히 사람 몫이다. 장치가 만능인 척하지 않는다.</span></div></div>
+    <div class="s reveal"><div class="q">6</div><div><b>안 본 것을 초록으로 세지 않는다</b><span>검사마다 “봤다/껐다/볼 게 없다/건너뛰었다”를 먼저 말한다. 초록의 분모를 늘 함께 적어서, 통과 개수만 보고 다 검사됐다고 읽는 일이 없다.</span></div></div>
   </div>
 
   <div class="foot">더 자세히 — 기술 문서: <a href="ownership-key.html">Ownership Key 모델과 동작 방식</a> · 전체 방법론: <a href="방법론.html">방법론.html</a></div>

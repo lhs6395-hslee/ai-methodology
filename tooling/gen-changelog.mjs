@@ -7,6 +7,9 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const raw = execSync("git log --date=short --no-merges --pretty=format:%ad%x09%h%x09%s", { cwd: root, encoding: "utf8" });
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -101,4 +104,6 @@ ${rows}
 </html>
 `;
 writeFileSync(join(root, "docs", "change_log.html"), html);
+// 생성기다 — 판정이 아니라 산출이다. 그 사실을 타입으로 밝힌다(초록으로 세지 않게).
+verdict(VERDICT_KINDS.SKIPPED, "생성기(판정 게이트 아님) — 문서를 산출한다");
 console.log(`docs/change_log.html 생성 — ${total}개 변경, ${dates.length}일, 최신 ${generated}`);

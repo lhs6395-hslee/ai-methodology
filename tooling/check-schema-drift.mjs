@@ -12,6 +12,8 @@ import { schemaDriftVerdict, MIGRATION_ENUM } from "./schema-drift-lib.mjs";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+
 export { schemaDriftVerdict, MIGRATION_ENUM };
 
 // 명령 stdout을 스키마 식별자 배열로 — 줄 단위 trim, 빈 줄 제거.
@@ -34,9 +36,13 @@ function isMainEntry(metaUrl) {
 // (게이트가 한 줄도 출력하지 않는데 sdd-sync는 clean으로 읽음). 킷은 sdd-sync.mjs(ab5eb1a)에서
 // 이미 fileURLToPath로 옮겼는데 이 파일들에 원본 비교가 남아 있었다.
 if (isMainEntry(import.meta.url)) {
+  // ⚠ arm은 **엔트리일 때만**이다 — 이 모듈을 import만 한 프로세스(테스트 러너 등)에서
+  // 종료 훅이 fd 1에 쓰면 그 프로세스의 stdout 프로토콜을 깨뜨린다(실측: node --test IPC 손상).
+  armVerdict();
   const cfg = loadConfig();
   const m = cfg.schemaDriftManifest; // null | {expected, deployed}
   if (!m || !m.expected || !m.deployed) {
+    verdict(VERDICT_KINDS.INERT, "schemaDriftManifest 미설정 — expected/deployed를 조회할 명령이 없다");
     console.log("런타임 스키마 드리프트 게이트 — schemaDriftManifest 미설정(비활성; DB 스키마 SSOT 프로젝트는 배포 preflight에 expected/deployed 조회 명령 설정 권장)");
     process.exit(0);
   }
@@ -47,6 +53,10 @@ if (isMainEntry(import.meta.url)) {
     catch { ran = false; }
   }
   const v = schemaDriftVerdict(expected, deployed, ran, policy);
+  // 조회가 실패했으면(ran=false) 본 것이 없다 — exit 0이어도 판정이 아니다.
+  if (!ran) verdict(VERDICT_KINDS.SKIPPED, "expected/deployed 조회 실패 — 라이브 스키마를 읽지 못했다");
+  else if (policy === "off") verdict(VERDICT_KINDS.OFF, "migrationStatePolicy");
+  else judged(v.exit ? 1 : 0);
   (v.valid ? console.log : console.error)(v.line);
   process.exit(v.exit);
 }

@@ -20,6 +20,9 @@ import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { parseDebt, settleDebt, changeLogAdded, deploySmokeVerdict } from "./deploy-guard-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
+
 let cfg;
 try { cfg = loadConfig(); } catch { process.exit(0); }
 if (String(cfg.outOfBandDeployPolicy ?? "advisory") !== "hard") process.exit(0);
@@ -86,6 +89,7 @@ if (settled.length) {
   try { writeFileSync(abs, keep.length ? keep.join("\n") + "\n" : "", "utf8"); } catch { /* 못 지워도 판정은 아래가 한다 */ }
 }
 
+judged(remaining.length + malformed.length);
 console.log(`배포 부채 게이트 — ${rel}: 해소 ${settled.length}건 · 잔여 ${remaining.length}건${malformed.length ? ` · 파싱 불가 ${malformed.length}건` : ""}`);
 for (const d of settled) {
   console.log(String(d.kind || "").startsWith("smoke-")

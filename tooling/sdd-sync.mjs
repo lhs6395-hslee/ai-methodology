@@ -13,6 +13,7 @@ import { loadConfig } from "./sdd-config.mjs";
 import { dirname, join } from "node:path";
 import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { VERDICT_KINDS, parseVerdict, stripVerdictLines, isJudged, KIND_LABEL } from "./verdict-lib.mjs";
 
 const STRICT = process.argv.includes("--strict");
 const JSON_OUT = process.argv.includes("--json");
@@ -66,15 +67,42 @@ const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
 // (엔트리 판정 실패·조건 분기 누락)은 exit 0으로 끝나므로, 출력 코드만 보면 거짓 green이 된다
 // (실측: 비-ASCII 경로에서 check-test-run이 한 줄도 내지 않고 exit 0 → `runTestsPolicy: hard`가
 // 여러 라운드 거짓 green). 판정 대상이 없어 발화하지 않는 게이트도 "off/no-op/skip" 한 줄을 낸다.
+// ⚠ 분류의 정본은 **게이트가 선언한 판정 타입**이다(SPEC-040) — 산문 스캔이 아니다.
+// 이전 판은 `/[⚠✗]/.test(stdout)`으로 추측했고, 그래서 "off (판정 안 함)"이라 적힌 줄을
+// ✓ clean으로 분류했다(실측: R7 Engines·Events, R9 라이브 대조). **규범과 도구가 같은 사실을
+// 다르게 말하는 상태**였다 — update.md §7은 off를 clean에서 떼라고 요구하는데 하네스가 합쳤다.
+// 이제 게이트가 종류를 말하고, 이 함수는 그것을 읽기만 한다. 말하지 않으면 UNTYPED(미판정)다.
 export function gateOutcome({ file, missing = false, crashed = false, stdout = "", stderr = "", timedOut = false, skippedBudget = false }) {
-  if (missing) return { flagged: true, summary: `(없음: ${file}) — detector 미설치라 이 규칙은 판정 없음(sdd-init/update로 배선 갱신 필요)` };
+  const K = VERDICT_KINDS;
+  const un = (summary) => ({ kind: K.UNTYPED, violation: false, flagged: true, summary });
+  if (missing) return un(`(없음: ${file}) — detector 미설치라 이 규칙은 판정 없음(sdd-init/update로 배선 갱신 필요)`);
   // 시간 예산 — 훅이 몇 초를 넘기면 사람이 --no-verify로 우회하고, 그러면 훅이 통째로 무의미해진다.
   // 그래서 끊되 **조용히 통과시키지 않는다**: 못 본 것은 "미판정"으로 남아 flagged다(§exit 0 ≠ 판정했음).
-  if (timedOut) return { flagged: true, summary: `(미판정: 시간 초과) — ${file}이 제한 시간 안에 끝나지 않아 판정하지 못했다(통과 아님). 전체 판정: node scripts/sdd-sync.mjs` };
-  if (skippedBudget) return { flagged: true, summary: `(미판정: 시간 예산 소진) — ${file}을 실행하지 않았다(통과 아님). 전체 판정: node scripts/sdd-sync.mjs` };
-  if (crashed) return { flagged: true, summary: lastLine(stdout) || lastLine(stderr) || "(비정상 종료)" };
-  if (!stdout.trim()) return { flagged: true, summary: `(출력 없음 — 게이트가 한 줄도 판정하지 않음: 무음 미실행 의심, exit 0 ≠ 판정함)` };
-  return { flagged: /[⚠✗]/.test(stdout), summary: lastLine(stdout) };
+  if (timedOut) return un(`(미판정: 시간 초과) — ${file}이 제한 시간 안에 끝나지 않아 판정하지 못했다(통과 아님). 전체 판정: node scripts/sdd-sync.mjs`);
+  if (skippedBudget) return un(`(미판정: 시간 예산 소진) — ${file}을 실행하지 않았다(통과 아님). 전체 판정: node scripts/sdd-sync.mjs`);
+
+  const v = parseVerdict(stdout);
+  const body = stripVerdictLines(stdout);
+  const summary = lastLine(body) || lastLine(stderr) || (crashed ? "(비정상 종료)" : "");
+
+  // 판정 타입 미선언 — 배선 누락이거나 arm 이전에 터진 것. 어느 쪽이든 **통과가 아니다**.
+  // (출력 0줄도 여기로 떨어진다 — 무음 미실행은 판정 줄조차 없으므로 같은 결론이다.)
+  if (!v) {
+    return un(crashed
+      ? `(미판정: 판정 타입 없이 비정상 종료) — ${summary || "게이트가 판정 종류를 선언하기 전에 끝났다"}`
+      : `(미판정: 게이트가 판정 종류를 선언하지 않음 — 배선 누락, exit 0 ≠ 판정함) ${summary}`.trim());
+  }
+  // 위반은 **JUDGED 안에서만** 성립한다 — 안 본 게이트는 위반을 낼 수 없다(그게 위험한 이유다).
+  const violation = isJudged(v.kind) && (crashed || /[⚠✗]/.test(body));
+  return {
+    kind: v.kind,
+    violation,
+    // strict가 막는 것은 **위반**과 **미판정**이다. off·inert·skipped는 막지 않되 clean에 합산하지도
+    // 않는다 — 채택 중인 프로젝트를 벽으로 막지 않으면서 "안 봤다"는 사실은 매 실행 계상된다.
+    flagged: violation || v.kind === K.UNTYPED,
+    summary: summary || v.line,
+    detail: v.detail,
+  };
 }
 
 // 게이트 항목은 문자열이거나 {file, args} — 일부 detector는 읽기 전용 모드 인자가 필요하다
@@ -143,16 +171,44 @@ function collect() {
     const id = rule.slice(0, sp); // "R1"
     const title = rule.slice(sp + 1); // "spec→code"
     if (DELEGATION && !DELEGATION.run.has(id)) {
-      return { id, title, flagged: false, delegated: true,
-        gates: [{ gate: gates.map(gateFile).join("·"), flagged: false,
+      return { id, title, flagged: false, delegated: true, state: "안 봄",
+        gates: [{ gate: gates.map(gateFile).join("·"), kind: VERDICT_KINDS.SKIPPED, violation: false, flagged: false,
           summary: `위임 — 이 훅에서는 판정하지 않는다(담당: ${DELEGATION.to}). 지금 보려면: node scripts/sdd-sync.mjs` }] };
     }
     const gateResults = gates.map((g) => {
       const r = runGate(g);
-      return { gate: gateFile(g), flagged: r.flagged, summary: r.summary };
+      return { gate: gateFile(g), kind: r.kind, violation: r.violation, flagged: r.flagged, summary: r.summary };
     });
-    return { id, title, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
+    // 규칙의 상태는 셋이다 — 이전 판의 ✓clean/⚠ 두 상태가 "안 봄"을 clean 쪽으로 접었다.
+    const state = gateResults.some((g) => g.violation || g.kind === VERDICT_KINDS.UNTYPED) ? "위반"
+      : gateResults.every((g) => isJudged(g.kind)) ? "판정함" : "안 봄";
+    return { id, title, state, flagged: gateResults.some((g) => g.flagged), gates: gateResults };
   });
+}
+
+// 세 상태의 표식 — 모르는 사람이 한 눈에 갈라 읽을 수 있어야 한다.
+// "안 봄"이 초록이 아니라는 사실이 이 표식의 전부다.
+const STATE_MARK = { "판정함": "✓ 판정함", "안 봄": "· 안 봄(판정 안 함 — 통과 아님)", "위반": "⚠ 확인 필요" };
+
+// 게이트 단위 집계 — update.md §7이 요구하는 보고 형식을 **계산**한다(사람 눈대중이 아니라).
+export function tallyGates(rules) {
+  const t = { total: 0, judged: 0, off: 0, inert: 0, skipped: 0, untyped: 0, violation: 0 };
+  for (const r of rules) for (const g of r.gates) {
+    t.total += 1;
+    if (g.violation) t.violation += 1;
+    if (g.kind === VERDICT_KINDS.JUDGED) t.judged += 1;
+    else if (g.kind === VERDICT_KINDS.OFF) t.off += 1;
+    else if (g.kind === VERDICT_KINDS.INERT) t.inert += 1;
+    else if (g.kind === VERDICT_KINDS.SKIPPED) t.skipped += 1;
+    else t.untyped += 1;
+  }
+  return t;
+}
+
+export function tallyLine(t) {
+  const unseen = t.off + t.inert + t.skipped;
+  const why = [t.off && `off ${t.off}`, t.inert && `inert ${t.inert}`, t.skipped && `생략 ${t.skipped}`].filter(Boolean).join(" · ");
+  return `게이트 ${t.total}종 = 판정 ${t.judged} · 안 봄 ${unseen}${why ? `(${why})` : ""} · 미판정 ${t.untyped}`;
 }
 
 // 엔트리 판정은 realpath 비교다 — `file://${argv[1]}` 문자열 비교는 비-ASCII 경로(%-인코딩)·
@@ -166,19 +222,29 @@ if (isMainEntry(import.meta.url)) {
   const rules = collect();
   const flaggedRules = rules.filter((r) => r.flagged).map((r) => r.id);
   const clean = flaggedRules.length === 0;
+  const tally = tallyGates(rules);
 
   if (JSON_OUT) {
-    process.stdout.write(JSON.stringify({ schemaVersion: 1, clean, flaggedRules, rules }, null, 2) + "\n");
+    process.stdout.write(JSON.stringify({ schemaVersion: 2, clean, tally, flaggedRules, rules }, null, 2) + "\n");
   } else {
     console.log("SDD sync 리포트 — detector 일괄 실행 (HARNESS.md 규칙표)");
     for (const r of rules) {
-      console.log(`\n● ${r.id} ${r.title}: ${r.delegated ? "· 위임" : r.flagged ? "⚠ 확인 필요" : "✓ clean"}`);
-      for (const g of r.gates) console.log(`    [${g.gate}] ${g.summary}`);
+      console.log(`\n● ${r.id} ${r.title}: ${r.delegated ? "· 위임" : STATE_MARK[r.state]}`);
+      // 게이트 줄에 "무엇을 했는지"를 앞에 붙인다 — 요약 문장만 보고 초록으로 읽는 일을 막는다.
+      for (const g of r.gates) {
+        const mark = isJudged(g.kind) ? "" : `[${KIND_LABEL[g.kind] || g.kind}] `;
+        console.log(`    [${g.gate}] ${mark}${g.summary}`);
+      }
     }
+    // ⚠ 집계 줄은 **항상** 나온다(clean일 때도). "전부 sync ✓"만 보고 12종이 off인 것을 모르는
+    // 상태가 이 게이트 계열의 원래 결함이었다 — 초록의 분모를 같은 줄에서 밝힌다.
+    console.log(`\n요약: ${tallyLine(tally)}`);
+    if (tally.untyped) console.log(`  ✗ 미판정 ${tally.untyped}종 — 판정 종류를 선언하지 않은 게이트다(배선 누락). 통과가 아니다.`);
+    if (tally.inert) console.log(`  ⚠ inert ${tally.inert}종 — 정책은 켜졌으나 판정 입력이 없다. "hard 선언 + 무판정 = 거짓 안전"의 자리다(update.md §6).`);
     console.log(
       clean
-        ? `\n요약: 전부 sync ✓`
-        : `\n요약: 확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → node scripts/sdd-sync.mjs 리포트로 의사결정(Claude Code: /sdd-sync)`
+        ? `  ${tally.judged}종이 판정했고 위반 0건 — 판정한 범위 안에서 sync ✓${tally.off + tally.inert + tally.skipped ? " (안 본 것은 위 집계를 보라 — 초록이 아니다)" : ""}`
+        : `  확인 필요 — ${rules.filter((r) => r.flagged).map((r) => `${r.id} ${r.title}`).join(", ")} → node scripts/sdd-sync.mjs 리포트로 의사결정(Claude Code: /sdd-sync)`
     );
   }
   if (STRICT && !clean) process.exit(1);

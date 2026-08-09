@@ -13,6 +13,9 @@ import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
+
 const target = process.argv[2];
 if (!target) process.exit(0);
 
@@ -50,6 +53,7 @@ if (!touched.size) process.exit(0); // git 없음/판정 불가 — 침묵(오�
 const stale = owners.filter((o) => !touched.has(o.file));
 if (!stale.length) process.exit(0); // 소유 스펙이 이미 이 브랜치에서 수정됨 — 정상 순서
 
+judged(stale.length);
 console.log(`[SDD spec-first — 편집 전 순서 확인] ${rel}`);
 for (const o of stale) console.log(`  ⚠ 소유 스펙 ${o.specId}(${o.file})이 이 브랜치에서 아직 미수정 — 코드보다 명세가 먼저다`);
 console.log("  → 먼저 그 스펙의 FR/Edge Cases/Change Log를 갱신하고 편집하라(커밋 시점엔 commit-msg 훅이 hard로 막는다).");

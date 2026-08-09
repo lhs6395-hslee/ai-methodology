@@ -21,6 +21,9 @@ import {
   entitySetFingerprint, parseCandidateHeader, candidateFreshness,
 } from "./synonym-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const POLICY = String(cfg.synonymPolicy ?? "off");
 if (!["off", "advisory", "hard"].includes(POLICY)) {
@@ -28,6 +31,7 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
   process.exit(1);
 }
 if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "synonymPolicy");
   console.log("동의어 게이트 — synonymPolicy:off (판정 안 함)");
   process.exit(0);
 }
@@ -52,6 +56,7 @@ for (const n of names.filter((x) => /\.md$/.test(x))) {
   for (const raw of own[ENT_CAT] || []) owned.push({ specId, category: ENT_CAT, key: normalizeKey(ENT_CAT, raw, cfg) });
 }
 if (!ENT_CAT) {
+  verdict(VERDICT_KINDS.INERT, "entity 역할 카테고리 미해석(ownershipCategoryRoles)");
   console.log(`동의어 게이트(synonymPolicy=${POLICY}): 판정 불가(inert) — entity 역할 카테고리 미해석(ownershipCategoryRoles)`);
   if (HARD) { console.error("\n✗ synonymPolicy=hard인데 판정 대상이 없다(거짓 안전) — entity 역할을 선언하거나 정책을 off로."); process.exit(1); }
   process.exit(0);
@@ -89,6 +94,9 @@ if (SIM_CMD) {
   }
 }
 
+// 유사 후보 층(③)이 돌지 못했으면 전수를 본 것이 아니다 — 결정적 층에 위반이 없어도 SKIPPED다.
+if (simSkipped && !collisions.length && !declared.length) verdict(VERDICT_KINDS.SKIPPED, `유사 후보 층 미실행 — ${simSkipped}`);
+else judged(collisions.length + declared.length);
 const tag = HARD ? "✗" : "⚠";
 console.log(`동의어 게이트(synonymPolicy=${POLICY}): entity ${owned.length}건 — 형태 충돌 ${collisions.length}·선언 별칭 ${declared.length}·미결 후보 ${cand.unresolved.length}`);
 

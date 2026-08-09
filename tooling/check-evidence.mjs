@@ -11,6 +11,9 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { evidenceFindings, DEFAULT_BROWSER_MARKERS } from "./evidence-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
@@ -20,6 +23,7 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
   process.exit(1);
 }
 if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "executionEvidencePolicy");
   console.log("실행 증거 게이트 — executionEvidencePolicy:off (판정 안 함)");
   process.exit(0);
 }
@@ -102,6 +106,7 @@ const units = specUnits();
 const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS, manifestOf });
 const claimCount = units.reduce((n, u) => n + u.claims.length, 0);
 
+judged(findings.length);
 console.log(`실행 증거 게이트(executionEvidencePolicy=${POLICY}): spec ${units.length}개·주장 ${claimCount}건 검사 — 위반 ${findings.length}건`);
 const tag = HARD ? "✗" : "⚠";
 for (const f of findings) {

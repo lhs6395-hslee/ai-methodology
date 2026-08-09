@@ -11,6 +11,8 @@ import { loadConfig } from "./sdd-config.mjs";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+
 export const RUN_TESTS_ENUM = ["off", "advisory", "hard"];
 
 // 순수 판정: 정책 × 명령유무 × exit code → {valid, exit, line}. line이 출력 바이트의 정본.
@@ -78,6 +80,9 @@ function isMainEntry(metaUrl) {
 // (게이트가 한 줄도 출력하지 않는데 sdd-sync는 clean으로 읽음). 킷은 sdd-sync.mjs(ab5eb1a)에서
 // 이미 fileURLToPath로 옮겼는데 이 파일들에 원본 비교가 남아 있었다.
 if (isMainEntry(import.meta.url)) {
+  // ⚠ arm은 **엔트리일 때만**이다 — 이 모듈을 import만 한 프로세스(테스트 러너 등)에서
+  // 종료 훅이 fd 1에 쓰면 그 프로세스의 stdout 프로토콜을 깨뜨린다(실측: node --test IPC 손상).
+  armVerdict();
   const cfg = loadConfig();
   const policy = cfg.runTestsPolicy || "off";
   const cmd = (cfg.commands || {}).test;
@@ -114,6 +119,12 @@ if (isMainEntry(import.meta.url)) {
     }
   }
   const ve = e2eRunVerdict(e2ePolicy, !!e2eCmd, { skipped, exitCode: e2eExit });
+  // 이 게이트의 원래 결함이 정확히 여기였다 — 정책이 hard인데 명령이 없으면 아무것도 안 돌고
+  // exit 0으로 끝났다(여러 라운드 거짓 green). 이제 그 상태는 INERT로 자백된다.
+  if (policy === "off") verdict(VERDICT_KINDS.OFF, "runTestsPolicy");
+  else if (!cmd) verdict(VERDICT_KINDS.INERT, "commands.test 미선언 — 돌릴 스위트가 없다");
+  else if (skipped) verdict(VERDICT_KINDS.SKIPPED, `e2e 전제 미충족 — ${skipped}`);
+  else judged((v.exit ? 1 : 0) + (ve.exit ? 1 : 0));
   // 출력 순서: e2e 축 먼저, 스위트 판정 마지막 — 하네스(sdd-sync)가 게이트 stdout의 **마지막 줄**을
   // 요약으로 쓰기 때문이다. 위반은 ⚠/✗ 스캔으로 잡히므로 순서와 무관하게 flagged된다.
   (ve.valid && ve.exit === 0 ? console.log : console.error)(ve.line);

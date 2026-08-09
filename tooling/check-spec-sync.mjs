@@ -13,6 +13,9 @@ import { parseStatus, canLeadCode } from "./lifecycle-lib.mjs";
 import { escalations } from "./drift-lib.mjs";
 import { parseDrivers, relaxingDrivers } from "./cross-spec-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 let cfg = loadConfig();
 const args = process.argv.slice(2);
 const STAGED = args.includes("--staged");
@@ -63,7 +66,11 @@ const changed = new Set();
 if (branchDiffOk) lines(shOk(`git diff --name-only ${BASE}...HEAD`)).forEach((f) => changed.add(f));
 else console.log(`· spec-sync: base(${BASE}) 해석 불가 — ${STAGED ? "staged만 판정(경고). 멀티커밋 브랜치(스펙 선커밋→코드 후커밋)는 오차단될 수 있음 — sdd.config.json specSyncBase 또는 SDD_DIFF_BASE로 base 지정" : "판정 불가, 건너뜀"}`);
 if (STAGED) lines(sh("git diff --cached --name-only")).forEach((f) => changed.add(f));
-if (!STAGED && !branchDiffOk) process.exit(0);
+if (!STAGED && !branchDiffOk) {
+  // 비교 기준이 없으면 볼 changeset 자체가 없다 — 통과가 아니라 미실행이다.
+  verdict(VERDICT_KINDS.SKIPPED, `base(${BASE}) 해석 불가 — 비교할 changeset이 없다`);
+  process.exit(0);
+}
 
 // ②b 리네임 수집(SPEC-019): 소유 파일 리네임은 semantic drift 승격 트리거.
 const renamed = new Set(); // 리네임된 새 경로
@@ -250,6 +257,7 @@ const driftHard = drift.hard && drift.violations.length > 0;
 // ⑤ 리포트. unowned는 정책대로 — warn은 어디서든 advisory, error는 staged에서만 hard(range는 advisory).
 const unownedHard = POLICY === "error" && STAGED && unowned.length > 0;
 const mode = STAGED ? "staged(hard)" : `range(advisory, base:${BASE})`;
+judged(violations.length + (unownedHard ? unowned.length : 0) + (driftHard ? drift.violations.length : 0));
 console.log(`spec-sync 게이트 — mode:${mode} changed:${changed.size} specs:${specs.length}`);
 for (const f of unowned) {
   console.log(`  ${unownedHard ? "✗" : "⚠"} unowned: ${f} — 어떤 스펙의 Files에도 매치 안 됨(specSyncUnownedPolicy=${POLICY})`);

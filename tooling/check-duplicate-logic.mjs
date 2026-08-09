@@ -22,6 +22,9 @@ import {
   extractLiterals, duplicateLiteralFindings, staleAllowEntries, parseDuplicateCandidates,
 } from "./duplicate-logic-lib.mjs";
 
+import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
+
 const cfg = loadConfig();
 const POLICY = String(cfg.duplicateLogicPolicy ?? "advisory");
 if (!["off", "advisory", "hard"].includes(POLICY)) {
@@ -29,6 +32,7 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
   process.exit(1);
 }
 if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "duplicateLogicPolicy");
   console.log("구현 중복 게이트 — duplicateLogicPolicy:off (판정 안 함)");
   process.exit(0);
 }
@@ -39,12 +43,20 @@ const MIN_LEN = Number(cfg.duplicateLiteralMinLength) || DEFAULT_DUPLICATE_MIN_L
 const CAP = Number(cfg.duplicateLogicListCap) || 12;
 const IGNORE = new Set(cfg.ignoreDirs);
 const TEST_RES = (cfg.testFileRegex || []).map((r) => new RegExp(r));
-const FILE_RES = (cfg.duplicateLiteralFileRegex && cfg.duplicateLiteralFileRegex.length
-  ? cfg.duplicateLiteralFileRegex : DEFAULT_DUPLICATE_FILE_REGEX).map((r) => new RegExp(r));
+// ⚠ 킷 기본값은 **킷의 언어**(JS/TS)다 — 그 사실이 소비 프로젝트에서 조용한 0건이 된다(SPEC-040 ②).
+// 실측: Python+Terraform 프로젝트가 이 게이트를 advisory로 켜면 기본 정규식이 아무 파일도 잡지
+// 못해 "중복 0건"을 보고하는데, 그 0은 진짜 0과 구분되지 않는다. 그래서 **미선언 상태를 추적**해
+// 아래에서 "안 본 확장자"가 남으면 INERT로 자백시킨다. 기본값을 없애지는 않는다(JS 프로젝트의
+// 하위호환) — 대신 기본값에 기대는 동안 무엇을 안 봤는지 매 실행 말한다.
+const FILE_REGEX_DECLARED = Boolean(cfg.duplicateLiteralFileRegex && cfg.duplicateLiteralFileRegex.length);
+const FILE_RES = (FILE_REGEX_DECLARED ? cfg.duplicateLiteralFileRegex : DEFAULT_DUPLICATE_FILE_REGEX).map((r) => new RegExp(r));
 const isTest = (rel) => TEST_RES.some((re) => re.test(rel));
 
 // scanDirs 순회 — 테스트 파일은 기본 제외(단언이 같은 문자열을 반복하는 것은 중복이 아니다).
-const files = [];
+const files = [];        // 리터럴이 **있는** 파일만 — 판정 입력이지 "본 파일 수"가 아니다
+let matchedFiles = 0;    // 대상 패턴에 걸린 파일 수(리터럴 0개여도 본 것이다 — 둘을 섞으면
+                         // "정규식을 안 쓰는 JS 저장소"가 "아무것도 안 봤음"으로 오분류된다)
+const skippedExt = new Map();   // 확장자 → 건수(대상 밖으로 밀려난 소스)
 for (const dir of cfg.scanDirs || []) {
   const abs = resolveFromRoot(cfg, dir);
   (function walk(d, rel) {
@@ -53,8 +65,13 @@ for (const dir of cfg.scanDirs || []) {
       const p = join(d, name), r = rel ? `${rel}/${name}` : `${dir}/${name}`;
       let st; try { st = statSync(p); } catch { continue; }
       if (st.isDirectory()) { if (!IGNORE.has(name)) walk(p, r); continue; }
-      if (!FILE_RES.some((re) => re.test(r))) continue;   // 대상 확장자 밖 — 문서·셸의 슬래시는 정규식이 아니다
+      if (!FILE_RES.some((re) => re.test(r))) {           // 대상 확장자 밖 — 문서·셸의 슬래시는 정규식이 아니다
+        const ext = (name.match(/\.[^.]+$/) || [""])[0];
+        if (ext) skippedExt.set(ext, (skippedExt.get(ext) || 0) + 1);
+        continue;
+      }
       if (!cfg.duplicateLogicIncludeTests && isTest(r)) continue;
+      matchedFiles += 1;
       let text; try { text = readFileSync(p, "utf8"); } catch { continue; }
       const literals = extractLiterals(text, PATTERNS, MIN_LEN);
       if (literals.length) files.push({ path: r, literals });
@@ -85,6 +102,19 @@ if (String(cfg.duplicateLogicCommand || "").trim()) {
 }
 
 const litCount = files.reduce((n, f) => n + f.literals.length, 0);
+// 판정 종류(SPEC-040) — "0건"이 무엇의 0건인지 밝힌다.
+//   ① 볼 파일이 0개  → 아무것도 안 봤다(언어 불일치의 전형)
+//   ② 언어 미선언인데 안 본 확장자가 남음 → 킷 기본(JS/TS)에 기댄 부분 판정이다. 전수가 아니다.
+// ②를 JUDGED로 부르면 "이 저장소에 중복이 없다"는 문장이 되는데, 실제로는 일부만 본 것이다.
+const skippedList = [...skippedExt.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${e}×${n}`);
+if (!matchedFiles) {
+  verdict(VERDICT_KINDS.INERT, "판정 대상 파일 0개 — duplicateLiteralFileRegex가 이 프로젝트의 소스와 맞지 않는다");
+} else if (!FILE_REGEX_DECLARED && skippedList.length) {
+  verdict(VERDICT_KINDS.INERT, `언어 미선언 — 킷 기본(JS/TS) 패턴으로 ${matchedFiles}개만 봤고 ${skippedList.join(" ")}는 보지 않았다`
+    + " · duplicateLiteralPatterns·duplicateLiteralFileRegex를 이 프로젝트 언어로 함께 선언하라");
+} else {
+  judged(findings.length);
+}
 console.log(`구현 중복 게이트(duplicateLogicPolicy=${POLICY}): 파일 ${files.length}개·리터럴 ${litCount}건(하한 ${MIN_LEN}자) — 중복 ${findings.length}건`
   + (Object.keys(allow).length ? ` · 면제 ${Object.keys(allow).length}건` : ""));
 

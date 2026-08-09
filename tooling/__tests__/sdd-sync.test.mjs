@@ -54,10 +54,16 @@ test("R2에 check-spec-sync(range)가 배선됨", () => {
 
 // ── 게이트 결과 판정 코어(감사 M-8 + 무음 미실행) ──
 // @covers SPEC-004/FR-001
-test("gateOutcome: 판정 줄만 있는 green stdout → flagged 아님(러너 텍스트 오독 금지)", () => {
-  const o = gateOutcome({ file: "check-test-run.mjs", stdout: "테스트 실행 게이트 — commands.test green (runTestsPolicy:hard)\n" });
+test("gateOutcome: 판정 타입이 붙은 green stdout → flagged 아님(러너 텍스트 오독 금지)", () => {
+  // SPEC-040 이후 계약: 초록 **문장**만으로는 통과가 아니다 — 게이트가 판정 종류를 선언해야 한다.
+  // 문장만 보고 통과로 읽던 것이 정확히 "판정 안 함"을 ✓ clean으로 세던 결함이다.
+  const o = gateOutcome({
+    file: "check-test-run.mjs",
+    stdout: "테스트 실행 게이트 — commands.test green (runTestsPolicy:hard)\n판정: JUDGED — 위반 0건\n",
+  });
   assert.equal(o.flagged, false);
-  assert.match(o.summary, /green/);
+  assert.equal(o.kind, "JUDGED");
+  assert.match(o.summary, /green/);   // 요약은 여전히 게이트의 사람 문장이다(판정 줄이 자리를 뺏지 않는다)
 });
 
 // @covers SPEC-004/FR-001
@@ -108,7 +114,7 @@ test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내�
   const r = run(dir, ["--json"]);
   assert.equal(r.code, 0);
   const rep = JSON.parse(r.out); // 사람 텍스트가 섞이면 여기서 throw
-  assert.equal(rep.schemaVersion, 1);
+  assert.equal(rep.schemaVersion, 2);   // SPEC-040: tally·kind 추가
   assert.equal(typeof rep.clean, "boolean");
   assert.ok(Array.isArray(rep.flaggedRules));
   assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13"]);
@@ -120,6 +126,8 @@ test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내�
       assert.equal(typeof g.gate, "string");
       assert.equal(typeof g.flagged, "boolean");
       assert.equal(typeof g.summary, "string");
+      // 판정 종류가 기계 리포트에도 실린다 — 소비자가 초록/안 봄을 가를 수 있어야 한다(SPEC-040).
+      assert.ok(["JUDGED", "OFF", "INERT", "SKIPPED", "UNTYPED"].includes(g.kind), `알 수 없는 판정 종류: ${g.kind}`);
     }
   }
   // 내부 정합: clean ⟺ flaggedRules 빔, rule.flagged ⟺ id ∈ flaggedRules

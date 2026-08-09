@@ -22,7 +22,7 @@ import { schemaBackingFindings } from "../schema-backing-lib.mjs";
 
 const LIBS = ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs",
   "key-anchor-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs",
-  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs"];
+  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs", "verdict-lib.mjs"];
 
 function repo({ config = {}, specs = {}, srcFiles = {} } = {}) {
   const root = mkdtempSync(join(tmpdir(), "sdd-real-"));
