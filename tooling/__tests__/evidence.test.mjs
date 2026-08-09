@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseEvidenceTag, hasExecutionVerb, isBrowserGradeEvidence, evidenceFindings , markerHits } from "../evidence-lib.mjs";
+import { parseEvidenceTag, hasExecutionVerb, isBrowserGradeEvidence, evidenceFindings , markerHits, isDeployGradeEvidence, DEFAULT_DEPLOY_EVIDENCE_PATTERNS } from "../evidence-lib.mjs";
 
 const GATE = new URL("../check-evidence.mjs", import.meta.url).pathname;
 
@@ -193,4 +193,30 @@ test("게이트: 본문에 실행 증거가 있는데 매니페스트에도 엔�
     assert.match(r.out, /FR-001 \(manifest-vs-tag\)/);
     assert.match(r.out, /매니페스트는 \*\*실행할 수 없는 검증\*\*의 회계 수단이다/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── 배포 등급 증거(제보 ④) — "단위테스트 통과"와 "배포본에서 실제 실행됨"은 다른 사실이다 ──
+test("배포 등급 판정 — smoke·e2e·live·runbook은 등급이고 단위테스트 경로는 아니다", () => {
+  const P = DEFAULT_DEPLOY_EVIDENCE_PATTERNS;
+  assert.equal(isDeployGradeEvidence("tests/smoke/deploy.sh", P), true);
+  assert.equal(isDeployGradeEvidence("sdd/verification/RUNBOOK-deploy.md", P), true);
+  assert.equal(isDeployGradeEvidence("tests/unit/image.test.ts", P), false);
+});
+
+test("트리거는 **소유 + 주장** 둘 다다 — 배포를 다루기만 하는 스펙은 단위테스트가 정답 증거다", () => {
+  const claims = [{ id: "SC-001", kind: "SC", text: "- **SC-001**: 러너 이미지가 노드에서 뜬다. [검증: tests/unit/x.test.ts]" }];
+  // ① 소유 없음 + 마커 있음 → 발화하지 않는다(킷 시운전 실측: 마커만 걸면 31건 과발화).
+  const noOwn = evidenceFindings([{ specId: "S1", claims, ownsDeployArtifact: false }], () => true);
+  assert.equal(noOwn.filter((f) => f.finding === "deploy-needs-live-evidence").length, 0);
+  // ② 소유 있음 + 마커 있음 + 단위테스트 증거 → 등급 미달로 표면화.
+  const own = evidenceFindings([{ specId: "S1", claims, ownsDeployArtifact: true }], () => true);
+  const hit = own.filter((f) => f.finding === "deploy-needs-live-evidence");
+  assert.equal(hit.length, 1);
+  assert.match(hit[0].detail, /저장소 안 단위테스트는 배포본의 아치·이미지 내용·전제 자원에 닿지 않는다/);
+});
+
+test("배포 등급 증거를 대면 통과한다 — 막는 것은 등급 미달이지 배포 주장 자체가 아니다", () => {
+  const claims = [{ id: "SC-001", kind: "SC", text: "- **SC-001**: 러너 이미지가 노드에서 뜬다. [검증: tests/smoke/qa-image.sh]" }];
+  const r = evidenceFindings([{ specId: "S1", claims, ownsDeployArtifact: true }], () => true);
+  assert.equal(r.filter((f) => f.finding === "deploy-needs-live-evidence").length, 0);
 });

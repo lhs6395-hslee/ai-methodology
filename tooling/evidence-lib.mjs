@@ -48,6 +48,25 @@ export const DEFAULT_BROWSER_EVIDENCE_PATTERNS = [
   "e2e", "playwright", "cypress", "puppeteer", "selenium", "browser",
 ];
 
+// 배포 등급 증거 — **"단위테스트가 통과했다"와 "배포본에서 실제로 돌았다"는 다른 사실이다**(제보 ④).
+// 실측(2026-08-10 qa에이전트): 아치 불일치·이미지 안 모듈 누락은 단위테스트가 100% 통과해도
+// 남는다. 그 둘이 깨지는 곳은 **배포된 이미지의 런타임**이고, 저장소 안 테스트는 거기 닿지 않는다.
+export const DEFAULT_DEPLOY_EVIDENCE_PATTERNS = [
+  "smoke", "e2e", "live", "deploy", "runbook", "canary", "staging",
+];
+// 주장이 배포 산출물 대상인지 — 브라우저 마커와 같은 방식(주장 라인에서만 찾는다).
+export const DEFAULT_DEPLOY_MARKERS = [
+  "이미지", "컨테이너", "레지스트리", "배포", "파이프라인", "스테이지", "클러스터", "노드",
+  "image", "container", "registry", "deploy", "pipeline", "stage", "cluster", "node", "helm",
+];
+
+// 증거 경로가 배포 등급인가(패턴 부분일치).
+export function isDeployGradeEvidence(path, patterns) {
+  const s = String(path || "").toLowerCase();
+  return (patterns && patterns.length ? patterns : DEFAULT_DEPLOY_EVIDENCE_PATTERNS)
+    .some((p) => s.includes(String(p).toLowerCase()));
+}
+
 // 한 라인에서 검증 태그를 추출한다. 반환 null | {kind, paths[]}
 //   kind: "exec"(경로 있음) | "bare"(경로 없는 [검증]) | "self"(자기신고 서술) | "unknown"([미확인])
 // `[검증: a, b]`의 구분자는 `:` 또는 `：`(전각). `[검증 — …]`·`[검증 - …]`는 자기신고 서술.
@@ -96,11 +115,17 @@ export function isBrowserGradeEvidence(path, patterns) {
 //
 // 반환 [{specId, claimId, kind, finding, detail}] — 선언 순(결정적).
 //   finding: "bare-tag" | "missing-asset" | "exec-verb-no-evidence" | "browser-needs-ui-evidence"
-//          | "unknown-vs-manifest" | "manifest-vs-tag"
+//          | "deploy-needs-live-evidence" | "unknown-vs-manifest" | "manifest-vs-tag"
 export function evidenceFindings(units, assetExists, opts = {}) {
   const verbs = opts.verbs && opts.verbs.length ? opts.verbs : DEFAULT_EXECUTION_VERBS;
   const bpat = opts.browserPatterns && opts.browserPatterns.length ? opts.browserPatterns : DEFAULT_BROWSER_EVIDENCE_PATTERNS;
   const bmark = opts.browserMarkers && opts.browserMarkers.length ? opts.browserMarkers : DEFAULT_BROWSER_MARKERS;
+  const dpat = opts.deployPatterns && opts.deployPatterns.length ? opts.deployPatterns : DEFAULT_DEPLOY_EVIDENCE_PATTERNS;
+  const dmark = opts.deployMarkers && opts.deployMarkers.length ? opts.deployMarkers : DEFAULT_DEPLOY_MARKERS;
+  const isDeployClaim = (t) => {
+    const s = String(t || "").toLowerCase();
+    return dmark.some((m) => markerHits(s, m));
+  };
   const isBrowserClaim = (t) => {
     const s = String(t || "").toLowerCase();
     return bmark.some((m) => markerHits(s, m));
@@ -137,6 +162,17 @@ export function evidenceFindings(units, assetExists, opts = {}) {
         if (isBrowserClaim(c.text) && !tag.paths.some((p) => isBrowserGradeEvidence(p, bpat))) {
           out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "browser-needs-ui-evidence",
             detail: `UI/브라우저 대상인데 증거가 브라우저 등급 아님(${tag.paths.join(", ")}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다` });
+        }
+        // 배포 산출물 대상인데 증거가 저장소 안 단위테스트뿐이면 표면화(제보 ④ — 등급 분리).
+        // "단위테스트 통과"와 "배포본에서 실제 실행됨"을 같은 증거로 세면, 아치 불일치·이미지 안
+        // 모듈 누락처럼 **런타임에서만 깨지는 결함**이 100% green 위에서 배포된다(실측 8건).
+        // ⚠ 트리거는 **둘 다**여야 한다: 이 스펙이 배포 산출물을 소유하고(u.ownsDeployArtifact),
+        // 그 주장이 배포 대상을 말할 때. 마커만으로 걸면 "배포 가드의 판정 로직"처럼 배포를
+        // *다루는* 스펙까지 잡혀 31건이 쏟아진다(킷 시운전 실측) — 그런 스펙의 정답 증거는
+        // 단위테스트가 맞다. 소유 없는 마커는 화제이지 대상이 아니다.
+        if (u.ownsDeployArtifact && isDeployClaim(c.text) && !tag.paths.some((p) => isDeployGradeEvidence(p, dpat))) {
+          out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "deploy-needs-live-evidence",
+            detail: `배포 산출물 대상인데 증거가 배포 등급 아님(${tag.paths.join(", ")}) — 저장소 안 단위테스트는 배포본의 아치·이미지 내용·전제 자원에 닿지 않는다(smoke·e2e·live·runbook 등급 증거 또는 실행 원장 기록으로 올려라)` });
         }
         continue;
       }

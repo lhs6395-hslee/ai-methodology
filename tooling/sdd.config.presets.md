@@ -192,6 +192,7 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `filesOverlapPolicy` | Files 글롭 **겹침**(SPEC-002 G3) — 두 스펙의 `Files` 글롭이 같은 실파일을 덮으면 소유가 사실상 겹친 것(spec-sync가 어느 쪽을 요구할지도 모호해진다). 저장소를 걸어 실제 매치로 판정. `off`·`advisory`·`hard`. **권장 종착지 = `hard`** | `"advisory"` |
 | `executionEvidencePolicy` | 실행 증거 등급(SPEC-031) — FR·SC의 `[검증]` 태그가 **실행 가능한 경로**를 지목하는지 판정(맨 태그 금지·경로 실재·실행동사 주장에 증거 요구·UI 주장에 UI 증거 요구). 증거가 없으면 `[미확인]`으로 정직하게 표기하면 통과한다(차단 대상은 "증거 없는 자기신고"). `off`·`advisory`·`hard`. **권장 종착지 = `hard`** | `"off"` |
 | `liveRealityPolicy` · `liveRealityChecks` | 라이브 대조(SPEC-032) — 저장소 **밖** 진실(클라우드·클러스터 실물)과 선언의 diff. 어댑터 주입형(`{kind:"terraform"\|"kubernetes"\|"ownership"\|"custom", command}`) — stdout 한 줄 = 위반 하나. **명령이 비-0으로 죽으면 위반이 아니라 `skipped(사유)`**(자격증명 없는 로컬·오프라인에서 하드 실패 금지). 체크가 비면 inert | `"off"` · `[]` |
+| `liveRealityCoveragePolicy` · `deployArtifactMarkers` · `liveRealityChecks[].covers` | **등록 축**(SPEC-032 확장) — 스펙이 배포 산출물을 선언하면 그것을 보는 검사가 **등록돼 있는지**를 본다. 실행 축과 정책이 분리된 이유: 실행은 자격증명이 필요해 흔히 off·skipped인데 등록은 순수 선언 대조라 오프라인에서도 판정된다 — 한 정책에 묶으면 실행을 끄는 순간 등록도 꺼지고, 그게 실측 제보의 구조다(새 산출물 8개 결함을 **배포로 하나씩** 발견, R9 틀은 있었지만 검사 6건에 그 중 하나도 없었음). `deployArtifactMarkers`는 **조용한 기본값을 두지 않는다** — 미선언이면 inert로 자백한다(권장 목록은 아래 §라이브 대조 템플릿). `off`·`advisory`(기본)·`hard`. **권장 종착지 = `hard`** | `"advisory"` · `null` · `[]` |
 | `hooksInstalledPolicy` | 훅 배선 실재(SPEC-036) — 선언된 훅(`hooks.list`)이 `.git/hooks`에 **설치·실행 가능·킷 훅**인가. 게이트 파일이 다 있어도 훅이 없으면 한 번도 발동하지 않는데, 종전 확인은 게이트의 inert만 보고 훅의 inert는 안 봐서 그 상태가 green으로 읽혔다(실측 제보). `off`·`advisory`(기본)·`hard`. **권장 종착지 = `hard`**(배선 완료 후 승격) | `"advisory"` |
 | `syncHookRules` · `syncHookDelegatedTo` | pre-push 훅(`sdd-sync --hook`)에서 판정할 규칙 집합과 **나머지를 누가 대신 판정하는지**. 미선언이면 전체 실행(하위호환). 선언하면 목록 밖 규칙은 "위임"으로 출력되고 flagged가 아니다 — 담당자를 안 적으면 **에러**(조용한 생략 금지). ⚠ 실측: 스윕 30.3초 중 R5(스위트 실행)가 29.8초라 매 push가 멈춰 `--no-verify` 우회가 습관이 됐다. 우회를 유발하는 강제는 강제가 아니다 | `null` · `""` |
 | `SDD_SYNC_BUDGET_MS`(env) · `--budget` | 훅 경로 시간 예산(기본 15000). 초과분은 **미판정**으로 flagged된다(위임과 다르다 — 예산 초과는 사고, 위임은 선언) | `15000`(훅) |
@@ -224,3 +225,74 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 > **모델 무관:** 이 config에는 어떤 LLM/에이전트 가정도 없다. 게이트는 모델과 독립적으로 CI에서 강제된다.
 > **컴포넌트 무관:** DB(RDB·NoSQL)·캐시(Redis…)·브로커/스트림(Kafka…)·검색·스토리지 등 **어떤 미들웨어 제품도 config·게이트·spec에 박지 않는다.** spec은 *역량/요구*만 적고(예: "이벤트 로그 필요") 제품 선택은 프로젝트 몫이다(`principles.md` §10, `SSOT.md` §5b).
 > **런타임 무관:** 게이트 4판 동봉 — **Go 정적 바이너리(`go-gate/`)가 사실상 모든 언어 커버**(인터프리터 0, 네이티브 Windows 포함), 셸판은 빌드 없이 즉시 실행, Python판은 Node 전 게이트 패리티, Node판이 정본. 전부 같은 config — 커버 매트릭스·검증 상태는 `ci-examples.md`·`REALITY_CHECK.md`.
+
+---
+
+## 라이브 대조 템플릿 (SPEC-032 — 프로젝트마다 재발명 금지)
+
+실측 제보(2026-08-10): qa에이전트 도입에서 배포 산출물 결함 8건을 **배포로 하나씩** 발견했다 —
+ECR 리포 없음 · 경로 가드 · base==HEAD · 크로스계정 ECR API · buildx 캐시 드라이버 ·
+**아치 불일치(arm64 노드에 amd64 이미지)** · 리포 정책 부재 · **이미지에 의존 모듈 누락**.
+전부 저장소 밖 사실이고 전부 로컬 게이트를 green으로 통과했다. 아래는 그 8건이 다시 나오지
+않게 하는 최소 집합이다 — 붙여넣고 명령만 프로젝트 도구에 맞춰라.
+
+**계약 복습(중요):** stdout **한 줄 = 위반 하나**(비면 clean), **exit ≠ 0 = `skipped(사유)`**.
+자격증명 없는 로컬에서 하드 실패하면 안 되므로, 조회 자체가 불가하면 비-0으로 죽는 것이 옳다.
+그리고 `covers`에 **담당 산출물**을 반드시 적는다 — 안 적으면 등록 축이 "아무도 안 보는 산출물"로 센다.
+
+**권장 `deployArtifactMarkers`(복사해 시작):**
+`["image","container","registry","ecr","gcr","acr","docker","deployment","statefulset","daemonset","cronjob","k8s","kubernetes","helm","lambda","function","service","ingress","pipeline","stage","workflow","job"]`
+— 프로젝트 어휘에 맞게 **줄이거나 늘려라**. 이 목록이 프로젝트와 어긋나면 0건이 나오는데,
+그 0은 진짜 0과 구분되지 않는다(SPEC-040 ②).
+
+### ① 이미지 플랫폼 ↔ 대상 노드 아키텍처
+```json
+{
+  "id": "image-arch-matches-node",
+  "kind": "custom",
+  "label": "이미지 플랫폼이 대상 노드 아키텍처와 일치하는가",
+  "covers": ["*-image", "*-runner"],
+  "command": "IMG=$(kubectl get job/qa-agent -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null) || exit 3; NODE=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}' 2>/dev/null) || exit 3; IMGARCH=$(crane config \"$IMG\" 2>/dev/null | jq -r .architecture) || exit 3; [ \"$IMGARCH\" = \"$NODE\" ] || echo \"아치 불일치: 이미지 $IMGARCH ≠ 노드 $NODE ($IMG)\""
+}
+```
+> 실측 그대로다 — arm64 노드에 amd64 이미지를 밀어 넣어도 빌드·푸시·매니페스트가 전부 통과한다.
+> 깨지는 곳은 런타임이고, 그때는 이미 배포된 뒤다.
+
+### ② 레지스트리 계정 ↔ 빌드 주체 · 리포지토리 정책 실재
+```json
+{
+  "id": "registry-account-and-policy",
+  "kind": "custom",
+  "label": "이미지가 참조하는 레지스트리 계정이 빌드 주체와 맞고 리포 정책이 있는가",
+  "covers": ["*-image", "ecr/*"],
+  "command": "ACC=$(aws sts get-caller-identity --query Account --output text 2>/dev/null) || exit 3; REG=$(echo \"$IMAGE_URI\" | cut -d. -f1); [ \"$REG\" = \"$ACC\" ] || echo \"크로스계정 참조: 이미지 계정 $REG ≠ 빌드 계정 $ACC\"; aws ecr get-repository-policy --repository-name \"$ECR_REPO\" >/dev/null 2>&1 || echo \"리포지토리 정책 없음: $ECR_REPO (다른 계정에서 pull 불가)\""
+}
+```
+> 리포지토리가 **없는 것**과 정책이 **없는 것**은 다른 실패다. 전자는 push에서, 후자는 pull에서 죽는다.
+
+### ③ 엔트리포인트 dry-run — 이미지 안에 실제로 들어 있는가
+```json
+{
+  "id": "entrypoint-dry-run",
+  "kind": "custom",
+  "label": "컨테이너가 import·실행하는 파일이 이미지 안에 실재하는가",
+  "covers": ["*-image"],
+  "command": "docker run --rm --entrypoint sh \"$IMAGE_URI\" -c 'python -c \"import app.main\" 2>&1' >/tmp/e 2>&1 || { grep -q 'ModuleNotFoundError\\|No such file' /tmp/e && echo \"이미지에 의존 모듈·파일 누락: $(tail -1 /tmp/e)\" || exit 3; }"
+}
+```
+> **빌드 성공은 실행 가능성이 아니다.** COPY 경로 하나가 어긋나도 이미지는 정상적으로 만들어진다.
+> 이 검사가 없으면 그 사실을 배포 후 런타임 로그에서 배운다.
+
+### ④ 파이프라인 스테이지의 전제 자원
+```json
+{
+  "id": "stage-prereqs",
+  "kind": "custom",
+  "label": "스테이지가 참조하는 이미지 태그·시크릿·SA 권한이 실재하는가",
+  "covers": ["*-job", "*-stage", "*-workflow"],
+  "command": "aws ecr describe-images --repository-name \"$ECR_REPO\" --image-ids imageTag=\"$TAG\" >/dev/null 2>&1 || echo \"참조 태그 없음: $ECR_REPO:$TAG (스테이지가 뜨지 못한다)\"; kubectl get secret \"$SECRET\" >/dev/null 2>&1 || echo \"시크릿 없음: $SECRET\"; kubectl auth can-i create jobs --as=system:serviceaccount:\"$NS\":\"$SA\" >/dev/null 2>&1 || echo \"SA 권한 부족: $SA\""
+}
+```
+> ⚠ 이 검사는 **스테이지 자신이 먼저 하는 것이 더 낫다**(SPEC-041 ③). 스테이지가 자기 전제를
+> 검사해 `--record <asset> INERT "<사유>"`를 남기면, 안 뜬 사실이 초록에 묻히지 않는다.
+> 여기 R9 검사는 그 배선이 아직 없는 동안의 백스톱이다.

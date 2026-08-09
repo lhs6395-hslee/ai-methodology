@@ -15,6 +15,71 @@
 
 export const CHECK_KINDS = ["terraform", "kubernetes", "ownership", "custom"];
 
+// ── 등록 축(오프라인) ────────────────────────────────────────────────────────
+// 실측 제보(2026-08-10, qa에이전트 도입): 배포 산출물 8개 결함을 **배포로 하나씩** 발견했다 —
+// ECR 리포 없음 · 경로 가드 · base==HEAD · 크로스계정 ECR API · buildx 캐시 드라이버 ·
+// 아치 불일치(arm64 노드에 amd64 이미지) · 리포 정책 부재 · 이미지에 의존 모듈 누락.
+// 전부 저장소 **밖** 사실이고 전부 로컬 게이트를 green으로 통과했다. R9라는 틀은 있었지만
+// 검사 항목 6건에 이 중 하나도 없었고, **새 산출물을 선언해도 대응 검사를 등록하지 않으면
+// 게이트가 통과**했다 — 틀이 있는 것과 그 틀이 이 산출물을 본다는 것은 다른 사실이다.
+//
+// 이 축이 실행 축과 갈라져야 하는 이유: 실행은 자격증명·네트워크가 필요해 로컬에서 흔히
+// skipped이고 훅에서 위임된다. 등록은 순수 선언 대조라 오프라인에서도 판정된다. 한 축에
+// 묶여 있으면 자격증명이 없는 순간 등록 누락까지 함께 안 보인다 — 그게 제보의 구조다.
+
+// 배포 산출물 식별 **권장** 마커 — Artifact 키에 이 토큰이 있으면 "저장소 밖에 실재하는 것"으로 본다.
+// ⚠ 이것은 **기본값이 아니라 붙여넣을 목록**이다. 조용한 기본값으로 쓰면 프로젝트 어휘와 어긋난
+// 순간 0건이 나오고 그 0은 진짜 0과 구분되지 않는다(SPEC-040 ②가 언어 편향에서 배운 것). 그래서
+// `deployArtifactMarkers` 미선언은 게이트가 INERT로 자백하고, 저자는 이 목록을 복사해 시작한다.
+export const RECOMMENDED_DEPLOY_ARTIFACT_MARKERS = [
+  "image", "container", "registry", "ecr", "gcr", "acr", "docker",
+  "deployment", "statefulset", "daemonset", "cronjob", "k8s", "kubernetes", "helm",
+  "lambda", "function", "service", "ingress", "pipeline", "stage", "workflow", "job",
+];
+
+// 키가 배포 산출물인가 — 소문자 부분 문자열 매치(경계 없음: qa-runner-image도 잡아야 한다).
+export function isDeployArtifact(key, markers) {
+  const k = String(key || "").toLowerCase();
+  return (markers || []).some((m) => k.includes(String(m).toLowerCase()));
+}
+
+// 검사가 이 키를 담당하는가. covers는 키 또는 글롭 목록이며, 미선언 검사는 아무것도 담당하지
+// 않는다 — 담당 선언 없는 검사를 커버로 세면 "검사가 하나라도 있으면 통과"가 되고, 그건 제보가
+// 지적한 바로 그 상태다(틀은 있는데 이 산출물은 아무도 안 본다).
+function checkCovers(check, key, matcher) {
+  const covers = Array.isArray(check && check.covers) ? check.covers : [];
+  const k = String(key || "").trim().toLowerCase();
+  return covers.some((c) => {
+    const pat = String(c || "").trim();
+    if (!pat) return false;
+    if (pat.toLowerCase() === k) return true;
+    if (GLOBBY.test(pat)) { try { return matcher(pat).test(String(key)); } catch { return false; } }
+    return false;
+  });
+}
+const GLOBBY = /[*?]/;
+
+// 선언된 배포 산출물 × 등록된 검사 → 미검사 산출물 목록.
+//   declared: [{specId, key}] — 스펙별 Artifacts 키(호출자가 수집)
+//   반환 {covered:[{specId,key,by}], uncovered:[{specId,key}], scanned:<배포 산출물 총수>}
+export function liveRealityCoverage(declared, checks, markers, matcher) {
+  const covered = [], uncovered = [];
+  let scanned = 0;
+  for (const d of declared || []) {
+    if (!isDeployArtifact(d.key, markers)) continue;
+    scanned += 1;
+    const by = (checks || []).find((c) => checkCovers(c, d.key, matcher));
+    if (by) covered.push({ ...d, by: String(by.id || "") });
+    else uncovered.push(d);
+  }
+  return { covered, uncovered, scanned };
+}
+
+// 등록 축 강도 처분 — 미검사 산출물만 위반이다(실행 실패는 실행 축의 몫이고 여기선 세지 않는다).
+export function liveRealityCoverageVerdict(policy, uncovered) {
+  return { blocking: policy === "hard" && uncovered.length > 0, violations: uncovered.length };
+}
+
 // checks config 무결성 — id 필수·유일, command 필수, kind는 알려진 값(미지정 시 custom).
 // 반환: 에러 문자열 배열(빈 배열 = 정상). 순수.
 export function validateChecks(checks) {
@@ -28,6 +93,9 @@ export function validateChecks(checks) {
     if (!String((c && c.command) || "").trim()) errors.push(`liveRealityChecks[${i}] "${id}" — command 필요(빈 값 불가)`);
     const kind = String((c && c.kind) || "custom").trim();
     if (!CHECK_KINDS.includes(kind)) errors.push(`liveRealityChecks[${i}] "${id}" — 알 수 없는 kind "${kind}"(${CHECK_KINDS.join("|")})`);
+    if (c && c.covers !== undefined && !Array.isArray(c.covers)) {
+      errors.push(`liveRealityChecks[${i}] "${id}" — covers는 배열이어야 한다(담당 산출물 키·글롭 목록)`);
+    }
   });
   return errors;
 }

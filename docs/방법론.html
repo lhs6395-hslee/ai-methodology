@@ -485,6 +485,25 @@
   <p class="note">이전 화면에서 R7은 <code>✓ clean</code>이었다. 줄 수만 세면 18종이 전부 검증된 것처럼 읽힌다 — 실제로 검증된 것은 15종이다. <strong>"전부 sync ✓"라는 문장은 분모를 밝히지 않으면 거짓말에 가깝다.</strong></p>
   <p>강제의 세기는 신중히 골랐다. <code>--strict</code>가 막는 것은 <strong>위반</strong>과 <strong>미판정</strong>뿐이다. <code>OFF</code>·<code>INERT</code>·<code>SKIPPED</code>는 막지 않는다 — 채택 중인 프로젝트는 소스·매니페스트를 아직 안 갖췄고, 그 상태를 벽으로 막으면 사람이 정책을 통째로 끈다(<em>우회를 유발하는 강제는 강제가 아니다</em>). 대신 <strong>매 실행 집계에 남아</strong> 조용히 사라지지 않는다.</p>
 
+  <h4>틀이 있는 것과 그 틀이 이 산출물을 본다는 것</h4>
+  <p>저장소 <em>밖</em>을 보는 게이트(R9)는 이미 있었다. 그런데 <strong>새 배포 산출물을 선언할 때 대응 검사 등록을 요구하지 않으면</strong> 그 산출물은 여전히 아무도 보지 않는다. 실측에서 배포 산출물 결함 8건이 <strong>배포로 하나씩</strong> 발견됐다:</p>
+  <pre>ECR 리포 없음 → 경로 가드 → base==HEAD → 크로스계정 ECR API →
+buildx 캐시 드라이버 → <span class="r">아치 불일치(arm64 노드에 amd64 이미지)</span> →
+리포 정책 부재 → <span class="r">이미지에 의존 모듈 누락</span></pre>
+  <p>전부 저장소 밖 사실이고, 전부 로컬 게이트를 <strong>초록으로</strong> 통과했다. R9 검사 항목 6건에 이 중 <strong>하나도 없었다.</strong></p>
+  <p>그래서 R9를 두 축으로 가른다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>축</th><th>묻는 것</th><th>필요한 것</th><th>언제 도나</th></tr>
+    <tr><td><strong>등록</strong></td><td>이 배포 산출물을 <em>보는 검사가 있는가</em></td><td>선언 대조뿐</td><td class="pass">오프라인 포함 <strong>언제나</strong></td></tr>
+    <tr><td><strong>실행</strong></td><td>그 검사가 <em>라이브를 봤는가</em></td><td>자격증명·네트워크</td><td>있을 때만(없으면 skipped)</td></tr>
+  </table></div>
+  <p class="note"><strong>정책까지 갈라야 한다</strong>는 것이 이 설계의 핵심이다. 실행은 자격증명이 없어 흔히 off이거나 훅에서 위임된다 — 한 정책에 묶여 있으면 <strong>실행을 끄는 순간 등록 누락까지 함께 안 보인다.</strong> 그게 제보가 만난 구조다. 그리고 담당 선언(<code>covers</code>) 없는 검사는 아무것도 커버하지 않는다: 그걸 커버로 세면 <em>"검사가 하나라도 있으면 통과"</em>가 되고, 그건 이 결함의 다른 이름이다.</p>
+  <p>표준 검사 4종 — <strong>아치 일치</strong> · <strong>레지스트리 계정과 리포 정책</strong> · <strong>엔트리포인트 dry-run</strong>(이미지 안에 실제로 들어 있는가) · <strong>스테이지 전제 자원</strong> — 은 붙여넣을 형태로 프리셋에 있다. 프로젝트마다 다시 발명하면 같은 8건을 각자 다시 겪는다.</p>
+
+  <h4>"단위테스트 통과"와 "배포본에서 실제 실행됨"</h4>
+  <p>아치 불일치와 이미지 안 모듈 누락은 <strong>저장소 안 테스트가 100% green이어도 남는다.</strong> 깨지는 곳이 배포된 이미지의 런타임이고, 테스트는 거기 닿지 않기 때문이다. 그래서 배포 산출물을 <strong>소유한</strong> 스펙의 배포 대상 주장은 배포 등급 증거(smoke·e2e·live·runbook 또는 실행 원장 기록)를 요구한다.</p>
+  <p class="note">⚠ 트리거는 <strong>소유와 주장 둘 다</strong>여야 한다. 마커만으로 걸었더니 킷 시운전에서 31건이 쏟아졌다 — 배포 가드의 <em>판정 로직</em>처럼 배포를 <strong>다루기만 하는</strong> 스펙까지 잡힌 것이고, 그런 스펙의 정답 증거는 단위테스트가 맞다. <strong>소유 없는 마커는 화제이지 대상이 아니다.</strong></p>
+
   <h4>존재는 실행이 아니다 — 조용히 사라진 검증</h4>
   <p>같은 함정이 게이트 <em>밖에서도</em> 일어난다. 소비 프로젝트 실측에서 검증 절차가 <strong>세 번 조용히 사라졌다</strong>:</p>
   <div class="tablewrap"><table>

@@ -96,3 +96,4 @@
 | 2026-08-03 | `RATCHETED_POLICIES`에 `duplicateLogicPolicy` 등재(24→25). Node·Python 동시 | SPEC-038 신설 동반. 앞 라운드에 명시한 규칙("새 정책을 만들면 여기에도 등재한다")을 같은 커밋에서 지킨다 — 감시 밖 knob은 하향이 조용히 통과한다 |
 | 2026-08-04 | `RATCHETED_POLICIES`에 `coversBacklinkPolicy` 등재(25→26). Node·Python 동시 | SPEC-039 신설 동반 — "새 정책을 만들면 여기에도 등재한다"를 같은 커밋에서 지킨다 |
 | 2026-08-09 | 래칫 목록에 `verificationRunPolicy` 추가(26→27) | SPEC-041 동반. 래칫 목록은 **판정 데이터**라 새 강도 knob이 등재되지 않으면 그 knob만 조용히 하향 가능해진다(도입 시 누락이 실측으로 두 번 있었다 — `outOfBandDeployPolicy`·`changeLogFrRefPolicy`) |
+| 2026-08-09 | 래칫 목록에 `liveRealityCoveragePolicy` 추가(27→28) | SPEC-032 등록 축 동반. **래칫 전수성 게이트가 이 누락을 스스로 잡았다** — 킷 config의 강도 enum knob이 감시 밖에 있으면 그 knob만 조용히 하향 가능해지고, 도입 시 누락은 이미 세 번 실측됐다(outOfBandDeploy·changeLogFrRef·verificationRun) |

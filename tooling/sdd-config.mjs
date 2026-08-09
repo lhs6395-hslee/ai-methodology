@@ -136,6 +136,20 @@ export const DEFAULTS = {
   // config에 둔다(원장은 gitignore라 체크아웃마다 사라진다). 실행됨으로 세지 않고 사유 있는 부채로
   // 계상하므로 면제가 아니다 — 침묵을 사유 있는 미실행으로 바꿀 뿐이고, 실제 기록이 있으면 그쪽이 이긴다.
   verificationRunEnvBound: {},
+  // ── 라이브 대조 등록 축(SPEC-032 확장) ─────────────────────────────────────
+  // 실행 축(liveRealityPolicy)과 **정책을 분리**한다: 실행은 자격증명이 필요해 흔히 off·skipped인데
+  // 등록은 순수 선언 대조라 오프라인에서도 판정된다. 한 정책에 묶으면 실행을 끄는 순간 등록도 꺼지고,
+  // 그러면 새 배포 산출물을 선언해도 아무 검사가 없다는 사실이 보이지 않는다(실측 제보 8건).
+  liveRealityCoveragePolicy: "advisory",
+  // 무엇이 "배포 산출물"인가 — **조용한 기본값을 두지 않는다**(SPEC-040 ②). 미선언이면 게이트가
+  // inert로 자백한다. 권장 목록은 sdd.config.presets.md §라이브 대조 템플릿에서 복사한다.
+  // ⚠ 이 선언 하나를 SPEC-032(등록 축)와 SPEC-031(증거 등급)이 **함께** 쓴다 — 같은 사실에
+  // 목록이 둘이면 한쪽만 갱신돼 두 게이트가 다른 답을 낸다.
+  deployArtifactMarkers: null,
+  // 배포 등급 증거로 인정할 경로 패턴 — "단위테스트 통과"와 "배포본에서 실제 실행됨"은 다른 사실이다.
+  deployEvidencePatterns: null,
+  // 주장이 배포 대상을 말하는지 판정할 마커(주장 라인에서만 탐색 — 브라우저 마커 동형).
+  deployMarkers: null,
   coversBacklinkPolicy: "advisory",
   // 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
   coversBacklinkListCap: 12,

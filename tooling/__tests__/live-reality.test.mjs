@@ -13,7 +13,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { validateChecks, classifyResult, summarize } from "../live-reality-lib.mjs";
+import {
+  validateChecks, classifyResult, summarize,
+  isDeployArtifact, liveRealityCoverage, liveRealityCoverageVerdict, RECOMMENDED_DEPLOY_ARTIFACT_MARKERS,
+} from "../live-reality-lib.mjs";
+import { compileGlob } from "../spec-sync-lib.mjs";
 
 const GATE = new URL("../check-live-reality.mjs", import.meta.url).pathname;
 
@@ -71,7 +75,7 @@ function run(root) {
 
 test("게이트: off → 판정 안 함 exit 0", () => {
   const root = fixture({});
-  try { const r = run(root); assert.equal(r.code, 0); assert.match(r.out, /off \(판정 안 함\)/); }
+  try { const r = run(root); assert.equal(r.code, 0); assert.match(r.out, /off \(실행 축 판정 안 함\)/); }
   finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -127,4 +131,69 @@ test("게이트: hard인데 검사 0건 → inert 거짓 안전 차단 / 잘못�
   const badPol = fixture({ liveRealityPolicy: "strict" });
   try { const r = run(badPol); assert.equal(r.code, 1); assert.match(r.out, /liveRealityPolicy 값 위반/); }
   finally { rmSync(badPol, { recursive: true, force: true }); }
+});
+
+// ── 등록 축(SPEC-032 확장) — 제보 (1)+(3) ────────────────────────────────────
+// 실측: qa에이전트 도입에서 배포 산출물 결함 8건을 **배포로 하나씩** 발견했다. R9 틀은 있었지만
+// 검사 6건에 그 중 하나도 없었고, 새 산출물을 선언해도 대응 검사 없이 게이트가 통과했다.
+test("담당 선언(covers) 없는 검사는 아무것도 커버하지 않는다 — '검사가 하나라도 있으면 통과'가 제보의 상태다", () => {
+  const declared = [{ specId: "S1", key: "qa-runner-image" }];
+  const M = RECOMMENDED_DEPLOY_ARTIFACT_MARKERS;
+  // covers 미선언 검사가 등록돼 있어도 커버로 세지 않는다.
+  const a = liveRealityCoverage(declared, [{ id: "tf-drift", command: "x" }], M, compileGlob);
+  assert.deepEqual(a.uncovered.map((u) => u.key), ["qa-runner-image"]);
+  // 담당을 선언하면 커버된다(정확·글롭 둘 다).
+  assert.equal(liveRealityCoverage(declared, [{ id: "arch", covers: ["qa-runner-image"] }], M, compileGlob).uncovered.length, 0);
+  assert.equal(liveRealityCoverage(declared, [{ id: "arch", covers: ["*-image"] }], M, compileGlob).uncovered.length, 0);
+});
+
+test("배포 산출물만 대상이다 — 저장소 안 산출물은 등록을 요구하지 않는다", () => {
+  const M = RECOMMENDED_DEPLOY_ARTIFACT_MARKERS;
+  assert.equal(isDeployArtifact("qa-runner-image", M), true);
+  assert.equal(isDeployArtifact("sdd/OWNERSHIP_MAP.md", M), false);
+  const r = liveRealityCoverage(
+    [{ specId: "S1", key: "sdd/OWNERSHIP_MAP.md" }, { specId: "S2", key: "qa-job" }], [], M, compileGlob);
+  assert.equal(r.scanned, 1);                       // 맵 문서는 세지 않는다
+  assert.deepEqual(r.uncovered.map((u) => u.key), ["qa-job"]);
+});
+
+test("등록 축은 미검사 산출물만 위반으로 센다 — 실행 실패는 실행 축의 몫이다", () => {
+  assert.equal(liveRealityCoverageVerdict("hard", [{}]).blocking, true);
+  assert.equal(liveRealityCoverageVerdict("advisory", [{}]).blocking, false);
+  assert.equal(liveRealityCoverageVerdict("advisory", [{}]).violations, 1);
+  assert.equal(liveRealityCoverageVerdict("hard", []).blocking, false);
+});
+
+test("게이트 e2e: 마커 미선언 → 등록 축 inert(조용한 기본값 금지) / 선언 후 미검사 산출물 지목", () => {
+  const SPEC = "**Spec**: `SPEC-001`\n## Ownership\n- **Artifacts**: qa-runner-image\n";
+  const bare = fixture({ liveRealityPolicy: "off" });
+  try {
+    writeFileSync(join(bare, "sdd/specs/SPEC-001.md"), SPEC);
+    const r = run(bare);
+    assert.match(r.out, /등록 축 판정 불가: deployArtifactMarkers 미선언/);
+  } finally { rmSync(bare, { recursive: true, force: true }); }
+
+  const declared = fixture({ liveRealityPolicy: "off", deployArtifactMarkers: ["image"] });
+  try {
+    writeFileSync(join(declared, "sdd/specs/SPEC-001.md"), SPEC);
+    const r = run(declared);
+    assert.match(r.out, /미검사 산출물: \[SPEC-001\] qa-runner-image/);
+    assert.match(r.out, /판정: JUDGED — 위반 1건/);   // 실행이 off여도 등록 축은 판정했다
+    assert.equal(r.code, 0);                          // advisory라 차단은 아니다
+  } finally { rmSync(declared, { recursive: true, force: true }); }
+});
+
+test("등록 축 hard → 미검사 산출물이 차단한다(실행 축이 off여도)", () => {
+  const root = fixture({ liveRealityPolicy: "off", liveRealityCoveragePolicy: "hard", deployArtifactMarkers: ["image"] });
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), "**Spec**: `SPEC-001`\n## Ownership\n- **Artifacts**: qa-runner-image\n");
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /틀이 있는 것과 그 틀이 이 산출물을 본다는 것은 다른 사실이다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("covers가 배열이 아니면 설정 오류로 막는다 — 문법화", () => {
+  assert.deepEqual(validateChecks([{ id: "a", command: "x", covers: "qa-image" }]).length, 1);
+  assert.equal(validateChecks([{ id: "a", command: "x", covers: ["qa-image"] }]).length, 0);
 });

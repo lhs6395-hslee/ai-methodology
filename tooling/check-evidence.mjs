@@ -14,7 +14,14 @@ import { evidenceFindings, DEFAULT_BROWSER_MARKERS } from "./evidence-lib.mjs";
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
 
+import { parseSection } from "./ownership-keys.mjs";
+import { isDeployArtifact } from "./live-reality-lib.mjs";
+
 const cfg = loadConfig();
+// 배포 산출물 마커 — SPEC-032의 등록 축과 **같은 선언**을 쓴다(같은 사실에 목록이 둘이면 갈라진다).
+// 미선언이면 이 축은 발화하지 않는다(조용한 기본값 금지 — SPEC-040 ②).
+const DEPLOY_MARKERS = Array.isArray(cfg.deployArtifactMarkers) && cfg.deployArtifactMarkers.length
+  ? cfg.deployArtifactMarkers : null;
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const POLICY = String(cfg.executionEvidencePolicy ?? "off");
@@ -75,7 +82,13 @@ function specUnits() {
       const sc = t.match(/\*\*((?:SC|NFR)-\d{3}[a-z]?)\*\*/);
       if (sc) claims.push({ id: sc[1], kind: sc[1].startsWith("N") ? "NFR" : "SC", text: t });
     }
-    return { specId, claims };
+    // 이 스펙이 **배포 산출물을 소유**하는가 — 증거 등급 분리의 트리거 절반(SPEC-031 FR 확장).
+    // 마커만으로 걸면 배포를 *다루는* 스펙(가드 로직 등)까지 잡힌다. 소유가 대상성을 가른다.
+    const artiCat = (cfg.__roles && cfg.__roles.artifact) || "Artifacts";
+    const ownsDeployArtifact = DEPLOY_MARKERS
+      ? (parseSection(text, "Ownership", [artiCat])[artiCat] || []).some((k) => isDeployArtifact(k, DEPLOY_MARKERS))
+      : false;
+    return { specId, claims, ownsDeployArtifact };
   });
 }
 
@@ -103,7 +116,8 @@ const manifestOf = (specId, claimId) =>
   (/^(SC|NFR)-/.test(claimId) ? EVID : SMOKE).get(`${specId}/${claimId}`) || null;
 
 const units = specUnits();
-const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS, manifestOf });
+const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS,
+  deployMarkers: cfg.deployMarkers, deployPatterns: cfg.deployEvidencePatterns, manifestOf });
 const claimCount = units.reduce((n, u) => n + u.claims.length, 0);
 
 judged(findings.length);

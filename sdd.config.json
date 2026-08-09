@@ -121,6 +121,22 @@
   "relationTypes": [
     "references"
   ],
+  "deployArtifactMarkers": [
+    "workflow"
+  ],
+  "liveRealityCoveragePolicy": "hard",
+  "liveRealityPolicy": "advisory",
+  "liveRealityChecks": [
+    {
+      "id": "ci-workflow-live",
+      "kind": "custom",
+      "label": "CI 워크플로가 원격에 실제로 배선돼 있는가(최근 실행 존재)",
+      "covers": [
+        ".github/workflows/**"
+      ],
+      "command": "gh run list --workflow=sdd-gates.yml --limit 1 --json databaseId >/dev/null 2>&1 || exit 3"
+    }
+  ],
   "verificationRunPolicy": "hard",
   "verificationRunLedger": ".sdd/verification-runs.jsonl",
   "verificationRunEnvBound": {

@@ -123,6 +123,10 @@ DEFAULTS = {
     "verificationRunListCap": 12,
     "verificationRunTestAssets": None,
     "verificationRunEnvBound": {},
+    "liveRealityCoveragePolicy": "advisory",
+    "deployArtifactMarkers": None,
+    "deployEvidencePatterns": None,
+    "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
     "hooksInstalledPolicy": "advisory",
@@ -239,6 +243,7 @@ RATCHETED_POLICIES = [
     "duplicateLogicPolicy",
     "coversBacklinkPolicy",
     "verificationRunPolicy",
+    "liveRealityCoveragePolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -1511,6 +1516,19 @@ DEFAULT_BROWSER_MARKERS = [
 ]
 DEFAULT_BROWSER_EVIDENCE_PATTERNS = ["e2e", "playwright", "cypress", "puppeteer", "selenium", "browser"]
 
+# 배포 등급 증거(evidence-lib.mjs 패리티) — "단위테스트 통과"와 "배포본에서 실제 실행됨"은 다른 사실이다.
+# 실측(2026-08-10 qa에이전트): 아치 불일치·이미지 안 모듈 누락은 단위테스트 100% 통과해도 남는다.
+DEFAULT_DEPLOY_EVIDENCE_PATTERNS = ["smoke", "e2e", "live", "deploy", "runbook", "canary", "staging"]
+DEFAULT_DEPLOY_MARKERS = [
+    "이미지", "컨테이너", "레지스트리", "배포", "파이프라인", "스테이지", "클러스터", "노드",
+    "image", "container", "registry", "deploy", "pipeline", "stage", "cluster", "node", "helm",
+]
+
+
+def is_deploy_grade_evidence(path, patterns):
+    p = str(path or "").lower()
+    return any(str(x).lower() in p for x in (patterns if patterns else DEFAULT_DEPLOY_EVIDENCE_PATTERNS))
+
 
 _ASCII_ONLY = re.compile(r"^[\x00-\x7F]+$")
 
@@ -1558,10 +1576,12 @@ def is_browser_grade_evidence(path, patterns):
 
 
 def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, browser_patterns=None,
-                      manifest_of=None):
+                      manifest_of=None, deploy_markers=None, deploy_patterns=None):
     vs = verbs if verbs else DEFAULT_EXECUTION_VERBS
     bpat = browser_patterns if browser_patterns else DEFAULT_BROWSER_EVIDENCE_PATTERNS
     bmark = browser_markers if browser_markers else DEFAULT_BROWSER_MARKERS
+    dpat = deploy_patterns if deploy_patterns else DEFAULT_DEPLOY_EVIDENCE_PATTERNS
+    dmark = deploy_markers if deploy_markers else DEFAULT_DEPLOY_MARKERS
     man_of = manifest_of if callable(manifest_of) else (lambda s, c: None)
     out = []
     for u in units or []:
@@ -1590,6 +1610,12 @@ def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, bro
                 if any(marker_hits(low, m) for m in bmark) and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"]):
                     out.append((u["specId"], c["id"], c["kind"], "browser-needs-ui-evidence",
                                 f"UI/브라우저 대상인데 증거가 브라우저 등급 아님({', '.join(tag['paths'])}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다"))
+                # 트리거는 **소유 + 주장** 둘 다다 — 마커만 걸면 배포를 *다루는* 스펙까지 잡힌다.
+                if (u.get("ownsDeployArtifact")
+                        and any(marker_hits(low, m) for m in dmark)
+                        and not any(is_deploy_grade_evidence(p, dpat) for p in tag["paths"])):
+                    out.append((u["specId"], c["id"], c["kind"], "deploy-needs-live-evidence",
+                                f"배포 산출물 대상인데 증거가 배포 등급 아님({', '.join(tag['paths'])}) — 저장소 안 단위테스트는 배포본의 아치·이미지 내용·전제 자원에 닿지 않는다(smoke·e2e·live·runbook 등급 증거 또는 실행 원장 기록으로 올려라)"))
                 continue
             if c["kind"] == "SC" and has_execution_verb(c["text"], vs):
                 out.append((u["specId"], c["id"], c["kind"], "exec-verb-no-evidence",
@@ -1599,6 +1625,63 @@ def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, bro
 
 # ─── 라이브 대조 (SPEC-032) — live-reality-lib.mjs 미러 ───
 CHECK_KINDS = ["terraform", "kubernetes", "ownership", "custom"]
+
+
+# ── 라이브 대조 등록 축(live-reality-lib.mjs 패리티, SPEC-032 확장) ──
+# 실측 제보(2026-08-10 qa에이전트): 배포 산출물 결함 8건을 **배포로 하나씩** 발견했다. R9 틀은
+# 있었지만 검사 6건에 그 중 하나도 없었고, 새 산출물을 선언해도 대응 검사 없이 게이트가 통과했다.
+# 등록은 순수 선언 대조라 오프라인에서도 판정된다 — 실행 축과 정책을 분리하는 이유다.
+RECOMMENDED_DEPLOY_ARTIFACT_MARKERS = [
+    "image", "container", "registry", "ecr", "gcr", "acr", "docker",
+    "deployment", "statefulset", "daemonset", "cronjob", "k8s", "kubernetes", "helm",
+    "lambda", "function", "service", "ingress", "pipeline", "stage", "workflow", "job",
+]
+
+
+def is_deploy_artifact(key, markers):
+    k = str(key or "").lower()
+    return any(str(m).lower() in k for m in (markers or []))
+
+
+def _check_covers(check, key, matcher):
+    """담당 선언(covers) 없는 검사는 아무것도 커버하지 않는다 — 그걸 커버로 세면
+    '검사가 하나라도 있으면 통과'가 되고, 그게 제보가 지적한 상태다."""
+    covers = check.get("covers") if isinstance(check, dict) else None
+    if not isinstance(covers, list):
+        return False
+    k = str(key or "").strip().lower()
+    for c in covers:
+        pat = str(c or "").strip()
+        if not pat:
+            continue
+        if pat.lower() == k:
+            return True
+        if re.search(r"[*?]", pat):
+            try:
+                if matcher(pat).search(str(key)):
+                    return True
+            except Exception:  # noqa: BLE001
+                pass
+    return False
+
+
+def live_reality_coverage(declared, checks, markers, matcher):
+    """반환 (covered, uncovered, scanned). declared: [(spec_id, key)]"""
+    covered, uncovered, scanned = [], [], 0
+    for spec_id, key in declared or []:
+        if not is_deploy_artifact(key, markers):
+            continue
+        scanned += 1
+        by = next((c for c in (checks or []) if _check_covers(c, key, matcher)), None)
+        if by:
+            covered.append((spec_id, key, str(by.get("id") or "")))
+        else:
+            uncovered.append((spec_id, key))
+    return covered, uncovered, scanned
+
+
+def live_reality_coverage_verdict(policy, uncovered):
+    return policy == "hard" and len(uncovered) > 0, len(uncovered)
 
 
 def validate_checks(checks):
@@ -1616,6 +1699,8 @@ def validate_checks(checks):
         kind = str((c or {}).get("kind") or "custom").strip()
         if kind not in CHECK_KINDS:
             errors.append(f'liveRealityChecks[{i}] "{cid}" — 알 수 없는 kind "{kind}"({"|".join(CHECK_KINDS)})')
+        if isinstance(c, dict) and c.get("covers") is not None and not isinstance(c.get("covers"), list):
+            errors.append(f'liveRealityChecks[{i}] "{cid}" — covers는 배열이어야 한다(담당 산출물 키·글롭 목록)')
     return errors
 
 
@@ -4482,9 +4567,18 @@ def cmd_evidence(cfg):
             if sc:
                 claims.append({"id": sc.group(1),
                                "kind": "NFR" if sc.group(1).startswith("N") else "SC", "text": t})
-        units.append({"specId": spec_id, "claims": claims})
+        # 이 스펙이 **배포 산출물을 소유**하는가 — 증거 등급 분리의 트리거 절반(SPEC-031 확장).
+        # 마커만으로 걸면 배포를 *다루는* 스펙(가드 로직 등)까지 잡힌다. 소유가 대상성을 가른다.
+        dep_markers = cfg.get("deployArtifactMarkers")
+        dep_markers = dep_markers if isinstance(dep_markers, list) and dep_markers else None
+        arti_cat = (cfg.get("__roles") or {}).get("artifact") or "Artifacts"
+        owns_deploy = bool(dep_markers) and any(
+            is_deploy_artifact(k, dep_markers)
+            for k in (parse_section(text, "Ownership", [arti_cat]).get(arti_cat) or []))
+        units.append({"specId": spec_id, "claims": claims, "ownsDeployArtifact": owns_deploy})
 
-    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of)
+    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of,
+                                 cfg.get("deployMarkers"), cfg.get("deployEvidencePatterns"))
     claim_count = sum(len(u["claims"]) for u in units)
     judged(len(findings))
     print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")
@@ -4505,10 +4599,57 @@ def cmd_livereality(cfg):
         print(f'✗ liveRealityPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
         sys.exit(1)
     checks = cfg.get("liveRealityChecks") or []
+
+    # ── 축 ①: 등록(오프라인) — 실행 축과 **정책도 분리**한다(check-live-reality.mjs 패리티).
+    cov_policy = str(cfg.get("liveRealityCoveragePolicy") or "advisory")
+    if cov_policy not in ("off", "advisory", "hard"):
+        print(f'✗ liveRealityCoveragePolicy 값 위반 "{cov_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    cov_judged, cov_violations, cov_inert = False, 0, []
+    if cov_policy != "off":
+        markers = cfg.get("deployArtifactMarkers")
+        markers = markers if isinstance(markers, list) and markers else None
+        if not markers:
+            cov_inert.append("deployArtifactMarkers 미선언 — 무엇이 배포 산출물인지 이 프로젝트의 어휘를 모른다"
+                             f"(권장 목록: {'·'.join(RECOMMENDED_DEPLOY_ARTIFACT_MARKERS[:6])} … — presets 참조)")
+        else:
+            arti_cat = (cfg.get("__roles") or {}).get("artifact") or "Artifacts"
+            declared = []
+            for file in spec_md_files(cfg, missing_fatal=False):
+                text = read_text(file)
+                m = cfg["__specId"].search(text)
+                spec_id = m.group(0) if m else os.path.basename(file)[:-3]
+                for key in parse_section(text, "Ownership", [arti_cat]).get(arti_cat) or []:
+                    k = str(key).strip()
+                    if k and k not in ("—", "-") and not k.startswith("["):
+                        declared.append((spec_id, k))
+            if not declared:
+                cov_inert.append(f"선언된 {arti_cat} 키 0건 — 대조할 배포 산출물이 없다")
+            else:
+                covered, uncovered, scanned = live_reality_coverage(declared, checks, markers, compile_glob)
+                blocking, cov_violations = live_reality_coverage_verdict(cov_policy, uncovered)
+                cov_judged = True
+                ctag = "✗" if cov_policy == "hard" else "⚠"
+                print(f"등록 축(liveRealityCoveragePolicy={cov_policy}): 배포 산출물 {scanned}건 — "
+                      f"검사 등록됨 {len(covered)}·미검사 {len(uncovered)}")
+                for spec_id, key in uncovered:
+                    print(f"  {ctag} 미검사 산출물: [{spec_id}] {key} — 저장소 밖에 실재하는데 이 산출물을 보는 liveRealityChecks 항목이 없다(검사에 covers로 담당을 선언하라)")
+                if blocking:
+                    print(f"\n✗ liveRealityCoveragePolicy=hard: 배포 산출물 {len(uncovered)}건이 미검사다 — **틀이 있는 것과 그 틀이 이 산출물을 본다는 것은 다른 사실이다**(실측: 새 산출물 8개 결함을 배포로 하나씩 발견). 대응 검사를 등록하라(템플릿: sdd.config.presets.md §라이브 대조).",
+                          file=sys.stderr)
+                    judged(cov_violations)
+                    sys.exit(1)
+
+    # ── 축 ②: 실행(온라인) ──
     if policy == "off":
-        verdict("OFF", "liveRealityPolicy")
-        print("라이브 대조 게이트 — liveRealityPolicy:off (판정 안 함)")
-        sys.exit(0)
+        if cov_judged:
+            judged(cov_violations)
+        else:
+            verdict("OFF", f"liveRealityPolicy{f' · 등록 축 inert({cov_inert[0]})' if cov_inert else ''}")
+        tail = f" · 등록 축 판정 불가: {' / '.join(cov_inert)}" if cov_inert else ""
+        print(f"라이브 대조 게이트 — liveRealityPolicy:off (실행 축 판정 안 함){tail}")
+        sys.exit(1 if (cov_judged and cov_violations and cov_policy == "hard") else 0)
     cfg_errors = validate_checks(checks)
     if cfg_errors:
         print("✗ liveRealityChecks 설정 오류:", file=sys.stderr)
@@ -4536,6 +4677,11 @@ def cmd_livereality(cfg):
             results.append(classify_result({"id": cid, "label": label, "kind": kind,
                                             "exitCode": 1, "stdout": "", "stderr": str(e)}))
     sm = summarize_live(results)
+    # 축이 둘이라 판정 종류도 합산한다 — 등록 축이 판정했으면 이 게이트는 판정한 것이다.
+    if sm["skipped"] and not sm["violations"] and not cov_judged:
+        verdict("SKIPPED", f"검사 {sm['skipped']}건이 실행되지 못했다(자격증명·네트워크)")
+    else:
+        judged(sm["violations"] + cov_violations)
     print(f"라이브 대조 게이트(liveRealityPolicy={policy}): 검사 {len(results)}건 — clean {sm['clean']}·위반 {sm['violations']}(항목 {sm['items']})·skipped {sm['skipped']}")
     tag = "✗" if hard else "⚠"
     for r in results:
