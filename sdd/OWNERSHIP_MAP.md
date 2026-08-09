@@ -205,7 +205,7 @@
 | `verification-run.account` | SPEC-041 | ✓ | ✓ | ✓ |
 | `verification-run.record` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## 역할 없는 카테고리 키 — 16건
+## 역할 없는 카테고리 키 — 17건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -223,12 +223,13 @@
 | `.kiro/steering/sdd.md` | SPEC-004 | ✓ | — | — |
 | `agents.md` | SPEC-004 | ✓ | — | — |
 | `sdd/derivation.json` | SPEC-009 | ✓ | — | — |
+| `sdd/duplicate-candidates.tsv` | SPEC-038 | ✓ | — | — |
 | `sdd/ownership_map.md` | SPEC-028 | ✓ | — | — |
 | `sdd/smoke-manifest.json` | SPEC-007 | ✓ | — | — |
 
 ## 집계
 
-- 소유 키 총 **182건** (entity 42 · surface 80 · capability 44 · 역할없음 16)
+- 소유 키 총 **183건** (entity 42 · surface 80 · capability 44 · 역할없음 17)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

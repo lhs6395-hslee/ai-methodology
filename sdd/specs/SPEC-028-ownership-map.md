@@ -94,3 +94,4 @@
 | 2026-07-30 | `--check` 강제점 확보 — `sdd-sync` R3 스윕에 `gen-ownership-map --check`(읽기 전용) 배선(게이트 항목이 인자를 받도록 하네스 확장, 배선 자체는 SPEC-004 소유) | 실측: 스펙 2개(SPEC-031·032) 추가 직후 맵이 낡았는데 아무 게이트도 잡지 못했다 — `--check`는 있었으나 호출처가 0곳이라 "사람이 기억해야" 했다(도입 당시부터 알려진 구멍). 이제 pre-push·CI가 sdd-sync를 타면 자동 표면화 |
 | 2026-08-02 | 맵 재생성(신규 소유 키 반영: sc-coverage·deploy-guard·hook-wiring) + 이후 맵을 생성물 예외로 편입(SPEC-001) | 맵은 게이트가 재생성하는 산출물이라 smoke-manifest와 같은 클래스인데 예외에서 빠져 있어 재생성마다 이 스펙에 억지 Change Log를 요구했다. **이번 행은 예외가 HEAD에 들어가기 전이라 필요하다** — config 자기보호(SPEC-003)가 HEAD 시점 config로 판정하기 때문 |
 | 2026-08-09 | `gen-ownership-map`이 Ownership 경계를 `bodyBeforeOwnership`(SPEC-001)로 위임 | `check-spec-consistency`와 같은 정규식이 복제돼 있었다(R13 실측). 두 산출물이 같은 경계를 봐야 맵의 FR 라인 수집과 게이트의 근거 대조가 어긋나지 않는다 |
+| 2026-08-09 | 보증 맵 재생성 — SPEC-038이 `sdd/duplicate-candidates.tsv`를 Artifacts·Files로 편입 | 확률적 층 후보 파일을 면제(specSyncExemptGlobs)가 아니라 **소유**로 해소한 결과가 맵에 반영된다. 면제를 늘리는 대신 소유를 주는 쪽이 config 표면 증가 0이고, 그 파일이 어느 스펙의 산출물인지도 남는다 |
