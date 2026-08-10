@@ -19,6 +19,7 @@ import { STATUS_ENUM, parseStatus, isReviewedPlus, hasReviewLogEntry, hasDedupRe
 import { changeLogRationaleFindings } from "./derivation-lib.mjs";
 import { parseModule, frLinesMissingShall, frDeclStyleFindings, dedupReviewDanglingIds } from "./grammar-lib.mjs";
 import { objectStorageFindings } from "./object-storage-lib.mjs";
+import { evidenceScopeFindings } from "./evidence-scope-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -26,6 +27,11 @@ armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) —
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
+const SCOPE_POLICY = String(cfg.evidenceScopePolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(SCOPE_POLICY)) {
+  console.error(`✗ evidenceScopePolicy 값 위반 "${SCOPE_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
 
 // 정본은 sdd-config의 specMdFiles — 세 게이트에 본문 동일로 복붙돼 있던 것(R13 구조 중복).
 const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
@@ -66,6 +72,13 @@ for (const { text, specId } of texts) {
   // 선제 캡처(SPEC-009) — 실기록 Change Log 행의 근거 칸은 빈 값 불가(변경 의도는 저술 시점에만 남는다).
   for (const d of changeLogRationaleFindings(text))
     findings.push({ specId, miss: `Change Log ${d} 행의 근거 칸이 빈 값 — 변경 의도는 저술 시점에만 캡처 가능(선제 캡처)` });
+  // 근거 적용범위(SPEC-043) — **관측은 그 관측이 이루어진 범위까지만 참이다.** 특정 환경을
+  // 지목해 관측을 주장한 근거는 그 결론이 참인 범위를 밝혀야 한다. 실측 제보: 리눅스 1대
+  // (X 서버 없음)에서 한 번 본 것이 보편 규칙으로 승격됐고, 근거 칸이 비지 않았으니 초록이었다.
+  if (SCOPE_POLICY !== "off") {
+    for (const f of evidenceScopeFindings(text, cfg.observationMarkers, cfg.evidenceScopeLabels, cfg.environmentMarkers))
+      findings.push({ specId, hard: SCOPE_POLICY === "hard", miss: `Change Log ${f.date} 행: 근거가 특정 환경(${f.environments.join("·")})에서의 관측을 주장하는데 **관측 범위 표기가 없다** — \`범위: <이 결론이 참인 범위>\`를 근거 칸에 덧붙여라(1대에서 본 것을 보편 규칙으로 올렸는지 되짚을 축이 생긴다)` });
+  }
   // Dedup-Review 이웃 ID 실재(SPEC-013) — 기록 형식 검사의 연장(오타·삭제 잔재 표면화; 내용의 질은 리뷰 몫).
   for (const id of dedupReviewDanglingIds(text, cfg.__specIdRe, knownIds))
     findings.push({ specId, miss: `Dedup-Review가 존재하지 않는 스펙 "${id}" 참조 — 오타/삭제 잔재(삭제된 이웃은 "이웃 없음(삭제됨)"으로 갱신)` });
@@ -96,10 +109,14 @@ if (!files.length) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — s
 else judged(findings.length);
 console.log(`Spec 완전성 게이트: spec ${files.length}개 검사 (FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요).`);
 if (findings.length) {
+  // 개별 축이 hard로 승급되면 --strict 없이도 그 항목은 막는다 — 정책 승급이 실효를 갖지
+  // 못하면 "hard로 올렸다"는 선언이 거짓이 된다(SPEC-027 래칫의 전제).
+  const hardOnes = findings.filter((f) => f.hard);
   const tag = STRICT ? "✗" : "⚠";
   console.log(`${tag} 완전성 미흡 ${findings.length}건:`);
-  for (const f of findings) console.log(`  ${tag} ${f.specId}: ${f.miss}`);
+  for (const f of findings) console.log(`  ${STRICT || f.hard ? "✗" : "⚠"} ${f.specId}: ${f.miss}`);
   if (STRICT) { console.error(`\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요.`); process.exit(1); }
+  if (hardOnes.length) { console.error(`\n✗ hard 승급 축 위반 ${hardOnes.length}건 — 해당 정책이 hard이므로 --strict 없이도 막는다.`); process.exit(1); }
   process.exit(0);
 }
 console.log(`✓ 완전성 구비 — SC·인수조건·수명주기·근거 기록 모두 충족.`);

@@ -129,6 +129,15 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "termGlossary": [],
+    "termCoveragePolicy": "advisory",
+    "termCoverageListCap": 12,
+    "externalTargetPolicy": "advisory",
+    "externalTargetListCap": 12,
+    "evidenceScopePolicy": "advisory",
+    "observationMarkers": None,
+    "evidenceScopeLabels": None,
+    "environmentMarkers": None,
     "hooksInstalledPolicy": "advisory",
     "syncHookRules": None,
     "syncHookDelegatedTo": "",
@@ -921,6 +930,7 @@ def cmd_fr(cfg, strict):
     all_repo_files = walk_all_rel(root, cfg)
     test_infra_globs = [compile_glob(g) for g in (cfg.get("testInfraGlobs") or [])]  # SPEC-015
     prefix_class_warnings = []
+    ownership_units = []  # {specId, specText, files} — 결정 입도 판정 입력(SPEC-044)
     for f in spec_md_names:
         m = cfg["__specId"].search(f)
         if not m:
@@ -930,8 +940,11 @@ def cmd_fr(cfg, strict):
         text = read_text(os.path.join(spec_dir, f))
         globs = [compile_glob(g) for g in
                  (strip_inline_comment(x) for x in parse_section(text, "Ownership", ["Files"])["Files"]) if g]
-        owned = sorted(p for p in all_repo_files
-                       if not is_test_file(os.path.basename(p), cfg) and any(rx.search(p) for rx in globs)) if globs else []
+        matched_files = sorted(p for p in all_repo_files if any(rx.search(p) for rx in globs)) if globs else []
+        owned = [p for p in matched_files if not is_test_file(os.path.basename(p), cfg)]
+        # 결정 입도 축(SPEC-044)은 테스트도 본다 — 실측 사례의 BASE_URL 폴백은 e2e 설정에 있었다.
+        if matched_files:
+            ownership_units.append({"specId": sid, "specText": text, "files": matched_files})
         finding = prefix_class_finding(pfx, owned, class_globs)
         exempted = bool(str(exemptions.get(sid) or "").strip())
         if finding and finding[0] == "error":
@@ -967,6 +980,7 @@ def cmd_fr(cfg, strict):
     fr_decls = {}  # SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — set은 중복을 삼킨다)
     cl_refs = {}   # SPEC-ID -> (declared, retired) — SPEC-037 판정 소스(새 검사·결번 문구 공용)
     fr_evidence = {}   # "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
+    fr_text = {}       # "SPEC/FR" -> FR 선언 라인 원문 (SPEC-042 의미 커버리지 입력)
     cover_tags = []    # {file, specId, frId} — 양방향 결속 판정 입력
     for f in spec_names:
         if not (f.endswith(".md") and any(f.startswith(p + "-") for p in cfg["__prefixes"])):
@@ -988,6 +1002,7 @@ def cmd_fr(cfg, strict):
             paths2 = evidence_paths_of(t2)
             if paths2:
                 fr_evidence[f"{m.group(0)}/{fr2.group(1)}"] = paths2
+            fr_text.setdefault(f"{m.group(0)}/{fr2.group(1)}", t2)
         cl_refs[m.group(0)] = change_log_fr_refs(text, cfg["__reqAlt"], cfg["__idAlt"], {
             "neu": cfg.get("changeLogNewVerbs"), "rev": cfg.get("changeLogReviseVerbs"),
             "ret": cfg.get("changeLogRetireVerbs")})
@@ -1014,6 +1029,8 @@ def cmd_fr(cfg, strict):
     cover_seen = set()
     runnable_covered = set()
     bad_refs = []
+    cover_files = {}      # "SPEC/FR" -> [파일 경로] — 의미 커버리지 입력(SPEC-042)
+    cover_file_text = {}  # 파일 경로 -> 본문(태그가 있는 파일만 보관)
     for scan in cfg["scanDirs"]:
         for file in walk_tests(resolve(cfg, scan), cfg):
             text = read_text(file)
@@ -1022,6 +1039,9 @@ def cmd_fr(cfg, strict):
                 key = f"{spec}/{fr}"
                 cover_tags.append({"file": rel_from_root(cfg, file), "specId": spec, "frId": fr})
                 cover_seen.add(key)
+                if file not in cover_files.setdefault(key, []):
+                    cover_files[key].append(file)
+                cover_file_text.setdefault(file, text)
                 if not is_e2e_file(file, cfg):
                     runnable_covered.add(key)
                 if spec not in specs or fr not in specs[spec]:
@@ -1093,6 +1113,75 @@ def cmd_fr(cfg, strict):
                   "없어 대조할 축이 없다. 표기하면 그 FR은 이 검사의 보호를 받는다.")
         if not mism:
             print("  ✓ 결속 불일치 0건 — 태그와 FR이 서로를 인정한다(미표기는 위 별도 집계).")
+
+    # R1c: 의미 커버리지(SPEC-042) — @covers는 "인용했다"이지 "시험했다"가 아니다.
+    tc_policy = str(cfg.get("termCoveragePolicy") or "advisory")
+    if tc_policy not in ("off", "advisory", "hard"):
+        print(f'✗ termCoveragePolicy 값 위반 "{tc_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if tc_policy != "off":
+        glossary = cfg.get("termGlossary") or []
+        if not glossary:
+            print(f"의미 커버리지(termCoveragePolicy={tc_policy}): **용어집 미선언 — 판정하지 않는다**."
+                  " termGlossary에 FR이 이름 대는 프로토콜·외부 시스템·제품명을 등록하면"
+                  ' "그 이름이 커버 파일에 없다"를 대조한다(킷은 산문에서 고유명사를 자동 추출하지 않는다'
+                  " — 오탐 폭풍이라 이미 거부된 길이다).")
+        else:
+            units = []
+            for key, t3 in fr_text.items():
+                files3 = sorted(cover_files.get(key) or [])
+                if not files3:
+                    continue
+                sid3, frid3 = key.split("/")
+                units.append({"specId": sid3, "frId": frid3, "text": t3,
+                              "coveringTexts": [cover_file_text.get(x, "") for x in files3]})
+            tc_findings = term_coverage_findings(units, glossary)
+            print(f"의미 커버리지(termCoveragePolicy={tc_policy}): 용어 {len(glossary)}종 × 커버된 FR {len(units)}건 대조"
+                  f" — 미실증 {len(tc_findings)}건")
+            tc_cap = int(cfg.get("termCoverageListCap") or 12)
+            tc_block = tc_policy == "hard" or strict
+            for f in tc_findings[:tc_cap]:
+                (errors if tc_block else warnings).append(
+                    f"[{f['specId']}/{f['frId']}] FR이 \"{f['term']}\"을(를) 주장하는데 이 FR을 커버하는 어떤 파일에도 "
+                    "그 이름이 없다 — 대상을 실제로 건드리는 검증을 추가하거나, 구현이 다른 이름을 쓴다면 "
+                    "termGlossary 동의어로 등록하라")
+            if len(tc_findings) > tc_cap:
+                (errors if tc_block else warnings).append(
+                    f"의미 커버리지 미실증 … 외 {len(tc_findings) - tc_cap}건 (termCoverageListCap 상향으로 확인)")
+            if not tc_findings:
+                print("  ✓ 등록 용어를 주장한 FR은 모두 그 이름을 커버 파일에서 확인할 수 있다.")
+
+    # R1d: 결정 입도(SPEC-044) — 소유는 파일 단위인데 동작을 정하는 결정은 파일 안에 있다.
+    xt_policy = str(cfg.get("externalTargetPolicy") or "advisory")
+    if xt_policy not in ("off", "advisory", "hard"):
+        print(f'✗ externalTargetPolicy 값 위반 "{xt_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if xt_policy != "off":
+        xt_units = []
+        for u in ownership_units:
+            for rel in u["files"]:
+                try:
+                    body = read_text(os.path.join(root, rel))
+                except OSError:
+                    continue
+                xt_units.append({"path": rel, "text": body, "specId": u["specId"], "specText": u["specText"]})
+        xt = external_target_findings(xt_units)
+        print(f"결정 입도(externalTargetPolicy={xt_policy}): 소유 파일 {len(xt_units)}건에서 env 폴백 기본값 검사"
+              f" — 미공개 외부 대상 {len(xt)}건")
+        xt_cap = int(cfg.get("externalTargetListCap") or 12)
+        xt_block = xt_policy == "hard" or strict
+        for f in xt[:xt_cap]:
+            (errors if xt_block else warnings).append(
+                f"[{f['specId']}] {f['path']}: `{f['env']}` 폴백 기본값 \"{f['value']}\"({f['kind']})이 외부 대상인데 "
+                "소유 스펙이 그 대상을 언급하지 않는다 — 환경변수가 비면 여기로 간다는 사실은 계약이다. "
+                "FR·Edge Cases 어디든 스펙 본문에 적어라(위치는 강제하지 않는다)")
+        if len(xt) > xt_cap:
+            (errors if xt_block else warnings).append(
+                f"결정 입도 미공개 … 외 {len(xt) - xt_cap}건 (externalTargetListCap 상향으로 확인)")
+        if not xt:
+            print("  ✓ 소유 파일의 env 폴백 기본값 중 스펙이 모르는 외부 대상은 없다(미소유 파일은 R4가 본다).")
 
     # 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
     #     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
@@ -2350,12 +2439,179 @@ def validate_derivation_manifest(data):
     return errors
 
 
-def change_log_rationale_findings(text):
-    """선제 캡처(SPEC-009 FR-006) — 실제 날짜(YYYY-MM-DD) 행의 근거 칸이 빈 값이면 그 날짜."""
+# ── 의미 커버리지 코어 (SPEC-042, term-coverage-lib.mjs 미러) ──────────────
+def _term_forms(entry):
+    if isinstance(entry, dict):
+        return [x for x in [entry.get("term")] + list(entry.get("synonyms") or []) if x]
+    return [entry] if entry else []
+
+
+def _display_term(entry):
+    return entry.get("term") if isinstance(entry, dict) else entry
+
+
+def claimed_terms(fr_text, glossary):
+    out = []
+    for entry in glossary or []:
+        if any(marker_hits(fr_text, f) for f in _term_forms(entry)):
+            out.append(_display_term(entry))
+    return out
+
+
+def term_coverage_findings(units, glossary):
+    """units: [{specId, frId, text, coveringTexts:[...]}] — FR이 주장했는데 모든 커버 파일에 없는 용어."""
+    out = []
+    if not glossary:
+        return out
+    for u in units or []:
+        covering = (u or {}).get("coveringTexts") or []
+        if not covering:
+            continue
+        for entry in glossary:
+            forms = _term_forms(entry)
+            if not any(marker_hits(u["text"], f) for f in forms):
+                continue
+            if any(any(marker_hits(ct, f) for f in forms) for ct in covering):
+                continue
+            out.append({"specId": u["specId"], "frId": u["frId"], "term": _display_term(entry)})
+    return out
+
+
+# ── 결정 입도 코어 (SPEC-044, external-target-lib.mjs 미러) ────────────────
+_FALLBACK_RES = [
+    re.compile(r"""process\.env(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[\s*["'`]([^"'`]+)["'`]\s*\])\s*(?:\|\||\?\?)\s*["'`]([^"'`]+)["'`]"""),
+    re.compile(r"""os\.(?:environ\.get|getenv)\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)"""),
+    re.compile(r"""\$\{([A-Za-z_][A-Za-z0-9_]*)\s*:?-\s*([^}"'\s]+)\}"""),
+]
+_FULL_LINE_COMMENT = re.compile(r"^\s*(//|#|--|\*|<!--)")
+
+
+def strip_full_line_comments(text):
+    """전체가 주석인 줄만 걷어낸다 — 줄 안쪽의 //는 자르지 않는다(https://를 못 보게 된다)."""
+    return "\n".join("" if _FULL_LINE_COMMENT.match(l) else l for l in str(text or "").split("\n"))
+
+
+def env_fallbacks(text):
+    out = []
+    s = strip_full_line_comments(text)
+    for rex in _FALLBACK_RES:
+        for m in rex.finditer(s):
+            groups = [g for g in m.groups() if g is not None]
+            if len(groups) < 2:
+                continue
+            out.append({"env": groups[0], "value": groups[-1]})
+    return out
+
+
+_LOCAL_HOSTS = re.compile(
+    r"^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal|example\.com|example\.org|.*\.example|.*\.local|.*\.test|.*\.invalid)$",
+    re.I)
+_URL_HOST = re.compile(r"^[a-z][a-z0-9+.-]*://([^/?#\s:]+)", re.I)
+_FQDN = re.compile(r"^(?!\d+(\.\d+)*$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d+)?$", re.I)
+
+
+def external_target_kind(value):
+    v = str(value or "").strip()
+    if not v:
+        return None
+    m = _URL_HOST.match(v)
+    if m:
+        return None if _LOCAL_HOSTS.match(m.group(1)) else "url"
+    if re.match(r"^arn:[a-z-]+:", v, re.I):
+        return "arn"
+    if re.match(r"^\d{12}$", v):
+        return "account"
+    if _FQDN.match(v):
+        return None if _LOCAL_HOSTS.match(re.sub(r":\d+$", "", v)) else "endpoint"
+    return None
+
+
+def spec_knows_target(spec_text, value):
+    s = str(spec_text or "").lower()
+    v = str(value or "").strip().lower()
+    if not v:
+        return False
+    if v in s:
+        return True
+    m = re.match(r"^[a-z][a-z0-9+.-]*://([^/?#\s]+)", v, re.I)
+    host = re.sub(r":\d+$", "", m.group(1)) if m else ""
+    return bool(host) and host in s
+
+
+def external_target_findings(units):
+    """units: [{path, text, specId, specText}] — 미소유(specId 없음)는 판정하지 않는다."""
+    out = []
+    for u in units or []:
+        if not u or not u.get("specId"):
+            continue
+        seen = set()
+        for fb in env_fallbacks(u.get("text")):
+            kind = external_target_kind(fb["value"])
+            if not kind:
+                continue
+            key = f"{fb['env']} {fb['value']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            if spec_knows_target(u.get("specText"), fb["value"]):
+                continue
+            out.append({"path": u["path"], "specId": u["specId"], "env": fb["env"],
+                        "value": fb["value"], "kind": kind})
+    return out
+
+
+# ── 근거 적용범위 코어 (SPEC-043, evidence-scope-lib.mjs 미러) ─────────────
+DEFAULT_OBSERVATION_MARKERS = [
+    "실측", "관측", "재현", "측정", "실험", "확인함",
+    "observed", "measured", "reproduced", "benchmark",
+]
+DEFAULT_SCOPE_LABELS = ["범위", "관측범위", "관측 범위", "환경", "scope", "observed on"]
+DEFAULT_ENVIRONMENT_MARKERS = [
+    "리눅스", "linux", "macos", "맥os", "windows", "윈도우", "wsl", "x11", "wayland",
+    "도커", "docker", "컨테이너", "container", "우분투", "ubuntu", "alpine",
+    "arm64", "amd64", "x86", "런타임 환경",
+]
+
+
+def scope_declared(text, labels):
+    s = str(text or "")
+    for label in (labels or DEFAULT_SCOPE_LABELS):
+        if re.search(re.escape(str(label)) + r"\s*[:：]\s*\S", s, re.I):
+            return True
+    return False
+
+
+def claims_observation(text, markers):
+    return any(marker_hits(text, m) for m in (markers or DEFAULT_OBSERVATION_MARKERS))
+
+
+def named_environments(text, env_markers):
+    return [m for m in (env_markers or DEFAULT_ENVIRONMENT_MARKERS) if marker_hits(text, m)]
+
+
+def evidence_scope_findings(text, markers=None, labels=None, env_markers=None):
+    out = []
+    for date, cells in change_log_dated_rows(text):
+        rationale = cells[2]
+        if not rationale:
+            continue
+        if not claims_observation(rationale, markers):
+            continue
+        envs = named_environments(rationale, env_markers)
+        if not envs:
+            continue
+        if scope_declared(rationale, labels):
+            continue
+        out.append({"date": date, "rationale": rationale, "environments": envs})
+    return out
+
+
+def change_log_dated_rows(text):
+    """Change Log의 실기록 행 선별 정본 — 이 판단은 한 곳에만 있어야 한다(derivation-lib.mjs 미러)."""
     block = section_block(text, "Change Log")
     if block is None:
         return []
-    missing = []
+    rows = []
     for line in block.split("\n"):
         if not re.match(r"^\s*\|", line):
             continue
@@ -2364,9 +2620,13 @@ def change_log_rationale_findings(text):
             continue
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", cells[0]):
             continue
-        if not cells[2]:
-            missing.append(cells[0])
-    return missing
+        rows.append((cells[0], cells))
+    return rows
+
+
+def change_log_rationale_findings(text):
+    """선제 캡처(SPEC-009 FR-006) — 실제 날짜 행의 근거 칸이 빈 값이면 그 날짜."""
+    return [d for d, cells in change_log_dated_rows(text) if not cells[2]]
 
 
 # ── 접두어↔클래스 정합 (prefix-class-lib.mjs 패리티, SPEC-012) ──
@@ -2682,6 +2942,12 @@ def cmd_completeness(cfg, strict):
     known_ids = {sid for _, sid in texts}  # Dedup-Review 이웃 ID 실재 판정용
     module_values = {}  # Module 값 -> [spec_id] (1 레포 = 1 모듈 판정용)
     findings = []
+    hard_idx = set()    # hard 승급 축의 항목 색인 — --strict 없이도 막는다(정책 승급이 실효를 가져야 한다)
+    scope_policy = str(cfg.get("evidenceScopePolicy") or "advisory")
+    if scope_policy not in ("off", "advisory", "hard"):
+        print(f'✗ evidenceScopePolicy 값 위반 "{scope_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
     enum = "|".join(STATUS_ENUM)
     for text, spec_id in texts:
         # 수명주기(SPEC-008) — FR 유무와 무관하게 전 spec 대상. Status 없는 레거시는 warn(점진 도입).
@@ -2708,6 +2974,16 @@ def cmd_completeness(cfg, strict):
         # 선제 캡처(SPEC-009) — 실기록 Change Log 행의 근거 칸은 빈 값 불가(변경 의도는 저술 시점에만 남는다).
         for d in change_log_rationale_findings(text):
             findings.append((spec_id, f"Change Log {d} 행의 근거 칸이 빈 값 — 변경 의도는 저술 시점에만 캡처 가능(선제 캡처)"))
+        # 근거 적용범위(SPEC-043) — 관측은 그 관측이 이루어진 범위까지만 참이다.
+        if scope_policy != "off":
+            for f in evidence_scope_findings(text, cfg.get("observationMarkers"),
+                                             cfg.get("evidenceScopeLabels"), cfg.get("environmentMarkers")):
+                item = (spec_id, f"Change Log {f['date']} 행: 근거가 특정 환경({'·'.join(f['environments'])})에서의 "
+                                 "관측을 주장하는데 **관측 범위 표기가 없다** — `범위: <이 결론이 참인 범위>`를 근거 칸에 "
+                                 "덧붙여라(1대에서 본 것을 보편 규칙으로 올렸는지 되짚을 축이 생긴다)")
+                findings.append(item)
+                if scope_policy == "hard":
+                    hard_idx.add(len(findings) - 1)
         # Dedup-Review 이웃 ID 실재(SPEC-013) — 기록 형식 검사의 연장(오타·삭제 잔재 표면화; 내용의 질은 리뷰 몫).
         for i in dedup_review_dangling_ids(text, cfg["__specId"], known_ids):
             findings.append((spec_id, f'Dedup-Review가 존재하지 않는 스펙 "{i}" 참조 — 오타/삭제 잔재(삭제된 이웃은 "이웃 없음(삭제됨)"으로 갱신)'))
@@ -2742,10 +3018,13 @@ def cmd_completeness(cfg, strict):
     if findings:
         tag = "✗" if strict else "⚠"
         print(f"{tag} 완전성 미흡 {len(findings)}건:")
-        for spec_id, miss in findings:
-            print(f"  {tag} {spec_id}: {miss}")
+        for i, (spec_id, miss) in enumerate(findings):
+            print(f"  {'✗' if strict or i in hard_idx else '⚠'} {spec_id}: {miss}")
         if strict:
             print("\n✗ --strict: FR 있는 spec은 SC·인수조건, Reviewed 이상은 리뷰 기록, Change Log 실기록 행은 근거 필요.", file=sys.stderr)
+            sys.exit(1)
+        if hard_idx:
+            print(f"\n✗ hard 승급 축 위반 {len(hard_idx)}건 — 해당 정책이 hard이므로 --strict 없이도 막는다.", file=sys.stderr)
             sys.exit(1)
         return
     print("✓ 완전성 구비 — SC·인수조건·수명주기·근거 기록 모두 충족.")

@@ -153,6 +153,21 @@ export const DEFAULTS = {
   coversBacklinkPolicy: "advisory",
   // 목록 출력 상한(총량은 헤더가 말한다 — 감춤이 아니라 지면 절약).
   coversBacklinkListCap: 12,
+  // 의미 커버리지(SPEC-042) — FR이 이름 댄 대상이 커버 파일에 문자 그대로 있는가.
+  // 용어집은 **프로젝트가 선언**한다(빈 배열 = 이 축은 판정하지 않는다고 매 실행 밝힌다).
+  // 항목은 "용어" 또는 {term, synonyms:[…]} — 파라프레이즈는 동의어 등록으로 해소한다.
+  termGlossary: [],
+  termCoveragePolicy: "advisory",
+  termCoverageListCap: 12,
+  // 결정 입도(SPEC-044) — env 폴백 기본값이 외부 대상이면 소유 스펙이 그것을 알아야 한다.
+  externalTargetPolicy: "advisory",
+  externalTargetListCap: 12,
+  // 근거 적용범위(SPEC-043) — 특정 환경을 지목한 관측 근거는 그 결론이 참인 범위를 밝힌다.
+  evidenceScopePolicy: "advisory",
+  // null = 킷 기본 마커. 프로젝트 어휘가 다르면 선언으로 대체한다(면제가 아니라 어휘 교체).
+  observationMarkers: null,
+  evidenceScopeLabels: null,
+  environmentMarkers: null,
   // e2e 실행 축(SPEC-021 확장) — commands.e2e를 실제로 돌려 판정한다.
   // check-live-reality(SPEC-032)와 같은 계약: "판정 못 함"과 "위반 없음"을 섞지 않는다. 단
   // 반전 주의 — 테스트에서 비-0은 **실패**지 skip이 아니다. 그래서 실행 가능 여부는 별도

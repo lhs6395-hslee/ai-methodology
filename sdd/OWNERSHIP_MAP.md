@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 42건
+## Entity 키 (aggregate root) — 45건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -40,7 +40,9 @@
 | `entity-relations` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing` | SPEC-026 | ✓ | ✓ | ✓ |
 | `entity-synonym` | SPEC-033 | ✓ | ✓ | ✓ |
+| `evidence-scope` | SPEC-043 | ✓ | ✓ | ✓ |
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
+| `external-target` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
 | `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
@@ -66,12 +68,13 @@
 | `spec-quality-gates` | SPEC-002 | ✓ | ✓ | ✓ |
 | `spec-retirement` | SPEC-018 | ✓ | ✓ | ✓ |
 | `spec-sync` | SPEC-003 | ✓ | ✓ | ✓ |
+| `term-coverage` | SPEC-042 | ✓ | ✓ | ✓ |
 | `test-domain` | SPEC-015 | ✓ | ✓ | ✓ |
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 80건
+## Surface 키 — 83건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -110,6 +113,8 @@
 | `duplicate-logic-lib.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
 | `engine-event-lib.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `evidence-lib.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
+| `evidence-scope-lib.mjs` | SPEC-043 | ✓ | ✓ | ✓ |
+| `external-target-lib.mjs` | SPEC-044 | ✓ | ✓ | ✓ |
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
 | `go-gate` | SPEC-006 | ✓ | ✓ | ✓ |
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
@@ -151,12 +156,13 @@
 | `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
 | `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `synonym-lib.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
+| `term-coverage-lib.mjs` | SPEC-042 | ✓ | ✓ | ✓ |
 | `test-domain-lib.mjs` | SPEC-015 | ✓ | ✓ | ✓ |
 | `verdict-lib.mjs` | SPEC-040 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 44건
+## Capability 키 — 47건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -172,7 +178,9 @@
 | `entity-relations.resolve` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing.judge` | SPEC-026 | ✓ | ✓ | ✓ |
 | `entity-synonym.judge` | SPEC-033 | ✓ | ✓ | ✓ |
+| `evidence-scope.qualify` | SPEC-043 | ✓ | ✓ | ✓ |
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
+| `external-target.disclose` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
 | `gate-verdict.account` | SPEC-040 | ✓ | ✓ | ✓ |
 | `gate-verdict.emit` | SPEC-040 | ✓ | ✓ | ✓ |
@@ -199,6 +207,7 @@
 | `spec-quality-gates.judge` | SPEC-002 | ✓ | ✓ | ✓ |
 | `spec-retirement.retire` | SPEC-018 | ✓ | ✓ | ✓ |
 | `spec-sync.enforce` | SPEC-003 | ✓ | ✓ | ✓ |
+| `term-coverage.substantiate` | SPEC-042 | ✓ | ✓ | ✓ |
 | `test-domain.judge` | SPEC-015 | ✓ | ✓ | ✓ |
 | `test-execution.run` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting.account` | SPEC-007 | ✓ | ✓ | ✓ |
@@ -229,7 +238,7 @@
 
 ## 집계
 
-- 소유 키 총 **183건** (entity 42 · surface 80 · capability 44 · 역할없음 17)
+- 소유 키 총 **192건** (entity 45 · surface 83 · capability 47 · 역할없음 17)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

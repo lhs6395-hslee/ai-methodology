@@ -56,16 +56,23 @@ export function validateManifest(data) {
 // Change Log 근거(선제 캡처, SPEC-009 FR-006) — 실제 날짜(YYYY-MM-DD) 행인데 근거 칸이
 // 빈 값이면 그 날짜를 반환. 플레이스홀더([YYYY-MM-DD])·헤더·구분선 행은 대상 아님.
 // 변경의 "왜"는 저술 시점에만 존재한다 — 사후 재도출 불가.
-export function changeLogRationaleFindings(text) {
+// Change Log의 **실기록 행** 선별 — 이 판단(무엇이 실제 이력 행인가)은 한 곳에만 있어야 한다.
+// SPEC-043이 같은 선별을 자기 파일에 복제했다가 R13 구현 중복으로 즉시 잡혔다: 두 축이 서로
+// 다른 "행"을 보기 시작하면 사람은 어느 쪽을 고쳐야 할지 모른다. 반환 [{date, cells}](행 순서).
+export function changeLogDatedRows(text) {
   const block = sectionBlock(text, "Change Log");
   if (block === null) return [];
-  const missing = [];
+  const rows = [];
   for (const line of block.split("\n")) {
     if (!/^\s*\|/.test(line)) continue;
     const cells = line.split("|").slice(1, -1).map((c) => c.trim());
     if (cells.length < 3) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(cells[0])) continue;
-    if (!cells[2]) missing.push(cells[0]);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cells[0])) continue;   // 플레이스홀더·헤더·구분선 제외
+    rows.push({ date: cells[0], cells });
   }
-  return missing;
+  return rows;
+}
+
+export function changeLogRationaleFindings(text) {
+  return changeLogDatedRows(text).filter((r) => !r.cells[2]).map((r) => r.date);
 }

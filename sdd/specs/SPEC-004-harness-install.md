@@ -57,7 +57,7 @@
 - **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh, sdd-run.mjs
 - **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md, .kiro/steering/sdd.md, AGENTS.md
 - **Capabilities**: harness-install.install
-- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs
+- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs, tooling/__tests__/ship-closure.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
@@ -88,6 +88,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `sdd-init.sh` 배포 목록에 신설 코어 3종 추가 + **배포 폐포 계약 테스트** 신설(`ship-closure.test.mjs`) | 배포 목록 누락이 세 번 재발했다(verdict-lib·verification-run-lib·term-coverage-lib) — 매번 소비 프로젝트는 게이트가 아니라 `ERR_MODULE_NOT_FOUND`를 받는다. 세 번 다 "다음엔 목록도 같이 고치자"는 규범으로 끝났고 세 번 다 안 지켜졌다. 규범으로 두 번 이상 실패한 것은 기계가 잡는다: import 전이 폐포와 규칙표 등재 게이트가 배포 목록에 모두 있는지 계약으로 강제한다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | FR-002 정직 정정 — pre-push 자동배선 아님; commit-msg 자동배선 명시; sdd-pre-push.sh 스캐폴딩+안내 정확히 기술 | HONESTY 위반(자기 정렬 발견) |
 | 2026-07-02 | `self-hooks-install.sh`(키트 자기 훅 배선 — tooling 직접 호출) Files 편입 | plan ④ T3: 키트 자신을 자기 궤도에 |

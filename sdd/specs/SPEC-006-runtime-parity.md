@@ -79,6 +79,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | Python 미러 — 의미 커버리지·결정 입도·근거 적용범위 코어 3종 + `change_log_dated_rows` 정본화 + `fr`·`completeness` 게이트 배선, 패리티 테스트 2종(시나리오 10개) | 판정 게이트는 양판 필수(SPEC-006 불변) — 한쪽에만 있으면 Python 사이트에서 그 축이 조용히 사라진다. 실측 선례: 리터럴 실재 축이 Node 전용이라 SPEC-013 SC-001이 거짓 충족돼 있었다. 용어집 미선언·미실증·동의어 해소·미공개 외부 대상·hard 승격·범위 표기 각 갈래를 바이트 동일로 고정 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-07-05 | 초안 — Python 전 게이트 패리티·requirementIdPrefixes 전 사이트 일반화·셸/Go 문법 정렬·preset 템플릿 앵커 패리티 | 진단 A-1/A-2/B-1/B-2: 런타임 간·경로 간 문법 불일치가 "조용히 빠지는" 클래스를 만듦 — 문법화(정의되지 않은 예외 제거) |
 | 2026-07-05 | Python fr 게이트에 검증 회계(strictSpecs·requireAccounting·smokeManifest) 미러 + DEFAULTS 5키 정렬 + 회계 바이트 패리티 테스트 | SPEC-007 신설 동반 — 셸/Go fr에는 회계 계층 없음(핵심 3커맨드 계약 밖, 정직한 델타) |
 | 2026-07-05 | Python completeness·specsync에 수명주기(Status·리뷰 기록·Draft 차단) 미러 + 바이트 패리티 테스트 + 템플릿 수명주기 앵커(Review Log·Dedup-Review·Status enum) 패리티 편입 | SPEC-008 신설 동반 — preset 경로 스펙이 수명주기 문법을 결여한 채 조용히 빠지는 것 방지 |

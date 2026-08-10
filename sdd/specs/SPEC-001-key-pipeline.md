@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 어댑터에 의미 커버리지·결정 입도·근거 적용범위 knob 9종 추가(`termGlossary`·`termCoveragePolicy`·`termCoverageListCap`·`externalTargetPolicy`·`externalTargetListCap`·`evidenceScopePolicy`·`observationMarkers`·`evidenceScopeLabels`·`environmentMarkers`) | SPEC-042·043·044 신설에 따른 기본값 등재 — 새 축의 어휘 목록은 전부 `null` 기본(킷 기본 마커)이고 프로젝트가 선언으로 교체한다. 면제가 아니라 어휘 교체다: 교체해도 축은 계속 판정한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `__coversRe` 레터 서픽스(소문자 1자) 지원 + 경계 강제 | 도그푸딩(소비 프로젝트 A): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |
 | 2026-07-02 | `surfaceFormat`(http\|path\|any) config 추가 — FR-002/005 개정 + `normalizeKey`/`validateKey` 분기 + 테스트 | 도그푸딩(소비 프로젝트 A): Next.js 파일 라우팅·비-HTTP 자원(Dockerfile·IaC)을 Surface로 모델링 — HTTP 강제를 config로 완화 |

@@ -36,6 +36,8 @@ import { changeLogFrRefs, changeLogFrFindings } from "./changelog-fr-lib.mjs";
 import { evidencePathsOf, coversBacklinkFindings, coversBacklinkVerdict } from "./covers-backlink-lib.mjs";
 import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
+import { termCoverageFindings } from "./term-coverage-lib.mjs";
+import { externalTargetFindings } from "./external-target-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -105,15 +107,17 @@ const walkAll = (dir, relBase = "", acc = []) => walkFiles(dir, IGNORE, relBase,
 const allRepoFiles = walkAll(ROOT);
 const testInfraGlobs = (cfg.testInfraGlobs || []).map(compileGlob); // SPEC-015: 테스트 인프라 네임스페이스
 const prefixClassWarnings = [];
+const ownershipUnits = [];   // {specId, specText, files:[…]} — 결정 입도 판정 입력(SPEC-044)
 for (const f of specMdNames) {
   const id = f.match(SPEC_ID)?.[0];
   if (!id) continue; // 미등록 접두어는 위 0단계가 이미 에러 처리
   const pfx = f.match(/^([A-Z]+)-/)[1];
   const text = readFileSync(join(SPEC_DIR, f), "utf8");
   const globs = parseSection(text, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).map(compileGlob);
-  const owned = globs.length
-    ? allRepoFiles.filter((p) => !isTestFile(p.split("/").pop(), cfg) && globs.some((re) => re.test(p))).sort()
-    : [];
+  const matched = globs.length ? allRepoFiles.filter((p) => globs.some((re) => re.test(p))).sort() : [];
+  const owned = matched.filter((p) => !isTestFile(p.split("/").pop(), cfg));
+  // 결정 입도 축(SPEC-044)은 테스트도 본다 — 실측 사례의 `BASE_URL` 폴백은 e2e 설정에 있었다.
+  if (matched.length) ownershipUnits.push({ specId: id, specText: text, files: matched });
   const finding = prefixClassFinding(pfx, owned, classGlobs);
   const exempted = !!String(exemptions[id] ?? "").trim();
   if (finding && finding.kind === "error") {
@@ -147,6 +151,7 @@ const specs = new Map();    // SPEC-ID -> Set(FR-ID)
 const frDecls = new Map();
 const clRefs = new Map();  // SPEC-ID -> {declared:Map, retired:Set} (SPEC-037)
 const frEvidence = new Map(); // "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
+const frText = new Map();     // "SPEC/FR" -> FR 선언 라인 원문 (SPEC-042 의미 커버리지 입력)
 const coverTags = [];         // {file, specId, frId} — 양방향 결속 판정 입력  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md") || !PREFIXES.some((p) => f.startsWith(p + "-"))) continue;
@@ -166,6 +171,7 @@ for (const f of readdirSync(SPEC_DIR)) {
     if (!fr) continue;
     const paths = evidencePathsOf(t);
     if (paths.length) frEvidence.set(`${id}/${fr[1]}`, paths);
+    if (!frText.has(`${id}/${fr[1]}`)) frText.set(`${id}/${fr[1]}`, t);
   }
   // Change Log가 **선언한** FR 집합(SPEC-037) — 새 검사와 결번 advisory가 같은 소스를 쓴다.
   clRefs.set(id, changeLogFrRefs(text, cfg.__reqAlt, cfg.__idAlt, {
@@ -195,6 +201,8 @@ for (const id of [...frDecls.keys()].sort()) {
 
 // 2. Collect @covers tags from test files.
 const covered = new Map();   // SPEC-ID -> Set(FR-ID covered)
+const coverFiles = new Map();    // "SPEC/FR" -> Set(파일 절대경로) — 의미 커버리지 입력(SPEC-042)
+const coverFileText = new Map(); // 파일 절대경로 -> 본문(태그가 있는 파일만 보관)
 const coverSeen = new Set();       // "SPEC/FR" — 커버 태그가 하나라도 있는 FR
 const runnableCovered = new Set(); // "SPEC/FR" — e2e가 **아닌** 파일이 커버한 FR
 const badRefs = [];          // tags pointing to nonexistent FRs
@@ -209,6 +217,9 @@ for (const dir of SCAN_DIRS) {
       const key = `${spec}/${fr}`;
       coverSeen.add(key);
       coverTags.push({ file: file.replace(ROOT + "/", ""), specId: spec, frId: fr });
+      if (!coverFiles.has(key)) coverFiles.set(key, new Set());
+      coverFiles.get(key).add(file);
+      if (!coverFileText.has(file)) coverFileText.set(file, text);
       if (!isE2eFile(file, cfg)) runnableCovered.add(key);
       const declared = specs.get(spec);
       if (!declared || !declared.has(fr)) {
@@ -292,6 +303,79 @@ if (BL_POLICY !== "off") {
     console.log(`  · backlink 미표기 ${bl.counts.unlabeled}건(부채·비차단) — 해당 FR에 \`[검증: <경로>]\`가 없어 대조할 축이 없다. 표기하면 그 FR은 이 검사의 보호를 받는다.`);
   }
   if (!mism.length) console.log("  ✓ 결속 불일치 0건 — 태그와 FR이 서로를 인정한다(미표기는 위 별도 집계).");
+}
+
+// R1c: 의미 커버리지(SPEC-042) — R1은 번호의 실재를, R1b는 서로를 인정하는가를 본다. 둘 다
+// 통과해도 남는 사실이 있다: **테스트가 FR이 이름 댄 대상을 아예 건드리지 않는 것**. 실측 제보
+// (2026-08-10): FR이 "Claude in Chrome(MCP)"를 주장하는데 커버 테스트는 선택자가 문자열 "chrome"을
+// 돌려주는지만 봤다 — 동어반복이 세 게이트를 모두 통과했다. 여기서 잡는 것은 그 중 값싸고 결정적인
+// 한 조각뿐이다: FR이 등록 용어를 말했는데 커버 파일 어디에도 그 용어가 없다. 질(테스트가 의미를
+// 시험하는가)은 여전히 리뷰의 몫이다(SPEC-031·039가 그은 경계 그대로).
+const TC_POLICY = String(cfg.termCoveragePolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(TC_POLICY)) {
+  console.error(`✗ termCoveragePolicy 값 위반 "${TC_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+if (TC_POLICY !== "off") {
+  const glossary = cfg.termGlossary || [];
+  if (!glossary.length) {
+    // 0건이 아니라 "안 봤음"이다 — 용어집이 비면 이 축은 아무것도 대조하지 않는다(SPEC-040 규범).
+    console.log(`의미 커버리지(termCoveragePolicy=${TC_POLICY}): **용어집 미선언 — 판정하지 않는다**.`
+      + ` termGlossary에 FR이 이름 대는 프로토콜·외부 시스템·제품명을 등록하면 "그 이름이 커버 파일에 없다"를 대조한다`
+      + `(킷은 산문에서 고유명사를 자동 추출하지 않는다 — 오탐 폭풍이라 이미 거부된 길이다).`);
+  } else {
+    const units = [];
+    for (const [key, text] of frText) {
+      const files = [...(coverFiles.get(key) || [])].sort();
+      if (!files.length) continue;                          // 미커버는 R1/R2의 몫
+      const [specId, frId] = key.split("/");
+      units.push({ specId, frId, text, coveringTexts: files.map((f) => coverFileText.get(f) || "") });
+    }
+    const tcFindings = termCoverageFindings(units, glossary);
+    const judgedUnits = units.length;
+    console.log(`의미 커버리지(termCoveragePolicy=${TC_POLICY}): 용어 ${glossary.length}종 × 커버된 FR ${judgedUnits}건 대조`
+      + ` — 미실증 ${tcFindings.length}건`);
+    const tcCap = Number(cfg.termCoverageListCap) || 12;
+    for (const f of tcFindings.slice(0, tcCap)) {
+      const msg = `[${f.specId}/${f.frId}] FR이 "${f.term}"을(를) 주장하는데 이 FR을 커버하는 어떤 파일에도 그 이름이 없다`
+        + ` — 대상을 실제로 건드리는 검증을 추가하거나, 구현이 다른 이름을 쓴다면 termGlossary 동의어로 등록하라`;
+      (TC_POLICY === "hard" || STRICT ? errors : warnings).push(msg);
+    }
+    if (tcFindings.length > tcCap) {
+      (TC_POLICY === "hard" || STRICT ? errors : warnings).push(`의미 커버리지 미실증 … 외 ${tcFindings.length - tcCap}건 (termCoverageListCap 상향으로 확인)`);
+    }
+    if (!tcFindings.length) console.log("  ✓ 등록 용어를 주장한 FR은 모두 그 이름을 커버 파일에서 확인할 수 있다.");
+  }
+}
+
+// R1d: 결정 입도(SPEC-044) — 소유는 파일 단위인데 동작을 정하는 결정은 파일 안에 있다.
+// 실측 제보(2026-08-10): `process.env.BASE_URL || "https://api.example-vendor.com"` 한 줄이 배포
+// 대상을 정하는데 어떤 FR도 그 대상을 인정하지 않았고, 소유·커버리지·spec-sync가 전부 초록이었다.
+// 소유의 입도를 줄 단위로 낮추지 않는다 — 좁히는 것은 **결정의 종류**다: 폴백 기본값이 외부
+// 대상(다른 시스템의 주소·계정·자격)이면 그건 구현 세부가 아니라 계약이고, 계약은 스펙이 안다.
+const XT_POLICY = String(cfg.externalTargetPolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(XT_POLICY)) {
+  console.error(`✗ externalTargetPolicy 값 위반 "${XT_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+if (XT_POLICY !== "off") {
+  const units = [];
+  for (const u of ownershipUnits) {
+    for (const rel of u.files) {
+      let text; try { text = readFileSync(join(ROOT, rel), "utf8"); } catch { continue; }
+      units.push({ path: rel, text, specId: u.specId, specText: u.specText });
+    }
+  }
+  const xt = externalTargetFindings(units);
+  console.log(`결정 입도(externalTargetPolicy=${XT_POLICY}): 소유 파일 ${units.length}건에서 env 폴백 기본값 검사 — 미공개 외부 대상 ${xt.length}건`);
+  const xtCap = Number(cfg.externalTargetListCap) || 12;
+  for (const f of xt.slice(0, xtCap)) {
+    const msg = `[${f.specId}] ${f.path}: \`${f.env}\` 폴백 기본값 "${f.value}"(${f.kind})이 외부 대상인데 소유 스펙이 그 대상을 언급하지 않는다`
+      + ` — 환경변수가 비면 여기로 간다는 사실은 계약이다. FR·Edge Cases 어디든 스펙 본문에 적어라(위치는 강제하지 않는다)`;
+    (XT_POLICY === "hard" || STRICT ? errors : warnings).push(msg);
+  }
+  if (xt.length > xtCap) (XT_POLICY === "hard" || STRICT ? errors : warnings).push(`결정 입도 미공개 … 외 ${xt.length - xtCap}건 (externalTargetListCap 상향으로 확인)`);
+  if (!xt.length) console.log("  ✓ 소유 파일의 env 폴백 기본값 중 스펙이 모르는 외부 대상은 없다(미소유 파일은 R4가 본다).");
 }
 
 // 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.

@@ -77,4 +77,4 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
-| 2026-08-02 | 초안 — `hooksInstalledPolicy` + `hooks.list`(단일 선언) + `hooks-install-lib`(파싱·3분기) + `check-hooks-installed` 게이트 + sdd-sync R12, 설치기 마커·자기검증 | 실측 제보: 게이트 스크립트는 있는데 `.git/hooks`가 비어 있어 강제가 한 번도 발동하지 않았고, 그 상태가 green으로 읽혔다. 게이트의 inert만 보고 훅의 inert를 안 보면 "설치 안 된 강제"가 통과한다. 킷 자신에게 돌리자마자 이 컨테이너의 실제 미설치 4종을 잡았다 [검증: tooling/__tests__/hooks-install.test.mjs] |
+| 2026-08-02 | 초안 — `hooksInstalledPolicy` + `hooks.list`(단일 선언) + `hooks-install-lib`(파싱·3분기) + `check-hooks-installed` 게이트 + sdd-sync R12, 설치기 마커·자기검증 | 실측 제보: 게이트 스크립트는 있는데 `.git/hooks`가 비어 있어 강제가 한 번도 발동하지 않았고, 그 상태가 green으로 읽혔다. 게이트의 inert만 보고 훅의 inert를 안 보면 "설치 안 된 강제"가 통과한다. 킷 자신에게 돌리자마자 이 컨테이너의 실제 미설치 4종을 잡았다. 범위: 미설치 4종은 이 개발 컨테이너 1대의 관측이고, 여기서 끌어낸 규칙은 "선언된 훅이 `.git/hooks`에 없으면 표면화한다"는 것뿐이다 — 훅 경로는 `core.hooksPath`로 바뀔 수 있어 게이트는 설정된 경로를 읽는다(1대 관측을 경로 가정으로 굳히지 않는다) [검증: tooling/__tests__/hooks-install.test.mjs] |

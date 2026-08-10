@@ -85,6 +85,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | Change Log 실기록 행 선별을 `changeLogDatedRows`로 **정본화**(근거 공백 판정은 그 위의 필터로 축소) | SPEC-043이 같은 행 선별을 자기 파일에 복제했다가 R13 구현 중복이 즉시 잡았다. 무엇이 실제 이력 행인가라는 판단이 두 곳에 있으면 두 축이 서로 다른 "행"을 보기 시작하고, 그러면 사람은 어느 쪽을 고쳐야 할지 모른다. 판정 자체는 불변(출력 바이트 동일) [검증: tooling/__tests__/derivation.test.mjs] |
 | 2026-07-05 | 초안 — 소스 클래스 9종 enum·derivationManifest 회계·검출 교차검사·Change Log 근거 선제 캡처(Node·Python 동시) | 고도화 3차: 재생성 비교[검증]에서 초기 재도출이 비-src 소스를 조용히 누락 + 순수 인간 의도는 사후 복원 불가 — 회계·선제 캡처로 문법화(정의되지 않은 예외 제거) |
 | 2026-07-06 | 검출 글롭 기본값 보정을 D3 회귀로 고정 — .dockerignore(iac 동반)·composite action(ci 구성요소)이 실재하는데 none 선언이면 exit 1 | B안: 인프라 동반·보조 파일이 검출 밖이면 "스캔함 — 없음" 선언이 거짓 green — 분류 원칙(정의+동반 파일)을 테스트로 고정 |
 | 2026-07-27 | FR-001·002·003 주어를 `THE SYSTEM`에서 실제 행위자로 교체 — 게이트 **check-derivation.mjs**·판정 코어 **derivation-lib.mjs**·aggregate **derivation-accounting** FR 앵커 | SPEC-023 FR-007(소유 키 앵커) 자기적용: SPEC-001 FR-010의 `ownershipCategoryRoles` 선언으로 규칙이 킷 자신에게 발화(감사 #21) — 소유 키 3건이 FR 선언 라인에 흔적이 없던 것을 명시(9클래스 enum·상태 규칙은 불변) |

@@ -1196,3 +1196,63 @@ test("py ownership G1·G2·G3: 미선언·카테고리간·Files겹침 — Node�
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 의미 커버리지·결정 입도·근거 적용범위 패리티(SPEC-042·043·044) ──
+test("py fr: 의미 커버리지·결정 입도 — 용어집 미선언/미실증/미공개 세 갈래 바이트 동일", skip, () => {
+  const SPEC = (own, extra = "") =>
+    `# S\n**Spec**: \`SPEC-001\`\n**Module**: \`m\`\n**Status**: Active\n`
+    + `## Functional Requirements\n- **FR-001** (event): THE SYSTEM SHALL speak MCP to ${extra || "the browser"}.\n`
+    + `\n## Ownership\n- **Entities**: thing\n- **Files**: ${own}\n`;
+  const scen = [
+    // ① 용어집 미선언 — "판정하지 않는다"를 양판이 같은 문장으로 말한다.
+    { cfg: {}, files: {
+      "sdd/specs/SPEC-001.md": SPEC("src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+    // ② 미실증 — FR이 MCP를 주장하는데 커버 파일에 그 이름이 없다.
+    { cfg: { termGlossary: ["MCP"] }, files: {
+      "sdd/specs/SPEC-001.md": SPEC("src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+    // ③ 동의어 등록으로 해소 — 면제가 아니라 어휘 등록이 정답이다.
+    { cfg: { termGlossary: [{ term: "MCP", synonyms: ["chrome-bridge"] }] }, files: {
+      "sdd/specs/SPEC-001.md": SPEC("src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\nimport x from 'chrome-bridge';\n" } },
+    // ④ 결정 입도 — env 폴백 기본값이 외부 대상인데 소유 스펙이 모른다.
+    { cfg: { termGlossary: [] }, files: {
+      "sdd/specs/SPEC-001.md": SPEC("src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\nconst U = process.env.BASE_URL || \"https://api.vendor.io\";\n" } },
+    // ⑤ hard 승격 — 양판이 같은 지점에서 막는다.
+    { cfg: { externalTargetPolicy: "hard" }, files: {
+      "sdd/specs/SPEC-001.md": SPEC("src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\nconst U = process.env.BASE_URL || \"https://api.vendor.io\";\n" } },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-fr-coverage.mjs");
+      const p = runPy(root, ["fr"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+test("py completeness: 근거 적용범위 — 환경 지목 관측/범위 표기/hard 승격 바이트 동일", skip, () => {
+  const CL = (rationale) => `# S\n**Spec**: \`SPEC-001\`\n**Module**: \`m\`\n**Status**: Active\n`
+    + `## Ownership\n- **Entities**: thing\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-08-10 | x | ${rationale} |\n`;
+  const scen = [
+    { cfg: {}, files: { "sdd/specs/SPEC-001.md": CL("리눅스에서 실측: DISPLAY 없음") } },
+    { cfg: {}, files: { "sdd/specs/SPEC-001.md": CL("리눅스에서 실측. 범위: X 없는 CI 러너 한정") } },
+    { cfg: {}, files: { "sdd/specs/SPEC-001.md": CL("소비 프로젝트 실측 — 환경 무관") } },
+    { cfg: { evidenceScopePolicy: "hard" }, files: { "sdd/specs/SPEC-001.md": CL("리눅스에서 실측: DISPLAY 없음") } },
+    { cfg: { evidenceScopePolicy: "off" }, files: { "sdd/specs/SPEC-001.md": CL("리눅스에서 실측: DISPLAY 없음") } },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-spec-completeness.mjs");
+      const p = runPy(root, ["completeness"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
