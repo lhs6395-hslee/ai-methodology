@@ -1683,3 +1683,30 @@ test("py duplicatelogic: 중복·면제(사유 없음 포함)·낡은 면제·�
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 완료 판정 신호 강도 패리티(SPEC-055, R22) ──
+// @covers SPEC-006/FR-001
+// @covers SPEC-055/FR-005
+test("py completionsignal: 파생·자기신고·미선언·오타·통과·inert·off 바이트 동일", skip, () => {
+  const C = (extra) => ({ id: "deploy", command: "true", ...extra });
+  const scen = [
+    { cfg: { completionSignalPolicy: "hard", liveRealityChecks: [C({ assertsCompletion: true, signal: "derived" })] } },
+    { cfg: { completionSignalPolicy: "advisory", liveRealityChecks: [C({ assertsCompletion: true, signal: "self-report" })] } },
+    { cfg: { completionSignalPolicy: "hard", liveRealityChecks: [C({ assertsCompletion: true })] } },
+    { cfg: { completionSignalPolicy: "hard", liveRealityChecks: [C({ assertsCompletion: true, signal: "targetstate" })] } },
+    { cfg: { completionSignalPolicy: "hard", liveRealityChecks: [C({ assertsCompletion: true, signal: "target-state" })] } },
+    { cfg: { completionSignalPolicy: "hard", liveRealityChecks: [C({})] } },        // 완료 주장 0건 → INERT
+    { cfg: { completionSignalPolicy: "hard" } },                                     // 선언 자체가 없음 → INERT
+    { cfg: { completionSignalPolicy: "off", liveRealityChecks: [C({ assertsCompletion: true, signal: "derived" })] } },
+    { cfg: { completionSignalPolicy: "strict" } },                                   // enum 밖 → exit 1
+  ];
+  for (const [i, { cfg }] of scen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-completion-signal.mjs");
+      const py = runPy(root, ["completionsignal"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

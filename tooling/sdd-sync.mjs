@@ -83,6 +83,10 @@ const RULES = [
   // 조회는 커밋도 파일 변경도 남기지 않는다. 스윕에서는 훅이 아니라 **선언 자체**를 판정한다
   // (잘못된 선언은 아무것도 막지 않고 아무것도 알리지 않는 조용한 무발화다).
   { rule: "R21 진단 가드 선언(조사 전에 명세를 보는가)", gates: ["check-diagnosis-guard.mjs"] },
+  // R22(SPEC-055): 완료 판정이 **대상 상태**를 봤는가 — 로그·CI 상태는 대상이 아니라 대상에
+  // 대한 이야기다. 실측 제보: 파이프라인 로그와 초록 CI로 배포 완료를 보고했는데 migrate Job이
+  // 실패해 배포 스테이지가 스킵된 상태였다. 완료 주장 검사 0건이면 게이트가 스스로 INERT다.
+  { rule: "R22 완료 판정 신호(대상 상태를 봤는가)", gates: ["check-completion-signal.mjs"] },
 ];
 
 // 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
@@ -119,6 +123,7 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-agent-wiring.mjs": "agentwiring",
   "check-spec-conflict.mjs": "specconflict",
   "check-diagnosis-guard.mjs": "diagnosisguard",
+  "check-completion-signal.mjs": "completionsignal",
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 

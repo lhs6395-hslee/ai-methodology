@@ -112,3 +112,4 @@
 | 2026-08-04 | `RATCHETED_POLICIES`에 `coversBacklinkPolicy` 등재(25→26). Node·Python 동시 | SPEC-039 신설 동반 — "새 정책을 만들면 여기에도 등재한다"를 같은 커밋에서 지킨다 |
 | 2026-08-09 | 래칫 목록에 `verificationRunPolicy` 추가(26→27) | SPEC-041 동반. 래칫 목록은 **판정 데이터**라 새 강도 knob이 등재되지 않으면 그 knob만 조용히 하향 가능해진다(도입 시 누락이 실측으로 두 번 있었다 — `outOfBandDeployPolicy`·`changeLogFrRefPolicy`) |
 | 2026-08-09 | 래칫 목록에 `liveRealityCoveragePolicy` 추가(27→28) | SPEC-032 등록 축 동반. **래칫 전수성 게이트가 이 누락을 스스로 잡았다** — 킷 config의 강도 enum knob이 감시 밖에 있으면 그 knob만 조용히 하향 가능해지고, 도입 시 누락은 이미 세 번 실측됐다(outOfBandDeploy·changeLogFrRef·verificationRun) |
+| 2026-08-10 | 래칫 감시 대상에 `completionSignalPolicy` 추가 + **Python 래칫 목록을 Node 정본에서 재생성** | Python 목록이 5개 뒤처져 있었다(`importWiringPolicy`·`agentWiringPolicy`·`specConflictPolicy`·`diagnosisGuardPolicy`·`completionSignalPolicy`) — 즉 Python 런타임 프로젝트는 R18~R22의 강도를 **조용히 내릴 수 있었다.** 래칫 전수성 테스트가 새 knob을 잡았고, 그 자리에서 기존 드리프트 4건이 함께 드러났다. 손으로 두 목록을 유지하는 동안 한쪽은 반드시 뒤처진다 |

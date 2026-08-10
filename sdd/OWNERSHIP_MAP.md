@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 55건
+## Entity 키 (aggregate root) — 56건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -34,6 +34,7 @@
 | `capability-ownership` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref` | SPEC-037 | ✓ | ✓ | ✓ |
 | `check-outcome` | SPEC-054 | ✓ | ✓ | ✓ |
+| `completion-signal` | SPEC-055 | ✓ | ✓ | ✓ |
 | `covers-backlink` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -84,7 +85,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 102건
+## Surface 키 — 104건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -94,6 +95,7 @@
 | `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-lib.mjs` | SPEC-037 | ✓ | ✓ | ✓ |
 | `check-agent-wiring.mjs` | SPEC-051 | ✓ | ✓ | ✓ |
+| `check-completion-signal.mjs` | SPEC-055 | ✓ | ✓ | ✓ |
 | `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-deploy-debt.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -126,6 +128,7 @@
 | `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | ✓ |
 | `check-verification-executed.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `check-watchdog.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
+| `completion-signal-lib.mjs` | SPEC-055 | ✓ | ✓ | ✓ |
 | `covers-backlink-lib.mjs` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard-lib.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -191,7 +194,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 57건
+## Capability 키 — 58건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -201,6 +204,7 @@
 | `capability-ownership.judge` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref.judge` | SPEC-037 | ✓ | ✓ | ✓ |
 | `check-outcome.classify` | SPEC-054 | ✓ | ✓ | ✓ |
+| `completion-signal.grade` | SPEC-055 | ✓ | ✓ | ✓ |
 | `covers-backlink.judge` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change.judge` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard.gate` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -278,7 +282,7 @@
 
 ## 집계
 
-- 소유 키 총 **232건** (entity 55 · surface 102 · capability 57 · 역할없음 18)
+- 소유 키 총 **236건** (entity 56 · surface 104 · capability 58 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **2건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

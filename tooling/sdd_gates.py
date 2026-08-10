@@ -212,6 +212,7 @@ DEFAULTS = {
     "specConflictClauseBreaks": None,
     # 진단 진입점 명세 강제 열람(SPEC-053) — 조회는 커밋을 남기지 않으므로 도구 호출 직전에 발동.
     "diagnosisGuardPolicy": "advisory",
+    "completionSignalPolicy": "advisory",
     "diagnosisSpecMap": [],
     "diagnosisSpecReadPatterns": None,
     "diagnosisGuideSections": None,
@@ -335,9 +336,14 @@ POLICY_RANK = {"off": 0, "silent": 0, "advisory": 1, "warn": 1, "hard": 2, "erro
 # 자기포함: policyRatchetPolicy가 목록 선두 — 래칫 자신이 감시 밖이면 off 한 줄로 자폭(감사 A-2).
 RATCHETED_POLICIES = [
     "policyRatchetPolicy",
-    "specSyncUnownedPolicy", "draftBlockPolicy", "semanticDriftPolicy",
-    "capabilityOwnershipPolicy", "frKeyAnchorPolicy", "runTestsPolicy",
-    "migrationStatePolicy", "entitySchemaBackingPolicy",
+    "specSyncUnownedPolicy",
+    "draftBlockPolicy",
+    "semanticDriftPolicy",
+    "capabilityOwnershipPolicy",
+    "frKeyAnchorPolicy",
+    "runTestsPolicy",
+    "migrationStatePolicy",
+    "entitySchemaBackingPolicy",
     "symbolRealityPolicy",
     "ownershipRequiredPolicy",
     "crossCategoryDedupPolicy",
@@ -363,6 +369,11 @@ RATCHETED_POLICIES = [
     "implReferencePolicy",
     "processSsotPolicy",
     "watchdogPolicy",
+    "importWiringPolicy",
+    "agentWiringPolicy",
+    "specConflictPolicy",
+    "diagnosisGuardPolicy",
+    "completionSignalPolicy",
     "liveRealityCoveragePolicy",
 ]
 
@@ -6936,6 +6947,110 @@ def cmd_agentwiring(cfg):
         print(f"  ✓ 선언된 에이전트 훅 {len(decls)}종이 모두 배선돼 있고 지목된 스크립트가 실재한다 — 감시자가 에이전트를 본다.")
 
 
+# ── 완료 판정 신호 강도 (SPEC-055, R22) — Node판 completion-signal-lib.mjs 미러 ──────
+# 실측 제보: 배포 완료를 **파생 신호로 판정했다.** 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서
+# 완료로 보고했는데 migrate Job이 실패해 배포 스테이지가 스킵된 상태였다.
+# **로그와 상태는 대상이 아니라 대상에 대한 이야기다.**
+SIGNAL_KINDS = ["target-state", "derived", "self-report"]
+COMPLETION_MIN_SIGNAL = "target-state"
+
+
+def signal_rank(kind):
+    try:
+        i = SIGNAL_KINDS.index(str(kind or ""))
+    except ValueError:
+        return -1
+    return len(SIGNAL_KINDS) - i
+
+
+def parse_signal(value):
+    """값이 없으면 **추정하지 않는다** — 추정한 기본값은 조용히 정답이 된다."""
+    s = str("" if value is None else value).strip()
+    return s if s else None
+
+
+def completion_findings(claims, min_signal=COMPLETION_MIN_SIGNAL):
+    """반환 findings[] — kind: no-signal | bad-signal | weak-signal."""
+    need = signal_rank(min_signal)
+    findings = []
+    for c in (claims or []):
+        cid = str((c or {}).get("id") or "").strip() or "(무명)"
+        if not (c or {}).get("assertsCompletion"):
+            continue
+        sig = parse_signal((c or {}).get("signal"))
+        if not sig:
+            findings.append({"kind": "no-signal", "id": cid})
+            continue
+        if sig not in SIGNAL_KINDS:
+            findings.append({"kind": "bad-signal", "id": cid, "got": sig})
+            continue
+        if signal_rank(sig) < need:
+            findings.append({"kind": "weak-signal", "id": cid, "got": sig})
+    return findings
+
+
+SIGNAL_FINDING_TEXT = {
+    "no-signal": "완료를 주장하는데 **무엇을 관측했는지 선언이 없다** — `signal`을 적어라"
+                 f"({' | '.join(SIGNAL_KINDS)}). 기본값을 두지 않는 이유: 추정한 기본값은 조용히 정답이 된다",
+    "bad-signal": f"신호 종류가 열거 밖이다({' | '.join(SIGNAL_KINDS)}) — 오타는 **조용한 무발화**가 된다",
+    "weak-signal": "**파생 신호만으로 완료를 주장한다** — 로그·CI 상태·저널은 대상이 아니라 대상에 대한"
+                   " 이야기다. 실측: 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서 배포 완료로 보고했는데"
+                   " migrate Job이 실패해 배포 스테이지가 스킵된 상태였다. 대상 상태를 직접 조회하는 검사를 하나 더해라",
+}
+
+SIGNAL_KIND_TEXT = {
+    "target-state": "대상을 직접 조회한다(클러스터·DB·엔드포인트의 지금 상태)",
+    "derived": "대상에 대한 이야기를 읽는다(로그·CI 상태·저널·리포트)",
+    "self-report": "사람·에이전트의 진술",
+}
+
+
+def cmd_completionsignal(cfg):
+    policy = str(cfg.get("completionSignalPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ completionSignalPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "completionSignalPolicy")
+        print("완료 신호 게이트 — completionSignalPolicy:off (판정 안 함)")
+        return
+    hard = policy == "hard"
+    checks = cfg.get("liveRealityChecks")
+    checks = checks if isinstance(checks, list) else []
+    claims = [{"id": str((c or {}).get("id") or ""),
+               "assertsCompletion": bool((c or {}).get("assertsCompletion")),
+               "signal": (c or {}).get("signal")} for c in checks]
+    asserting = [c for c in claims if c["assertsCompletion"]]
+
+    if not asserting:
+        # **판정 입력이 없는 것을 clean으로 말하지 않는다**(SPEC-040 INERT).
+        verdict("INERT", "완료를 주장하는 검사 0건 — liveRealityChecks 항목에 assertsCompletion을 선언하면 판정한다")
+        print(f"[안 봄(판정 입력 없음)] 완료 신호 게이트 — 완료를 주장하는 검사가 선언되지 않았다(검사 {len(checks)}건 중 0건).")
+        kinds = " · ".join(f"{k}({SIGNAL_KIND_TEXT[k]})" for k in SIGNAL_KINDS)
+        print('  · "됐는가"를 말하는 검사에 `assertsCompletion: true`와 `signal`을 붙이면'
+              f" 그 판정이 **대상 상태를 봤는지** 대조한다 — {kinds}")
+        return
+
+    findings = completion_findings(asserting, COMPLETION_MIN_SIGNAL)
+    judged(len(findings))
+    print(f"완료 신호 게이트(completionSignalPolicy={policy}): 완료 주장 {len(asserting)}건 검사"
+          f" (하한 {COMPLETION_MIN_SIGNAL}) — 위반 {len(findings)}건")
+    tag = "✗" if hard else "⚠"
+    for f in findings:
+        got = f' (선언: {f["got"]})' if f.get("got") else ""
+        print(f'  {tag} [{f["id"]}]{got} {SIGNAL_FINDING_TEXT[f["kind"]]}')
+    if findings and hard:
+        print(f"\n✗ completionSignalPolicy=hard: 완료 판정이 대상 상태를 관측하지 않는다 {len(findings)}건.", file=sys.stderr)
+        print("  · 해소는 신호 종류를 고쳐 적는 것이 아니라 **대상을 조회하는 검사를 더하는 것**이다"
+              "(선언을 target-state로 바꾸면서 명령이 그대로면 그 선언은 거짓이 된다).", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print(f"완료 신호 게이트: OK — 완료를 주장하는 {len(asserting)}건이 모두 대상 상태를 관측한다고 선언한다.")
+        print("  · 이 축은 **선언**을 판정한다 — 그 명령이 정말 대상을 조회하는지는 정적으로 결정되지 않는다"
+              "(추측으로 판정하면 오탐이 쌓이고, 오탐이 잦은 게이트는 꺼진다).")
+
+
 # ── 구현 중복 (SPEC-038, R13) — Node판 duplicate-logic-lib.mjs + check-duplicate-logic.mjs 미러 ──
 # 판정 게이트는 양판 필수다(SPEC-006). 이 축이 Node에만 있던 동안 Python 런타임 프로젝트는
 # 구현 중복을 아무도 보지 않는 상태였고, 그 0건은 진짜 0건과 구분되지 않았다.
@@ -7578,6 +7693,8 @@ def main():
         cmd_processssot(cfg)
     elif sub == "watchdog":
         cmd_watchdog(cfg)
+    elif sub == "completionsignal":
+        cmd_completionsignal(cfg)
     elif sub == "duplicatelogic":
         cmd_duplicatelogic(cfg)
     elif sub == "hooksinstalled":

@@ -228,6 +228,7 @@ export const DEFAULTS = {
   // 커밋 게이트로는 원리상 볼 수 없는 층이라 도구 호출 직전에 발동한다.
   //   diagnosisSpecMap: [{ match: <명령 정규식>, spec: <답이 있는 스펙>, mode: "surface"|"deny", why, instead: [...] }]
   diagnosisGuardPolicy: "advisory",
+  completionSignalPolicy: "advisory",
   diagnosisSpecMap: [],
   // 명세를 **읽는** 명령으로 인정할 패턴. null이면 킷 기본 —
   // 명세 읽기를 막으면 "읽어라"면서 읽기를 막는 자기모순이 되고 그 순간 사람이 훅을 끈다.
