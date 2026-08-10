@@ -16,7 +16,9 @@ import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
 
-const target = process.argv[2];
+const ARGS = process.argv.slice(2);
+const IS_CODE_PATH = ARGS.includes("--is-code-path");   // 배선 질의 모드(아래) — 판정이 아니다
+const target = ARGS.find((a) => !a.startsWith("--"));
 if (!target) process.exit(0);
 
 let cfg;
@@ -25,6 +27,20 @@ if (String(cfg.preEditSpecFirstPolicy ?? "advisory") === "off") process.exit(0);
 
 const ROOT = cfg.__root;
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
+
+// ── 코드 경로 질의(`--is-code-path <경로>`) — exit 0이면 코드, 1이면 아니다.
+// 편집 가드 쉘(`sdd-edit-check.sh`)이 체크리스트를 보일지 결정하는 데 쓴다. **왜 여기냐**:
+// 이전 판은 쉘이 `case src/|lib/|app/`으로 경로를 **하드코딩**했고, 주석은 "sdd-init가 조정한다"고
+// 적혀 있었지만 설치기는 그 파일을 그대로 복사만 했다. 실측: 킷의 `scanDirs`는 `tooling`이라
+// 체크리스트가 **한 번도 발화할 수 없었다** — 하드코딩된 어휘 밖의 프로젝트에서 판정이 통째로
+// 사라지고 그 0건이 진짜 0건과 구분되지 않는다(SPEC-051). config가 정본이다.
+if (IS_CODE_PATH) {
+  const relq = String(target).replace(/^\.\//, "");
+  const dirs = (cfg.scanDirs || []).map((d) => String(d).replace(/^\.\//, "").replace(/\/+$/, ""));
+  const hit = dirs.some((d) => d && (relq === d || relq.startsWith(`${d}/`) || relq.includes(`/${d}/`)));
+  verdict(VERDICT_KINDS.SKIPPED, "경로 질의 모드(판정 아님) — 코드 경로 여부만 답한다");
+  process.exit(hit ? 0 : 1);
+}
 const rel = String(target).replace(/^\.\//, "").replace(new RegExp(`^${ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`), "");
 
 // 스펙별 Files glob → 이 경로를 소유한 스펙 찾기.

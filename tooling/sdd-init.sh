@@ -98,7 +98,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs; do
+                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -183,42 +183,41 @@ if [ "$GATE" = "node" ]; then
     say "  → package.json check:spec-sync 스크립트 추가"
   fi
 
-  # .claude/settings.json 병합 — 기존 hooks 보존; jq 있으면 merge, 없으면 신규 생성
+  # ── 에이전트측 훅 배선 (SPEC-051) — **감시자가 에이전트를 보는 층.**
+  # git 훅은 커밋 시점에 이미 작성된 코드를 본다. 에이전트가 스펙 없이 코드를 쓰는 **그 순간**을
+  # 보는 것은 이 훅뿐이다. 실측 제보: 이 배선이 통째로 없어도 감시자 축(R17)은 초록이었다.
+  #
+  # ⚠ 훅 목록을 여기 하드코딩하지 않는다 — 선언은 `agent-hooks.list` 하나이고 설치기와 게이트가
+  # 같은 파일을 읽는다(SPEC-036에서 배운 것). 이전 판은 이 자리에 JSON을 박아뒀고, 그 JSON이
+  # 사실상 정본인데 **어떤 검사도 그것과 대조되지 않았다.**
+  copy "$KIT/tooling/harness/agent-hooks.list" "$T/scripts/agent-hooks.list"
   mkdir -p "$T/.claude"
   SETTINGS="$T/.claude/settings.json"
-  NEW_HOOKS='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"sh scripts/sdd-session-context.sh"}]}],"PreToolUse":[{"matcher":"Write|Edit","hooks":[{"type":"command","command":"sh scripts/sdd-edit-check.sh"}]},{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-precheck.sh"}]}],"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"sh scripts/sdd-deploy-check.sh"}]}]}}'
-  if [ -f "$SETTINGS" ]; then
-    if command -v jq >/dev/null 2>&1; then
-      # jq merge — 기존 SDD hook 항목 제거 후 신규 추가(idempotency 보장)
-      # select로 sdd-session-context / sdd-edit-check 포함 엔트리를 걷어낸 뒤 concat
-      tmp=$(mktemp)
-      jq -s '
-        .[0] as $old | .[1] as $new |
-        ($old * $new) |
-        .hooks.SessionStart = (
-          [ ($old.hooks.SessionStart // [])[] | select((.hooks[0].command // "") | test("sdd-session-context") | not) ]
-          + ($new.hooks.SessionStart // [])
-        ) |
-        .hooks.PreToolUse = (
-          [ ($old.hooks.PreToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-edit-check|sdd-deploy-precheck") | not) ]
-          + ($new.hooks.PreToolUse // [])
-        ) |
-        .hooks.PostToolUse = (
-          [ ($old.hooks.PostToolUse // [])[] | select((.hooks[0].command // "") | test("sdd-deploy-check") | not) ]
-          + ($new.hooks.PostToolUse // [])
-        )
-      ' "$SETTINGS" - <<_JQ > "$tmp" && mv "$tmp" "$SETTINGS"
-$NEW_HOOKS
-_JQ
-      say "  → .claude/settings.json hooks 병합 완료"
-    else
-      say "  ⚠ jq 미설치 — 기존 .claude/settings.json 보존(hook 배선 스킵). jq 설치 후 재실행 권장."
-      # 기존 파일 보존 — 절대 덮어쓰지 않음
-    fi
+  # 병합은 게이트가 계산하고(선언 하나에서 설치·판정이 함께 나온다) 쓰기는 여기서 한다.
+  # jq는 더 이상 쓰지 않는다 — 이 블록은 `--gate node` 안이라 node가 보장되고, 이전 판의
+  # "jq 미설치 → 배선 스킵"은 **설치가 성공으로 끝나는 조용한 0건**이었다(워크트리 결함을 몇 달간
+  # 가린 best-effort 침묵과 같은 모양).
+  tmp=$(mktemp)
+  if ( cd "$T" && node scripts/check-agent-wiring.mjs --emit-settings ) > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    # 판정 줄(마지막 한 줄)을 걷어내고 JSON만 남긴다 — 게이트는 항상 판정을 방출한다(SPEC-040).
+    grep -v '^판정: ' "$tmp" > "$SETTINGS"
+    rm -f "$tmp"
+    say "  → .claude/settings.json 배선(선언 $(grep -cvE '^[[:space:]]*(#|$)' "$T/scripts/agent-hooks.list")종 · 기존 훅 보존)"
   else
-    printf '%s\n' "$NEW_HOOKS" > "$SETTINGS"
-    say "  → .claude/settings.json 생성(hooks 배선)"
+    rm -f "$tmp"
+    echo "✗ .claude/settings.json 배선 실패 — 에이전트측 훅을 깔지 못했다." >&2
+    echo "  이 훅이 없으면 에이전트가 스펙 없이 코드를 쓰는 순간을 아무도 보지 못한다(SPEC-051)." >&2
+    echo "  확인: (cd \"$T\" && node scripts/check-agent-wiring.mjs --emit-settings)" >&2
+    exit 1
   fi
+  # 배선 건수 자기검증 — 0건을 조용히 넘기지 않는다(설치기가 "깔았다"고 말한 뒤 세지 않던 것이
+  # 이 결함 계열의 본체다 — SPEC-036 §2e와 같은 규율).
+  if ! ( cd "$T" && node scripts/check-agent-wiring.mjs ) >/dev/null 2>&1; then
+    echo "✗ 에이전트 훅 배선 자기검증 실패 — 배선했다고 말한 직후 게이트가 위반을 낸다." >&2
+    ( cd "$T" && node scripts/check-agent-wiring.mjs ) >&2 || true
+    exit 1
+  fi
+  say "  ✓ 에이전트 훅 배선 자기검증 통과(선언 전부 배선·스크립트 실재)"
 fi
 
 # ── 3. 방법론 설명서는 복사 안 함 — 키트 참조(드리프트 방지). 포인터만. ──
@@ -307,8 +306,17 @@ NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "")
   ( cd "$T" && ls scripts 2>/dev/null | grep -E '^(check|gen)-' | sed 's|^|    "scripts/|; s|$|",|' | sed '$ s|,$||' )
   echo "  ],"
   echo "  \"hooks\": ["
-  ( cd "$T" && ls .git/hooks 2>/dev/null | grep -vE '\.sample$' | sed 's|^|    ".git/hooks/|; s|$|",|' | sed '$ s|,$||' )
-  echo "  ]"
+  # ⚠ `.git/hooks`를 문자열로 가정하지 않는다 — 워크트리에서 `.git`은 파일이라 그 목록이 조용히
+  # 비고, 영수증이 "훅 0건"을 사실처럼 기록한다(SPEC-036의 결함이 이 자리에도 남아 있었다).
+  ( ls "$HOOKS_DIR" 2>/dev/null | grep -vE '\.sample$' | sed 's|^|    "|; s|$|",|' | sed '$ s|,$||' )
+  echo "  ],"
+  # 에이전트측 훅도 기록한다(SPEC-051) — 이전 판은 git 훅만 적었고, 그래서 "감시 에이전트가
+  # 깔렸는가"는 영수증에서 알 수 없었다. 감시자가 무엇을 깔았는지가 영수증의 존재 이유다.
+  echo "  \"agentHooks\": ["
+  ( cd "$T" && grep -vE '^[[:space:]]*(#|$)' scripts/agent-hooks.list 2>/dev/null \
+      | awk '{printf "    \"%s %s %s\",\n", $1, $2, $3}' | sed '$ s|,$||' )
+  echo "  ],"
+  echo "  \"agentSettings\": \"$( [ -f "$T/.claude/settings.json" ] && echo ".claude/settings.json" || echo "" )\""
   echo "}"
 } > "$RECEIPT"
 say "+ sdd/adoption.json (채택 영수증 — 커밋하라)"

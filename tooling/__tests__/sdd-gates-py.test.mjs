@@ -1445,3 +1445,60 @@ test("py importwiring: export 없음·파일 없음·확인 못 함·통과·off
   }
   console.log("IMPORTWIRING PARITY OK");
 });
+
+// ── 에이전트 배선 패리티(SPEC-051) ──
+// ⚠ 이 게이트도 판정 입력이 **저장소 상태**(선언 파일·설정 파일)이므로 픽스처에 두 런타임을
+// 나란히 깔고 같은 상태를 보게 한다.
+test("py agentwiring: 설정 부재·미배선·매처 좁음·스크립트 부재·통과·advisory·off·inert·값 위반 바이트 동일", skip, () => {
+  const closure = (entry) => {
+    const seen = new Set(); const stack = [entry];
+    while (stack.length) {
+      const f = stack.pop();
+      if (seen.has(f)) continue;
+      seen.add(f);
+      let t; try { t = readFileSync(join(TOOLING, f), "utf8"); } catch { continue; }
+      for (const imp of localImports(t)) stack.push(imp.specifier.replace(/^\.\//, ""));
+    }
+    return [...seen];
+  };
+  const DECL = "SessionStart  -           sdd-session-context.sh\nPreToolUse    Write|Edit  sdd-edit-check.sh\n";
+  const wire = (matcher, cmd) => ({ hooks: { PreToolUse: [{ matcher, hooks: [{ type: "command", command: cmd }] }] } });
+  const scen = [
+    { cfg: { agentWiringPolicy: "hard" }, decl: DECL, settings: null, scripts: true },      // 설정 부재
+    { cfg: { agentWiringPolicy: "hard" }, decl: DECL, settings: { hooks: {} }, scripts: true }, // 미배선
+    { cfg: { agentWiringPolicy: "hard" }, decl: DECL, settings: wire("Write", "sh scripts/sdd-edit-check.sh"), scripts: true }, // 매처 좁음
+    { cfg: { agentWiringPolicy: "hard" }, decl: DECL, settings: wire("Write|Edit", "sh scripts/sdd-edit-check.sh"), scripts: false }, // 스크립트 부재
+    { cfg: { agentWiringPolicy: "advisory" }, decl: DECL, settings: { hooks: {} }, scripts: true }, // 비차단
+    { cfg: { agentWiringPolicy: "off" }, decl: DECL, settings: null, scripts: true },
+    { cfg: { agentWiringPolicy: "hard" }, decl: null, settings: null, scripts: true },      // 선언 파일 없음 → INERT
+    { cfg: { agentWiringPolicy: "hard" }, decl: "# 주석만\n", settings: null, scripts: true }, // 선언 0건 → INERT
+    { cfg: { agentWiringPolicy: "nope" }, decl: DECL, settings: null, scripts: true },      // 값 위반
+  ];
+  for (const [i, sc] of scen.entries()) {
+    const root = fixture({}, sc.cfg);
+    try {
+      mkdirSync(join(root, "scripts"), { recursive: true });
+      for (const f of closure("check-agent-wiring.mjs")) cpSync(join(TOOLING, f), join(root, "scripts", f));
+      cpSync(PY, join(root, "scripts", "sdd_gates.py"));
+      if (sc.decl !== null) writeFileSync(join(root, "scripts", "agent-hooks.list"), sc.decl);
+      if (sc.scripts) for (const n of ["sdd-session-context.sh", "sdd-edit-check.sh"]) writeFileSync(join(root, "scripts", n), "#!/bin/sh\n");
+      if (sc.settings) {
+        mkdirSync(join(root, ".claude"), { recursive: true });
+        writeFileSync(join(root, ".claude", "settings.json"), JSON.stringify(sc.settings, null, 2));
+      }
+      const runIn = (cmd, args) => {
+        try { return { code: 0, out: execFileSync(cmd, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+        catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+      };
+      const n = runIn("node", [join(root, "scripts", "check-agent-wiring.mjs")]);
+      const py = runIn("python3", [join(root, "scripts", "sdd_gates.py"), "agentwiring"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+      // 생성 모드도 양판 동일해야 한다 — 설치기가 어느 런타임에서 돌든 같은 배선이 나와야 한다.
+      const ne = runIn("node", [join(root, "scripts", "check-agent-wiring.mjs"), "--emit-settings"]);
+      const pe = runIn("python3", [join(root, "scripts", "sdd_gates.py"), "agentwiring", "--emit-settings"]);
+      assert.equal(pe.out, ne.out, `시나리오 ${i + 1} --emit-settings 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  console.log("AGENTWIRING PARITY OK");
+});

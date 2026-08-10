@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, existsSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 test("sdd-init가 hook·settings·pre-commit 배선", () => {
   const root = mkdtempSync(join(tmpdir(), "sdd-init-"));
@@ -51,17 +51,26 @@ test("sdd-init가 기존 settings.json hooks 보존(merge)", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("jq 없으면 기존 settings.json 보존(clobber 금지)", () => {
+// jq 계약이 **반전**됐다(SPEC-051). 이전 판은 "jq 없으면 배선을 스킵하고 기존 파일을 보존"이었고
+// 그 스킵이 곧 **설치가 성공으로 끝나는 조용한 0건**이었다 — 에이전트측 훅이 하나도 안 깔린 채
+// 채택이 완료로 보고됐다. 이제 배선은 게이트(node)가 계산하므로 jq가 아예 필요 없고, 남의 키는
+// 병합으로 보존된다. 즉 보존 **그리고** 배선을 함께 단언한다.
+test("jq 없이도 배선되고 남의 키는 보존된다 — 조용한 스킵이 사라졌다", () => {
   const root = mkdtempSync(join(tmpdir(), "sdd-init-nojq-"));
   try {
     mkdirSync(join(root, ".claude"), { recursive: true });
     const sentinel = { _sentinel: "keep", hooks: { SessionStart: [] } };
     writeFileSync(join(root, ".claude/settings.json"), JSON.stringify(sentinel));
 
-    // PATH를 jq 없는 최소 경로로 — 스크립트가 sh/cp/mkdir 등은 찾되 jq만 없게 함.
-    // /bin:/usr/bin는 macOS/Linux 공통 기본 유틸 위치이나 jq는 보통 /usr/local/bin 등에 있음.
-    // 더 안전하게: PATH를 스크립트 실행에 필요한 최소값으로 설정하고 jq를 제외.
-    const noJqPath = "/bin:/usr/bin";
+    // jq만 없는 PATH를 만든다 — 이전 판은 PATH를 `/bin:/usr/bin`으로 줄였는데 그러면 **node도**
+    // 사라진다. 이 블록은 배선을 node 게이트로 계산하므로(SPEC-051) node 없는 PATH는 "jq 없음"이
+    // 아니라 "런타임 없음"을 시험하는 것이 되고, `--gate node` 설치 자체가 성립하지 않는다.
+    // jq를 가리는 shim 디렉터리를 PATH 앞에 두어 `command -v jq`가 실패하게 한다.
+    const shim = mkdtempSync(join(tmpdir(), "sdd-nojq-shim-"));
+    writeFileSync(join(shim, "jq"), "#!/bin/sh\nexit 127\n");
+    // 실행 비트를 주지 않는다 → `command -v jq`가 찾지 못한다(가림의 가장 단순한 형태).
+    const nodeDir = dirname(process.execPath);
+    const noJqPath = `${shim}:/bin:/usr/bin:${nodeDir}`;
     execFileSync(
       "sh",
       [join(process.cwd(), "tooling/sdd-init.sh"), "--gate=node"],
@@ -72,6 +81,10 @@ test("jq 없으면 기존 settings.json 보존(clobber 금지)", () => {
     assert.ok(existsSync(join(root, ".claude/settings.json")), "settings.json 파일 유지");
     const s = JSON.parse(readFileSync(join(root, ".claude/settings.json"), "utf8"));
     assert.strictEqual(s._sentinel, "keep", "sentinel 키 보존(clobber 없음)");
+    // 그리고 **배선이 실제로 됐어야 한다** — 이것이 없으면 조용한 스킵이 남아 있다는 뜻이다.
+    const cmds = (s.hooks?.SessionStart || []).flatMap((g) => (g.hooks || []).map((h) => h.command || ""));
+    assert.ok(cmds.some((c) => c.includes("sdd-session-context")),
+      `jq 없는 환경에서 에이전트 훅이 배선되지 않았다: ${JSON.stringify(s.hooks?.SessionStart)}`);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

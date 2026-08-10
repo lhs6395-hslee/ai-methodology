@@ -24,11 +24,12 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 51건
+## Entity 키 (aggregate root) — 52건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
 | `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | ✓ |
+| `agent-wiring` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref` | SPEC-037 | ✓ | ✓ | ✓ |
@@ -80,13 +81,16 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 93건
+## Surface 키 — 96건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `agent-hooks.list` | SPEC-051 | ✓ | ✗ 미앵커 | ✓ |
+| `agent-wiring-lib.mjs` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation-lib.mjs` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-lib.mjs` | SPEC-037 | ✓ | ✓ | ✓ |
+| `check-agent-wiring.mjs` | SPEC-051 | ✓ | ✓ | ✓ |
 | `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-deploy-debt.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -178,11 +182,12 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 53건
+## Capability 키 — 54건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
 | `adoption-lifecycle.adopt` | SPEC-005 | ✓ | ✓ | ✓ |
+| `agent-wiring.attest` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation.account` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership.judge` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref.judge` | SPEC-037 | ✓ | ✓ | ✓ |
@@ -240,7 +245,7 @@
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
-| `.claude/settings.json` | SPEC-004 | ✓ | — | — |
+| `.claude/settings.json` | SPEC-051 | ✓ | — | — |
 | `.claude/skills/sdd-migrate/skill.md` | SPEC-025 | ✓ | — | — |
 | `.claude/skills/sdd-readopt/skill.md` | SPEC-005 | ✓ | — | — |
 | `.claude/skills/sdd-start/skill.md` | SPEC-005 | ✓ | — | — |
@@ -261,8 +266,8 @@
 
 ## 집계
 
-- 소유 키 총 **215건** (entity 51 · surface 93 · capability 53 · 역할없음 18)
+- 소유 키 총 **220건** (entity 52 · surface 96 · capability 54 · 역할없음 18)
 - 유일성 위반 **0건**
-- FR 앵커 미충족 **0건** / 미판정 0건
+- FR 앵커 미충족 **1건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건
 

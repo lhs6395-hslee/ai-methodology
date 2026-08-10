@@ -125,6 +125,7 @@
     "external-target": "환경이 아무 말도 하지 않을 때 이 시스템이 기본으로 치는 **다른 시스템** — 평범한 상수와 다른 층이다. 그건 구현 세부가 아니라 계약이고, 계약은 스펙이 알아야 조용히 바뀌지 않는다(SPEC-044)",
     "gate-verdict": "게이트가 무엇을 했는지의 **종류**(판정함·정책 off·판정 입력 없음·사유 있는 생략) — 게이트가 내는 문장과 다른 층이다. 문장은 사람이 읽고 종류는 집계기가 읽는데, 둘이 어긋나 \"판정 안 함\"이 \"✓ clean\"으로 집계되던 것이 이 entity의 신설 사유다(SPEC-040)",
     "import-wiring": "설치된 게이트 집합의 모듈들이 서로의 **선언된 export를 실제로 해석할 수 있는 상태** — 파일이 거기 있는 것과 다른 층이다. 부분 동기화(게이트 최신·lib 구판)는 파일 실재 검사를 통과하고 로드 시점에야 SyntaxError로 나타나며, 그 신호는 고장 지점이 아닌 다른 게이트에서 뜬다(SPEC-050). 실측: update 절차의 diff가 공유 lib 27개를 빠뜨려 소비처가 판정 대신 크래시를 받았다",
+    "agent-wiring": "에이전트의 도구 사용을 관측하는 가드가 **그 에이전트에 실제로 배선된 상태** — 가드 스크립트가 디스크에 있는 것과도, 우회 불가한 CI 채널이 있는 것과도 다른 층이다. CI는 커밋 이후에 돌므로 \"지금 스펙 없이 코드를 쓰고 있다\"를 말할 수 있는 자리는 에이전트 훅뿐인데, 그 배선이 아무 축의 대상이 아니어서 감시자 축(R17)이 초록인 동안 감시 에이전트가 전무할 수 있었다(SPEC-051). 실측: 킷 자신에 `.claude/`가 없어 이 층만 도그푸딩이 0이었다",
     "covers-backlink": "테스트 태그와 FR 검증 목록의 **상호 인정** — FR이 실재하는 것과 그 FR이 이 테스트를 인정하는 것은 다른 사실이다(번호가 겹치면 실재는 성립하고 동일성은 깨진다, SPEC-039)"
   },
   "relationTypes": [
@@ -197,6 +198,9 @@
   "introDocRuleSource": "HARNESS.md",
   "introDocPolicy": "hard",
   "importWiringPolicy": "hard",
+  "agentWiringPolicy": "hard",
+  "agentHookDecl": "tooling/harness/agent-hooks.list",
+  "agentScriptDir": "tooling/harness",
   "capabilityVerbs": [
     "account",
     "adopt",

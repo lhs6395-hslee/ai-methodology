@@ -185,6 +185,17 @@ export const DEFAULTS = {
   // 판정 대상 확장자. null이면 킷 기본(`["mjs","js"]`) — 코드에 고정하면 목록 밖 설치에서
   // 판정이 통째로 사라지고 그 0건이 진짜 0건과 구분되지 않는다(SPEC-038 계열).
   importWiringExtensions: null,
+
+  // 에이전트 배선 실재(SPEC-051) — **감시자가 에이전트를 실제로 보는가.**
+  // R17은 CI·영수증(커밋 이후 채널)을 보고, 이 축은 에이전트가 도구를 쓰는 **순간**에 발동하는
+  // 훅의 배선을 본다. 실측: 킷 자신에 `.claude/`가 없어 이 층이 통째로 비어 있었는데 R17은
+  // 초록이었다 — 감시자가 있다와 감시자가 에이전트를 본다는 다른 사실이다.
+  agentWiringPolicy: "advisory",
+  // 에이전트 설정 파일·훅 단일 선언·스크립트 디렉터리. null이면 킷 기본
+  // (`.claude/settings.json` · `scripts/agent-hooks.list` · `scripts`).
+  agentSettingsFile: null,
+  agentHookDecl: null,
+  agentScriptDir: null,
   sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.

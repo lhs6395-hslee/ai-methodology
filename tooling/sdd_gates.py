@@ -137,6 +137,11 @@ DEFAULTS = {
     # 배포 폐포 계약으로도 안 잡힌다: 그건 파일 실재, 이건 export 실재다.
     "importWiringPolicy": "advisory",
     "importWiringExtensions": None,
+    # 에이전트 배선 실재(SPEC-051) — 감시자가 에이전트를 보는가.
+    "agentWiringPolicy": "advisory",
+    "agentSettingsFile": None,
+    "agentHookDecl": None,
+    "agentScriptDir": None,
     "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
@@ -6040,6 +6045,216 @@ def format_wiring_violation(v):
             % (v["from"], v["specifier"], v["name"], re.sub(r"^\./", "", v["specifier"])))
 
 
+# ── 에이전트 배선 실재 (SPEC-051, R19) — Node판 agent-wiring-lib.mjs 미러 ─────
+# 오너 실측: "감시게이트/감시에이전트가 SDD로 수행하는지 혼자 날뛰지 않는지 보게 해야 하는데
+# 그게 동작을 하지 않아." R17은 CI·영수증(커밋 이후 채널)을 보고, 이 축은 에이전트가 도구를 쓰는
+# **순간** 발동하는 훅의 배선을 본다. 킷 자신에 `.claude/`가 없었는데도 R17은 초록이었다.
+NO_MATCHER = "-"
+DEFAULT_AGENT_SETTINGS_FILE = ".claude/settings.json"
+DEFAULT_AGENT_HOOK_DECL = "scripts/agent-hooks.list"
+DEFAULT_AGENT_SCRIPT_DIR = "scripts"
+
+
+def parse_agent_hook_decl(text):
+    out = []
+    for raw in str(text or "").split("\n"):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        ev, mt, sc = parts[0], parts[1], parts[2]
+        out.append({"event": ev, "matcher": "" if mt == NO_MATCHER else mt, "script": sc})
+    return out
+
+
+def wired_hooks(settings):
+    out = []
+    hooks = settings.get("hooks") if isinstance(settings, dict) else None
+    if not isinstance(hooks, dict):
+        return out
+    for event, groups in hooks.items():
+        if not isinstance(groups, list):
+            continue
+        for g in groups:
+            if not isinstance(g, dict):
+                continue
+            matcher = str(g.get("matcher") or "")
+            hl = g.get("hooks")
+            for h in hl if isinstance(hl, list) else []:
+                if not isinstance(h, dict):
+                    continue
+                out.append({"event": event, "matcher": matcher, "command": str(h.get("command") or "")})
+    return out
+
+
+def missing_matcher_tokens(declared, wired):
+    want = [t.strip() for t in str(declared or "").split("|") if t.strip()]
+    if not want:
+        return []
+    have = set(t.strip() for t in str(wired or "").split("|") if t.strip())
+    return [t for t in want if t not in have]
+
+
+def command_names_script(command, script):
+    if not command or not script:
+        return False
+    return re.search(r'(^|[\s/"\'])' + re.escape(script) + r'([\s"\']|$)', str(command)) is not None
+
+
+def agent_wiring_findings(decls, settings, script_exists):
+    missing, narrowed, script_missing = [], [], []
+    settings_missing = not settings
+    wired = wired_hooks(settings) if settings else []
+    for d in decls or []:
+        hits = [w for w in wired if w["event"] == d["event"] and command_names_script(w["command"], d["script"])]
+        if not hits:
+            missing.append(d)
+            continue
+        gaps = [missing_matcher_tokens(d["matcher"], h["matcher"]) for h in hits]
+        best = gaps[0]
+        for g in gaps:
+            if len(g) < len(best):
+                best = g
+        if best:
+            nd = dict(d)
+            nd["missingTools"] = best
+            narrowed.append(nd)
+        if callable(script_exists) and not script_exists(d["script"]):
+            script_missing.append(d)
+    return {"settingsMissing": settings_missing, "missing": missing,
+            "narrowed": narrowed, "scriptMissing": script_missing}
+
+
+def build_hook_settings(decls, command_for):
+    order, groups = [], {}
+    for d in decls or []:
+        key = (d["event"], d["matcher"])
+        if key not in groups:
+            order.append(key)
+            groups[key] = []
+        groups[key].append({"type": "command", "command": command_for(d["script"])})
+    hooks, ev_order = {}, []
+    for key in order:
+        ev, mt = key
+        if ev not in hooks:
+            hooks[ev] = []
+            ev_order.append(ev)
+        entry = {"hooks": groups[key]}
+        if mt:
+            entry["matcher"] = mt
+        hooks[ev].append(entry)
+    return {"hooks": hooks}
+
+
+def merge_hook_settings(existing, decls, command_for):
+    base = existing if isinstance(existing, dict) else {}
+    fresh = build_hook_settings(decls, command_for)
+    def is_ours(command):
+        return any(command_names_script(command, d["script"]) for d in decls or [])
+    merged = dict(base)
+    merged["hooks"] = dict(base.get("hooks") if isinstance(base.get("hooks"), dict) else {})
+    for event, groups in fresh["hooks"].items():
+        prev = merged["hooks"].get(event)
+        prev = prev if isinstance(prev, list) else []
+        kept = []
+        for g in prev:
+            hl = g.get("hooks") if isinstance(g, dict) else None
+            cmds = [str(h.get("command") or "") for h in (hl if isinstance(hl, list) else []) if isinstance(h, dict)]
+            if not cmds or not all(is_ours(c) for c in cmds):
+                kept.append(g)
+        merged["hooks"][event] = kept + groups
+    return merged
+
+
+def cmd_agentwiring(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("agentWiringPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ agentWiringPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "agentWiringPolicy")
+        print("에이전트 배선 게이트 — agentWiringPolicy:off (판정 안 함)")
+        return
+    def absp(rel):
+        return os.path.join(root, *str(rel).split("/"))
+    decl_rel = str(cfg.get("agentHookDecl") or DEFAULT_AGENT_HOOK_DECL)
+    decl_path = absp(decl_rel)
+    if not os.path.exists(decl_path):
+        verdict("INERT", f"훅 선언 파일 없음 — {decl_rel}")
+        print(f"[안 봄(판정 입력 없음)] 에이전트 배선 게이트 — 훅 선언 파일이 없다({decl_rel})."
+              " 이 파일이 설치기와 게이트의 **단일 선언**이다 — 없으면 무엇이 배선돼야 하는지 알 수 없다."
+              " `sh scripts/sdd-init.sh`가 깔거나 킷 `tooling/harness/agent-hooks.list`를 복사하라.")
+        return
+    decls = parse_agent_hook_decl(read_text(decl_path))
+    if not decls:
+        verdict("INERT", "선언된 에이전트 훅 0건")
+        print(f"[안 봄(판정 입력 없음)] 에이전트 배선 게이트 — {decl_rel}에 선언된 훅이 0건이다"
+              " — **0건은 '깨끗함'이 아니라 '볼 것이 없음'이다**.")
+        return
+    settings_rel = str(cfg.get("agentSettingsFile") or DEFAULT_AGENT_SETTINGS_FILE)
+    settings_path = absp(settings_rel)
+    settings, parse_error = None, ""
+    if os.path.exists(settings_path):
+        try:
+            settings = json.loads(read_text(settings_path))
+        except Exception:
+            parse_error = "설정 파일을 JSON으로 읽지 못했다"
+    script_dir = str(cfg.get("agentScriptDir") or DEFAULT_AGENT_SCRIPT_DIR)
+
+    if "--emit-settings" in sys.argv:
+        merged = merge_hook_settings(settings, decls, lambda s: f"sh {script_dir}/{s}")
+        verdict("SKIPPED", "생성 모드(판정 아님) — 병합된 설정을 산출한다. 판정은 무인자 실행")
+        sys.stdout.write(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+        return
+
+    def script_exists(name):
+        p = absp(f"{script_dir}/{name}")
+        return os.path.exists(p) and os.access(p, os.R_OK)
+
+    f = agent_wiring_findings(decls, settings, script_exists)
+    errors, warnings = [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    if parse_error:
+        block(f"{settings_rel}: {parse_error} — 에이전트가 이 파일을 읽지 못하면 훅이 하나도 발동하지 않는다")
+    elif f["settingsMissing"]:
+        block(f"에이전트 설정 파일이 없다 — {settings_rel}. 선언된 훅 {len(decls)}종이 **한 번도 발동한 적이 없다**는 뜻이다."
+              " git 훅은 커밋 시점에 이미 작성된 코드를 보므로, 에이전트가 스펙 없이 코드를 쓰는 **그 순간**을 보는 층은 이것뿐이다."
+              " `sh scripts/sdd-init.sh`가 이 파일을 만든다(기존 hooks는 보존·병합)")
+    for d in f["missing"]:
+        mt = f'({d["matcher"]})' if d["matcher"] else ""
+        block(f'{d["event"]}{mt}에 `{d["script"]}`가 배선되지 않았다'
+              " — 그 이벤트에서 이 훅은 발동하지 않는다(선언만 있고 배선이 없으면 감시자는 없는 것과 같다)")
+    for d in f["narrowed"]:
+        block(f'{d["event"]}의 `{d["script"]}` 매처가 좁다 — 도구 {"·".join(d["missingTools"])}에서 발동하지 않는다'
+              f'(선언: {d["matcher"]}). 넓히는 것은 정상이지만 좁히면 그 도구가 감시 밖으로 나간다')
+    for d in f["scriptMissing"]:
+        block(f'`{d["script"]}`가 배선돼 있는데 {script_dir}/에 실재하지 않거나 읽을 수 없다'
+              " — 에이전트는 그 훅을 조용히 건너뛴다(존재는 실행이 아니다)")
+
+    judged(len(errors))
+    wired_count = len(decls) - len(f["missing"])
+    print(f'에이전트 배선 게이트(agentWiringPolicy={policy}): 선언 {len(decls)}종 · 배선 {wired_count}종'
+          f' · 매처 좁음 {len(f["narrowed"])} · 스크립트 부재 {len(f["scriptMissing"])} | 설정 {settings_rel}')
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 감시 에이전트가 배선되지 않았다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        print("\n→ `sh scripts/sdd-init.sh`(기존 hooks 보존 병합). 배선 실패는 조용히 넘어가지 않는다 — 설치기가 건수를 세고 0이면 실패로 말한다.",
+              file=sys.stderr)
+        sys.exit(1)
+    if not warnings:
+        print(f"  ✓ 선언된 에이전트 훅 {len(decls)}종이 모두 배선돼 있고 지목된 스크립트가 실재한다 — 감시자가 에이전트를 본다.")
+
+
 def cmd_importwiring(cfg):
     policy = str(cfg.get("importWiringPolicy") or "advisory")
     if policy not in ("off", "advisory", "hard"):
@@ -6265,6 +6480,8 @@ def main():
         cmd_watchdog(cfg)
     elif sub == "importwiring":
         cmd_importwiring(cfg)
+    elif sub == "agentwiring":
+        cmd_agentwiring(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

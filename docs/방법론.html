@@ -656,6 +656,29 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
   <p>스윕은 게이트 출력의 <strong>마지막 줄</strong>을 요약으로 뽑았고, 크래시 stderr의 마지막 줄은 <strong>런타임 버전 배너</strong>였다. 원인 줄은 스택 프레임 위에 묻혀 있었으므로 제보자가 스택을 직접 읽어야 했다. <em>마지막 줄이 요약인 것은 게이트가 협조적으로 끝났을 때만 참이다 — 크래시는 협조가 아니다.</em></p>
   <p class="note">이제 요약은 스택 프레임·캐럿·버전 배너를 <strong>형태로</strong> 걸러낸 뒤 던져진 오류 줄을 고른다(특정 런타임의 어휘에 기대면 다른 런타임에서 통째로 빗나간다). 침묵이 아니라 <strong>오진</strong>이었던 사례다 — 게이트 크래시는 원래도 미판정으로 계상돼 초록이 아니었지만, 사유가 쓸모없으면 사람이 원인까지 가는 길이 없다.</p>
 
+  <h4>감시자가 있다와 감시자가 에이전트를 본다는 다른 사실이다 <span class="note">(규칙 R19)</span></h4>
+  <p>오너의 실측은 한 문장이었다 — <strong>"SDD에 의해 수행하는지 혼자 날뛰지 않는지 봐야 하는데, 그게 동작을 하지 않아."</strong></p>
+  <p>R17이 이미 "감시자가 실재하는가"를 묻고 초록이었는데도 그랬다. 왜냐하면 <strong>R17이 보는 채널은 커밋 이후에 돈다.</strong> 관측 시점을 늘어놓으면 빈 칸이 보인다:</p>
+  <div class="tablewrap"><table>
+    <tr><th>층</th><th>언제 보는가</th><th>무엇을 볼 수 있나</th></tr>
+    <tr><td>CI (R17)</td><td>커밋·머지 <strong>이후</strong></td><td>완성된 changeset. 우회 불가하지만 사후다</td></tr>
+    <tr><td>git 훅 (R12)</td><td>커밋 시점</td><td>이미 작성된 코드. 순서 위반이 여기서 처음 드러난다</td></tr>
+    <tr><td><strong>에이전트 훅 (R19)</strong></td><td>에이전트가 <strong>도구를 쓰는 순간</strong></td><td class="pass">"지금 스펙 없이 코드를 쓰고 있다" — 이걸 말할 수 있는 유일한 자리</td></tr>
+  </table></div>
+  <p>그 세 번째 층의 배선이 <strong>어떤 축의 판정 대상도 아니었다.</strong> 그래서 아무것도 에이전트를 보지 않는 상태가 감시자 축의 초록과 공존할 수 있었다.</p>
+  <p>가장 결정적인 증거는 킷 자신이었다. 이 킷은 모든 축을 스스로에게 적용하는데 <strong>이 층만 도그푸딩이 0이었다</strong> — <code>.claude/</code> 디렉터리가 아예 없었다. 즉 <em>이 배선이 동작하는 것을 킷이 한 번도 관측한 적이 없다.</em> 게이트를 만들자마자 킷에서 위반 5건이 나왔고, 배선한 뒤 편집 가드가 <strong>이 킷에서 처음 실제로 발화했다.</strong></p>
+  <p>나머지 네 원인도 모두 <strong>조용한 0건</strong> 계열이었다:</p>
+  <div class="tablewrap"><table>
+    <tr><th>원인</th><th>왜 조용했나</th></tr>
+    <tr><td>영수증이 git 훅만 기록</td><td>"감시 에이전트가 깔렸는가"를 영수증에서 알 수 없었다 — 무엇을 깔았는지가 영수증의 존재 이유인데</td></tr>
+    <tr><td><code>jq</code> 미설치 → 배선 스킵</td><td>설치가 <strong>성공으로</strong> 끝났다. 워크트리 결함을 몇 달간 가린 침묵과 같은 모양</td></tr>
+    <tr><td>편집 가드 경로 하드코딩</td><td><code>src/|lib/|app/</code>였고 킷의 <code>scanDirs</code>는 <code>tooling</code> — 배선했어도 <strong>발화할 수 없었다</strong></td></tr>
+    <tr><td>그 하드코딩의 주석</td><td>"설치기가 조정한다"고 적혀 있었지만 설치기는 그 파일을 <strong>복사만 했다</strong></td></tr>
+  </table></div>
+  <p>훅 목록은 이제 <strong>단일 선언</strong>이다 — 설치기와 게이트가 같은 파일을 읽는다(R12에서 배운 것: 목록이 둘이면 훅을 추가해도 한쪽이 뒤처져 "설치 안 됐는데 아무도 모르는" 상태가 된다). 배선은 그 선언에서 계산되고, 실패는 큰 소리로 멈추며, 배선 직후 자기검증을 돈다. <code>jq</code>는 더 이상 쓰지 않는다.</p>
+  <p class="note">매처는 <strong>부분집합</strong>으로 판정한다. 프로젝트가 감시 도구를 넓히는 것(<code>Write|Edit</code> → <code>Write|Edit|MultiEdit</code>)은 정당한 강화인데 정확 일치를 요구하면 그것이 전부 위반이 되고, 오탐이 잦은 게이트는 꺼진다. 좁혀서 어떤 도구가 감시 밖으로 나가면 <strong>그 도구를 이름으로</strong> 말한다.</p>
+  <p class="note"><strong>자동 치유는 두지 않았다.</strong> 게이트가 설정을 직접 고쳐 배선할 수도 있었지만, 판정 게이트가 판정 대상을 고치면 그 게이트는 언제나 초록이고 <em>초록의 의미가 사라진다.</em> 생성 모드는 배선을 <strong>산출만</strong> 하고 쓰기는 설치기가 한다. 그리고 이 축은 <strong>배선의 실재만</strong> 판정한다 — 훅이 발동한 뒤 에이전트가 경고를 따르는지는 다른 층이고(차단 분기 발화 회계), 두 사실을 합치면 "훅이 깔렸다"가 "에이전트가 따랐다"로 읽힌다.</p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>
@@ -676,7 +699,7 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">17</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">23</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">51</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">18</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">24</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">52</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

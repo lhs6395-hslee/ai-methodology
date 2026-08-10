@@ -85,6 +85,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 래칫 감시 목록에 `agentWiringPolicy` 추가 | SPEC-051 동반. 구조적 완전성 테스트가 이번에도 새 knob을 지목했다 — 감시 배선 정책이 래칫 밖에서 태어나면 조용히 하향될 수 있고, 그 하향은 정확히 이 라운드가 고친 결함(감시 없음)으로 되돌아간다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `importWiringPolicy` 추가 | SPEC-050 동반. 새 강제 knob이 래칫 밖에서 태어나면 그 knob은 조용히 하향될 수 있다 — 이 스펙의 구조적 완전성 테스트가 이번에도 새 knob을 지목했다(라운드마다 발화하는 것이 이 축의 정상 동작이다) [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `watchdogPolicy` 추가 — 양판 | 감시자 정책이 감시 밖이면 hard→advisory 한 줄로 감시자 요구를 회피할 수 있다. 감시자를 끄는 것이 가장 값싼 우회이므로 특히 래칫 안에 있어야 한다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `processSsotPolicy` 추가 — 양판 | 신설 강도 knob이 감시 밖에서 태어나면 hard→advisory 한 줄로 위반을 회피할 수 있다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |

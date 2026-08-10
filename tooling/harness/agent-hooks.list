@@ -1,0 +1,19 @@
+# 킷이 설치하는 **에이전트측 훅** 집합 — 단일 선언(SPEC-051).
+#
+# 설치기(sdd-init.sh)와 검사 게이트(check-agent-wiring)가 **같은 이 파일을 읽는다.**
+# git 훅에서 이미 배운 교훈이다(SPEC-036 `hooks.list`): 목록을 두 곳에 적으면 훅을 추가해도
+# 설치기·검사 중 한쪽이 뒤처져 "설치 안 됐는데 아무도 모르는" 상태가 된다.
+#
+# ⚠ 이 층은 git 훅과 **다른 것을 감시한다.** git 훅은 커밋·푸시 시점에 발동하므로 이미 작성된
+# 코드를 본다. 에이전트측 훅은 **에이전트가 도구를 쓰는 순간** 발동한다 — 즉 "이 에이전트가 SDD로
+# 수행하고 있는가, 혼자 날뛰고 있는가"를 보는 자리는 여기뿐이다. 실측: 킷 자신에 이 배선이
+# 통째로 없었고(`.claude/` 부재) 그런데도 감시자 축(R17)은 초록이었다 — R17은 CI와 영수증을 보고
+# 이 층을 보지 않았기 때문이다. **감시자가 있다와 감시자가 에이전트를 본다는 다른 사실이다.**
+#
+# 형식: <이벤트> <매처> <스크립트>  (공백 구분 3필드, 매처 없음은 `-`)
+#   매처는 **부분집합 판정**이다 — 프로젝트가 `Write|Edit|MultiEdit`로 넓히면 정상이고,
+#   `Write`만 남겨 `Edit`이 빠지면 그 도구에서 훅이 발동하지 않으므로 위반이다.
+SessionStart  -           sdd-session-context.sh
+PreToolUse    Write|Edit  sdd-edit-check.sh
+PreToolUse    Bash        sdd-deploy-precheck.sh
+PostToolUse   Bash        sdd-deploy-check.sh
