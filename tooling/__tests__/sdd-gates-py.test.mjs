@@ -1550,3 +1550,44 @@ test("py specconflict: 교차 모순·한 스펙 내 모순·흔한 술어·통�
   }
   console.log("SPECCONFLICT PARITY OK");
 });
+
+// ── 진단 가드 패리티(SPEC-053) ── 훅·스윕 **두 모드** 모두 대조한다.
+test("py diagnosisguard: 금지·노출·명세읽기·무관·선언위반·inert·off 바이트 동일(훅+스윕)", skip, () => {
+  const RULE = { match: "kubectl get application", spec: "INFRA-004.md", mode: "deny",
+    why: "소유자 결정으로 GitOps를 쓰지 않는다", instead: ["젠킨스 빌드 결과"] };
+  const scen = [
+    { cfg: { diagnosisGuardPolicy: "hard", diagnosisSpecMap: [RULE] } },
+    { cfg: { diagnosisGuardPolicy: "hard", diagnosisSpecMap: [{ ...RULE, mode: "surface" }] } },
+    { cfg: { diagnosisGuardPolicy: "advisory", diagnosisSpecMap: [RULE] } },
+    { cfg: { diagnosisGuardPolicy: "hard", diagnosisSpecMap: [{ ...RULE, spec: "NOPE.md" }] } }, // 선언 위반
+    { cfg: { diagnosisGuardPolicy: "hard", diagnosisSpecMap: [{ ...RULE, instead: [] }] } },     // deny-without-instead
+    { cfg: { diagnosisGuardPolicy: "hard", diagnosisSpecMap: [] } },                             // INERT
+    { cfg: { diagnosisGuardPolicy: "off", diagnosisSpecMap: [RULE] } },
+    { cfg: { diagnosisGuardPolicy: "bogus", diagnosisSpecMap: [] } },                            // 값 위반
+  ];
+  const CMDS = ["kubectl get application -A", "grep -n kubectl sdd/specs/INFRA-004.md", "npm test", ""];
+  for (const [i, sc] of scen.entries()) {
+    const root = fixture({ "sdd/specs/INFRA-004.md": "**Spec**: `INFRA-004`\n## Edge Cases\n- x\n" }, sc.cfg);
+    try {
+      // 스윕 모드
+      const n = runNode(root, "check-diagnosis-guard.mjs");
+      const py = runPy(root, ["diagnosisguard"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 스윕 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} 스윕 exit 불일치`);
+      // 훅 모드 — 명령별로
+      for (const cmd of CMDS) {
+        const input = JSON.stringify({ tool_input: { command: cmd } });
+        const one = (bin, args) => {
+          try { return { code: 0, out: execFileSync(bin, args, { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "pipe"] }) }; }
+          catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+        };
+        // 기존 runNode·runPy와 같이 **킷 경로**의 게이트를 cwd=root로 돌린다(픽스처는 config·스펙만 준다).
+        const hn = one("node", [join(TOOLING, "check-diagnosis-guard.mjs"), "--hook"]);
+        const hp = one("python3", [PY, "diagnosisguard", "--hook"]);
+        assert.equal(hp.out, hn.out, `시나리오 ${i + 1} 훅 출력 불일치 (cmd=${cmd})`);
+        assert.equal(hp.code, hn.code, `시나리오 ${i + 1} 훅 exit 불일치 (cmd=${cmd})`);
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  console.log("DIAGGUARD PARITY OK");
+});

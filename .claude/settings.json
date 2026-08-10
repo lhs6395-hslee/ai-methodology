@@ -25,6 +25,10 @@
           {
             "type": "command",
             "command": "sh tooling/harness/sdd-deploy-precheck.sh"
+          },
+          {
+            "type": "command",
+            "command": "sh tooling/harness/sdd-diagnosis-check.sh"
           }
         ],
         "matcher": "Bash"

@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 53건
+## Entity 키 (aggregate root) — 54건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -37,6 +37,7 @@
 | `cross-spec-change` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard` | SPEC-035 | ✓ | ✓ | ✓ |
 | `derivation-accounting` | SPEC-009 | ✓ | ✓ | ✓ |
+| `diagnosis-guard` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic` | SPEC-038 | ✓ | ✓ | ✓ |
 | `engine-event` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations` | SPEC-017 | ✓ | ✓ | ✓ |
@@ -82,7 +83,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 98건
+## Surface 키 — 101건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -97,6 +98,7 @@
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-precheck.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
+| `check-diagnosis-guard.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `check-duplicate-logic.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
@@ -126,6 +128,7 @@
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard-lib.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `derivation-lib.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
+| `diagnosis-guard-lib.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `drift-lib.mjs` | SPEC-019 | ✓ | ✓ | ✓ |
 | `duplicate-logic-lib.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
 | `engine-event-lib.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
@@ -163,6 +166,7 @@
 | `sdd-config.mjs` | SPEC-001 | ✓ | ✓ | ✓ |
 | `sdd-deploy-check.sh` | SPEC-035 | ✓ | ✓ | ✓ |
 | `sdd-deploy-precheck.sh` | SPEC-035 | ✓ | ✓ | ✓ |
+| `sdd-diagnosis-check.sh` | SPEC-053 | ✓ | ✗ 미앵커 | ✓ |
 | `sdd-edit-check.sh` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-init.sh` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-migrate.skill.md` | SPEC-025 | ✓ | ✓ | ✓ |
@@ -185,7 +189,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 55건
+## Capability 키 — 56건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -198,6 +202,7 @@
 | `cross-spec-change.judge` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard.gate` | SPEC-035 | ✓ | ✓ | ✓ |
 | `derivation-accounting.account` | SPEC-009 | ✓ | ✓ | ✓ |
+| `diagnosis-guard.expose` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic.judge` | SPEC-038 | ✓ | ✓ | ✓ |
 | `engine-event.judge` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations.resolve` | SPEC-017 | ✓ | ✓ | ✓ |
@@ -270,8 +275,8 @@
 
 ## 집계
 
-- 소유 키 총 **224건** (entity 53 · surface 98 · capability 55 · 역할없음 18)
+- 소유 키 총 **229건** (entity 54 · surface 101 · capability 56 · 역할없음 18)
 - 유일성 위반 **0건**
-- FR 앵커 미충족 **1건** / 미판정 0건
+- FR 앵커 미충족 **2건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건
 

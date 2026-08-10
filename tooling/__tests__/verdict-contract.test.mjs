@@ -33,8 +33,20 @@ test("스윕 등재 게이트는 전부 판정 타입을 선언한다 — 미배
 });
 
 test("스윕 등재 게이트는 훅 계층 좁힘(quietWhenSilent)을 쓸 수 없다 — 선언만으로 집계를 빠져나가지 못하게", () => {
-  const abusing = sweepGates().filter((g) => /armVerdict\(\s*\{[^}]*quietWhenSilent/.test(readFileSync(join(HERE, g), "utf8")));
-  assert.deepEqual(abusing, [], `스윕 게이트가 침묵 계약을 선언했다: ${abusing.join(", ")}`);
+  // 계약의 의도는 "**스윕 판정**을 침묵시키지 말라"다. 한 파일이 훅과 스윕 두 모드로 사는 게이트가
+  // 생겼고(SPEC-053 — 조회는 커밋을 남기지 않으므로 훅 모드가 필수다), 그 경우 훅 모드에서만 켜는
+  // 조건부는 계약을 어기지 않는다: 스윕 실행에는 여전히 판정 줄이 나온다.
+  // 그래서 금지 대상을 **무조건 켜기**로 좁힌다 — 조건부는 `--hook`에 묶여 있어야 한다.
+  const bad = [];
+  for (const g of sweepGates()) {
+    const src = readFileSync(join(HERE, g), "utf8");
+    const m = src.match(/armVerdict\(\s*\{([^}]*quietWhenSilent[^}]*)\}/);
+    if (!m) continue;
+    const arg = m[1];
+    if (/quietWhenSilent\s*:\s*true/.test(arg)) { bad.push(`${g}: 무조건 침묵 선언`); continue; }
+    if (!/--hook/.test(arg)) bad.push(`${g}: 침묵 조건이 훅 모드에 묶여 있지 않다`);
+  }
+  assert.deepEqual(bad, [], `스윕 게이트가 침묵 계약을 어겼다:\n  ${bad.join("\n  ")}`);
 });
 
 test("main-guard가 있는 게이트는 arm을 guard 안에서 한다 — import만 한 프로세스의 stdout을 깨뜨리지 않게", () => {

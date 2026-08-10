@@ -729,6 +729,24 @@ check-hooks-installed                         <span class="r">OK (선언 3종 ·
   <p class="note">오탐 억제가 이 축 설계의 절반이었다. 도입 <strong>전에</strong> 킷 코퍼스(지시 441건)로 재며 세 번 조정했다 — ①고정 길이 술어 비교는 <code>SHALL NOT use ArgoCD.</code>처럼 <strong>짧은 술어를 통째로 건너뛰었다</strong>(회수 구멍, 조용하다) → 포함 관계로 교체 ②술어가 뒤 절을 삼켜 무관한 지시가 겹쳤다 → 절 경계에서 끊음 ③<code>report it as a violation</code> 같은 <strong>흔한 술어</strong>는 주어가 달라도 겹쳤다 → <strong>말뭉치 희귀도</strong>로 배제. 마지막이 특히 중요하다: 어휘 목록은 프로젝트마다 다르고 목록 밖에서 오탐이 되살아나는데, <em>희귀도는 그 코퍼스에서 스스로 계산되므로 프로젝트가 바뀌어도 따라온다.</em> 최종 오탐 0 · 양성 대조 2/2.</p>
   <p class="note">게이트는 <strong>어느 쪽이 정본인지 정하지 않는다.</strong> 모순의 해소는 어느 지시가 살아남을지의 결정이고 그건 소유자의 판단이다 — <em>추정으로 고른 정본이 다음 모순의 씨앗이 된다.</em> 게이트는 둘을 나란히 보여주고 결정을 요구한다. 면제 경로는 없다.</p>
 
+  <h4>읽기가 재량이면 급할 때 가장 먼저 생략된다 <span class="note">(규칙 R21)</span></h4>
+  <p>앞의 규칙(R20)이 "읽으면 답이 하나인가"를 보장한다. 그 짝이 필요하다 — <strong>읽게 만드는가.</strong></p>
+  <p>실측 제보는 이랬다. 에이전트가 배포가 반영되지 않은 원인을 조사하며 클러스터를 뒤져 ArgoCD sync 실패를 원인으로 단정해 보고했다. 그런데:</p>
+  <pre>INFRA-004 61행   그 오류 문자열이 <span class="g">이미 Edge Case에 적혀 있음</span>
+INFRA-004 48행   "ArgoCD sync가 멈춰 있어도 Jenkins가 직접 적용한다"
+INFRA-004 273행  소유자 결정 — "배포는 GitOps가 힘드니 젠킨스에서 바로 배포한다"
+실제 원인        <span class="r">스냅샷 누락 → migrate Job 실패 → 배포 스테이지 스킵</span></pre>
+  <p>명세에 답이 있었고, 소유자는 여러 세션에 걸쳐 그 조회 경로를 금지했는데 <strong>재발했고 결론까지 틀렸다.</strong></p>
+  <p class="note"><strong>읽기가 재량이면 급할 때 가장 먼저 생략된다.</strong> 그런데 커밋 게이트는 이 행동을 <em>원리상 볼 수 없다</em> — 조회는 커밋도 파일 변경도 남기지 않는다. 결정적인 발화 지점은 <strong>도구 호출 직전</strong> 하나뿐이다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>강도</th><th>무엇을 하는가</th><th>왜</th></tr>
+    <tr><td><code>surface</code></td><td>막지 않고 관련 명세와 <strong>절 위치</strong>를 띄운다</td><td>강제 노출만으로 충분한 경우가 있다. 이름만 주면 처음부터 읽어야 하고, <em>급할 때 처음부터 읽는 사람은 없다</em></td></tr>
+    <tr><td><code>deny</code></td><td>막는다 — 단 <strong>대신 볼 곳을 반드시</strong> 준다</td><td>막기만 하면 사람은 <em>아무도 모르는 우회로</em>를 찾는다</td></tr>
+  </table></div>
+  <p class="note">⚠ <strong>명세를 읽는 명령은 모든 규칙을 이긴다.</strong> 읽기를 막으면 "읽어라"고 하면서 읽기를 막는 자기모순이고, 오탐이 즉시 쌓여 사람이 훅을 끈다. 그리고 읽기 인정은 <em>읽기 도구와 스펙 경로의 곱</em>으로 좁힌다 — <code>cat</code>만으로 통과시키면 무엇이든 <code>cat</code>으로 감싸 우회할 수 있다.</p>
+  <p>금지 목록은 게이트에 <strong>하드코딩하지 않는다.</strong> 프로젝트마다 금지 대상이 다르고, 하드코딩하면 킷이 그 프로젝트의 결정을 담게 된다. 선언으로 빼고 <strong>선언 자체를 판정한다</strong> — 이 축의 자기결함은 <em>조용한 무발화</em>다: 깨진 정규식·실재하지 않는 스펙·사유 없는 규칙은 아무것도 막지 않고 아무것도 알리지 않는다.</p>
+  <p class="note">그리고 <strong>금지를 걷어내는 길은 명세 편집이다.</strong> 그 조회가 정말 필요하면 규칙이 가리키는 스펙을 고쳐 금지를 없앤다 — 우회가 아니라 결정의 갱신이다. 이 가드는 감시 에이전트 층에 살고 그 배선의 실재는 R19가 판정한다: <em>층이 합성된다.</em></p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>
@@ -749,7 +767,7 @@ check-hooks-installed                         <span class="r">OK (선언 3종 ·
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">19</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">25</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">53</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">20</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">26</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">54</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

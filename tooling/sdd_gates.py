@@ -152,6 +152,11 @@ DEFAULTS = {
     "specConflictStopwords": None,
     "specConflictNegationMarkers": None,
     "specConflictClauseBreaks": None,
+    # 진단 진입점 명세 강제 열람(SPEC-053) — 조회는 커밋을 남기지 않으므로 도구 호출 직전에 발동.
+    "diagnosisGuardPolicy": "advisory",
+    "diagnosisSpecMap": [],
+    "diagnosisSpecReadPatterns": None,
+    "diagnosisGuideSections": None,
     "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
@@ -6380,6 +6385,202 @@ def format_conflict(pair):
     ]
 
 
+# ── 진단 진입점 명세 강제 열람 (SPEC-053, R21) — Node판 diagnosis-guard-lib.mjs 미러 ──
+# 실측: 에이전트가 명세에 답이 있는데 읽지 않고 실측으로 다시 찾았고 결론까지 틀렸다.
+# "읽었는가"는 정적으로 판정되지 않고 **조회는 커밋도 파일 변경도 남기지 않는다** —
+# 커밋 게이트로는 원리상 볼 수 없는 층이라 도구 호출 직전에 발동한다.
+GUARD_MODES = ["surface", "deny"]
+DEFAULT_SPEC_READ_PATTERNS = [
+    r"\b(grep|rg|cat|head|tail|less|sed|awk|find|ls)\b[^|;]*\bsdd/specs?\b",
+    r"\b(grep|rg|cat|head|tail|less|sed|awk)\b[^|;]*\b(SPEC|INFRA|TEST|CICD)-\d",
+]
+DEFAULT_GUIDE_SECTIONS = ["Edge Cases", "Change Log", "Assumptions"]
+
+GUARD_FINDING_TEXT = {
+    "no-match": "명령 패턴이 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
+    "bad-regex": "명령 패턴이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+    "no-spec": "답이 있는 스펙을 지목하지 않았다 — 읽으라고 할 대상이 없다",
+    "missing-spec": "지목한 스펙이 실재하지 않는다 — 읽으라는 곳이 없으면 안내가 거짓이 된다",
+    "bad-mode": "강도가 surface|deny 중 하나가 아니다",
+    "no-why": "사유가 없다 — 왜 이 조회가 아닌지 모르면 사람은 규칙을 우회한다",
+    "deny-without-instead": "금지인데 **대신 볼 곳**이 없다 — 막기만 하면 사람은 아무도 모르는 우회로를 찾는다",
+}
+
+
+def parse_diagnosis_map(value):
+    out = []
+    for raw in (value if isinstance(value, list) else []):
+        if not isinstance(raw, dict):
+            continue
+        inst = raw.get("instead")
+        out.append({
+            "match": str(raw.get("match") or ""),
+            "spec": str(raw.get("spec") or ""),
+            "mode": str(raw.get("mode") or "surface"),
+            "why": str(raw.get("why") or ""),
+            "instead": [str(x) for x in inst] if isinstance(inst, list) else [],
+        })
+    return out
+
+
+def validate_diagnosis_map(entries, spec_exists):
+    findings = []
+    for i, e in enumerate(entries or []):
+        at = e["match"] or f"#{i + 1}"
+        if not e["match"]:
+            findings.append({"kind": "no-match", "at": at})
+            continue
+        try:
+            re.compile(e["match"])
+        except re.error:
+            findings.append({"kind": "bad-regex", "at": at})
+            continue
+        if not e["spec"]:
+            findings.append({"kind": "no-spec", "at": at})
+        elif callable(spec_exists) and not spec_exists(e["spec"]):
+            findings.append({"kind": "missing-spec", "at": at, "spec": e["spec"]})
+        if e["mode"] not in GUARD_MODES:
+            findings.append({"kind": "bad-mode", "at": at, "got": e["mode"]})
+        if not e["why"].strip():
+            findings.append({"kind": "no-why", "at": at})
+        if e["mode"] == "deny" and not e["instead"]:
+            findings.append({"kind": "deny-without-instead", "at": at})
+    return findings
+
+
+def is_spec_read(command, patterns=None):
+    for p in (patterns or DEFAULT_SPEC_READ_PATTERNS):
+        try:
+            if re.search(p, str(command or ""), re.I):
+                return True
+        except re.error:
+            continue
+    return False
+
+
+def judge_command(command, entries, spec_read_patterns=None):
+    cmd = str(command or "")
+    if not cmd.strip():
+        return {"verdict": "allow", "entry": None, "specRead": False}
+    if is_spec_read(cmd, spec_read_patterns):
+        return {"verdict": "allow", "entry": None, "specRead": True}
+    hit = None
+    for e in entries or []:
+        if not e["match"] or e["mode"] not in GUARD_MODES:
+            continue
+        try:
+            rx = re.compile(e["match"], re.I)
+        except re.error:
+            continue
+        if not rx.search(cmd):
+            continue
+        if e["mode"] == "deny":
+            return {"verdict": "deny", "entry": e, "specRead": False}
+        if hit is None:
+            hit = e
+    return {"verdict": "surface", "entry": hit, "specRead": False} if hit else {"verdict": "allow", "entry": None, "specRead": False}
+
+
+def format_guidance(entry, sections=None):
+    secs = " · ".join(sections or DEFAULT_GUIDE_SECTIONS)
+    lines = [
+        (f'✗ 이 조회는 금지돼 있다 — 조회하지 말고 {entry["spec"]}를 읽어라.'
+         if entry["mode"] == "deny"
+         else f'· 이 조회의 답이 이미 명세에 있을 수 있다 — {entry["spec"]}를 먼저 보라.'),
+        f'  왜: {entry["why"]}',
+        f'  어디: {entry["spec"]} 의 {secs}(결정 이력이 사는 절)',
+    ]
+    if entry["instead"]:
+        lines.append(f'  대신 볼 곳: {" · ".join(entry["instead"])}')
+    return lines
+
+
+def cmd_diagnosisguard(cfg, argv):
+    policy = str(cfg.get("diagnosisGuardPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ diagnosisGuardPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    hook = "--hook" in argv
+    rest = [a for a in argv if a != "--hook"]
+    command = " ".join(rest)
+    if not command and hook:
+        # ⚠ stdin은 훅 모드에서만 읽는다 — 데이터 없는 파이프에서 블록되면 판정이 통째로 사라진다.
+        try:
+            raw = sys.stdin.read()
+        except Exception:
+            raw = ""
+        if raw.strip():
+            try:
+                o = json.loads(raw)
+                command = str((o.get("tool_input") or {}).get("command") or o.get("command") or "")
+            except Exception:
+                command = raw.strip()
+    entries = parse_diagnosis_map(cfg.get("diagnosisSpecMap"))
+    sections = cfg.get("diagnosisGuideSections") or DEFAULT_GUIDE_SECTIONS
+
+    if policy == "off":
+        if hook:
+            sys.exit(0)
+        verdict("OFF", "diagnosisGuardPolicy")
+        print("진단 가드 게이트 — diagnosisGuardPolicy:off (판정 안 함)")
+        return
+
+    if hook or command:
+        if not entries:
+            sys.exit(0)
+        r = judge_command(command, entries, cfg.get("diagnosisSpecReadPatterns"))
+        if r["verdict"] == "allow":
+            sys.exit(0)
+        lines = format_guidance(r["entry"], sections)
+        if r["verdict"] == "deny" and policy == "hard":
+            for l in lines:
+                print(l, file=sys.stderr)
+            print("  (이 조회가 정말 필요하면 그 스펙을 고쳐 금지를 걷어내라 — 우회가 아니라 명세 편집이다)",
+                  file=sys.stderr)
+            sys.exit(2)
+        for l in lines:
+            print(l)
+        sys.exit(0)
+
+    if not entries:
+        verdict("INERT", "diagnosisSpecMap 미선언 — 무엇에 발화할지 모른다")
+        print("[안 봄(판정 입력 없음)] 진단 가드 게이트 — `diagnosisSpecMap` 미선언: **판정하지 않는다**."
+              " 조사 전에 읽어야 할 명세가 있으면 `{ match: <명령 정규식>, spec: <그 답이 있는 스펙>, mode: surface|deny, why, instead }`로 선언하라."
+              " 조회는 커밋도 파일 변경도 남기지 않으므로 **커밋 게이트로는 원리상 볼 수 없는 층**이다.")
+        return
+    spec_dir = resolve(cfg, cfg["specDir"])
+    try:
+        spec_names = os.listdir(spec_dir)
+    except OSError:
+        spec_names = []
+
+    def spec_exists(ref):
+        r = str(ref)
+        if os.path.exists(os.path.join(cfg["__root"], *r.split("/"))):
+            return True
+        return any(r in n for n in spec_names)
+
+    findings = validate_diagnosis_map(entries, spec_exists)
+    judged(len(findings) if policy == "hard" else 0)
+    deny = sum(1 for e in entries if e["mode"] == "deny")
+    print(f"진단 가드 게이트(diagnosisGuardPolicy={policy}): 규칙 {len(entries)}종"
+          f" (금지 {deny} · 노출 {len(entries) - deny}) — 선언 위반 {len(findings)}")
+    tag = "✗" if policy == "hard" else "⚠"
+    for f in findings:
+        extra = f' ({f["spec"]})' if f.get("spec") else (f' ({f["got"]})' if f.get("got") else "")
+        line = f'  {tag} [{f["at"]}] {GUARD_FINDING_TEXT[f["kind"]]}{extra}'
+        print(line, file=sys.stderr) if policy == "hard" else print(line)
+    if findings and policy == "hard":
+        print("\n✗ 진단 가드 선언이 깨졌다 — 이 축의 자기결함은 **조용한 무발화**다:"
+              " 잘못된 선언은 아무것도 막지 않고 아무것도 알리지 않는다.", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print(f"  ✓ 규칙 {len(entries)}종이 모두 실재하는 스펙을 지목하고 사유·대안을 갖는다.")
+        print("  · 이 층은 **도구 호출 직전**에 발동한다 — 조회는 커밋도 파일 변경도 남기지 않으므로"
+              " 커밋 게이트로는 원리상 볼 수 없다. 배선 실재는 R19(에이전트 배선)가 판정한다.")
+
+
 def cmd_specconflict(cfg):
     policy = str(cfg.get("specConflictPolicy") or "advisory")
     if policy not in ("off", "advisory", "hard"):
@@ -6683,7 +6884,12 @@ def main():
     strict = "--strict" in args
     # 판정 타입 방출(SPEC-040) — 어떤 종료 경로로 끝나든 한 줄. 선언 안 하면 UNTYPED로 자백된다.
     # Node판 게이트는 파일마다 armVerdict()를 부르지만 Python판은 단일 엔트리라 여기서 한 번이다.
-    arm_verdict()
+    # ⚠ **훅 편의 계층은 예외가 아니라 좁힌 계약이다**(SPEC-040): PreToolUse처럼 매 명령에 붙어
+    # 도는 계층은 발동 조건이 아니면 아무것도 출력하지 않는 것이 계약이고, 여기에 판정 줄을
+    # 강제하면 모든 Bash 명령마다 한 줄이 붙어 소음이 된다 — 소음이 되는 순간 사람이 훅을 끈다.
+    # 그래서 Node판의 `armVerdict({quietWhenSilent:true})`와 같은 조건으로만 침묵을 허용한다.
+    HOOK_LAYER_SUBS = ("diagnosisguard",)
+    arm_verdict(quiet_when_silent=(sub in HOOK_LAYER_SUBS and "--hook" in args))
     cfg = load_config()
     positional = []
     i = 1
@@ -6769,6 +6975,8 @@ def main():
         cmd_agentwiring(cfg)
     elif sub == "specconflict":
         cmd_specconflict(cfg)
+    elif sub == "diagnosisguard":
+        cmd_diagnosisguard(cfg, positional + (["--hook"] if "--hook" in args else []))
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

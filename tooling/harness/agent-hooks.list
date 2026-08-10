@@ -16,4 +16,5 @@
 SessionStart  -           sdd-session-context.sh
 PreToolUse    Write|Edit  sdd-edit-check.sh
 PreToolUse    Bash        sdd-deploy-precheck.sh
+PreToolUse    Bash        sdd-diagnosis-check.sh
 PostToolUse   Bash        sdd-deploy-check.sh

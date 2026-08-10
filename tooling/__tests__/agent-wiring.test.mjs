@@ -33,10 +33,13 @@ test("선언은 공백 3필드이고 `-`는 매처 없음이다 — 주석·빈 
   ]);
 });
 
-test("킷의 실제 선언 파일이 파싱되고 4종을 선언한다 — 설치기와 게이트의 단일 선언이다", () => {
+test("킷의 실제 선언 파일이 파싱되고 선언 전부를 뽑는다 — 설치기와 게이트의 단일 선언이다", () => {
+  // 개수를 박지 않는다 — 훅을 추가할 때 이 테스트가 먼저 깨지면 "숫자만 고치기"가 정상 경로가 된다.
+  // 대신 **선언 파일이 진실의 원천**임을 고정한다(SPEC-051: 목록이 둘이면 한쪽이 뒤처진다).
   const d = parseAgentHookDecl(readFileSync(join(TOOLING, "harness/agent-hooks.list"), "utf8"));
-  assert.equal(d.length, 4);
-  assert.deepEqual(d.map((x) => x.event), ["SessionStart", "PreToolUse", "PreToolUse", "PostToolUse"]);
+  assert.ok(d.length >= 4, `선언이 너무 적다(${d.length})`);
+  assert.deepEqual([...new Set(d.map((x) => x.event))].sort(), ["PostToolUse", "PreToolUse", "SessionStart"]);
+  assert.ok(d.every((x) => x.script.endsWith(".sh")), "스크립트가 아닌 선언이 있다");
   assert.equal(NO_MATCHER, "-");
 });
 

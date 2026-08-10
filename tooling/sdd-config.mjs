@@ -221,6 +221,18 @@ export const DEFAULTS = {
   specConflictStopwords: null,
   specConflictNegationMarkers: null,
   specConflictClauseBreaks: null,
+
+  // 진단 진입점 명세 강제 열람(SPEC-053) — **조사 전에 명세를 보게 한다.**
+  // 실측: 에이전트가 명세에 답이 있는데 읽지 않고 실측으로 다시 찾았고 결론까지 틀렸다.
+  // "읽었는가"는 정적으로 판정되지 않고 **조회는 커밋도 파일 변경도 남기지 않는다** —
+  // 커밋 게이트로는 원리상 볼 수 없는 층이라 도구 호출 직전에 발동한다.
+  //   diagnosisSpecMap: [{ match: <명령 정규식>, spec: <답이 있는 스펙>, mode: "surface"|"deny", why, instead: [...] }]
+  diagnosisGuardPolicy: "advisory",
+  diagnosisSpecMap: [],
+  // 명세를 **읽는** 명령으로 인정할 패턴. null이면 킷 기본 —
+  // 명세 읽기를 막으면 "읽어라"면서 읽기를 막는 자기모순이 되고 그 순간 사람이 훅을 끈다.
+  diagnosisSpecReadPatterns: null,
+  diagnosisGuideSections: null,
   sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.
