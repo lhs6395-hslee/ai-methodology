@@ -13,8 +13,7 @@ import { join } from "node:path";
 import { loadConfig, walkFiles } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import {
-  parseReceipt, missingGates, ciWiring,
-  DEFAULT_WATCHDOG_RECEIPT, DEFAULT_WATCHDOG_CI_GLOBS,
+  parseReceipt, missingGates, ciWiring, DEFAULT_WATCHDOG_RECEIPT, DEFAULT_WATCHDOG_CI_GLOBS, sweepInvocation, gatesOutsideCi, sweepGateFiles, DEFAULT_SWEEP_SOURCE_CANDIDATES,
 } from "./watchdog-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
@@ -49,6 +48,37 @@ function main() {
     block(`CI에 스윕이 배선되지 않았다(CI 파일 ${ci.files}건 검사) — **우회 불가한 감시 채널이 없다**.`
       + " 로컬 훅은 --no-verify로 우회되고 웹 UI 머지는 훅을 타지 않으며, 게이트 파일은 지워도 아무 일도 일어나지 않는다."
       + " 커밋한 사람이 끌 수 없는 것은 서버측 CI뿐이다 — 스윕을 도는 워크플로를 추가하라(sdd-init.sh가 템플릿을 깐다)");
+  }
+  // **라벨에만 있는 마커는 배선이 아니면서 배선처럼 보인다** — 이 축이 겪은 거짓 초록의 본체다.
+  // 아예 없는 것보다 나쁘다: 없으면 위 줄이 고발하지만, 라벨에 걸리면 아무도 고발하지 않았다.
+  for (const p of ci.labelOnly) {
+    block(`${p}: 스윕 마커가 **라벨에만** 있다(\`name:\`·\`title:\` 등) — 호출이 아니다.`
+      + " 실측: 킷 자신의 워크플로가 `sdd-gates.yml`이고 안에 `name: sdd-gates`가 있어서 이 게이트가"
+      + " **자기 파일명에 매치해** 여러 달 \"배선돼 있다\"고 보고했고, 그 사이 스윕 등재 게이트 9종이"
+      + " 어떤 우회 불가 층에도 없었다(이 게이트 자신 포함). 그 줄을 실제 호출로 바꿔라");
+  }
+  // 호출이 있어도 **비-0을 낼 수 없으면** 그것은 채널이 아니라 로그다.
+  if (ci.wired.length && !ci.blocking) {
+    block(`CI의 스윕 호출에 \`--strict\`가 없다(${ci.wired.join(" · ")}) — advisory 발견에서 exit 0으로 끝난다.`
+      + " **보고하고 통과하는 채널은 채널이 아니라 로그다** — 우회 불가한 자리에서 통과만 하면 우회할 필요도 없다");
+  }
+  // CI가 스윕을 부르지 않고 게이트를 **손으로 열거**하면, 빠진 게이트는 사람이 손으로 스윕을 칠
+  // 때만 돈다. 손목록은 반드시 드리프트한다(설치기·픽스처 목록이 이미 같은 결함을 냈다).
+  // 스윕 규칙표를 못 찾으면 이 판정은 **하지 않는다**(0종으로 세면 "전부 덮였다"는 거짓 초록이다).
+  const syncAbs = [cfg.syncRulesFile, ...DEFAULT_SWEEP_SOURCE_CANDIDATES]
+    .filter(Boolean).map((rel) => join(ROOT, ...String(rel).split("/"))).find((a) => existsSync(a));
+  let sweepGates = null;
+  if (syncAbs) { try { sweepGates = sweepGateFiles(readFileSync(syncAbs, "utf8")); } catch { sweepGates = null; } }
+  const outside = sweepGates ? gatesOutsideCi(sweepGates, ciFiles.map((f) => f.text), cfg.sweepInvocationMarkers) : [];
+  if (!sweepGates) {
+    console.log("· 스윕 규칙표를 찾지 못해 **강제 층 커버리지를 판정하지 않았다** — 통과가 아니다"
+      + "(`syncRulesFile`로 경로를 선언하면 판정한다)");
+  }
+  if (outside.length) {
+    block(`스윕 등재 게이트 ${outside.length}종이 어떤 우회 불가 층에도 없다: ${outside.slice(0, 8).join(", ")}`
+      + `${outside.length > 8 ? " …" : ""} — CI가 스윕을 부르지 않고 게이트를 손으로 열거하기 때문이다.`
+      + " 그 게이트들은 **사람이 손으로 스윕을 칠 때만** 돈다. 손목록을 스윕 호출 한 줄로 바꿔라"
+      + "(목록은 적는 것이 아니라 계산하는 것이다 — 설치기 복사 목록·테스트 픽스처 목록이 이미 같은 드리프트를 냈다)");
   }
 
   // ── 채택 영수증 — "채택했다"를 자기신고에서 기계가 읽는 사실로 바꾼다.

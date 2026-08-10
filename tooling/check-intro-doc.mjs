@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot, isSpecMdName } from "./sdd-config.mjs";
+import { sweepGateFiles, DEFAULT_SWEEP_SOURCE_CANDIDATES } from "./watchdog-lib.mjs";
 import { ruleIdsOf, missingRuleIds, citedCounts, countMismatches, companionMissing } from "./intro-doc-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
@@ -111,15 +112,13 @@ function actualCounts(cfg, ROOT, ruleIds) {
   // **경로를 고정하지 않는다**: 킷 저장소는 `tooling/`, 소비 프로젝트는 `sdd-init.sh`가 `scripts/`에
   // 깔고, 프로젝트가 다른 곳에 둘 수도 있다. 고정하면 소비 사이트에서 이 키가 조용히 미지원이 되고,
   // 문서가 인용한 숫자는 "오타난 키"로 오진된다(훅 목록 탐색과 같은 후보 해석 방식, SPEC-036 선례).
-  const sync = [cfg.syncRulesFile, "tooling/sdd-sync.mjs", "scripts/sdd-sync.mjs", "sdd-sync.mjs"]
+  // 파싱은 **한 곳에서만** 한다 — 이 숫자와 감시자 축의 "강제 층 커버리지"는 같은 정본을 읽어야
+  // 하고, 같은 규칙을 두 번 구현하면 한쪽이 뒤처진다(R13이 보는 결함이 정확히 그것이다).
+  const sync = [cfg.syncRulesFile, ...DEFAULT_SWEEP_SOURCE_CANDIDATES]
     .filter(Boolean).map((rel) => join(ROOT, ...String(rel).split("/"))).find((abs) => existsSync(abs));
   if (sync) {
-    const src = readFileSync(sync, "utf8");
-    const i = src.indexOf("const RULES = [");
-    if (i >= 0) {
-      const blk = src.slice(i, src.indexOf("\n];", i));
-      out.gates = new Set([...blk.matchAll(/"((?:check|gen)-[a-z-]+\.mjs)"/g)].map((m) => m[1])).size;
-    }
+    const gates = sweepGateFiles(readFileSync(sync, "utf8"));
+    if (gates) out.gates = gates.length;
   }
   // 스윕 규칙표를 못 찾으면 `gates`는 **미지원 키로 남는다** — 0으로 세면 문서의 인용이
   // "실제는 0"이라는 거짓 판정을 받는다. 모르는 것을 숫자로 말하지 않는다.

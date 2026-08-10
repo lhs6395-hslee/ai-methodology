@@ -40,9 +40,14 @@ test("hookFindings: 미설치·실행권한 없음·남의 훅 점유를 구분�
 test("게이트 e2e: 미설치는 advisory ⚠ · hard ✗ / 설치되면 침묵", () => {
   const root = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
   const sh = (c) => execFileSync("sh", ["-c", c], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  const run = (p) => {
+  // 픽스처는 **환경을 선언한다.** 주변 `CI`를 물려받으면 이 축은 SKIPPED로 빠지고(git은 훅을
+  // 복제하지 않으므로 CI에서 훅 부재는 미채택의 증거가 아니다 — SPEC-036) 이 케이스가 아무것도
+  // 판정하지 않는다. 실측: CI에서 스위트를 돌리자 이 테스트만 깨졌고, 그것이 정확한 신호였다.
+  const run = (p, env = {}) => {
     writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", hooksInstalledPolicy: p }));
-    try { return { code: 0, out: execFileSync("node", [GATE], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+    const opts = { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, CI: "", GITHUB_ACTIONS: "", ...env } };
+    try { return { code: 0, out: execFileSync("node", [GATE], opts) }; }
     catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
   };
   try {
@@ -55,6 +60,16 @@ test("게이트 e2e: 미설치는 advisory ⚠ · hard ✗ / 설치되면 침묵
     assert.equal(adv.code, 0);
     assert.match(adv.out, /pre-commit: 설치되지 않았다/);
     assert.match(adv.out, /한 번도 발동하지 않는다/);
+
+    // **git은 훅을 복제하지 않는다** — CI 체크아웃에서 훅 부재는 미채택의 증거가 아니다.
+    // 여기서 거짓 위반을 내면 스윕을 CI에 배선한 hard 프로젝트의 빌드가 깨지고, 그러면 사람이
+    // 이 게이트를 끈다. 통과로도 쓰지 않는다 — **판정하지 않았다**고 선언한다(SPEC-040 SKIPPED).
+    const ci = run("hard", { CI: "true" });
+    assert.equal(ci.code, 0, "CI에서 거짓 위반을 내면 사람이 게이트를 끈다");
+    assert.match(ci.out, /판정하지 않았다\(통과가 아니다\)/);
+    assert.match(ci.out, /SKIPPED/);
+    assert.match(ci.out, /영수증/, "대체 강제 경로(R17)를 알려야 한다");
+    assert.doesNotMatch(ci.out, /설치되지 않았다/, "CI에서 미설치를 위반으로 말하지 않는다");
 
     const hard = run("hard");
     assert.equal(hard.code, 1, "미설치를 green으로 읽으면 안 된다");

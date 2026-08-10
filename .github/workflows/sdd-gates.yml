@@ -4,15 +4,20 @@
 # @verifies CICD-001/FR-001 smoke: 이 워크플로의 GitHub Actions 실행 로그(push/PR마다 스위트+게이트)
 # @verifies CICD-001/FR-002 smoke: PR run의 spec-sync(range) 스텝 로그 — merge-base 대비 판정
 #
-# ⚠ 게이트 목록은 **전수여야 한다.** CI에서 빠진 게이트는 로컬 훅에만 걸려 있고, 로컬 훅은
-# `--no-verify`와 웹 UI 병합으로 우회된다 — 즉 그 게이트는 우회 가능한 강제다. 실측(2026-08-02):
-# SC·NFR 회계를 hard로 올리며 도그푸딩 SC 18건의 증거를 이 워크플로로 지목하려다, 그중
-# derivation·ratchet·evidence·ownership-map 등 게이트 11종이 CI에 아예 없다는 것이 드러났다
-# (증거를 붙이는 행위가 증거의 부재를 실수확했다). 게이트를 추가하면 여기에도 추가한다.
+# ⚠ 게이트 목록을 **손으로 적지 않는다.** 이전 판은 게이트 18종을 손으로 열거하고 그 위에
+# "게이트를 추가하면 여기에도 추가한다"는 주석을 달았다 — 그 규범은 실패했다. 실측(2026-08-10):
+# 스윕 등재 25종 중 **10종이 이 파일에 없었다** — R13 구현 중복·R15 소개 문서·R16 순차 SSOT·
+# R18 배선 무결성·R19 에이전트 배선·R20 명세 모순 감사·R21 진단 가드·R5 테스트 실행·R12 훅 배선,
+# 그리고 **R17 감시자 실재 게이트 자신.** 그 10종은 사람이 손으로 스윕을 칠 때만 돌았다.
 #
-# 여기 없는 것과 그 이유: check-hooks-installed(CI 체크아웃엔 .git/hooks가 없다 — 로컬 채택 축),
-# check-deploy-guard·check-deploy-debt(PostToolUse·pre-commit 로컬 훅 계층, 부채 파일은 gitignore),
-# check-pre-edit(PreToolUse 편의 계층 — 게이트가 아니다).
+# 그리고 그 사실을 R17이 고발하지 못한 이유가 이 파일 안에 있었다: 마커 목록에 `sdd-gates`가 있고
+# 이 파일에 `name: sdd-gates`가 있어서 **게이트가 자기 파일명에 매치해** "스윕이 배선돼 있다"를
+# 여러 달 보고했다. 그래서 지금은 호출 문법을 판정하고(선행 러너·경로 + 실행 확장자), 라벨 매치는
+# **"라벨에만 있다"는 별도 위반**으로 이름을 댄다.
+#
+# 해소는 목록을 고치는 것이 아니라 **목록을 없애는 것**이다 — 스윕이 게이트 목록의 정본이므로
+# CI는 스윕 한 줄을 부른다(`--strict`: 없으면 advisory 발견에서 exit 0으로 끝나고, 우회 불가한
+# 자리에서 통과만 하는 채널은 채널이 아니라 로그다).
 name: sdd-gates
 on:
   push:
@@ -29,40 +34,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # 스위트를 먼저 돌린다 — 코어가 깨졌으면 게이트 판정은 의미가 없고, 실패를 빨리 본다.
       - name: unit suite (runTestsPolicy=hard와 동일 스위트 — 커버리지 회계 ≠ 실행 결과)
         run: node --test tooling/__tests__/*.mjs
       # ⚠ 스테이지는 자기 결과를 **기록**한다(SPEC-041). 초록으로 끝난 것과 "돌았다는 기록이 남은 것"은
-      # 다른 사실이고, 후자가 없으면 아래 R14가 이 자산을 "기록 없음"으로 센다. 실측 제보에서
+      # 다른 사실이고, 후자가 없으면 R14가 이 자산을 "기록 없음"으로 센다. 실측 제보에서
       # 배포 훅 Job이 전제 자원 부재로 한 번도 안 떴는데 비차단이라 파이프라인은 SUCCESS였다.
       - name: 검증 실행 기록 (unit suite)
         run: |
           node tooling/check-verification-executed.mjs --record "tooling/__tests__" JUDGED "CI unit suite green (node --test)"
-          node tooling/check-verification-executed.mjs --record ".github/workflows/sdd-gates.yml" JUDGED "이 워크플로가 지금 돌고 있다(자기 기록)"
-      - name: quality gates (fr·ownership·cohesion·completeness·consistency)
-        run: |
-          node tooling/check-fr-coverage.mjs
-          node tooling/check-ownership.mjs
-          node tooling/check-spec-cohesion.mjs
-          node tooling/check-spec-completeness.mjs
-          node tooling/check-spec-consistency.mjs
-      - name: 실재·증거·회계 게이트 (R6~R11 — 로컬 훅만 걸려 있으면 --no-verify로 통째 우회된다)
-        run: |
-          node tooling/check-test-adequacy.mjs
-          node tooling/check-orphan-surfaces.mjs
-          node tooling/check-converge-drift.mjs
-          node tooling/check-derivation.mjs
-          node tooling/check-policy-ratchet.mjs
-          node tooling/check-engine-event.mjs
-          node tooling/check-evidence.mjs
-          node tooling/check-sc-coverage.mjs
-          node tooling/check-verification-executed.mjs
-          node tooling/check-live-reality.mjs
-          node tooling/check-schema-drift.mjs
-          node tooling/gen-ownership-map.mjs --check
-      - name: 동의어·형태 변이 (①② hard 차단 / ③ 후보는 구조적으로 비차단)
-        run: node tooling/check-synonym.mjs
-      - name: smoke evidence drift (태그↔매니페스트)
-        run: node tooling/sdd-smoke-scan.mjs
+          node tooling/check-verification-executed.mjs --record "sdd-gates workflow" JUDGED "이 워크플로가 지금 돌고 있다(자기 기록)"
+      # ── 전 게이트 = 스윕 한 줄. 목록은 적는 것이 아니라 계산하는 것이다.
+      #    스윕이 게이트 목록의 정본이므로 게이트를 추가해도 이 파일은 바뀌지 않는다 —
+      #    바뀌지 않는 것이 요점이다(바뀌어야 하는 목록은 반드시 뒤처진다).
+      - name: 전 게이트 스윕 (--strict — 통과만 하는 채널은 채널이 아니라 로그다)
+        run: node tooling/sdd-sync.mjs --strict
       - name: spec-sync range (웹 UI 병합 백스톱 — draftBlockPolicy=hard 승격 소비)
         if: github.event_name == 'pull_request'
         run: node tooling/check-spec-sync.mjs "origin/${{ github.base_ref }}"

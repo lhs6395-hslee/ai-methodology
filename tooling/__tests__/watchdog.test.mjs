@@ -11,7 +11,8 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseReceipt, missingGates, ciWiring, DEFAULT_WATCHDOG_RECEIPT } from "../watchdog-lib.mjs";
+import { parseReceipt, missingGates, ciWiring, sweepInvocation, sweepBlocking, gatesOutsideCi,
+  DEFAULT_WATCHDOG_RECEIPT } from "../watchdog-lib.mjs";
 import { importClosure } from "../import-wiring-lib.mjs";
 
 // 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
@@ -44,9 +45,50 @@ test("CI 배선은 스윕 진입점의 등장으로 본다 — 마커는 프로�
     { path: ".github/workflows/ci.yml", text: "run: npm test\n" },
     { path: ".github/workflows/sdd.yml", text: "run: node scripts/sdd-sync.mjs --strict\n" },
   ];
-  assert.deepEqual(ciWiring(files), { wired: [".github/workflows/sdd.yml"], files: 2 });
-  assert.deepEqual(ciWiring(files, ["npm test"]).wired, [".github/workflows/ci.yml"]);
-  assert.deepEqual(ciWiring([]), { wired: [], files: 0 });
+  assert.deepEqual(ciWiring(files),
+    { wired: [".github/workflows/sdd.yml"], labelOnly: [], blocking: true, files: 2 });
+  assert.deepEqual(ciWiring(files, ["npm test"]).wired, []);   // `npm test`는 호출 선행 문맥이 없다
+  assert.deepEqual(ciWiring([]), { wired: [], labelOnly: [], blocking: false, files: 0 });
+});
+
+// ── 거짓 초록의 본체: 마커가 라벨에 걸렸다 ──────────────────────────────────
+// @covers SPEC-048/FR-005
+test("워크플로 자기 이름에 매치한 마커를 호출로 읽지 않는다 — 이 게이트가 자기 파일명에 속았다", () => {
+  // 킷 실측 그대로: 파일명이 `sdd-gates.yml`이고 안에 `name: sdd-gates`가 있었다.
+  // 스윕은 한 번도 불리지 않았는데 이 게이트는 여러 달 "✓ 배선돼 있다"를 보고했다.
+  const kit = "name: sdd-gates\njobs:\n  gates:\n    steps:\n      - run: node tooling/check-ownership.mjs\n";
+  assert.deepEqual(sweepInvocation(kit), { invoked: false, labelOnly: true });
+  // **아예 없는 것과 라벨에만 있는 것은 다르다** — 후자가 거짓 초록의 원인이라 이름을 대야 한다.
+  assert.deepEqual(sweepInvocation("run: npm test\n"), { invoked: false, labelOnly: false });
+  const w = ciWiring([{ path: ".github/workflows/sdd-gates.yml", text: kit }]);
+  assert.deepEqual(w, { wired: [], labelOnly: [".github/workflows/sdd-gates.yml"], blocking: false, files: 1 });
+});
+
+test("호출로 인정하는 선행 문맥 — 경로·러너만. 주석과 라벨은 탈락한다", () => {
+  for (const line of ["- run: node tooling/sdd-sync.mjs", "  run: ./scripts/sdd-sync.mjs",
+    "run: npm run sdd-gates", "run: python3 scripts/sdd_gates.py sync", "run: sh scripts/sdd-run.sh"]) {
+    assert.equal(sweepInvocation(line).invoked, true, line);
+  }
+  for (const line of ["# node tooling/sdd-sync.mjs 를 붙일 것", "name: sdd-sync", "  title: sdd-run 배선"]) {
+    assert.equal(sweepInvocation(line).invoked, false, line);
+  }
+});
+
+test("통과만 하는 채널은 채널이 아니라 로그다 — --strict 없는 스윕 호출은 차단하지 않는다", () => {
+  assert.equal(sweepBlocking("run: node tooling/sdd-sync.mjs --strict"), true);
+  assert.equal(sweepBlocking("run: node tooling/sdd-sync.mjs"), false);
+  assert.equal(sweepBlocking("# node tooling/sdd-sync.mjs --strict"), false);
+});
+
+// @covers SPEC-048/FR-006
+test("CI가 손으로 열거하면 빠진 스윕 게이트는 어떤 우회 불가 층에도 없다", () => {
+  const sweep = ["check-ownership.mjs", "check-watchdog.mjs", "check-spec-conflict.mjs"];
+  const handList = ["- run: node tooling/check-ownership.mjs\n"];
+  // 킷 실측: 스윕 등재 25종 중 9종이 CI 손목록에서 빠져 있었고 그중에 이 게이트 자신이 있었다.
+  assert.deepEqual(gatesOutsideCi(sweep, handList), ["check-watchdog.mjs", "check-spec-conflict.mjs"]);
+  // 스윕을 부르면 전부 덮인다 — **목록은 적는 것이 아니라 계산하는 것이고, CI에서 그 계산이 스윕이다.**
+  assert.deepEqual(gatesOutsideCi(sweep, ["- run: node tooling/sdd-sync.mjs --strict\n"]), []);
+  assert.deepEqual(gatesOutsideCi([], handList), []);
 });
 
 test("영수증 기본 경로는 `.sdd/`가 아니다 — 그쪽은 gitignore라 채택 선언이 사라진다", () => {

@@ -6099,10 +6099,93 @@ def missing_gates(receipt, exists=None):
     return {"gone": gone, "unchecked": unchecked}
 
 
-def ci_wiring(ci_files, markers=None):
+# **마커가 라벨·데이터 경로에 걸리는 것을 호출로 읽지 않는다**(watchdog-lib.mjs 미러).
+# 킷 실측: 워크플로 파일명이 `sdd-gates.yml`이고 `name: sdd-gates`가 있어서 마커가 자기 이름에
+# 매치했고, `--record ".github/workflows/sdd-gates.yml"` 인자 경로에도 매치했다. CI는 스윕을 한 번도
+# 부르지 않았는데 이 게이트는 여러 달 "배선돼 있다"를 보고했다 — 감시자가 자기 파일명에 속았다.
+_INVOCATION_LEAD = r"(?:/|\./|node\s+|python3?\s+|sh\s+|bash\s+|make\s+|npx\s+|(?:npm|pnpm|yarn)\s+run\s+)"
+_INVOCATION_TAIL = r"(?:\.(?:mjs|cjs|js|py|sh|bash))?(?![\w.-])"
+_LABEL_LINE = re.compile(r"^\s*(?:name|id|title|description|displayName|stage|job)\s*:")
+_COMMENT_LINE = re.compile(r"^\s*(?:#|//)")
+_STRICT_FLAG = re.compile(r"--strict\b")
+
+
+def _invocation_re(marker):
+    return re.compile(_INVOCATION_LEAD + re.escape(str(marker)) + _INVOCATION_TAIL)
+
+
+def sweep_invocation(text, markers=None):
+    """반환 {"invoked":bool, "labelOnly":bool} — 아예 없는 것과 라벨에만 있는 것은 다른 사실이다."""
     lst = markers if markers else DEFAULT_SWEEP_INVOCATION_MARKERS
-    wired = [f["path"] for f in (ci_files or []) if any(str(m) in str(f.get("text") or "") for m in lst)]
-    return {"wired": wired, "files": len(ci_files or [])}
+    label_only = False
+    for raw in str(text or "").split("\n"):
+        for m in lst:
+            marker = str(m)
+            if marker not in raw:
+                continue
+            if _COMMENT_LINE.search(raw):
+                continue
+            if _invocation_re(marker).search(raw):
+                return {"invoked": True, "labelOnly": False}
+            if _LABEL_LINE.search(raw):
+                label_only = True
+    return {"invoked": False, "labelOnly": label_only}
+
+
+def sweep_blocking(text, markers=None):
+    """`--strict` 없는 스윕은 advisory에서 exit 0이다 — 통과만 하는 채널은 채널이 아니라 로그다."""
+    lst = markers if markers else DEFAULT_SWEEP_INVOCATION_MARKERS
+    for raw in str(text or "").split("\n"):
+        if _COMMENT_LINE.search(raw):
+            continue
+        if not any(_invocation_re(m).search(raw) for m in lst):
+            continue
+        if _STRICT_FLAG.search(raw):
+            return True
+    return False
+
+
+DEFAULT_SWEEP_SOURCE_CANDIDATES = ["tooling/sdd-sync.mjs", "scripts/sdd-sync.mjs", "sdd-sync.mjs"]
+_SWEEP_GATE_ENTRY = re.compile(r"\"((?:check|gen)-[a-z-]+\.mjs)\"")
+
+
+def sweep_gate_files(sync_source):
+    """스윕 규칙표에 등재된 게이트 집합. 못 찾으면 None — **0종이 아니다.**"""
+    src = str(sync_source or "")
+    i = src.find("const RULES = [")
+    if i < 0:
+        return None
+    end = src.find("\n];", i)
+    blk = src[i:] if end < 0 else src[i:end]
+    out = []
+    for m in _SWEEP_GATE_ENTRY.finditer(blk):
+        if m.group(1) not in out:
+            out.append(m.group(1))
+    return out
+
+
+def gates_outside_ci(sweep_gates, ci_texts, markers=None):
+    """CI가 스윕을 부르지 않고 손으로 열거하면, 빠진 게이트는 어떤 우회 불가 층에도 없다."""
+    texts = [str(t or "") for t in (ci_texts or [])]
+    if any(sweep_invocation(t, markers)["invoked"] for t in texts):
+        return []
+    joined = "\n".join(texts)
+    return [str(g) for g in (sweep_gates or []) if g and str(g) not in joined]
+
+
+def ci_wiring(ci_files, markers=None):
+    wired, label_only = [], []
+    blocking = False
+    for f in (ci_files or []):
+        text = str(f.get("text") or "")
+        hit = sweep_invocation(text, markers)
+        if hit["invoked"]:
+            wired.append(f["path"])
+            if sweep_blocking(text, markers):
+                blocking = True
+        elif hit["labelOnly"]:
+            label_only.append(f["path"])
+    return {"wired": wired, "labelOnly": label_only, "blocking": blocking, "files": len(ci_files or [])}
 
 
 # ── 배선 무결성 (SPEC-050, R18) — Node판 import-wiring-lib.mjs 미러 ──────────
@@ -6945,6 +7028,41 @@ def cmd_watchdog(cfg):
         block(f'CI에 스윕이 배선되지 않았다(CI 파일 {ci["files"]}건 검사) — **우회 불가한 감시 채널이 없다**.'
               " 로컬 훅은 --no-verify로 우회되고 웹 UI 머지는 훅을 타지 않으며, 게이트 파일은 지워도 아무 일도 일어나지 않는다."
               " 커밋한 사람이 끌 수 없는 것은 서버측 CI뿐이다 — 스윕을 도는 워크플로를 추가하라(sdd-init.sh가 템플릿을 깐다)")
+    # **라벨에만 있는 마커는 배선이 아니면서 배선처럼 보인다** — 이 축이 겪은 거짓 초록의 본체다.
+    for pth in ci["labelOnly"]:
+        block(f"{pth}: 스윕 마커가 **라벨에만** 있다(`name:`·`title:` 등) — 호출이 아니다."
+              " 실측: 킷 자신의 워크플로가 `sdd-gates.yml`이고 안에 `name: sdd-gates`가 있어서 이 게이트가"
+              ' **자기 파일명에 매치해** 여러 달 "배선돼 있다"고 보고했고, 그 사이 스윕 등재 게이트 9종이'
+              " 어떤 우회 불가 층에도 없었다(이 게이트 자신 포함). 그 줄을 실제 호출로 바꿔라")
+    # 호출이 있어도 **비-0을 낼 수 없으면** 그것은 채널이 아니라 로그다.
+    if ci["wired"] and not ci["blocking"]:
+        block(f'CI의 스윕 호출에 `--strict`가 없다({" · ".join(ci["wired"])}) — advisory 발견에서 exit 0으로 끝난다.'
+              " **보고하고 통과하는 채널은 채널이 아니라 로그다** — 우회 불가한 자리에서 통과만 하면 우회할 필요도 없다")
+    # 스윕 규칙표를 못 찾으면 이 판정은 **하지 않는다**(0종으로 세면 "전부 덮였다"는 거짓 초록이다).
+    sync_abs = None
+    for rel_c in ([cfg.get("syncRulesFile")] if cfg.get("syncRulesFile") else []) + DEFAULT_SWEEP_SOURCE_CANDIDATES:
+        cand = os.path.join(root, *str(rel_c).split("/"))
+        if os.path.exists(cand):
+            sync_abs = cand
+            break
+    sweep_gates = None
+    if sync_abs:
+        try:
+            with open(sync_abs, encoding="utf-8") as fh:
+                sweep_gates = sweep_gate_files(fh.read())
+        except OSError:
+            sweep_gates = None
+    outside = gates_outside_ci(sweep_gates, [f["text"] for f in ci_files],
+                               cfg.get("sweepInvocationMarkers")) if sweep_gates else []
+    if not sweep_gates:
+        print("· 스윕 규칙표를 찾지 못해 **강제 층 커버리지를 판정하지 않았다** — 통과가 아니다"
+              "(`syncRulesFile`로 경로를 선언하면 판정한다)")
+    if outside:
+        more = " …" if len(outside) > 8 else ""
+        block(f'스윕 등재 게이트 {len(outside)}종이 어떤 우회 불가 층에도 없다: {", ".join(outside[:8])}'
+              f"{more} — CI가 스윕을 부르지 않고 게이트를 손으로 열거하기 때문이다."
+              " 그 게이트들은 **사람이 손으로 스윕을 칠 때만** 돈다. 손목록을 스윕 호출 한 줄로 바꿔라"
+              "(목록은 적는 것이 아니라 계산하는 것이다 — 설치기 복사 목록·테스트 픽스처 목록이 이미 같은 드리프트를 냈다)")
 
     receipt = None
     if not os.path.exists(abs_path):
