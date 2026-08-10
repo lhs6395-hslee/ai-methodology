@@ -88,6 +88,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 스윕 규칙표에 **R15 소개 문서 동기** 등재 + `sdd-init.sh` 배포 목록에 `intro-doc-lib`·`check-intro-doc` 추가 + `--json` 리포트 규칙 목록 계약에 R15 반영 | 오너 지시(키트 변경 시 소개 HTML 강제 갱신) → SPEC-045 신설. 배포 목록 누락은 **어제 세운 폐포 계약 테스트가 즉시 잡았다** — 규범으로 세 번 실패한 것을 기계로 옮긴 것이 하루 만에 효과를 냈다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-08-10 | `sdd-init.sh` 배포 목록에 신설 코어 3종 추가 + **배포 폐포 계약 테스트** 신설(`ship-closure.test.mjs`) | 배포 목록 누락이 세 번 재발했다(verdict-lib·verification-run-lib·term-coverage-lib) — 매번 소비 프로젝트는 게이트가 아니라 `ERR_MODULE_NOT_FOUND`를 받는다. 세 번 다 "다음엔 목록도 같이 고치자"는 규범으로 끝났고 세 번 다 안 지켜졌다. 규범으로 두 번 이상 실패한 것은 기계가 잡는다: import 전이 폐포와 규칙표 등재 게이트가 배포 목록에 모두 있는지 계약으로 강제한다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | FR-002 정직 정정 — pre-push 자동배선 아님; commit-msg 자동배선 명시; sdd-pre-push.sh 스캐폴딩+안내 정확히 기술 | HONESTY 위반(자기 정렬 발견) |

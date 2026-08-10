@@ -85,6 +85,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `check-fr-coverage`가 spec 파일명 판정을 SPEC-001의 정본(`isSpecMdName`)으로 위임 | 자체 정규식을 들고 있던 것을 R13 구현 중복이 잡았다. 판정 동작은 불변(출력 바이트 동일) [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | `check-fr-coverage`에 R1c(의미 커버리지, SPEC-042)·R1d(결정 입도, SPEC-044) 배선, `check-spec-completeness`에 근거 적용범위(SPEC-043) 배선 + 개별 축의 hard 승급이 `--strict` 없이도 그 항목만 차단하도록 렌더·종료 경로 확장 | 소비 프로젝트 제보: 스펙과 코드가 어긋난 채 모든 게이트가 green을 유지한 사례 3건 — 공통 원인은 게이트가 "연결의 존재"만 보고 "연결의 진위"를 안 본다는 것이다. 판정 코어는 각 spec이 소유하고 이 spec은 **배선만** 갖는다(품질 게이트군의 소비 지점). hard 승급이 `--strict`에서만 실효를 가지면 "hard로 올렸다"는 선언이 거짓이 되므로 승급 축은 즉시 차단한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `maxKeysPerCategoryPerSpec`를 4→6으로 상향(sdd.config.json) | 이 spec의 Symbols=5개 게이트 파일명은 한 응집 aggregate라 분할이 부적절 — 브리프 허용 config 조정으로 cohesion warn 해소 |

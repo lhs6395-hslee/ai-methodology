@@ -115,6 +115,7 @@
     "changelog-fr-ref": "Change Log 행이 FR에 대해 하는 **선언** — 그 FR 자체와 구분되는 실체다(\"FR-018을 추가했다\"는 주장 vs FR-018이라는 요구). 선언이 실물과 어긋나면 계약이 SSOT 밖에 산다(SPEC-037)",
     "duplicate-logic": "같은 규칙이 두 곳에 구현된 상태 — 선언 중복(dedup)의 거울 밖이다. 같은 파일을 두 스펙이 주장하는 것과, 같은 동작을 두 함수가 실현하는 것은 다른 사실이다(SPEC-038)",
     "verification-run": "선언된 검증 자산이 **실제로 돌았다는 사실** — 그 자산이 저장소에 존재하는 것과 다른 층이다. 존재는 실행이 아니고, 기록이 없으면 안 돈 것과 구분되지 않는다(SPEC-041)",
+    "intro-doc": "새로 배우는 사람이 **방법론을 만나는 문서** — 그 문서가 설명하는 도구와 다른 층이다. 설명이 도구보다 늦으면 그 설명은 거짓이 되고, 낡은 문서는 존재하지 않는 규칙 체계를 가르친다(SPEC-045)",
     "term-coverage": "커버 파일이 그 요구가 **이름 댄 대상을 적어도 언급하는가** — 커버 태그의 존재와 다른 층이다. 인용은 시험이 아니고, 동어반복하는 테스트는 태그만으로 초록이 된다(SPEC-042)",
     "evidence-scope": "관측에서 끌어낸 결론이 **참이라고 주장되는 범위** — 관측 자체와 다른 층이다. 1대에서 본 것이 보편 규칙으로 승격되면 그 규칙은 다른 환경에서 조용히 틀린다(SPEC-043)",
     "external-target": "환경이 아무 말도 하지 않을 때 이 시스템이 기본으로 치는 **다른 시스템** — 평범한 상수와 다른 층이다. 그건 구현 세부가 아니라 계약이고, 계약은 스펙이 알아야 조용히 바뀌지 않는다(SPEC-044)",
@@ -183,6 +184,9 @@
     "prompts"
   ],
   "symbolRealityPolicy": "hard",
+  "introDocs": ["docs/방법론.html", "docs/ownership-key.html", "docs/ownership-key-easy.html"],
+  "introDocRuleSource": "HARNESS.md",
+  "introDocPolicy": "hard",
   "capabilityVerbs": [
     "account",
     "adopt",
@@ -199,6 +203,7 @@
     "qualify",
     "record",
     "substantiate",
+    "synchronise",
     "resolve",
     "retire",
     "run",

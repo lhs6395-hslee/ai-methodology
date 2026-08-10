@@ -43,6 +43,10 @@ export const RATCHETED_POLICIES = [
   "duplicateLogicPolicy",
   "coversBacklinkPolicy",
   "verificationRunPolicy",
+  "termCoveragePolicy",
+  "externalTargetPolicy",
+  "evidenceScopePolicy",
+  "introDocPolicy",
   "liveRealityCoveragePolicy",
 ];
 

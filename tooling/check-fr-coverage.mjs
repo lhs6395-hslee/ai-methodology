@@ -25,7 +25,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile, walkFiles } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, DEFAULTS, isE2eFile, walkFiles, isSpecMdName } from "./sdd-config.mjs";
 import { loadManifest, classify } from "./verification-accounting.mjs";
 import { parseStatus } from "./lifecycle-lib.mjs";
 import { compileGlob, stripInlineComment } from "./spec-sync-lib.mjs";
@@ -93,7 +93,7 @@ for (const f of readdirSync(SPEC_DIR)) {
 //     규칙 iac/ci→INFRA)를 기계 강제. 비-인프라 소유 파일이 하나라도 있으면 통과(전체성
 //     임계 — 기능 SPEC-의 부수 IaC/CI 소유는 정당). 면제는 prefixClassExemptions(사유 필수).
 const exemptions = cfg.prefixClassExemptions || {};
-const specMdNames = readdirSync(SPEC_DIR).filter((f) => f.endsWith(".md") && /^[A-Z]+-\d{3}/.test(f)).sort();
+const specMdNames = readdirSync(SPEC_DIR).filter(isSpecMdName).sort();
 const knownIds = new Set(specMdNames.map((f) => f.match(SPEC_ID)?.[0]).filter(Boolean));
 prefixErrors.push(...validateExemptions(exemptions, knownIds));
 const classGlobs = {};

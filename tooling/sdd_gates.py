@@ -129,6 +129,9 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "introDocs": [],
+    "introDocRuleSource": "HARNESS.md",
+    "introDocPolicy": "advisory",
     "termGlossary": [],
     "termCoveragePolicy": "advisory",
     "termCoverageListCap": 12,
@@ -252,6 +255,10 @@ RATCHETED_POLICIES = [
     "duplicateLogicPolicy",
     "coversBacklinkPolicy",
     "verificationRunPolicy",
+    "termCoveragePolicy",
+    "externalTargetPolicy",
+    "evidenceScopePolicy",
+    "introDocPolicy",
     "liveRealityCoveragePolicy",
 ]
 
@@ -917,7 +924,7 @@ def cmd_fr(cfg, strict):
     #     클래스인 스펙은 INFRA- 접두어여야 한다 — STORAGE §2.2의 접두어 의미(readopt 착지
     #     규칙 iac/ci→INFRA)를 기계 강제. 비-인프라 소유 파일이 하나라도 있으면 통과.
     exemptions = cfg.get("prefixClassExemptions") or {}
-    spec_md_names = sorted(f for f in spec_names if f.endswith(".md") and re.match(r"^[A-Z]+-\d{3}", f))
+    spec_md_names = sorted(f for f in spec_names if is_spec_md_name(f))
     known_ids = set()
     for f in spec_md_names:
         m = cfg["__specId"].search(f)
@@ -2381,6 +2388,13 @@ _CODE_LEADING = {"Reviewed", "Approved", "Active", "Deprecated", "Removed"}
 
 def can_lead_code(status):
     return status is None or status in _CODE_LEADING
+
+
+def is_spec_md_name(name):
+    """spec 파일명 판정 정본 — `<PREFIX>-NNN….md` (sdd-config.mjs isSpecMdName 미러).
+    이 판단이 여러 곳에 흩어지면 한 게이트는 세고 다른 게이트는 안 세는 스펙이 생긴다."""
+    n = str(name or "")
+    return n.endswith(".md") and re.match(r"^[A-Z]+-\d{3}", n) is not None
 
 
 def section_block(text, heading):
@@ -4578,7 +4592,7 @@ def cmd_sccoverage(cfg):
     sys.exit(0)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -5186,6 +5200,148 @@ def cmd_verifyrun(cfg, record_args=None):
               if debt else "검증 실행 회계 게이트: OK — 선언된 증거가 모두 실행 기록을 갖는다.")
 
 
+# ── 소개 문서 동기 (SPEC-045, intro-doc-lib.mjs + check-intro-doc.mjs 미러) ──
+def rule_ids_of(text):
+    """규칙표 행에서만 규칙 ID를 뽑는다 — 산문 언급은 규칙 선언이 아니다."""
+    out = []
+    for line in str(text or "").split("\n"):
+        m = re.match(r"^\s*\|\s*\*{0,2}(R\d+)\b", line)
+        if m and m.group(1) not in out:
+            out.append(m.group(1))
+    return out
+
+
+def missing_rule_ids(rule_ids, doc_texts):
+    texts = doc_texts or []
+    out = []
+    for rid in rule_ids or []:
+        rex = re.compile(r"(^|[^A-Za-z0-9])" + rid + r"([^0-9]|$)")
+        if not any(rex.search(str(t or "")) for t in texts):
+            out.append(rid)
+    return out
+
+
+def cited_counts(text):
+    return [{"key": m.group(1), "cited": int(m.group(2).replace(",", ""))}
+            for m in re.finditer(r'data-sdd-count\s*=\s*"([a-z-]+)"\s*>\s*([0-9,]+)', str(text or ""))]
+
+
+def count_mismatches(cites, actuals):
+    out = []
+    for c in cites or []:
+        if c["key"] not in (actuals or {}):
+            out.append({"key": c["key"], "cited": c["cited"], "actual": None})
+        elif actuals[c["key"]] != c["cited"]:
+            out.append({"key": c["key"], "cited": c["cited"], "actual": actuals[c["key"]]})
+    return out
+
+
+def companion_missing(changed, rule_source, intro_docs):
+    if changed is None:
+        return False
+    if rule_source not in changed:
+        return False
+    return not any(d in changed for d in (intro_docs or []))
+
+
+def _intro_actual_counts(cfg, root, rule_ids):
+    out = {"rules": len(rule_ids)}
+    sync = os.path.join(root, "tooling", "sdd-sync.mjs")
+    if os.path.exists(sync):
+        src = read_text(sync)
+        i = src.find("const RULES = [")
+        if i >= 0:
+            blk = src[i:src.find("\n];", i)]
+            out["gates"] = len(set(re.findall(r'"((?:check|gen)-[a-z-]+\.mjs)"', blk)))
+    try:
+        out["specs"] = len([f for f in os.listdir(resolve(cfg, cfg["specDir"])) if is_spec_md_name(f)])
+    except OSError:
+        pass
+    return out
+
+
+def cmd_introdoc(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("introDocPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ introDocPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "introDocPolicy")
+        print("소개 문서 게이트 — introDocPolicy:off (판정 안 함)")
+        return
+    docs = [d for d in (cfg.get("introDocs") or []) if d]
+    rule_source = str(cfg.get("introDocRuleSource") or "HARNESS.md")
+    if not docs:
+        verdict("INERT", "introDocs 미선언 — 대조할 소개 문서가 없다")
+        print("소개 문서 게이트 — **introDocs 미선언: 판정하지 않는다**."
+              " 방법론을 설명하는 문서(HTML·MD)를 선언하면 ①규칙표의 규칙 ID가 그 문서에 다 있는지"
+              " ②문서가 `data-sdd-count`로 올린 숫자가 실제와 맞는지 ③규칙표를 고친 커밋에 그 문서가 함께 있는지를 본다.")
+        return
+    missing_docs = [d for d in docs if not os.path.exists(os.path.join(root, d))]
+    if missing_docs:
+        judged(len(missing_docs))
+        print(f"소개 문서 게이트(introDocPolicy={policy}): 문서 {len(docs)}건 선언")
+        for d in missing_docs:
+            print(f"  ✗ 선언된 소개 문서 없음: {d} — 경로 오타이거나 삭제됨(조용한 스킵 금지)", file=sys.stderr)
+        sys.exit(1)
+    src_path = os.path.join(root, rule_source)
+    if not os.path.exists(src_path):
+        verdict("INERT", f"규칙표 소스 없음 — {rule_source}")
+        print(f"소개 문서 게이트 — 규칙표 소스 `{rule_source}`가 없어 대조할 축이 없다(introDocRuleSource로 지정).")
+        return
+    doc_texts = [read_text(os.path.join(root, d)) for d in docs]
+    rule_ids = rule_ids_of(read_text(src_path))
+    errors, warnings = [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    for rid in missing_rule_ids(rule_ids, doc_texts):
+        block(f"규칙 {rid}가 소개 문서 어디에도 없다 — 규칙표({rule_source})는 이 규칙을 선언하는데 설명 문서는 모른다."
+              f" 새로 배우는 사람은 이 문서로 방법론을 만난다: {' 또는 '.join(docs)}에 {rid}를 설명하라")
+
+    actuals = _intro_actual_counts(cfg, root, rule_ids)
+    cited_total = 0
+    for i, text in enumerate(doc_texts):
+        cites = cited_counts(text)
+        cited_total += len(cites)
+        for m in count_mismatches(cites, actuals):
+            if m["actual"] is None:
+                block(f'{docs[i]}: 미지원 인용 키 "{m["key"]}" — 지원 키는 {"·".join(actuals.keys())}.'
+                      ' 오타난 키는 검산되지 않는다(조용히 "확인됨"으로 읽히는 자리)')
+            else:
+                block(f'{docs[i]}: 인용 수치 "{m["key"]}"가 {m["cited"]}인데 실제는 {m["actual"]}'
+                      " — 문서가 낡았다(숫자는 가장 먼저 낡고 가장 늦게 들킨다)")
+
+    changed = None
+    try:
+        out = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=root,
+                             capture_output=True, text=True, check=True).stdout
+        staged = [x.strip() for x in out.split("\n") if x.strip()]
+        if staged:
+            changed = set(staged)
+    except Exception:  # noqa: BLE001
+        pass
+    if companion_missing(changed, rule_source, docs):
+        block(f"규칙표({rule_source})가 이 changeset에서 바뀌었는데 소개 문서는 그대로다"
+              f" — 규칙이 바뀌면 그 규칙을 설명하는 문서도 같은 커밋에서 바뀌어야 한다({' 또는 '.join(docs)})")
+
+    judged(len(errors))
+    print(f"소개 문서 게이트(introDocPolicy={policy}): 문서 {len(docs)}건 · 규칙 {len(rule_ids)}종 대조 · 인용 수치 {cited_total}건 검산"
+          + (" · 동반 갱신 판정함" if changed else " · 동반 갱신은 판정 안 함(스테이징 집합 없음)"))
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 소개 문서가 도구보다 늦었다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if not warnings:
+        print("  ✓ 규칙 ID 누락 0건 · 인용 수치 불일치 0건 — 설명이 도구를 따라잡고 있다.")
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -5266,6 +5422,8 @@ def main():
         cmd_verifyrun(cfg, rec)
     elif sub == "sccoverage":
         cmd_sccoverage(cfg)
+    elif sub == "introdoc":
+        cmd_introdoc(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

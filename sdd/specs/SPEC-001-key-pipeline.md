@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 어댑터에 소개 문서 동기 knob 3종(`introDocs`·`introDocRuleSource`·`introDocPolicy`) 추가 + **spec 파일명 판정 정본화**(`isSpecMdName`) | SPEC-045 신설에 따른 기본값 등재(`introDocs` 빈 배열 = 결합 0, 미선언이면 게이트가 inert를 선언한다). 파일명 판정은 두 게이트에 복제돼 있던 것을 R13이 잡았다 — 이 판단이 흩어지면 한 게이트는 세고 다른 게이트는 안 세는 스펙이 생기고, 그 차이가 곧 조용한 사각이다 [검증: tooling/__tests__/intro-doc.test.mjs] |
 | 2026-08-10 | config 어댑터에 의미 커버리지·결정 입도·근거 적용범위 knob 9종 추가(`termGlossary`·`termCoveragePolicy`·`termCoverageListCap`·`externalTargetPolicy`·`externalTargetListCap`·`evidenceScopePolicy`·`observationMarkers`·`evidenceScopeLabels`·`environmentMarkers`) | SPEC-042·043·044 신설에 따른 기본값 등재 — 새 축의 어휘 목록은 전부 `null` 기본(킷 기본 마커)이고 프로젝트가 선언으로 교체한다. 면제가 아니라 어휘 교체다: 교체해도 축은 계속 판정한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | `__coversRe` 레터 서픽스(소문자 1자) 지원 + 경계 강제 | 도그푸딩(소비 프로젝트 A): 정본 갱신이 프로젝트 커스터마이즈를 덮어 가짜 dangling 발생 — 기본 지원으로 흡수(/speckit.fix) |

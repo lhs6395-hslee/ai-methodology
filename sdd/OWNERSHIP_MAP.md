@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 45건
+## Entity 키 (aggregate root) — 46건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -47,6 +47,7 @@
 | `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring` | SPEC-036 | ✓ | ✓ | ✓ |
+| `intro-doc` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-pipeline` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci` | CICD-001 | ✓ | ✓ | ✓ |
 | `live-reality` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -74,7 +75,7 @@
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 83건
+## Surface 키 — 85건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -90,6 +91,7 @@
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-hooks-installed.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
+| `check-intro-doc.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
 | `check-live-reality.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
 | `check-orphan-surfaces.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -120,6 +122,7 @@
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
 | `hooks-install-lib.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
 | `hooks.list` | SPEC-036 | ✓ | ✓ | ✓ |
+| `intro-doc-lib.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | ✓ |
 | `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | ✓ |
 | `live-reality-lib.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -162,7 +165,7 @@
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 47건
+## Capability 키 — 48건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -186,6 +189,7 @@
 | `gate-verdict.emit` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring.gate` | SPEC-036 | ✓ | ✓ | ✓ |
+| `intro-doc.synchronise` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-pipeline.parse` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci.gate` | CICD-001 | ✓ | ✓ | ✓ |
 | `live-reality.judge` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -238,7 +242,7 @@
 
 ## 집계
 
-- 소유 키 총 **192건** (entity 45 · surface 83 · capability 47 · 역할없음 17)
+- 소유 키 총 **196건** (entity 46 · surface 85 · capability 48 · 역할없음 17)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

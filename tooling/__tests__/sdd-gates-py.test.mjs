@@ -1256,3 +1256,31 @@ test("py completeness: 근거 적용범위 — 환경 지목 관측/범위 표�
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 소개 문서 동기 패리티(SPEC-045) ──
+test("py introdoc: 미선언 inert·규칙 누락·인용 불일치·문서 부재 — Node·Python 바이트 동일", skip, () => {
+  const TABLE = ["| 규칙 | 언제 | 게이트 |", "|---|---|---|",
+    "| **R1 spec→code** | x | `check-fr-coverage` |",
+    "| **R9 라이브 대조** | x | `check-live-reality` |"].join("\n");
+  const scen = [
+    { cfg: {}, files: { "HARNESS.md": TABLE } },                                        // introDocs 미선언 → INERT
+    { cfg: { introDocs: ["docs/intro.html"], introDocPolicy: "hard" },
+      files: { "HARNESS.md": TABLE, "docs/intro.html": "<p>R1만 설명</p>" } },           // R9 누락 → hard 차단
+    { cfg: { introDocs: ["docs/intro.html"] },
+      files: { "HARNESS.md": TABLE, "docs/intro.html": "<p>R1만 설명</p>" } },           // advisory → 표면화만
+    { cfg: { introDocs: ["docs/intro.html"], introDocPolicy: "hard" },
+      files: { "HARNESS.md": TABLE, "docs/intro.html": `<p>R1 R9 — 규칙 <span data-sdd-count="rules">7</span>종 · <span data-sdd-count="rulez">1</span></p>` } },
+    { cfg: { introDocs: ["docs/gone.html"] }, files: { "HARNESS.md": TABLE } },          // 선언했는데 없음 → 차단
+    { cfg: { introDocs: ["docs/intro.html"] }, files: { "docs/intro.html": "<p>x</p>" } }, // 규칙표 없음 → INERT
+    { cfg: { introDocs: ["docs/intro.html"], introDocPolicy: "off" }, files: { "HARNESS.md": TABLE } },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-intro-doc.mjs");
+      const p = runPy(root, ["introdoc"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

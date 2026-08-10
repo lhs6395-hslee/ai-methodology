@@ -159,6 +159,11 @@ export const DEFAULTS = {
   termGlossary: [],
   termCoveragePolicy: "advisory",
   termCoverageListCap: 12,
+  // 소개 문서 동기(SPEC-045) — 설명이 도구보다 늦으면 그 설명은 거짓이 된다.
+  // introDocs 미선언이면 INERT(판정 안 함). 킷 자신은 hard로 쓴다.
+  introDocs: [],
+  introDocRuleSource: "HARNESS.md",
+  introDocPolicy: "advisory",
   // 결정 입도(SPEC-044) — env 폴백 기본값이 외부 대상이면 소유 스펙이 그것을 알아야 한다.
   externalTargetPolicy: "advisory",
   externalTargetListCap: 12,
@@ -506,6 +511,12 @@ export function walkFiles(absDir, ignore, relBase = "", acc = []) {
 }
 
 // 스펙 디렉토리의 `.md` 절대 경로 목록. onMissing 미전달 시 빈 배열(호출자가 처분을 정한다).
+// spec 파일명 판정 정본 — `<PREFIX>-NNN…​.md`. 이 판단이 여러 곳에 흩어지면(실측: R13이 즉시
+// 잡았다) 한 게이트는 세고 다른 게이트는 안 세는 스펙이 생기고, 그 차이가 곧 조용한 사각이다.
+export function isSpecMdName(name) {
+  return /\.md$/.test(String(name || "")) && /^[A-Z]+-\d{3}/.test(String(name || ""));
+}
+
 export function specMdFiles(specDirAbs, onMissing = null) {
   let names;
   try { names = readdirSync(specDirAbs); } catch {

@@ -58,6 +58,9 @@ const RULES = [
   // R14(SPEC-041): 선언된 증거가 **돌았는가**. R8이 "증거가 실재하는가"까지 보고, 여기서 실행을 본다 —
   // 존재는 실행이 아니다. 원장 미선언이면 스스로 inert를 선언한다(SPEC-040).
   { rule: "R14 검증 실행(존재 아닌 실행)", gates: ["check-verification-executed.mjs"] },
+  // R15(SPEC-045): 도구가 아니라 **설명**을 본다. 새로 배우는 사람은 코드가 아니라 소개 문서로
+  // 방법론을 만나므로, 문서가 낡으면 존재하지 않는 규칙 체계를 가르친다. 소개 문서 미선언이면 inert.
+  { rule: "R15 소개 문서 동기(설명이 도구를 따라잡는가)", gates: ["check-intro-doc.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
