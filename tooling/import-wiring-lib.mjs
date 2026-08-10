@@ -205,6 +205,29 @@ export function wiringFindings(entries, read, resolve) {
   return { violations: dedupV, unchecked: dedupU, walked: visited.size };
 }
 
+// import 폐포 — 진입점들에서 도달 가능한 로컬 모듈의 전체 집합(진입점 포함).
+// readText(key) → 문자열 | null(못 읽으면 null). 순수하다(IO 주입).
+//
+// **왜 코어에 있어야 하는가**: 이 폐포는 킷 안에서 최소 세 곳이 필요하다 — 설치기 복사 목록,
+// 테스트 픽스처 복사 목록, R18의 열거기. 손으로 적은 목록은 반드시 드리프트한다. 실측: 픽스처
+// 복사 목록 6곳이 각자 손목록을 들고 있었고, 새 모듈 하나가 추가되자 5곳이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다 — 소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함이
+// 킷 자신의 픽스처에서 재연된 것이다. 목록은 적는 것이 아니라 **계산하는 것**이다.
+export function importClosure(entries, readText) {
+  const seen = new Set();
+  const stack = [...(entries || [])];
+  while (stack.length) {
+    const key = stack.pop();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let text = null;
+    try { text = readText(key); } catch { text = null; }
+    if (text == null) continue;                 // 못 읽은 것은 걷지 않는다(부재로 단정하지 않는다)
+    for (const imp of localImports(text)) stack.push(imp.specifier.replace(/^\.\//, ""));
+  }
+  return [...seen];
+}
+
 // 사람이 읽는 한 줄. 원인과 **해소 방법**을 같이 낸다 — 이 결함의 해소는 언제나 "그 파일을
 // 정본에서 다시 복사"이므로, 게이트가 그 문장을 대신 말해주면 사람이 스택을 읽지 않아도 된다.
 export function formatWiringViolation(v) {

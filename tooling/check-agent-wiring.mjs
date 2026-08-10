@@ -112,8 +112,11 @@ function main() {
   judged(errors.length);
   const wiredCount = decls.length - f.missing.length;
   console.log(`에이전트 배선 게이트(agentWiringPolicy=${POLICY}): 선언 ${decls.length}종 · 배선 ${wiredCount}종`
-    + ` · 매처 좁음 ${f.narrowed.length} · 스크립트 부재 ${f.scriptMissing.length} | 설정 ${settingsRel}`);
+    + ` · 매처 좁음 ${f.narrowed.length} · 스크립트 부재 ${f.scriptMissing.length} | 설정 ${settingsRel}`
+    + (f.unchecked.length ? ` · 확인 못 함 ${f.unchecked.length}(통과 아님)` : ""));
   for (const w of warnings) console.log(`  ⚠ ${w}`);
+  // 3분류 계약(SPEC-054) — 차단하지 않지만 **초록에도 합산하지 않는다**(조용한 0건 금지).
+  for (const u of f.unchecked) console.log(`  · \`${u.script}\` — ${u.why}(통과가 아니다: 부재로 단정하지 않는다)`);
   if (errors.length) {
     console.error(`\n✗ 감시 에이전트가 배선되지 않았다 ${errors.length}건:`);
     for (const e of errors) console.error(`  ✗ ${e}`);

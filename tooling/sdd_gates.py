@@ -34,6 +34,64 @@ import unicodedata
 import subprocess
 import sys
 
+# ── 판정 3분류 반환 계약(check-outcome-lib.mjs 패리티, SPEC-054) ───────────────
+# SPEC-040은 **게이트**가 스윕에 내는 판정 종류이고, 이것은 **코어**가 게이트에 돌려주는 형태다.
+# 040의 선언은 코어 반환값의 **해석**이므로, 코어에 "못 봤다"의 통로가 없으면 게이트는 그 사실을
+# 알 방법이 없고 빈 findings를 clean으로 읽는다 — 판정이 사라지는 자리는 코어와 게이트의 경계다.
+# 실측: 낡은 훅 사본이 green으로 보고돼 강제 정책이 한 번도 발화하지 않았고, 반대 방향으로는
+# 존재 판정기 주입 코어에서 읽기 실패가 `False`로 붕괴해 "부재"=위반이라는 거짓 판정이 가능했다.
+CHECK_KINDS = {"CLEAN": "clean", "UNCHECKED": "could-not-check", "VIOLATION": "violation"}
+TRI_YES, TRI_NO, TRI_UNKNOWN = "yes", "no", "unknown"
+
+
+def tri(value):
+    """bool | TRI → TRI 정규화. None은 **UNKNOWN**이다(모르는 것을 없다고 하지 않는다)."""
+    if value is True or value == TRI_YES:
+        return TRI_YES
+    if value is False or value == TRI_NO:
+        return TRI_NO
+    return TRI_UNKNOWN
+
+
+def tri_guard(fn):
+    """던지는 판정기를 3상태로 감싼다 — 예외를 False로 삼키던 자리가 이 결함의 발생 지점이다."""
+    def wrapped(*args):
+        try:
+            return tri(fn(*args))
+        except Exception:
+            return TRI_UNKNOWN
+    return wrapped
+
+
+def check_outcome(violations=None, unchecked=None):
+    """코어 반환값을 계약 형태로 정규화한다 — 위반이 UNCHECKED를 **가리지 않는다**."""
+    v = list(violations or [])
+    u = list(unchecked or [])
+    kind = CHECK_KINDS["VIOLATION"] if v else (CHECK_KINDS["UNCHECKED"] if u else CHECK_KINDS["CLEAN"])
+    return {"kind": kind, "violations": v, "unchecked": u}
+
+
+def merge_outcomes(*outcomes):
+    v, u = [], []
+    for o in outcomes:
+        if not o:
+            continue
+        v.extend(list(o.get("violations") or []))
+        u.extend(list(o.get("unchecked") or []))
+    return check_outcome(v, u)
+
+
+def outcome_summary(outcome, subject="판정"):
+    """게이트가 사람에게 낼 한 줄 — **못 본 것을 초록에 합산하지 않는다.**"""
+    o = outcome or check_outcome()
+    if o["kind"] == CHECK_KINDS["VIOLATION"]:
+        tail = f" · 확인 못 함 {len(o['unchecked'])}건(통과 아님)" if o["unchecked"] else ""
+        return f"{subject}: 위반 {len(o['violations'])}건{tail}"
+    if o["kind"] == CHECK_KINDS["UNCHECKED"]:
+        return f"{subject}: 위반 0건 · **확인 못 함 {len(o['unchecked'])}건** — 통과가 아니다"
+    return f"{subject}: 위반 0건 · 확인 못 함 0건"
+
+
 # ── 판정 타입(verdict-lib.mjs 패리티, SPEC-040) ────────────────────────────────
 # 게이트는 "무엇을 했는지"를 산문이 아니라 **타입**으로 말한다. 이 미러가 없으면 Python 런타임
 # 프로젝트의 스윕은 여전히 문자열로 추측하고, "off (판정 안 함)"을 초록으로 읽는다.
@@ -1127,7 +1185,8 @@ def cmd_fr(cfg, strict):
     # 귀속 분리 — 판정 집합은 워킹트리 전역을 유지하되 커밋 밖 위반은 강도를 낮춘다(오귀속 차단 제거).
     commit_scope = None
     try:
-        out2 = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=cfg["__root"],
+        # core.quotepath=off — 인용된 8진수 경로는 어떤 소유 글롭과도 매치하지 않아 귀속이 조용히 사라진다.
+        out2 = subprocess.run(["git", "-c", "core.quotepath=off", "diff", "--cached", "--name-only"], cwd=cfg["__root"],
                               capture_output=True, text=True, check=True).stdout
         staged2 = [x.strip() for x in out2.split("\n") if x.strip()]
         if staged2:
@@ -1829,8 +1888,14 @@ def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, bro
                 continue
             if tag and tag["kind"] == "exec":
                 for p in tag["paths"]:
-                    if not asset_exists(p):
+                    # 3분류 계약(SPEC-054) — 자산 실재를 **확인하지 못한** 것을 "없음"으로 말하면 거짓
+                    # 위반이다(권한·I/O 오류). 반대로 통과로 흘리면 증거 없는 주장이 초록이 된다.
+                    st = tri(asset_exists(p))
+                    if st == TRI_NO:
                         out.append((u["specId"], c["id"], c["kind"], "missing-asset", f"증거 자산 없음: {p}"))
+                    elif st == TRI_UNKNOWN:
+                        out.append((u["specId"], c["id"], c["kind"], "asset-unchecked",
+                                    f"증거 자산 실재를 확인하지 못했다: {p} — 통과가 아니다"))
                 low = str(c["text"] or "").lower()
                 # 등급은 **경로 또는 매니페스트 method** 둘 중 하나로 성립한다(evidence-lib.mjs 미러).
                 if (any(marker_hits(low, m) for m in bmark)
@@ -3758,8 +3823,9 @@ def files_line_missing_paths(tokens, exists):
     """Files 리터럴 경로 실재(spec-sync-lib.mjs 패리티, SPEC-013).
 
     글롭은 대상에서 뺀다 — 오늘 0건 매치가 정당할 수 있다. 리터럴엔 그 정당성이 없다.
-    exists: (relPath) -> bool 주입(파일 IO는 호출자가 한다)."""
-    out = []
+    exists: (relPath) -> bool|TRI 주입(파일 IO는 호출자가 한다).
+    반환 {"missing": [...], "unchecked": [...]} — 확인 못 한 것은 부재가 아니다(SPEC-054)."""
+    out, unchecked = [], []
     for raw in tokens or []:
         t = str(raw or "").strip()
         if not t or t in ("—", "-"):
@@ -3768,9 +3834,13 @@ def files_line_missing_paths(tokens, exists):
             continue
         if t.startswith("["):
             continue
-        if not exists(t):
+        # 3분류 계약(SPEC-054) — 실재를 **확인 못 한** 경로는 "부재"가 아니다(권한·I/O).
+        st = tri(exists(t))
+        if st == TRI_NO:
             out.append(t)
-    return out
+        elif st == TRI_UNKNOWN:
+            unchecked.append(t)
+    return {"missing": out, "unchecked": unchecked}
 
 
 def scan_files_line_issues(raw_line):
@@ -4008,9 +4078,12 @@ def cmd_specsync(cfg, staged, msg_file, base):
         # (staged=✗ hard / range=⚠). 삭제 중 스펙은 제외(수명 종료 경로).
         if not (idx is None and head is not None):
             # 이번 changeset에서 **삭제 중인** 경로는 "잘못 적힌 것"이 아니라 "지우는 것"이다.
-            missing_lit = [rel for rel in files_line_missing_paths(
+            paths = files_line_missing_paths(
                 sorted(globs), lambda rel: os.path.exists(resolve(cfg, rel)))
-                if rel not in deleted_paths]
+            missing_lit = [rel for rel in paths["missing"] if rel not in deleted_paths]
+            # 3분류(SPEC-054) — 실재를 확인 못 한 경로는 "부재"가 아니다(권한·I/O). 차단하지 않고 표면화.
+            for rel in [r for r in paths["unchecked"] if r not in deleted_paths]:
+                print(f"· [{spec_id}] Files 경로 실재를 확인하지 못했다 {rel} — 통과가 아니다(부재로 단정하지 않는다)")
             if missing_lit:
                 print(f"{'✗' if staged else '⚠'} [{spec_id}] Files 리터럴 경로 부재 {' '.join(missing_lit)} — "
                       f"그 경로는 어떤 변경 파일과도 매치하지 않으므로 이 스펙의 소유가 조용히 사라진다"
@@ -5256,15 +5329,21 @@ def cmd_evidence(cfg):
             for k in (parse_section(text, "Ownership", [arti_cat]).get(arti_cat) or []))
         units.append({"specId": spec_id, "claims": claims, "ownsDeployArtifact": owns_deploy})
 
-    findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of,
-                                 cfg.get("deployMarkers"), cfg.get("deployEvidencePatterns"),
-                                 cfg.get("browserGradeMethods"), cfg.get("deployGradeMethods"))
+    allf = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of,
+                             cfg.get("deployMarkers"), cfg.get("deployEvidencePatterns"),
+                             cfg.get("browserGradeMethods"), cfg.get("deployGradeMethods"))
+    # 3분류 계약(SPEC-054) — **확인 못 함은 차단하지 않고 초록에도 합산하지 않는다.**
+    findings = [f for f in allf if f[3] != "asset-unchecked"]
+    unchecked = [f for f in allf if f[3] == "asset-unchecked"]
     claim_count = sum(len(u["claims"]) for u in units)
     judged(len(findings))
-    print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")
+    unchecked_tail = f" · 확인 못 함 {len(unchecked)}건(통과 아님)" if unchecked else ""
+    print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건{unchecked_tail}")
     tag = "✗" if hard else "⚠"
     for spec_id, claim_id, _kind, finding, detail in findings:
         print(f"  {tag} [{spec_id}] {claim_id} ({finding}) — {detail}")
+    for spec_id, claim_id, _kind, finding, detail in unchecked:
+        print(f"  · [{spec_id}] {claim_id} ({finding}) — {detail}")
     if findings and hard:
         print("\n✗ executionEvidencePolicy=hard: `[검증]`은 실행 가능한 증거 경로를 지목해야 한다 — 산문 자기신고로 충족되지 않는다(실측: 게이트 전종 green인데 대시보드 패널 30여 개 사망).", file=sys.stderr)
         sys.exit(1)
@@ -5768,7 +5847,9 @@ def cmd_introdoc(cfg):
 
     changed = None
     try:
-        out = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=root,
+        # core.quotepath=off — 인용된 8진수 경로는 소개 문서 목록과 매치하지 않아 **자기 갱신을
+        # 놓친 것으로 오판**한다(도그푸딩: 이 게이트가 자기 문서를 고친 커밋을 차단했다).
+        out = subprocess.run(["git", "-c", "core.quotepath=off", "diff", "--cached", "--name-only"], cwd=root,
                              capture_output=True, text=True, check=True).stdout
         staged = [x.strip() for x in out.split("\n") if x.strip()]
         if staged:
@@ -6006,8 +6087,16 @@ def parse_receipt(raw):
 
 
 def missing_gates(receipt, exists=None):
+    """반환 {"gone": [...], "unchecked": [...]} — 실재를 확인 못 한 게이트는 "지워졌다"가 아니다(SPEC-054)."""
     has = exists if callable(exists) else (lambda g: True)
-    return [g for g in ((receipt or {}).get("gates") or []) if not has(g)]
+    gone, unchecked = [], []
+    for g in ((receipt or {}).get("gates") or []):
+        st = tri(has(g))
+        if st == TRI_NO:
+            gone.append(g)
+        elif st == TRI_UNKNOWN:
+            unchecked.append(g)
+    return {"gone": gone, "unchecked": unchecked}
 
 
 def ci_wiring(ci_files, markers=None):
@@ -6222,7 +6311,7 @@ def command_names_script(command, script):
 
 
 def agent_wiring_findings(decls, settings, script_exists):
-    missing, narrowed, script_missing = [], [], []
+    missing, narrowed, script_missing, unchecked = [], [], [], []
     settings_missing = not settings
     wired = wired_hooks(settings) if settings else []
     for d in decls or []:
@@ -6239,10 +6328,14 @@ def agent_wiring_findings(decls, settings, script_exists):
             nd = dict(d)
             nd["missingTools"] = best
             narrowed.append(nd)
-        if callable(script_exists) and not script_exists(d["script"]):
+        # 3분류 계약(SPEC-054) — 스크립트 실재를 확인 못 한 것을 부재로 보고하면 거짓 위반이다.
+        st = tri(script_exists(d["script"]) if callable(script_exists) else None)
+        if st == TRI_NO:
             script_missing.append(d)
+        elif st == TRI_UNKNOWN:
+            unchecked.append({"script": d["script"], "why": "스크립트 실재를 확인하지 못했다"})
     return {"settingsMissing": settings_missing, "missing": missing,
-            "narrowed": narrowed, "scriptMissing": script_missing}
+            "narrowed": narrowed, "scriptMissing": script_missing, "unchecked": unchecked}
 
 
 def build_hook_settings(decls, command_for):
@@ -6403,6 +6496,7 @@ GUARD_FINDING_TEXT = {
     "missing-spec": "지목한 스펙이 실재하지 않는다 — 읽으라는 곳이 없으면 안내가 거짓이 된다",
     "bad-mode": "강도가 surface|deny 중 하나가 아니다",
     "no-why": "사유가 없다 — 왜 이 조회가 아닌지 모르면 사람은 규칙을 우회한다",
+    "spec-unchecked": "지목한 스펙의 실재를 **확인하지 못했다** — 통과가 아니다(검사 못 함과 통과는 다른 사실이다)",
     "deny-without-instead": "금지인데 **대신 볼 곳**이 없다 — 막기만 하면 사람은 아무도 모르는 우회로를 찾는다",
 }
 
@@ -6437,8 +6531,13 @@ def validate_diagnosis_map(entries, spec_exists):
             continue
         if not e["spec"]:
             findings.append({"kind": "no-spec", "at": at})
-        elif callable(spec_exists) and not spec_exists(e["spec"]):
-            findings.append({"kind": "missing-spec", "at": at, "spec": e["spec"]})
+        elif callable(spec_exists):
+            # 3분류 계약(SPEC-054) — 스펙 실재를 확인 못 한 것을 "없다"로 말하면 거짓 위반이다.
+            st = tri(spec_exists(e["spec"]))
+            if st == TRI_NO:
+                findings.append({"kind": "missing-spec", "at": at, "spec": e["spec"]})
+            elif st == TRI_UNKNOWN:
+                findings.append({"kind": "spec-unchecked", "at": at, "spec": e["spec"]})
         if e["mode"] not in GUARD_MODES:
             findings.append({"kind": "bad-mode", "at": at, "got": e["mode"]})
         if not e["why"].strip():
@@ -6561,16 +6660,24 @@ def cmd_diagnosisguard(cfg, argv):
             return True
         return any(r in n for n in spec_names)
 
-    findings = validate_diagnosis_map(entries, spec_exists)
+    allf = validate_diagnosis_map(entries, spec_exists)
+    # 3분류 계약(SPEC-054) — **확인 못 함은 차단하지 않는다.** 권한·I/O 사정으로 못 본 것을
+    # 위반이라 부르면 오탐이 쌓이고, 오탐이 잦은 게이트는 꺼진다. 그러나 초록에도 합산하지 않는다.
+    findings = [x for x in allf if x["kind"] != "spec-unchecked"]
+    unchecked = [x for x in allf if x["kind"] == "spec-unchecked"]
     judged(len(findings) if policy == "hard" else 0)
     deny = sum(1 for e in entries if e["mode"] == "deny")
+    unchecked_tail = f" · 확인 못 함 {len(unchecked)}(통과 아님)" if unchecked else ""
     print(f"진단 가드 게이트(diagnosisGuardPolicy={policy}): 규칙 {len(entries)}종"
-          f" (금지 {deny} · 노출 {len(entries) - deny}) — 선언 위반 {len(findings)}")
+          f" (금지 {deny} · 노출 {len(entries) - deny}) — 선언 위반 {len(findings)}"
+          f"{unchecked_tail}")
     tag = "✗" if policy == "hard" else "⚠"
     for f in findings:
         extra = f' ({f["spec"]})' if f.get("spec") else (f' ({f["got"]})' if f.get("got") else "")
         line = f'  {tag} [{f["at"]}] {GUARD_FINDING_TEXT[f["kind"]]}{extra}'
         print(line, file=sys.stderr) if policy == "hard" else print(line)
+    for f in unchecked:
+        print(f'  · [{f["at"]}] {GUARD_FINDING_TEXT[f["kind"]]} ({f["spec"]})')
     if findings and policy == "hard":
         print("\n✗ 진단 가드 선언이 깨졌다 — 이 축의 자기결함은 **조용한 무발화**다:"
               " 잘못된 선언은 아무것도 막지 않고 아무것도 알리지 않는다.", file=sys.stderr)
@@ -6726,10 +6833,15 @@ def cmd_agentwiring(cfg):
 
     judged(len(errors))
     wired_count = len(decls) - len(f["missing"])
+    unchecked_tail = f' · 확인 못 함 {len(f["unchecked"])}(통과 아님)' if f["unchecked"] else ""
     print(f'에이전트 배선 게이트(agentWiringPolicy={policy}): 선언 {len(decls)}종 · 배선 {wired_count}종'
-          f' · 매처 좁음 {len(f["narrowed"])} · 스크립트 부재 {len(f["scriptMissing"])} | 설정 {settings_rel}')
+          f' · 매처 좁음 {len(f["narrowed"])} · 스크립트 부재 {len(f["scriptMissing"])} | 설정 {settings_rel}'
+          f'{unchecked_tail}')
     for w in warnings:
         print(f"  ⚠ {w}")
+    # 3분류 계약(SPEC-054) — 차단하지 않지만 **초록에도 합산하지 않는다**(조용한 0건 금지).
+    for u in f["unchecked"]:
+        print(f'  · `{u["script"]}` — {u["why"]}(통과가 아니다: 부재로 단정하지 않는다)')
     if errors:
         print(f"\n✗ 감시 에이전트가 배선되지 않았다 {len(errors)}건:", file=sys.stderr)
         for e in errors:
@@ -6844,7 +6956,11 @@ def cmd_watchdog(cfg):
         for e in errs:
             block(f"{rel}: {e}")
         if receipt:
-            gone = missing_gates(receipt, lambda g: os.path.exists(os.path.join(root, *str(g).split("/"))))
+            mg = missing_gates(receipt, lambda g: os.path.exists(os.path.join(root, *str(g).split("/"))))
+            gone = mg["gone"]
+            # 3분류(SPEC-054) — 실재를 확인 못 한 게이트는 "지워졌다"가 아니다(차단하지 않고 표면화).
+            for g in mg["unchecked"]:
+                warnings.append(f"{g} 실재를 확인하지 못했다 — 통과가 아니다(권한·I/O 오류일 수 있다)")
             if gone:
                 more = " …" if len(gone) > 6 else ""
                 block(f'영수증이 선언한 게이트 {len(gone)}건이 지금 없다: {", ".join(gone[:6])}{more}'

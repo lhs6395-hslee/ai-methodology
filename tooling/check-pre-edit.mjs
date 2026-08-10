@@ -58,7 +58,9 @@ for (const n of names) {
 if (!owners.length) process.exit(0); // 미소유 경로 — 침묵
 
 // 이 브랜치에서 이미 손댄 파일 집합(워킹트리 ∪ staged ∪ base...HEAD).
-const sh = (c) => { try { return execSync(c, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
+// core.quotepath=off — 비ASCII 경로가 8진수로 인용되면 소유 글롭과 매치하지 않아 **체크리스트가
+// 발화하지 않는다**(조용한 0건). 다른 게이트들이 이미 같은 정규화를 한다.
+const sh = (c) => { try { return execSync(c.replace(/^git /, "git -c core.quotepath=off "), { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
 const BASE = process.env.SDD_DIFF_BASE || cfg.specSyncBase || "origin/main";
 const touched = new Set(
   [sh("git diff --name-only"), sh("git diff --cached --name-only"), sh(`git diff --name-only ${BASE}...HEAD`)]

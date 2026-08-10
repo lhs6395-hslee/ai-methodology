@@ -48,7 +48,9 @@ const entries = parseHookEntries(readFileSync(listPath, "utf8"));
 const expected = entries.map((e) => e.name);
 const sourceOf = new Map(entries.map((e) => [e.name, e.source]));
 
-const git = (a) => { try { return execSync(`git ${a}`, { cwd: cfg.__root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
+// core.quotepath=off — 훅 경로가 비ASCII 디렉토리 아래 있으면 인용된 경로로 파일을 못 찾고,
+// 그 실패가 "훅 없음"이라는 거짓 위반이 된다(전 게이트 공통 계약).
+const git = (a) => { try { return execSync(`git -c core.quotepath=off ${a}`, { cwd: cfg.__root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
 // 훅 디렉토리는 **git에게 묻는다** — 손으로 조합하지 않는다.
 // 실측 제보(2026-08-10): `--git-dir` + `core.hooksPath`를 손으로 합치는 이전 판은 **git worktree에서
 // 틀린 답을 냈다.** 워크트리에서 `.git`은 파일이고 `--git-dir`은 `.git/worktrees/<이름>` —

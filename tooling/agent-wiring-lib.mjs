@@ -22,6 +22,8 @@
 //
 // 순수 함수(IO 없음) — 파일 읽기·존재 확인은 소비 게이트가 주입한다. Python 미러(SPEC-006).
 
+import { TRI, tri } from "./check-outcome-lib.mjs";
+
 // 매처 없는 이벤트의 표기. 선언 파일이 공백 구분 3필드이므로 빈 칸을 쓸 수 없다.
 export const NO_MATCHER = "-";
 
@@ -94,7 +96,7 @@ export function commandNamesScript(command, script) {
 //   narrowed        — 배선은 있는데 매처가 좁아 일부 도구에서 발동하지 않는다
 //   scriptMissing   — 배선은 있는데 지목된 스크립트가 실재하지 않거나 실행 불가다
 export function agentWiringFindings(decls, settings, scriptExists) {
-  const missing = [], narrowed = [], scriptMissing = [];
+  const missing = [], narrowed = [], scriptMissing = [], unchecked = [];
   const settingsMissing = !settings;
   const wired = wiredHooks(settings);
   for (const d of decls || []) {
@@ -104,9 +106,13 @@ export function agentWiringFindings(decls, settings, scriptExists) {
     const gaps = hits.map((h) => missingMatcherTokens(d.matcher, h.matcher));
     const best = gaps.reduce((a, b) => (b.length < a.length ? b : a), gaps[0]);
     if (best.length) narrowed.push({ ...d, missingTools: best });
-    if (typeof scriptExists === "function" && !scriptExists(d.script)) scriptMissing.push(d);
+    // 3분류 계약(SPEC-054) — 스크립트 실재를 **확인하지 못한** 경우를 부재와 가르지 않으면
+    // 읽기 실패가 "스크립트 없음"이라는 거짓 위반이 된다.
+    const st = tri(typeof scriptExists === "function" ? scriptExists(d.script) : undefined);
+    if (st === TRI.NO) scriptMissing.push(d);
+    else if (st === TRI.UNKNOWN) unchecked.push({ script: d.script, why: "스크립트 실재를 확인하지 못했다" });
   }
-  return { settingsMissing, missing, narrowed, scriptMissing };
+  return { settingsMissing, missing, narrowed, scriptMissing, unchecked };
 }
 
 // 기존 설정에 이 배선을 **병합**한다 — 남의 훅은 보존하고 킷 훅만 갈아끼운다(재실행 idempotent).

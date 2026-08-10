@@ -9,13 +9,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   validateProcesses, stagesOf, ssotMissingStages, fragmentFindings,
   statelessStageFindings, unownedStateFindings, DEFAULT_STATEFUL_STAGE_MARKERS,
 } from "../process-ssot-lib.mjs";
+
+import { importClosure } from "../import-wiring-lib.mjs";
+
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처들이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
 
 // 제보의 실제 사슬.
 const CHAIN = ["로컬 실측", "커밋·푸시", "main 머지", "배포", "개발 실측", "교차검증 일치", "dev-done", "리포터 확인"];
@@ -73,8 +81,8 @@ test("선언된 저장소는 소유돼야 한다 — 인프라 산출물이 스�
 });
 
 // ── 게이트 e2e ────────────────────────────────────────────────────────────
-const LIBS = ["sdd-config.mjs", "ownership-keys.mjs", "verdict-lib.mjs", "spec-sync-lib.mjs",
-  "process-ssot-lib.mjs", "check-process-ssot.mjs"];
+// 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+const LIBS = importClosure(["check-process-ssot.mjs"], KIT_SRC);
 function repo(files, config) {
   const root = mkdtempSync(join(tmpdir(), "sdd-proc-"));
   mkdirSync(join(root, "sdd", "specs"), { recursive: true });

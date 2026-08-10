@@ -116,16 +116,23 @@ const manifestOf = (specId, claimId) =>
   (/^(SC|NFR)-/.test(claimId) ? EVID : SMOKE).get(`${specId}/${claimId}`) || null;
 
 const units = specUnits();
-const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS,
+const all = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS,
   deployMarkers: cfg.deployMarkers, deployPatterns: cfg.deployEvidencePatterns, manifestOf,
   browserGradeMethods: cfg.browserGradeMethods, deployGradeMethods: cfg.deployGradeMethods });
+// 3분류 계약(SPEC-054) — **확인 못 함은 차단하지 않고 초록에도 합산하지 않는다.**
+const findings = all.filter((f) => f.finding !== "asset-unchecked");
+const unchecked = all.filter((f) => f.finding === "asset-unchecked");
 const claimCount = units.reduce((n, u) => n + u.claims.length, 0);
 
 judged(findings.length);
-console.log(`실행 증거 게이트(executionEvidencePolicy=${POLICY}): spec ${units.length}개·주장 ${claimCount}건 검사 — 위반 ${findings.length}건`);
+console.log(`실행 증거 게이트(executionEvidencePolicy=${POLICY}): spec ${units.length}개·주장 ${claimCount}건 검사 — 위반 ${findings.length}건`
+  + (unchecked.length ? ` · 확인 못 함 ${unchecked.length}건(통과 아님)` : ""));
 const tag = HARD ? "✗" : "⚠";
 for (const f of findings) {
   console.log(`  ${tag} [${f.specId}] ${f.claimId} (${f.finding}) — ${f.detail}`);
+}
+for (const f of unchecked) {
+  console.log(`  · [${f.specId}] ${f.claimId} (${f.finding}) — ${f.detail}`);
 }
 if (findings.length && HARD) {
   console.error(`\n✗ executionEvidencePolicy=hard: \`[검증]\`은 실행 가능한 증거 경로를 지목해야 한다 — 산문 자기신고로 충족되지 않는다(실측: 게이트 전종 green인데 대시보드 패널 30여 개 사망).`);

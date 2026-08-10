@@ -147,8 +147,12 @@ for (const p of specPaths) {
   if (!(idx === null && head !== null)) {
     // 이번 changeset에서 **삭제 중인** 경로는 "잘못 적힌 것"이 아니라 "지우는 것"이다.
     // 원래부터 틀린 경로(오타·리네임 누락)를 잡으려던 검사인데 삭제까지 함께 잡고 있었다.
-    const missing = filesLineMissingPaths([...globs], (rel) => existsSync(join(cfg.__root, rel)))
-      .filter((rel) => !deleted.has(rel));
+    const paths = filesLineMissingPaths([...globs], (rel) => existsSync(join(cfg.__root, rel)));
+    const missing = paths.missing.filter((rel) => !deleted.has(rel));
+    // 3분류(SPEC-054) — 실재를 확인 못 한 경로는 "부재"가 아니다(권한·I/O). 차단하지 않고 표면화.
+    for (const rel of paths.unchecked.filter((r) => !deleted.has(r))) {
+      console.log(`· [${id}] Files 경로 실재를 확인하지 못했다 ${rel} — 통과가 아니다(부재로 단정하지 않는다)`);
+    }
     if (missing.length) {
       console.log(`${STAGED ? "✗" : "⚠"} [${id}] Files 리터럴 경로 부재 ${missing.join(" ")} — 그 경로는 어떤 변경 파일과도 매치하지 않으므로 이 스펙의 소유가 조용히 사라진다(리네임됐으면 스펙을 실물 이름에 맞춰라)`);
       if (STAGED) filesMissingHard = true;

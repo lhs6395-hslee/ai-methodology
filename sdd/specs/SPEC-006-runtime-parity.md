@@ -23,6 +23,8 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 - 셸판은 ERE에 워드 경계가 없어 "과포집 후 정확형 필터" 2단계로 경계를 재현한다(비문법 태그의 절단 캡처 금지).
 - 런타임별 DEFAULTS(specIdPrefixes 등)가 Node와 다르면 config 없는 프로젝트에서 판정이 갈라진다 — 기본값 자체도 패리티 대상이다.
 - preset 경로(`.specify` ears-preset)로 작성된 spec이 정식 템플릿의 게이트 파싱 앵커를 결여하면 spec-first 강제에서 조용히 빠진다 — 템플릿 간 앵커 패리티도 게이트 대상이다.
+- **경로를 git에게 물을 때 인용을 끄지 않으면 판정이 양방향으로 틀린다** — `git diff --name-only`는 비ASCII 경로를 8진수 문자열로 인용해서 낸다. 그 문자열은 어떤 소유 글롭·문서 목록과도 매치하지 않으므로 **소유 귀속이 조용히 사라지고**(위반→통과) 동시에 **자기 갱신을 놓친 것으로 오판한다**(통과→위반). 실측: 소개 문서 게이트가 자기 문서를 고친 커밋을 "문서 그대로"라고 차단했다.
+- **인용 계약의 열거기는 프로세스 기동만 본다** — 래퍼 호출부는 기동이 아니고 오류 문구 속 `git diff(...)`는 산문이다. 첫 판이 산문 2줄과 래퍼 호출 3줄을 위반으로 잡았고, 오탐이 잦은 게이트는 꺼진다.
 
 ---
 
@@ -34,6 +36,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 - **FR-003** (event): WHEN the same fixture is evaluated by the Node gate and the Python gate, THE **runtime-parity** (E) contract SHALL require an identical exit code and identical report output.
 - **FR-004** (ubiquitous): THE **sdd_gates.sh** (S) and **go-gate** (S) runtimes SHALL keep their core commands (coverage with prefix governance, ownership, runner) on the same ID grammar and the same defaults as the Node canonical DEFAULTS.
 - **FR-005** (unwanted): IF the ears-preset spec template omits any gate-parsed anchor present in the canonical module-spec template (an ownership category line including Files, the Dependencies section, Edge Cases, or Change Log), THEN THE SYSTEM SHALL fail the template-parity test so preset-path specs are never silently exempt from spec-first enforcement.
+- **FR-006** (event): WHEN any runtime spawns git to read repository paths, THE SYSTEM SHALL disable git's path quoting so that a non-ASCII path is never returned as an escaped literal, and the runtime source contract SHALL enumerate every git process spawn across every runtime source to prove that no call site is missing, because a norm recorded only in prose left eight sites unnormalized.
 
 ### Key Entities
 - **runtime edition** — one of the four gate implementations (Node canonical, Python, shell, Go) sharing one config and one grammar.
@@ -58,6 +61,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 ## Success Criteria (측정형)
 - **SC-001**: 같은 픽스처에 대한 Node↔Python 게이트 판정 불일치 0건(패리티 테스트 green). [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
 - **SC-002**: 하드코딩 요구 접두어가 남은 파싱 사이트 0곳(전 런타임 회귀 테스트가 검출). [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
+- **SC-003**: 경로 인용을 끄지 않은 git 기동 0곳 — 두 런타임 소스를 전수 열거해 검산한다(도입 시 8곳 검출). [검증: tooling/__tests__/runtime-contract.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: Python판은 표준 라이브러리만 사용(3.7+), 셸판은 POSIX `sh`+`grep`+`awk`+`jq`만 사용 — 추가 의존 도입 금지. [검증: tooling/__tests__/sdd-gates-py.test.mjs, tooling/__tests__/sdd-gates-sh.test.mjs, tooling/__tests__/runtime-contract.test.mjs]
@@ -167,3 +171,5 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 | 2026-08-09 | Python 미러 — 검증 실행 회계 코어(`parse_run_line`·`parse_run_ledger`·`classify_runs`·`verification_run_verdict`) + `cmd_verifyrun`(판정 + `--record`) + `body_before_ownership` + DEFAULTS 4종 + 래칫 목록 확장 + `cmd_orphan`의 역할 해석·예외 재사용 | SPEC-041·SPEC-001·SPEC-003 동반. **판정 게이트라 양판 바이트 동일이 필수**다 — 원장 미선언(INERT)·침묵 차단(hard)·기록 후 통과 세 갈래에서 Node↔Python 출력·exit 일치 확인. 원장 어휘가 런타임마다 다르면 "안 봤다"가 두 뜻을 갖는다 |
 | 2026-08-09 | Python 미러 — `classify_runs`에 `env_bound` 인자 + DEFAULTS `verificationRunEnvBound` | SPEC-041 동반. 환경 결속 선언이 한쪽 런타임에만 있으면 같은 저장소가 Node에선 통과하고 Python에선 차단된다. 원장 미선언·침묵 차단·기록 후 통과·환경 결속 네 갈래에서 바이트 동일 확인 |
 | 2026-08-09 | Python 미러 — 등록 축 코어(`is_deploy_artifact`·`live_reality_coverage`·`live_reality_coverage_verdict`) + `cmd_livereality` 2축 배선 + 증거 등급(`is_deploy_grade_evidence`·`ownsDeployArtifact` 트리거) + DEFAULTS 4종 + 래칫 목록 | SPEC-032·031 동반. 등록 축은 자격증명 없이 도는 **판정** 축이라 양판 필수다 — 한쪽에만 있으면 Python 런타임 프로젝트는 새 배포 산출물을 선언해도 아무 경고를 못 받는다. 미검사 산출물 지목·마커 미선언 inert·skipped 사유 네 갈래에서 바이트 동일 확인 |
+| 2026-08-10 | 3분류 반환 계약 Python 미러 — `CHECK_KINDS`·`tri`·`tri_guard`·`check_outcome`·`merge_outcomes`·`outcome_summary` + 존재 판정기 주입 코어 4종(`files_line_missing_paths`·`missing_gates`·`agent_wiring_findings`·`validate_diagnosis_map`)과 `evidence_findings`의 3상태 전환 + 게이트 4종의 확인-못-함 출력 | 판정 게이트는 양판 필수다. Node만 고치면 Python 런타임 프로젝트에서는 읽기 실패가 여전히 "부재"=위반으로 흐른다 |
+| 2026-08-10 | FR-006·SC-003 신설 — **경로 인용 계약**: 두 런타임의 git 기동 전수에 `core.quotepath=off`를 요구하고 소스 열거 테스트로 검산한다(`runtime-contract.test.mjs` ④). 미정규화 8곳 수정 — `check-fr-coverage`·`check-intro-doc`·`check-pre-edit`·`check-deploy-guard`·`check-deploy-debt`·`check-deploy-precheck`·`check-hooks-installed`·`gen-changelog` + Python 2곳 | 도그푸딩 실측: `git diff --cached --name-only`가 비ASCII 경로를 8진수로 **인용해서** 내는 탓에 **소개 문서 게이트가 자기 문서를 고친 커밋을 "문서 그대로"라고 차단했다.** 판정이 양방향으로 틀린다 — 소유 귀속은 조용히 사라지고(위반→통과) 자기 갱신은 오판된다(통과→위반). 두 게이트는 이미 정규화하고 있었고 여덟 곳이 빠져 있었다: **규범으로만 적힌 계약은 반드시 새어나간다.** 열거기를 프로세스 기동으로 좁힌 이유: 첫 판이 오류 문구 속 산문 2줄과 래퍼 호출 3줄을 잡았고 오탐이 잦은 게이트는 꺼진다. `isMainEntry`의 퍼센트 인코딩 결함과 같은 계열이다 — **경로를 문자열로 가정하면 비ASCII 저장소에서 게이트가 눈을 감는다** [검증: tooling/__tests__/runtime-contract.test.mjs] |

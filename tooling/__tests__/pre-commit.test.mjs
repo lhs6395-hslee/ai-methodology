@@ -4,9 +4,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { importClosure } from "../import-wiring-lib.mjs";
+
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처 5곳이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
 
 function setupRepo() {
   const root = mkdtempSync(join(tmpdir(), "sdd-pc-"));
@@ -14,8 +21,8 @@ function setupRepo() {
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"] }));
   // 게이트·훅 복사
-  for (const f of ["check-fr-coverage.mjs","check-ownership.mjs","ownership-keys.mjs","sdd-config.mjs","verification-accounting.mjs",
-                   "verdict-lib.mjs","verification-run-lib.mjs","grammar-lib.mjs","key-anchor-lib.mjs","lifecycle-lib.mjs","numbering-lib.mjs","changelog-fr-lib.mjs","covers-backlink-lib.mjs","evidence-lib.mjs","term-coverage-lib.mjs","external-target-lib.mjs","evidence-scope-lib.mjs","impl-reference-lib.mjs","process-ssot-lib.mjs","prefix-class-lib.mjs","relation-lib.mjs","capability-ownership-lib.mjs","schema-backing-lib.mjs","ownership-reality-lib.mjs","spec-sync-lib.mjs","test-domain-lib.mjs"])
+  // 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+  for (const f of importClosure(["check-fr-coverage.mjs", "check-ownership.mjs", "verification-accounting.mjs"], KIT_SRC))
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   cpSync(join(process.cwd(), "tooling/harness/pre-commit"), join(root, "scripts/sdd-pre-commit.sh"));
   execFileSync("git", ["init", "-q"], { cwd: root });

@@ -747,6 +747,26 @@ INFRA-004 273행  소유자 결정 — "배포는 GitOps가 힘드니 젠킨스�
   <p>금지 목록은 게이트에 <strong>하드코딩하지 않는다.</strong> 프로젝트마다 금지 대상이 다르고, 하드코딩하면 킷이 그 프로젝트의 결정을 담게 된다. 선언으로 빼고 <strong>선언 자체를 판정한다</strong> — 이 축의 자기결함은 <em>조용한 무발화</em>다: 깨진 정규식·실재하지 않는 스펙·사유 없는 규칙은 아무것도 막지 않고 아무것도 알리지 않는다.</p>
   <p class="note">그리고 <strong>금지를 걷어내는 길은 명세 편집이다.</strong> 그 조회가 정말 필요하면 규칙이 가리키는 스펙을 고쳐 금지를 없앤다 — 우회가 아니라 결정의 갱신이다. 이 가드는 감시 에이전트 층에 살고 그 배선의 실재는 R19가 판정한다: <em>층이 합성된다.</em></p>
 
+  <h4>검사 못 함은 통과가 아니고 위반도 아니다 <span class="note">(판정 코어의 반환 계약)</span></h4>
+  <p>게이트는 자기가 무엇을 했는지 <strong>종류</strong>로 말한다(앞의 <code>UNTYPED</code> 이야기). 그런데 그 종류는 게이트가 <strong>판정 코어의 반환값을 해석한 결과</strong>다. 코어가 "못 봤다"를 말할 통로가 없으면 게이트는 그 사실을 알 방법이 없고, <strong>빈 결과를 초록으로 읽는다.</strong></p>
+  <p class="note"><strong>판정이 사라지는 자리는 코어와 게이트의 경계다.</strong></p>
+  <p>실측이 이 결함을 <strong>양쪽 방향</strong>으로 보여줬다:</p>
+  <div class="tablewrap"><table>
+    <tr><th>방향</th><th>무슨 일이 났는가</th><th>결과</th></tr>
+    <tr><td>못 본 것을 <strong>통과</strong>로</td><td>훅 사본 판정기가 "원본을 못 읽음"이라는 경우를 <em>아예 갖지 않았다</em></td><td class="r">낡은 훅이 green · 강제 정책이 한 번도 발화하지 않음</td></tr>
+    <tr><td>못 본 것을 <strong>위반</strong>으로</td><td>존재 판정기 4종이 <code>boolean</code>만 받아, 읽기 실패가 <code>false</code>로 붕괴</td><td class="r">"파일 없음" = 거짓 위반 · 오탐이 쌓이면 사람이 게이트를 끈다</td></tr>
+  </table></div>
+  <p>그래서 종류를 <strong>셋</strong>으로 못박고, 그것을 판정 코어의 <em>반환 형태</em>로 만들었다:</p>
+  <div class="tablewrap"><table>
+    <tr><th>종류</th><th>뜻</th><th>차단하는가</th><th>초록에 세는가</th></tr>
+    <tr><td class="pass">봤고 문제 없음</td><td>관측했고 위반이 없다</td><td>아니오</td><td class="pass">예 — 이것만이 초록의 자격이다</td></tr>
+    <tr><td>검사 못 함</td><td>권한·I/O 사정으로 <strong>관측 자체를 못 했다</strong></td><td>아니오 — 못 본 것으로 빌드를 깨면 사람이 그 층을 떼어낸다</td><td class="r">아니오 — 표면화하되 합산하지 않는다</td></tr>
+    <tr><td class="r">위반</td><td>봤고 문제가 있다</td><td>정책 강도대로</td><td>아니오</td></tr>
+  </table></div>
+  <p class="note">넷째를 만들지 않았다. 종류가 늘면 <strong>"이건 어디에 넣지"</strong>가 생기고, 경계 판단이 필요한 분류는 급할 때 편한 쪽으로 기운다.</p>
+  <p class="note">위반과 "검사 못 함"은 <strong>같은 반환값에 함께 실린다.</strong> 하나를 보고 다른 하나를 잊는 것이 이 계열 결함의 본체다 — 위반이 있으면 사람은 그것만 고치고, 확인하지 못한 대상은 조용히 초록으로 남는다.</p>
+  <p class="note">계약 모듈은 <strong>아무것도 import하지 않는다.</strong> 어떤 코어든 부담 없이 쓸 수 있어야 계약이 실제로 퍼진다 — <em>무거운 계약은 채택되지 않고, 채택되지 않은 계약은 계약이 아니다.</em> 그리고 규범 문서로만 적지 않았다: <strong>존재 판정기를 주입받는 코어를 소스에서 전수 열거해</strong> 각자 통로를 갖는지 테스트가 검산한다. 한 코어라도 통로가 없으면 그 코어가 다음 결함의 자리다.</p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>
@@ -767,11 +787,13 @@ INFRA-004 273행  소유자 결정 — "배포는 GitOps가 힘드니 젠킨스�
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">20</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">26</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">54</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">20</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">26</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">55</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 
   <p>여기에 기존 두 장치가 함께 선다. ① <strong><code>exit 0</code> ≠ "판정했음"</strong> — 게이트가 한 줄도 출력하지 않으면 clean이 아니라 <strong>미판정</strong>으로 집계한다(이제는 종류를 선언하지 않은 것 자체가 <code>UNTYPED</code>로 자백된다). ② <strong>Ownership 보증 맵</strong>(<code>sdd/OWNERSHIP_MAP.md</code>, 생성물) — 가드별 발화 여부와 inert 사유를 표로 적고, 소유 키마다 유일성·앵커·실재 칸을 <code>✓</code> / <code>✗</code> / <code>면제 — 사유</code> / <strong><code>미판정</code></strong>으로 채운다. <code>미판정</code> 칸은 "검증됨"이 아니라 <strong>"아무도 안 봤음"</strong>을 뜻하고, 하나라도 있으면 맵 머리에 경고가 뜬다.</p>
+  <p class="note">같은 계열이 <strong>한 번 더</strong> 나왔고, 이번엔 도그푸딩이 잡았다. <code>git diff --name-only</code>는 비ASCII 경로를 <strong>8진수 문자열로 인용해서</strong> 낸다 — <code>"docs/\353\260\251…"</code>. 그 문자열은 어떤 소유 글롭·문서 목록과도 매치하지 않으므로 판정이 <strong>양방향으로</strong> 틀린다: 소유 귀속이 조용히 사라지고(위반 → 통과), 동시에 자기 갱신을 놓친 것으로 오판한다(통과 → 위반). 실제로 <strong>소개 문서 게이트가 자기 문서를 고친 커밋을 "문서 그대로"라고 차단했다.</strong> 두 게이트는 이미 정규화하고 있었고 <strong>여덟 곳이 빠져 있었다</strong> — 규범으로만 적혀 있었기 때문이다. 그래서 두 런타임 소스를 <strong>전수 열거해</strong> 검산한다. <em>경로를 문자열로 가정하는 순간 비ASCII 저장소에서 게이트가 눈을 감는다.</em></p>
+  <p class="note">열거기 자신도 오탐을 조심해야 했다. 첫 판은 <strong>프로세스 기동과 무관한 줄</strong>을 잡았다 — 래퍼 호출부(<code>git("diff …")</code>)는 기동이 아니고, 오류 문구 속 <code>git diff(...)</code>는 산문이다. 산문 2줄과 래퍼 호출 3줄이 위반으로 떴고, <strong>오탐이 잦은 게이트는 꺼진다.</strong> 그래서 열거 대상을 <em>프로세스를 띄우는 줄</em>로 좁혔다 — 주석 속 예시가 인용이지 결정이 아닌 것과 같은 구분이다.</p>
   <p class="note">실측 사례: 어떤 프로젝트의 저장소 경로에 한글이 있었는데, 게이트의 진입 판정이 문자열 비교라 퍼센트 인코딩 때문에 <strong>항상 불일치</strong> → 본체가 실행되지 않고 한 줄도 출력하지 않은 채 <code>exit 0</code>. 테스트 실행 정책을 <code>hard</code>로 켜 둔 상태로 여러 라운드 동안 아무것도 검증되지 않았고, 집계기는 그 침묵을 "clean"으로 읽었다. 킷 자신의 경로는 ASCII라 <strong>자기 검증으로는 영구히 보이지 않는 결함</strong>이었다 — 그래서 규범을 하나 세울 때마다 성격이 다른 여러 저장소에서 실측한다.</p>
 
   <h3>"선언한 게 진짜 있나" — 어댑터 대신 문법으로</h3>

@@ -80,7 +80,10 @@ function main() {
   // ③ 동반 갱신 — 규칙표를 고쳤으면 설명도 같이 고친다.
   let changed = null;
   try {
-    const out = execSync("git diff --cached --name-only", { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    // core.quotepath=off — 비ASCII 경로를 git이 8진수로 인용하면 이 문서 자신(`docs/방법론.html`)이
+    // 스테이징 집합에서 사라져 **자기 갱신을 놓친 것으로 오판**한다(도그푸딩 발견: 이 게이트가
+    // 자기 문서를 고친 커밋을 "문서 그대로"라고 차단했다).
+    const out = execSync("git -c core.quotepath=off diff --cached --name-only", { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
     const staged = out.split("\n").map((x) => x.trim()).filter(Boolean);
     if (staged.length) changed = new Set(staged);
   } catch { /* git 없음·커밋 밖 실행 — 모르는 것을 위반으로 말하지 않는다 */ }

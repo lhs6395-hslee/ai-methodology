@@ -13,6 +13,7 @@
 // 판정 범위는 **FR 선언 라인과 SC 라인**뿐이다 — Change Log 산문의 `[검증]` 언급(이력 서술)은
 // 주장이 아니므로 건드리지 않는다(킷 자신의 9개 언급이 전부 그 경우).
 // 순수 함수(파일 IO 없음) — 자산 실재 판정은 소비 게이트가 주입한다. Python 미러(SPEC-006).
+import { TRI, tri } from "./check-outcome-lib.mjs";
 
 // 실행 동사 기본 어휘 — SC가 "렌더한다/응답한다" 류를 주장하면 실행 등급 증거를 요구한다.
 // 프로젝트가 config `executionVerbs`로 교체 가능(도메인 어휘 확장).
@@ -165,9 +166,15 @@ export function evidenceFindings(units, assetExists, opts = {}) {
       }
       if (tag && tag.kind === "exec") {
         for (const p of tag.paths) {
-          if (!assetExists(p)) {
+          // 3분류 계약(SPEC-054) — 자산 실재를 **확인하지 못한** 것을 "없음"으로 말하면 거짓
+          // 위반이다(권한·I/O 오류). 반대로 통과로 흘리면 증거 없는 주장이 초록이 된다.
+          const st = tri(assetExists(p));
+          if (st === TRI.NO) {
             out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "missing-asset",
               detail: `증거 자산 없음: ${p}` });
+          } else if (st === TRI.UNKNOWN) {
+            out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "asset-unchecked",
+              detail: `증거 자산 실재를 확인하지 못했다: ${p} — 통과가 아니다` });
           }
         }
         // UI/브라우저 대상인데 증거가 브라우저 등급이 아니면 표면화(API 단독 검증 불인정 — 실측 교훈).

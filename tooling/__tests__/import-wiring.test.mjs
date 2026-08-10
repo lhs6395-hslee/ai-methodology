@@ -14,7 +14,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  localImports, moduleExports, wiringFindings, formatWiringViolation, DEFAULT_WIRING_EXTENSIONS,
+  localImports, moduleExports, wiringFindings, formatWiringViolation, importClosure, DEFAULT_WIRING_EXTENSIONS,
 } from "../import-wiring-lib.mjs";
 
 // ── 코어: import 절 파싱 ─────────────────────────────────────────────────────
@@ -172,27 +172,14 @@ test("확장자 기본값은 킷 선언이다 — 코드에 고정하지 않는�
 // 픽스처 복사 목록을 **손으로 적지 않는다.** 처음엔 5개를 손으로 적었고 `sdd-config.mjs`가
 // 끌어오는 `ownership-keys.mjs`가 빠져 픽스처가 ERR_MODULE_NOT_FOUND로 죽었다 — 이 스레드가
 // 고치고 있는 바로 그 드리프트를 테스트가 재연한 것이다. 목록은 폐포에서 계산한다(도그푸딩).
-function closureCopyList(entry) {
-  const TOOLING = join(process.cwd(), "tooling");
-  const seen = new Set();
-  const stack = [entry];
-  while (stack.length) {
-    const f = stack.pop();
-    if (seen.has(f)) continue;
-    seen.add(f);
-    let text;
-    try { text = readFileSync(join(TOOLING, f), "utf8"); } catch { continue; }
-    for (const imp of localImports(text)) stack.push(imp.specifier.replace(/^\.\//, ""));
-  }
-  return [...seen];
-}
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
 
 function fixture(policy, extras = {}) {
   const root = mkdtempSync(join(tmpdir(), "sdd-wiring-"));
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"),
     JSON.stringify({ specDir: "sdd/specs", importWiringPolicy: policy, ...extras }));
-  for (const f of closureCopyList("check-import-wiring.mjs")) {
+  for (const f of importClosure(["check-import-wiring.mjs"], KIT_SRC)) {
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   }
   return root;

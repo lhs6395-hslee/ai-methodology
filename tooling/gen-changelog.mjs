@@ -11,7 +11,9 @@ import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const raw = execSync("git log --date=short --no-merges --pretty=format:%ad%x09%h%x09%s", { cwd: root, encoding: "utf8" });
+// core.quotepath=off — 이 생성물은 경로를 직접 싣지 않지만 계약은 전수여야 한다(한 곳의 예외가
+// 다음 결함의 자리다). 새 호출을 베낄 때 정규화가 같이 복사되는 것이 이 계약의 실질이다.
+const raw = execSync("git -c core.quotepath=off log --date=short --no-merges --pretty=format:%ad%x09%h%x09%s", { cwd: root, encoding: "utf8" });
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 // 커밋 타입 → 배지 클래스
 const typeOf = (subj) => {

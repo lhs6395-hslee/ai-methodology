@@ -10,11 +10,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @covers SPEC-013/FR-009
 import { parseModule, frLinesMissingShall, frDeclarations, frDeclStyleFindings, dedupReviewDanglingIds, ownershipCategoriesFindings, exemptGlobFindings } from "../grammar-lib.mjs";
+import { importClosure } from "../import-wiring-lib.mjs";
+
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처 5곳이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
 
 const FR_DECL_SRC = "\\*\\*((?:FR)-\\d{3}[a-z]?)\\*\\*";
 const SPEC_ID_RE = /(?:SPEC|INFRA|TEST)-\d{3}/;
@@ -276,7 +283,8 @@ function repo() {
   mkdirSync(join(root, "src"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs" }));
-  for (const f of ["check-spec-sync.mjs", "verdict-lib.mjs", "spec-sync-lib.mjs", "ownership-keys.mjs", "sdd-config.mjs", "lifecycle-lib.mjs", "grammar-lib.mjs", "key-anchor-lib.mjs", "drift-lib.mjs", "cross-spec-lib.mjs","branch-observation-lib.mjs"])
+  // 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+  for (const f of importClosure(["check-spec-sync.mjs", "check-spec-completeness.mjs", "check-ownership.mjs"], KIT_SRC))
     cpSync(join(process.cwd(), "tooling", f), join(root, "scripts", f));
   const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");

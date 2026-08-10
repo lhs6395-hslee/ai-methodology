@@ -62,7 +62,11 @@ function main() {
     for (const e of parsed.errors) block(`${rel}: ${e}`);
     receipt = parsed.receipt;
     if (receipt) {
-      const gone = missingGates(receipt, (g) => existsSync(join(ROOT, ...String(g).split("/"))));
+      const { gone, unchecked: gateUnchecked } = missingGates(receipt, (g) => existsSync(join(ROOT, ...String(g).split("/"))));
+      // 3분류(SPEC-054) — 실재를 확인 못 한 게이트는 "지워졌다"가 아니다(차단하지 않고 표면화).
+      for (const g of gateUnchecked) {
+        warnings.push(`${g} 실재를 확인하지 못했다 — 통과가 아니다(권한·I/O 오류일 수 있다)`);
+      }
       if (gone.length) {
         block(`영수증이 선언한 게이트 ${gone.length}건이 지금 없다: ${gone.slice(0, 6).join(", ")}${gone.length > 6 ? " …" : ""}`
           + " — 감시자가 지워졌는데 아무도 알리지 않았다(지워진 강제는 강제가 아니다)");

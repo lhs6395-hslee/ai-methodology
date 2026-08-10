@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 54건
+## Entity 키 (aggregate root) — 55건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -33,6 +33,7 @@
 | `branch-observation` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref` | SPEC-037 | ✓ | ✓ | ✓ |
+| `check-outcome` | SPEC-054 | ✓ | ✓ | ✓ |
 | `covers-backlink` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -83,7 +84,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 101건
+## Surface 키 — 102건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -108,6 +109,7 @@
 | `check-intro-doc.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
 | `check-live-reality.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
 | `check-orphan-surfaces.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-outcome-lib.mjs` | SPEC-054 | ✓ | ✓ | ✓ |
 | `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
 | `check-pre-edit.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
@@ -189,7 +191,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 56건
+## Capability 키 — 57건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -198,6 +200,7 @@
 | `branch-observation.account` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership.judge` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref.judge` | SPEC-037 | ✓ | ✓ | ✓ |
+| `check-outcome.classify` | SPEC-054 | ✓ | ✓ | ✓ |
 | `covers-backlink.judge` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change.judge` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard.gate` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -275,7 +278,7 @@
 
 ## 집계
 
-- 소유 키 총 **229건** (entity 54 · surface 101 · capability 56 · 역할없음 18)
+- 소유 키 총 **232건** (entity 55 · surface 102 · capability 57 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **2건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

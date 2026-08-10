@@ -8,10 +8,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseReceipt, missingGates, ciWiring, DEFAULT_WATCHDOG_RECEIPT } from "../watchdog-lib.mjs";
+import { importClosure } from "../import-wiring-lib.mjs";
+
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처들이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
 
 const OK_RECEIPT = { kitCommit: "abc1234def", installedAt: "2026-08-10T00:00:00Z", gate: "node", gates: ["scripts/check-fr-coverage.mjs"], hooks: [".git/hooks/pre-commit"] };
 
@@ -27,8 +34,9 @@ test("영수증 형식은 문법화한다 — 정의되지 않은 형태를 조�
 
 test("영수증이 선언한 게이트가 사라졌으면 지목한다 — 지워진 감시자는 스스로 알리지 않는다", () => {
   const { receipt } = parseReceipt(JSON.stringify({ ...OK_RECEIPT, gates: ["a.mjs", "b.mjs"] }));
-  assert.deepEqual(missingGates(receipt, (g) => g === "a.mjs"), ["b.mjs"]);
-  assert.deepEqual(missingGates(receipt, () => true), []);
+  // 3분류 계약(SPEC-054) — 부재와 **확인 못 함**을 가른다.
+  assert.deepEqual(missingGates(receipt, (g) => g === "a.mjs"), { gone: ["b.mjs"], unchecked: [] });
+  assert.deepEqual(missingGates(receipt, () => true), { gone: [], unchecked: [] });
 });
 
 test("CI 배선은 스윕 진입점의 등장으로 본다 — 마커는 프로젝트가 갈아끼운다", () => {
@@ -47,8 +55,8 @@ test("영수증 기본 경로는 `.sdd/`가 아니다 — 그쪽은 gitignore라
 });
 
 // ── 게이트 e2e ────────────────────────────────────────────────────────────
-const LIBS = ["sdd-config.mjs", "ownership-keys.mjs", "verdict-lib.mjs", "spec-sync-lib.mjs",
-  "watchdog-lib.mjs", "check-watchdog.mjs"];
+// 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+const LIBS = importClosure(["check-watchdog.mjs"], KIT_SRC);
 function repo(files, config) {
   const root = mkdtempSync(join(tmpdir(), "sdd-wd-"));
   mkdirSync(join(root, "sdd", "specs"), { recursive: true });

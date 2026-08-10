@@ -56,7 +56,8 @@ const smokeLine = smoke.status === "dead" ? `${SMOKE_TAG} ✗ ${smoke.detail}`
 
 const ROOT = cfg.__root;
 const git = (args) => {
-  try { return execSync(`git ${args}`, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); }
+  // core.quotepath=off — 비ASCII 경로가 8진수로 인용되면 경로 대조가 조용히 어긋난다(전 게이트 공통 계약).
+  try { return execSync(`git -c core.quotepath=off ${args}`, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); }
   catch { return null; }
 };
 if (git("rev-parse --git-dir") === null) process.exit(0); // git 없음 — 침묵

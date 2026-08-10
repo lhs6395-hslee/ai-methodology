@@ -27,6 +27,8 @@
 // 프로젝트가 래퍼 스크립트로 감싸면 `sweepInvocationMarkers`로 교체한다(하드코딩 지양).
 export const DEFAULT_SWEEP_INVOCATION_MARKERS = ["sdd-sync", "sdd_gates.py", "sdd-run", "sdd-gates"];
 // 채택 영수증의 기본 경로 — `.sdd/`가 아니다: 그쪽은 gitignore라 선언이 사라진다.
+import { TRI, tri } from "./check-outcome-lib.mjs";
+
 export const DEFAULT_WATCHDOG_RECEIPT = "sdd/adoption.json";
 export const DEFAULT_WATCHDOG_CI_GLOBS = [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml", ".circleci/**"];
 
@@ -58,8 +60,15 @@ export function parseReceipt(raw) {
 
 // 영수증이 선언한 게이트 중 지금 없는 것 — 지워진 감시자는 지운 사실을 스스로 알리지 않는다.
 export function missingGates(receipt, exists) {
-  const has = typeof exists === "function" ? exists : () => true;
-  return ((receipt || {}).gates || []).filter((g) => !has(g));
+  // 3분류 계약(SPEC-054) — 존재 판정기가 **모른다**고 답할 수 있다. 이전 판은 boolean만 받아
+  // 읽기 실패가 `false`로 붕괴해 "게이트가 지워졌다"는 **거짓 위반**을 냈다.
+  const gone = [], unknown = [];
+  for (const g of (receipt && Array.isArray(receipt.gates) ? receipt.gates : [])) {
+    const t = tri(exists ? exists(g) : undefined);
+    if (t === TRI.NO) gone.push(g);
+    else if (t === TRI.UNKNOWN) unknown.push(g);
+  }
+  return { gone, unchecked: unknown };   // 두 사실은 두 필드다(배열에 속성을 붙이면 소비처가 깨진다)
 }
 
 // CI에 스윕이 배선됐는가. ciFiles: [{path, text}].

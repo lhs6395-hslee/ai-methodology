@@ -247,7 +247,8 @@ for (const dir of SCAN_DIRS) {
 // null = 알 수 없음(커밋 밖 실행·git 없음·CI) → 종전대로 전부 hard.
 let commitScope = null;
 try {
-  const out = execSync("git diff --cached --name-only", { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  // core.quotepath=off — 인용된 8진수 경로는 어떤 소유 글롭과도 매치하지 않아 귀속이 조용히 사라진다.
+  const out = execSync("git -c core.quotepath=off diff --cached --name-only", { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const staged = out.split("\n").map((x) => x.trim()).filter(Boolean);
   if (staged.length) commitScope = new Set(staged);
 } catch { /* git 없음·저장소 아님 — 귀속 판정 불가 */ }

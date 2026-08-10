@@ -19,10 +19,16 @@ import {
   symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface, symbolCandidates,
 } from "../ownership-reality-lib.mjs";
 import { schemaBackingFindings } from "../schema-backing-lib.mjs";
+import { importClosure } from "../import-wiring-lib.mjs";
 
-const LIBS = ["check-ownership.mjs", "ownership-keys.mjs", "sdd-config.mjs", "grammar-lib.mjs",
-  "key-anchor-lib.mjs", "lifecycle-lib.mjs", "relation-lib.mjs", "capability-ownership-lib.mjs",
-  "spec-sync-lib.mjs", "schema-backing-lib.mjs", "ownership-reality-lib.mjs", "verdict-lib.mjs"];
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처들이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
+
+// 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+const LIBS = importClosure(["check-ownership.mjs"], KIT_SRC);
 
 function repo({ config = {}, specs = {}, srcFiles = {} } = {}) {
   const root = mkdtempSync(join(tmpdir(), "sdd-real-"));

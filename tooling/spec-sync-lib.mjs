@@ -1,6 +1,7 @@
 // tooling/spec-sync-lib.mjs
 // check-spec-sync 순수 코어 — glob 컴파일 + diff 섹션 귀속. git 비의존(테스트 용이).
 // 설계: docs/design/2026-07-02-spec-first-enforcement-design.md §4.1·§5.4
+import { TRI, tri } from "./check-outcome-lib.mjs";
 
 // §4.1 지원 부분집합: **(0+ 경로 세그먼트)·*(세그먼트 내). anchored, POSIX, 대소문자 구분.
 export function compileGlob(glob) {
@@ -26,15 +27,23 @@ export function compileGlob(glob) {
 // 디렉토리). 리터럴 경로엔 그런 정당성이 없다: 지금 없으면 지금 틀린 것이다.
 // exists: (relPath) => boolean 를 주입받는다(파일 IO는 소비 게이트가 한다).
 export function filesLineMissingPaths(tokens, exists) {
-  const out = [];
+  // 3분류 계약(SPEC-054) — 읽기 실패를 "없음"으로 붕괴시키지 않는다. 리터럴 경로가 실재하지
+  // 않는 것과 **실재를 확인하지 못한 것**은 다른 사실이고, 후자를 위반으로 말하면 거짓 위반이다.
+  // ⚠ 필터(플레이스홀더·글롭·빈 토큰)는 원본 그대로 유지한다 — 판정 범위를 바꾸는 것은 이 계약의
+  // 일이 아니다(범위가 넓어지면 오탐이, 좁아지면 조용한 누락이 생긴다).
+  const out = [], unknown = [];
   for (const raw of tokens || []) {
     const t = String(raw || "").trim();
     if (!t || t === "—" || t === "-") continue;
     if (/[*?{}]/.test(t)) continue;              // 글롭·패턴은 실재 판정 대상 아님
     if (t.startsWith("[")) continue;             // placeholder 토큰
-    if (!exists(t)) out.push(t);
+    const st = tri(exists ? exists(t) : undefined);
+    if (st === TRI.NO) out.push(t);
+    else if (st === TRI.UNKNOWN) unknown.push(t);
   }
-  return out;
+  // **객체로 반환한다.** 배열에 속성을 붙이는 편법을 먼저 시도했는데 `deepEqual` 소비처
+  // 6곳이 깨졌다 — 두 사실을 한 값에 담으려면 두 필드여야 한다.
+  return { missing: out, unchecked: unknown };
 }
 
 // §4.1: 원시 `- **Files**:` 라인에서 미지원 문법 스캔 — parseSection이 `[` 토큰을

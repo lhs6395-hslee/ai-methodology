@@ -92,15 +92,23 @@ function main() {
     // ID로 지목했으면 그 ID를 가진 스펙 파일이 있으면 인정한다.
     return specNames.some((n) => n.includes(r));
   };
-  const findings = validateDiagnosisMap(entries, specExists);
+  const all = validateDiagnosisMap(entries, specExists);
+  // 3분류 계약(SPEC-054) — **확인 못 함은 차단하지 않는다.** 권한·I/O 사정으로 못 본 것을
+  // 위반이라 부르면 오탐이 쌓이고, 오탐이 잦은 게이트는 꺼진다. 그러나 초록에도 합산하지 않는다.
+  const findings = all.filter((f) => f.kind !== "spec-unchecked");
+  const unchecked = all.filter((f) => f.kind === "spec-unchecked");
   judged(POLICY === "hard" ? findings.length : 0);
   const deny = entries.filter((e) => e.mode === "deny").length;
   console.log(`진단 가드 게이트(diagnosisGuardPolicy=${POLICY}): 규칙 ${entries.length}종`
-    + ` (금지 ${deny} · 노출 ${entries.length - deny}) — 선언 위반 ${findings.length}`);
+    + ` (금지 ${deny} · 노출 ${entries.length - deny}) — 선언 위반 ${findings.length}`
+    + (unchecked.length ? ` · 확인 못 함 ${unchecked.length}(통과 아님)` : ""));
   const tag = POLICY === "hard" ? "✗" : "⚠";
   for (const f of findings) {
     const extra = f.spec ? ` (${f.spec})` : f.got ? ` (${f.got})` : "";
     (POLICY === "hard" ? console.error : console.log)(`  ${tag} [${f.at}] ${GUARD_FINDING_TEXT[f.kind]}${extra}`);
+  }
+  for (const f of unchecked) {
+    console.log(`  · [${f.at}] ${GUARD_FINDING_TEXT[f.kind]} (${f.spec})`);
   }
   if (findings.length && POLICY === "hard") {
     console.error("\n✗ 진단 가드 선언이 깨졌다 — 이 축의 자기결함은 **조용한 무발화**다:"

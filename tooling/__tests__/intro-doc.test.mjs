@@ -8,10 +8,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ruleIdsOf, missingRuleIds, citedCounts, countMismatches, companionMissing } from "../intro-doc-lib.mjs";
+import { importClosure } from "../import-wiring-lib.mjs";
+
+// 픽스처가 복사할 모듈을 읽는 주입기. 손목록은 반드시 드리프트한다 — 실측: 새 모듈
+// 하나(check-outcome-lib.mjs)를 추가하자 손목록을 든 픽스처들이 동시에
+// ERR_MODULE_NOT_FOUND로 죽었다(소비 프로젝트가 제보한 "부분 동기화 crash"와 같은 결함).
+const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
+
 
 const TABLE = [
   "| 규칙 | 언제 | 게이트 |",
@@ -56,7 +63,8 @@ test("동반 갱신 — 규칙표를 고친 changeset에는 소개 문서가 있
 });
 
 // ── 게이트 e2e ────────────────────────────────────────────────────────────
-const LIBS = ["sdd-config.mjs", "ownership-keys.mjs", "verdict-lib.mjs", "intro-doc-lib.mjs", "check-intro-doc.mjs"];
+// 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
+const LIBS = importClosure(["check-intro-doc.mjs"], KIT_SRC);
 function repo(files, config) {
   const root = mkdtempSync(join(tmpdir(), "sdd-idoc-"));
   mkdirSync(join(root, "sdd", "specs"), { recursive: true });

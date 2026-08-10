@@ -23,6 +23,8 @@
 //
 // 순수 함수(IO 없음) — 명세 파일 읽기·훅 입력 파싱은 소비 게이트가 주입한다. Python 미러(SPEC-006).
 
+import { TRI, tri } from "./check-outcome-lib.mjs";
+
 export const GUARD_MODES = Object.freeze(["surface", "deny"]);
 
 // 명세를 **읽는** 행위로 인정하는 기본 패턴. 이 목록에 걸리면 어떤 규칙도 그 명령을 막지 않는다.
@@ -64,7 +66,12 @@ export function validateDiagnosisMap(entries, specExists) {
     if (!e.match) { findings.push({ kind: "no-match", at }); continue; }
     try { new RegExp(e.match); } catch { findings.push({ kind: "bad-regex", at }); continue; }
     if (!e.spec) findings.push({ kind: "no-spec", at });
-    else if (typeof specExists === "function" && !specExists(e.spec)) findings.push({ kind: "missing-spec", at, spec: e.spec });
+    else if (typeof specExists === "function") {
+      // 3분류 계약(SPEC-054) — 스펙 실재를 확인하지 못한 것을 "없다"로 말하면 거짓 위반이다.
+      const st = tri(specExists(e.spec));
+      if (st === TRI.NO) findings.push({ kind: "missing-spec", at, spec: e.spec });
+      else if (st === TRI.UNKNOWN) findings.push({ kind: "spec-unchecked", at, spec: e.spec });
+    }
     if (!GUARD_MODES.includes(e.mode)) findings.push({ kind: "bad-mode", at, got: e.mode });
     if (!e.why.trim()) findings.push({ kind: "no-why", at });
     // deny는 **대신 볼 곳**을 반드시 준다. 막기만 하면 사람은 우회로를 찾고, 그 우회로는
@@ -121,5 +128,6 @@ export const GUARD_FINDING_TEXT = Object.freeze({
   "missing-spec": "지목한 스펙이 실재하지 않는다 — 읽으라는 곳이 없으면 안내가 거짓이 된다",
   "bad-mode": `강도가 ${GUARD_MODES.join("|")} 중 하나가 아니다`,
   "no-why": "사유가 없다 — 왜 이 조회가 아닌지 모르면 사람은 규칙을 우회한다",
+  "spec-unchecked": "지목한 스펙의 실재를 **확인하지 못했다** — 통과가 아니다(검사 못 함과 통과는 다른 사실이다)",
   "deny-without-instead": "금지인데 **대신 볼 곳**이 없다 — 막기만 하면 사람은 아무도 모르는 우회로를 찾는다",
 });
