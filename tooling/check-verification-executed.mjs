@@ -20,6 +20,10 @@ import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
 import { evidencePathsOf } from "./covers-backlink-lib.mjs";
 import { parseRunLedger, classifyRuns, verificationRunVerdict, formatRunLine } from "./verification-run-lib.mjs";
+import {
+  parseBranchLedger, classifyBranches, undeclaredBranches, validateBranchDeclarations, formatBranchLine,
+  BRANCH_OUTCOMES,
+} from "./branch-observation-lib.mjs";
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
 
@@ -31,6 +35,36 @@ if (!["off", "advisory", "hard"].includes(POLICY)) {
 }
 const LEDGER_REL = cfg.verificationRunLedger || null;
 const LEDGER_ABS = LEDGER_REL ? resolveFromRoot(cfg, LEDGER_REL) : null;
+
+// ── 분기 발화 기록 모드(SPEC-049) — **차단 분기가 돌았다는 사실은 그 분기만 안다** ──────
+// 실측 제보(사례 6): 명세·구현·단위테스트가 모두 정상인데 두 기록이 만날 저장소가 없어 비교가
+// 단 한 번도 수행되지 않았다. 정적 검사로는 원리상 잡히지 않고, 증거는 매 실행 로그에 있었다.
+// 그래서 분기가 스스로 남긴다 — 남기지 않으면 그 분기는 "관측되지 않음"으로 회계된다.
+const brIdx = process.argv.indexOf("--record-branch");
+if (brIdx !== -1) {
+  const [branch, outcome, ...brRest] = process.argv.slice(brIdx + 1);
+  const brDetail = brRest.join(" ").trim();
+  if (!branch || !outcome) {
+    verdict(VERDICT_KINDS.SKIPPED, "인자 부족 — 판정을 요청받지 못했다(usage)");
+    console.error(`usage: check-verification-executed.mjs --record-branch <키> <${BRANCH_OUTCOMES.join("|")}> [사유...]`);
+    process.exit(2);
+  }
+  if (!BRANCH_OUTCOMES.includes(String(outcome).toUpperCase())) {
+    verdict(VERDICT_KINDS.JUDGED, "위반 1건");
+    console.error(`✗ 알 수 없는 분기 결과 "${outcome}" — ${BRANCH_OUTCOMES.join("|")} 중 하나(문법화, 정의되지 않은 값 금지)`);
+    process.exit(1);
+  }
+  if (!LEDGER_ABS) {
+    verdict(VERDICT_KINDS.INERT, "verificationRunLedger 미선언 — 기록할 원장이 없다");
+    console.error("✗ verificationRunLedger가 선언되지 않아 기록할 곳이 없다 — sdd.config.json에 경로를 선언하라.");
+    process.exit(1);
+  }
+  mkdirSync(dirname(LEDGER_ABS), { recursive: true });
+  appendFileSync(LEDGER_ABS, formatBranchLine({ branch, outcome: String(outcome).toUpperCase(), detail: brDetail, at: new Date().toISOString() }) + "\n");
+  judged(0);
+  console.log(`분기 발화 기록 — ${branch}: ${String(outcome).toUpperCase()}${brDetail ? ` (${brDetail})` : ""} → ${LEDGER_REL}`);
+  process.exit(0);
+}
 
 // ── 기록 모드 — CI 스테이지·에이전트·러너가 자기 결과를 남긴다 ──────────────
 const recIdx = process.argv.indexOf("--record");
@@ -126,6 +160,49 @@ if (silent.length > CAP) console.log(`  ${tag} … 외 ${silent.length - CAP}건
 
 for (const m of malformed.slice(0, CAP)) {
   console.log(`  ${tag} 깨진 기록: ${m.why} — ${m.raw.slice(0, 120)}`);
+}
+
+// ── 실행 관측 회계(SPEC-049) — **차단 분기가 필드에서 발화한 적이 있는가** ──────────
+// 이 축은 **어떤 강도에서도 차단하지 않는다.** 원장은 세션·CI 로컬 상태라 신선한 체크아웃에서
+// 비어 있는 것이 정상이고(SPEC-041), 그 상태를 벽으로 막으면 사람이 정책을 통째로 끈다.
+// 대신 매 실행 부채로 표면화한다 — 제보의 결함이 몇 달을 살아남은 이유가 정확히 "표면화되지 않음"이었다.
+{
+  const declared = cfg.blockingBranches && typeof cfg.blockingBranches === "object" && !Array.isArray(cfg.blockingBranches)
+    ? cfg.blockingBranches : {};
+  const declErrors = validateBranchDeclarations(declared);
+  for (const e of declErrors) console.log(`  ⚠ ${e}`);
+  const keys = Object.keys(declared);
+  if (!keys.length) {
+    console.log("실행 관측 회계(SPEC-049): **blockingBranches 미선언 — 판정하지 않는다**."
+      + " 차단 분기(전이 금지·마감 금지 같은 거부 경로)를 `{ \"<키>\": \"<무엇을 막는가>\" }`로 선언하고"
+      + " 그 분기가 `--record-branch <키> FIRED|PASSED|SKIPPED [사유]`로 남기게 하면,"
+      + " **발화 0회인 차단 분기를 미검증으로 회계**한다(정적 검사로는 원리상 잡히지 않는 층이다).");
+  } else {
+    const { entries: brEntries, broken: brBroken } = parseBranchLedger(ledgerText);
+    const rows = classifyBranches(declared, brEntries);
+    const tally = { observed: 0, unobserved: 0, "never-fired": 0, monotone: 0 };
+    for (const r of rows) tally[r.cls] += 1;
+    console.log(`실행 관측 회계(SPEC-049): 차단 분기 ${rows.length}종 — 관측됨 ${tally.observed}`
+      + ` · 미관측 ${tally.unobserved} · **발화 0회 ${tally["never-fired"]}** · 단조 ${tally.monotone}`);
+    for (const r of rows) {
+      if (r.cls === "observed") continue;
+      const why = r.cls === "unobserved"
+        ? "기록이 0건이다 — 이 분기가 `--record-branch`를 부르도록 배선하라(배선 없이는 관측이 없다)"
+        : r.cls === "never-fired"
+          ? "기록은 있는데 **FIRED가 0회다** — 차단 경로가 한 번도 돌지 않았다. 제보의 결함이 정확히 이 모양이었다(명세·구현·단위테스트가 정상인데 두 기록이 만날 저장소가 없어 비교가 단 한 번도 수행되지 않았다)"
+          : `기록 ${r.records}회가 **모두 같은 사유다** — 값이 한 번도 달라진 적이 없다면 배선이 죽었을 개연성이 높다("대조 생략"이 몇 달간 그대로였던 자리다)`;
+      console.log(`  ⚠ [${r.key}] ${why}${r.reason ? ` / 선언된 목적: ${r.reason}` : ""}`);
+    }
+    for (const b of undeclaredBranches(declared, brEntries).slice(0, CAP)) {
+      console.log(`  ⚠ 선언되지 않은 분기 키로 기록됨: ${b} — 낡은 러너이거나 오타다(조용히 버리면 그 기록은 없는 것과 같다)`);
+    }
+    for (const b of brBroken.slice(0, CAP)) {
+      console.log(`  ⚠ 깨진 분기 기록: ${b.raw.slice(0, 120)}`);
+    }
+    if (!tally.unobserved && !tally["never-fired"] && !tally.monotone) {
+      console.log("  ✓ 선언된 차단 분기 전부가 발화 기록을 갖고 결과가 한 종류에 고정돼 있지 않다.");
+    }
+  }
 }
 
 if (v.blocking) {

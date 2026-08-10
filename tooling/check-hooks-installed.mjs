@@ -6,7 +6,8 @@
 // 게이트가 한 번도 돌지 않은 채 green으로 읽혔다. 미설치를 green으로 읽지 않는 것이 목적이다.
 //
 // hooksInstalledPolicy: off | advisory(기본) | hard.
-// git 없음·hooks.list 없음이면 침묵(이식성). bare/worktree는 core.hooksPath를 존중한다.
+// git 없음·hooks.list 없음이면 침묵(이식성). 훅 경로는 `git rev-parse --git-path hooks`가 준다
+// — worktree·core.hooksPath·bare를 한 번에 해결한다(손 조합은 워크트리에서 틀린 답을 냈다).
 import { existsSync, readFileSync, readdirSync, accessSync, constants } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { execSync } from "node:child_process";
@@ -46,15 +47,23 @@ if (!listPath) {
 const expected = parseHookList(readFileSync(listPath, "utf8"));
 
 const git = (a) => { try { return execSync(`git ${a}`, { cwd: cfg.__root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
-const gitDir = git("rev-parse --git-dir");
-if (!gitDir) {
+// 훅 디렉토리는 **git에게 묻는다** — 손으로 조합하지 않는다.
+// 실측 제보(2026-08-10): `--git-dir` + `core.hooksPath`를 손으로 합치는 이전 판은 **git worktree에서
+// 틀린 답을 냈다.** 워크트리에서 `.git`은 파일이고 `--git-dir`은 `.git/worktrees/<이름>` —
+// **훅이 없는 워크트리 전용 디렉토리**를 준다(훅은 공통 디렉토리에 있다). 그래서 도입 프로젝트가
+// 워크트리 기반이라 commit-msg·pre-commit·pre-push가 **한 번도 발동한 적이 없었고**, 그날의 모든
+// 커밋이 게이트를 우회했다. `rev-parse --git-path hooks` 한 번이 워크트리와 `core.hooksPath`를
+// **동시에** 해결한다 — 조합을 손으로 하는 것이 바로 그 결함의 원인이었다.
+if (!git("rev-parse --git-dir")) {
   verdict(VERDICT_KINDS.INERT, "git 저장소 아님 — 훅이 설치될 자리가 없다");
   console.log("훅 배선 게이트 — git 저장소 아님(no-op)"); process.exit(0);
 }
-const custom = git("config --get core.hooksPath");
-const hooksDir = custom
-  ? (isAbsolute(custom) ? custom : join(cfg.__root, custom))
-  : join(isAbsolute(gitDir) ? gitDir : join(cfg.__root, gitDir), "hooks");
+const hooksPath = git("rev-parse --git-path hooks");
+if (!hooksPath) {
+  verdict(VERDICT_KINDS.INERT, "훅 경로를 git에게서 얻지 못했다 — 판정할 자리를 모른다");
+  console.log("훅 배선 게이트 — `git rev-parse --git-path hooks` 실패(판정 안 함)"); process.exit(0);
+}
+const hooksDir = isAbsolute(hooksPath) ? hooksPath : join(cfg.__root, hooksPath);
 
 const installed = new Map();
 let present = [];

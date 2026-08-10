@@ -24,11 +24,12 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 49건
+## Entity 키 (aggregate root) — 50건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
 | `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | ✓ |
+| `branch-observation` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref` | SPEC-037 | ✓ | ✓ | ✓ |
 | `covers-backlink` | SPEC-039 | ✓ | ✓ | ✓ |
@@ -78,10 +79,11 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 90건
+## Surface 키 — 91건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `branch-observation-lib.mjs` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership-lib.mjs` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-lib.mjs` | SPEC-037 | ✓ | ✓ | ✓ |
 | `check-converge-drift.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
@@ -173,11 +175,12 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 51건
+## Capability 키 — 52건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
 | `adoption-lifecycle.adopt` | SPEC-005 | ✓ | ✓ | ✓ |
+| `branch-observation.account` | SPEC-049 | ✓ | ✓ | ✓ |
 | `capability-ownership.judge` | SPEC-024 | ✓ | ✓ | ✓ |
 | `changelog-fr-ref.judge` | SPEC-037 | ✓ | ✓ | ✓ |
 | `covers-backlink.judge` | SPEC-039 | ✓ | ✓ | ✓ |
@@ -254,7 +257,7 @@
 
 ## 집계
 
-- 소유 키 총 **208건** (entity 49 · surface 90 · capability 51 · 역할없음 18)
+- 소유 키 총 **211건** (entity 50 · surface 91 · capability 52 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

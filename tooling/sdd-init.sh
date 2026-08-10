@@ -39,6 +39,26 @@ copy "$KIT/tooling/sdd.config.json"  "$T/sdd.config.json"
 copy "$KIT/templates/MODULE_MAP.md"  "$T/sdd/MODULE_MAP.md"
 copy "$KIT/templates/module-spec.md" "$T/sdd/templates/spec-template.md"
 
+# ── 1b. 훅 디렉토리 해석 — **git에게 묻는다**(문자열로 가정하지 않는다) ──────
+# 실측 제보(2026-08-10): 이전 판은 `[ -d "$T/.git" ]`로 가드하고 `$T/.git/hooks`에 직접 썼다.
+# **git worktree에서 `.git`은 파일이다** — 그래서 가드가 실패하고 훅 배선이 통째로 스킵됐다.
+# 그 스킵이 best-effort 경고였기 때문에 도입 프로젝트는 commit-msg·pre-commit·pre-push가
+# **한 번도 발동한 적이 없는 상태로 몇 달을 갔고**, 그날의 모든 커밋이 게이트를 우회했다.
+# `rev-parse --git-path hooks`는 worktree(공통 디렉토리의 hooks)와 `core.hooksPath`를 한 번에
+# 해결한다. 그리고 **설치 0건을 조용히 넘기지 않는다** — 아래 2e가 실측으로 확인하고 실패시킨다.
+HOOKS_DIR=$(git -C "$T" rev-parse --git-path hooks 2>/dev/null || echo "")
+case "$HOOKS_DIR" in
+  "") ;;                                  # git 저장소가 아니다
+  /*) ;;                                  # 절대경로 — 그대로 쓴다
+  *)  HOOKS_DIR="$T/$HOOKS_DIR" ;;        # $T 기준 상대경로
+esac
+if [ -n "$HOOKS_DIR" ]; then
+  mkdir -p "$HOOKS_DIR" 2>/dev/null || HOOKS_DIR=""
+fi
+if [ -n "$HOOKS_DIR" ]; then
+  say "· 훅 디렉토리: $HOOKS_DIR (git rev-parse --git-path hooks — worktree·core.hooksPath 해결)"
+fi
+
 # ── 2. 게이트 런타임 (택1, 출력 동일) ────────────────────────
 case "$GATE" in
   go)   say "  → Go 바이너리는 빌드/다운로드: cd $KIT/tooling/go-gate && CGO_ENABLED=0 go build -o \"$T/scripts/sdd-gate\" ."
@@ -51,26 +71,26 @@ case "$GATE" in
         # 감사 P3: 셸판도 fr·ownership 훅은 배선 가능 — 기본 경로(--gate=sh)가 "채택=상시 강제"
         # 주장과 어긋나게 훅 0개로 끝나던 결함 봉합. pre-merge-commit(M5): merge commit에도 동일
         # 게이트(번호 중복·ownership — 두 브랜치가 같은 번호를 집는 경쟁을 병합 시점에 차단).
-        if [ -d "$T/.git" ]; then
-          printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd_gates.sh fr && sh scripts/sdd_gates.sh ownership\n' > "$T/.git/hooks/pre-commit"
-          cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
-          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+        if [ -n "$HOOKS_DIR" ]; then
+          printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd_gates.sh fr && sh scripts/sdd_gates.sh ownership\n' > "$HOOKS_DIR/pre-commit"
+          cp "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
+          chmod +x "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
           say "  → git pre-commit·pre-merge-commit 훅 연결됨(셸 게이트 — fr·ownership)"
         else
-          warn "  ⚠ .git 없음 — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=sh --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
+          warn "  ⚠ git 저장소 아님(또는 훅 경로 해석 실패) — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=sh --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
         fi ;;
   py)   copy "$KIT/tooling/sdd_gates.py" "$T/scripts/sdd_gates.py"
         # Python판은 spec-first(specsync) 포함 Node 전 게이트 패리티(SPEC-006) — 훅도 배선.
-        if [ -d "$T/.git" ]; then
-          printf '#!/bin/sh\n# sdd-managed-hook\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$T/.git/hooks/pre-commit"
+        if [ -n "$HOOKS_DIR" ]; then
+          printf '#!/bin/sh\n# sdd-managed-hook\npython3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership\n' > "$HOOKS_DIR/pre-commit"
           # pre-merge-commit(M5): merge commit에도 fr·ownership — 병합 시점 번호 경쟁 차단.
-          cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+          cp "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
           # merge commit은 skip(§5.6) — harness/commit-msg와 동일 의미론.
-          printf '#!/bin/sh\n# sdd-managed-hook\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$T/.git/hooks/commit-msg"
-          chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit" "$T/.git/hooks/commit-msg"
+          printf '#!/bin/sh\n# sdd-managed-hook\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$HOOKS_DIR/commit-msg"
+          chmod +x "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit" "$HOOKS_DIR/commit-msg"
           say "  → git pre-commit·pre-merge-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
         else
-          warn "  ⚠ .git 없음 — pre-commit/commit-msg 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=py --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
+          warn "  ⚠ git 저장소 아님(또는 훅 경로 해석 실패) — pre-commit/commit-msg 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=py --force\` 재실행 필요(강제 궤도 미배선 상태)"; GITWARN=1
         fi ;;
   node) for f in sdd-config.mjs check-fr-coverage.mjs check-ownership.mjs sdd-run.mjs \
                  check-converge-drift.mjs check-orphan-surfaces.mjs check-test-adequacy.mjs check-spec-cohesion.mjs check-spec-completeness.mjs \
@@ -78,7 +98,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs; do
+                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -124,29 +144,29 @@ if [ "$GATE" = "node" ]; then
   # pre-merge-commit(M5): 무충돌 git merge는 pre-commit을 타지 않는다 — 두 브랜치가 각자 같은
   # 스펙 번호(SPEC-014 중복)나 같은 ownership 키를 들고 깨끗이 병합돼 main이 사후 red가 되던
   # 경쟁을 병합 시점에 차단(같은 게이트 재사용).
-  if [ -d "$T/.git" ]; then
-    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-commit.sh\n' > "$T/.git/hooks/pre-commit"
-    cp "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+  if [ -n "$HOOKS_DIR" ]; then
+    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-commit.sh\n' > "$HOOKS_DIR/pre-commit"
+    cp "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
     # pre-push는 선택이 아니다 — 미설치면 R4 sync가 한 번도 안 돈다(설치 안 된 것을 green으로 읽지 않기 위해
     # check-hooks-installed가 hooks.list 전체를 검사한다). 훅은 --hook·--budget으로 수 초 내 끝난다.
-    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-push.sh\n' > "$T/.git/hooks/pre-push"
-    chmod +x "$T/.git/hooks/pre-push"
-    chmod +x "$T/.git/hooks/pre-commit" "$T/.git/hooks/pre-merge-commit"
+    printf '#!/bin/sh\n# sdd-managed-hook\nsh scripts/sdd-pre-push.sh\n' > "$HOOKS_DIR/pre-push"
+    chmod +x "$HOOKS_DIR/pre-push"
+    chmod +x "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
     say "  → git pre-commit·pre-merge-commit 훅 연결됨"
   else
-    warn "  ⚠ .git 없음 — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
+    warn "  ⚠ git 저장소 아님(또는 훅 경로 해석 실패) — pre-commit 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
   fi
 
   # commit-msg 훅 + speckit-fix 스킬
   copy "$KIT/tooling/harness/commit-msg" "$T/scripts/sdd-commit-msg.sh"
   mkdir -p "$T/.claude/skills/speckit-fix"
   copy "$KIT/tooling/harness/speckit-fix.SKILL.md" "$T/.claude/skills/speckit-fix/SKILL.md"
-  if [ -d "$T/.git" ]; then
-    printf '#!/bin/sh\nsh scripts/sdd-commit-msg.sh "$1"\n' > "$T/.git/hooks/commit-msg"
-    chmod +x "$T/.git/hooks/commit-msg"
+  if [ -n "$HOOKS_DIR" ]; then
+    printf '#!/bin/sh\nsh scripts/sdd-commit-msg.sh "$1"\n' > "$HOOKS_DIR/commit-msg"
+    chmod +x "$HOOKS_DIR/commit-msg"
     say "  → git commit-msg 훅 연결됨"
   else
-    warn "  ⚠ .git 없음 — commit-msg(spec-first) 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
+    warn "  ⚠ git 저장소 아님(또는 훅 경로 해석 실패) — commit-msg(spec-first) 훅 배선 스킵. \`git init\` 후 \`sdd-init.sh --gate=node --force\` 재실행 필요"; GITWARN=1
   fi
 
   # 채택 수명주기 스킬 (start·readopt·update) — 최초 채택/재채택/평상시 동기화 진입점.
@@ -212,6 +232,29 @@ if [ ! -e "$PTR" ] || [ "$FORCE" -eq 1 ]; then
     echo "- 새 접두어(FEAT/TEST/INFRA…)는 sdd.config.json의 specIdPrefixes에 **반드시 등록**."
   } > "$PTR"
   say "+ sdd/README.md (키트 참조 포인터)"
+fi
+
+# ── 2e. 배선 실측 — **설치 0건을 조용히 넘기지 않는다** ──────────────────
+# best-effort 침묵이 워크트리 결함을 몇 달간 가렸다(실측 제보). 설치했다고 말한 뒤 실제로 그
+# 자리에 실행 가능한 훅이 있는지 **세어서** 알린다. 0건이면 그것은 "채택했지만 강제는 꺼진"
+# 상태이고, 그 사실은 경고가 아니라 **실패**로 말해야 한다 — 조용한 0건이 이 결함의 본체다.
+if [ -n "$HOOKS_DIR" ]; then
+  WIRED=0
+  for h in pre-commit pre-merge-commit commit-msg pre-push; do
+    if [ -x "$HOOKS_DIR/$h" ] && grep -q 'sdd-managed-hook\|sdd-pre-commit\|sdd-commit-msg\|sdd-pre-push\|sdd_gates\|sdd-gate' "$HOOKS_DIR/$h" 2>/dev/null; then
+      WIRED=$((WIRED+1))
+    fi
+  done
+  if [ "$WIRED" -eq 0 ]; then
+    warn ""
+    warn "✗ 훅 배선 0건 — 훅 디렉토리는 찾았는데($HOOKS_DIR) 킷 훅이 하나도 설치되지 않았다."
+    warn "  이 상태의 green은 거짓이다: 게이트 스크립트가 다 있어도 아무것도 발동하지 않는다."
+    warn "  파일 쓰기 권한·기존 훅 점유를 확인하고 재실행하라. (조용히 넘기지 않는 이유: best-effort"
+    warn "   침묵이 워크트리 결함을 몇 달간 가렸다 — 그 사이 모든 커밋이 게이트를 우회했다.)"
+    GITWARN=1
+  else
+    say "· 훅 배선 실측: 킷 훅 ${WIRED}종 설치·실행 가능 확인($HOOKS_DIR)"
+  fi
 fi
 
 # ── 2d. 감시자 필수 생성 (SPEC-048) ─────────────────────────────

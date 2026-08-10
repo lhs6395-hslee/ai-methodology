@@ -71,3 +71,81 @@ test("게이트 e2e: 미설치는 advisory ⚠ · hard ✗ / 설치되면 침묵
     assert.match(ok.out, /OK — 선언된 훅이 모두 설치·실행 가능/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── git worktree 배선(SPEC-036, 실측 제보 2026-08-10) ──────────────────────
+// 워크트리에서 `.git`은 **파일**이고 `--git-dir`은 훅이 없는 워크트리 전용 디렉토리를 준다.
+// 이전 판은 `[ -d .git ]` 가드 + `.git/hooks` 문자열 조합이라 배선이 통째로 스킵됐고, 그 스킵이
+// best-effort 침묵이라 도입 프로젝트는 commit-msg·pre-commit·pre-push가 **한 번도 발동하지 않은
+// 상태로 몇 달을 갔다** — 그 사이 모든 커밋이 게이트를 우회했다.
+// @covers SPEC-036/FR-004
+import { execFileSync as _exec } from "node:child_process";
+import { mkdtempSync as _mkdtemp, existsSync as _exists, readdirSync as _readdir, writeFileSync as _write, mkdirSync as _mkdir, rmSync as _rm, cpSync as _cp } from "node:fs";
+import { tmpdir as _tmpdir } from "node:os";
+import { join as _join } from "node:path";
+import { readFileSync } from "node:fs";
+import { stripFullLineComments } from "../external-target-lib.mjs";
+
+const KIT = new URL("../..", import.meta.url).pathname;
+const sh = (cmd, cwd) => _exec("sh", ["-c", cmd], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+function worktree() {
+  const base = _mkdtemp(_join(_tmpdir(), "sdd-wt-"));
+  const main = _join(base, "main"), wt = _join(base, "wtA");
+  sh(`git init -q "${main}"`, base);
+  sh(`git -c user.email=a@b -c user.name=a commit -q --allow-empty -m init`, main);
+  sh(`git worktree add -q "${wt}"`, main);
+  return { base, main, wt };
+}
+
+test("워크트리에서 `.git`은 파일이고 `--git-dir`에는 hooks가 없다 — 이 결함의 전제", () => {
+  const { base, main, wt } = worktree();
+  try {
+    const gitDir = sh("git rev-parse --git-dir", wt).trim();
+    const gitPath = sh("git rev-parse --git-path hooks", wt).trim();
+    assert.equal(_exists(_join(wt, ".git")), true);
+    assert.equal(_readdir(wt).includes(".git"), true);
+    assert.match(gitDir, /worktrees/, "--git-dir은 워크트리 전용 디렉토리를 준다");
+    assert.equal(_exists(_join(gitDir, "hooks")), false, "그 디렉토리에는 hooks가 없다");
+    assert.equal(_exists(gitPath), true, "--git-path hooks가 실재하는 자리를 준다");
+    assert.equal(gitPath.startsWith(_join(main, ".git")), true, "공통 디렉토리의 hooks다");
+  } finally { _rm(base, { recursive: true, force: true }); }
+});
+
+test("워크트리 채택에서 훅 4종이 실제로 배선된다 — 조용한 스킵의 회귀", () => {
+  const { base, wt } = worktree();
+  try {
+    const out = sh(`sh "${_join(KIT, "tooling/sdd-init.sh")}" --gate=node 2>&1`, wt);
+    const hooks = sh("git rev-parse --git-path hooks", wt).trim();
+    const installed = _readdir(hooks).filter((f) => !f.endsWith(".sample"));
+    for (const h of ["pre-commit", "pre-merge-commit", "commit-msg", "pre-push"]) {
+      assert.ok(installed.includes(h), `${h}가 배선되지 않았다 (설치된 것: ${installed.join(", ")})`);
+    }
+    // 설치 0건을 조용히 넘기지 않는다 — 실측 건수를 말한다.
+    assert.match(out, /훅 배선 실측: 킷 훅 4종/);
+    assert.match(out, /훅 디렉토리:/);
+  } finally { _rm(base, { recursive: true, force: true }); }
+});
+
+test("훅 경로 해석은 core.hooksPath도 존중한다 — 손 조합이 아니라 git이 답한다", () => {
+  const { base, main } = worktree();
+  try {
+    sh("git config core.hooksPath .myhooks", main);
+    assert.equal(sh("git rev-parse --git-path hooks", main).trim(), ".myhooks");
+  } finally { _rm(base, { recursive: true, force: true }); }
+});
+
+test("배선 사이트가 훅 경로를 손으로 조합하지 않는다 — `--git-path hooks` 단일 호출", () => {
+  // 조합(`--git-dir` + `core.hooksPath`)이 바로 워크트리를 틀리게 한 원인이다.
+  // ⚠ **주석은 코드가 아니다** — 이 결함을 설명하는 주석에 옛 형태가 인용돼 있으므로, 킷의 정본
+  //   헬퍼로 전줄 주석을 걷어낸 뒤 판정한다(SPEC-044가 세운 "주석 속 예시는 인용이지 결정이 아니다").
+  const code = (rel) => stripFullLineComments(readFileSync(_join(KIT, rel), "utf8"));
+  const gate = code("tooling/check-hooks-installed.mjs");
+  assert.match(gate, /rev-parse --git-path hooks/);
+  assert.doesNotMatch(gate, /config --get core\.hooksPath/, "게이트에 손 조합이 남아 있다");
+  const init = code("tooling/sdd-init.sh");
+  assert.match(init, /rev-parse --git-path hooks/);
+  assert.doesNotMatch(init, /\[ -d "\$T\/\.git" \]/, "`.git`을 디렉토리로 가정하는 가드가 남아 있다");
+  const self = code("tooling/harness/self-hooks-install.sh");
+  assert.match(self, /rev-parse --git-path hooks/);
+  assert.doesNotMatch(self, /mkdir -p \.git\/hooks/, "`.git/hooks` 문자열 가정이 남아 있다");
+});

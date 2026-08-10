@@ -37,7 +37,7 @@ test("깨진 줄을 버리지 않는다 — 버리면 '형식 틀림'이 '기록
     "",
   ].join("\n"));
   assert.equal(entries.length, 1);
-  assert.deepEqual(malformed.map((m) => m.why), ["JSON 아님", "asset 없음", 'outcome "GREEN" — JUDGED|OFF|INERT|SKIPPED|UNTYPED 중 하나']);
+  assert.deepEqual(malformed.map((m) => m.why), ["JSON 아님", "asset·branch 둘 다 없음 — 무엇에 대한 기록인지 알 수 없다", 'outcome "GREEN" — JUDGED|OFF|INERT|SKIPPED|UNTYPED 중 하나']);
 });
 
 test("매칭 폭은 증거 경로 인정 폭과 같다 — 정확·디렉토리·글롭(좁히면 정당한 스위트 지목이 거짓 미실행)", () => {
@@ -223,4 +223,87 @@ test("off → 판정 안 함을 명시(침묵 금지)", () => {
 test("enum 밖 정책 값 → exit 1(문법화)", () => {
   const root = repo({ verificationRunPolicy: "kinda" });
   try { assert.equal(run(root).code, 1); } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── 실행 관측 회계(SPEC-049) — 차단 분기가 필드에서 발화한 적이 있는가 ──────────
+// 실측 제보(사례 6): 명세·구현·단위테스트가 모두 정상인데 두 기록이 만날 저장소가 없어
+// **비교가 단 한 번도 수행되지 않았다.** 정적 검사로는 원리상 잡히지 않고, 증거는 매 실행 로그의
+// 같은 한 줄("대조 생략")이었다 — 그 값이 몇 달간 달라지지 않은 사실을 읽는 장치만 없었다.
+// @covers SPEC-049/FR-001
+// @covers SPEC-049/FR-002
+// @covers SPEC-049/FR-003
+// @covers SPEC-049/FR-004
+import {
+  parseBranchLine, parseBranchLedger, classifyBranches, undeclaredBranches,
+  validateBranchDeclarations, formatBranchLine, BRANCH_OUTCOMES,
+} from "../branch-observation-lib.mjs";
+
+const L = (o) => JSON.stringify(o);
+
+test("분기 기록과 자산 기록은 다른 종류다 — 서로를 깨진 기록으로 오인하지 않는다", () => {
+  // 실측: 이 구분 없이 분기 기록을 넣자 자산 축이 "asset 없음"으로 세어 hard에서 거짓 차단이 났다.
+  assert.equal(parseBranchLine(L({ asset: "a", outcome: "JUDGED" })), null, "자산 기록은 분기 파서의 대상이 아니다");
+  assert.deepEqual(parseBranchLine(L({ branch: "k", outcome: "FIRED", detail: "d" })), { branch: "k", outcome: "FIRED", detail: "d" });
+  assert.equal(parseRunLine(L({ branch: "k", outcome: "FIRED" })), null, "분기 기록은 자산 축의 깨진 기록이 아니다");
+});
+
+test("알 수 없는 분기 결과는 깨진 기록이다 — 정의되지 않은 값을 조용히 통과시키지 않는다", () => {
+  assert.deepEqual(BRANCH_OUTCOMES, ["FIRED", "PASSED", "SKIPPED"]);
+  assert.equal(parseBranchLine(L({ branch: "k", outcome: "MAYBE" })).broken, true);
+  assert.equal(parseBranchLine("not json").broken, true);
+});
+
+test("세 사실을 각각 회계한다 — 미관측·발화 0회·단조는 해소 방법이 다르다", () => {
+  const declared = { A: "a를 막는다", B: "b를 막는다", C: "c를 막는다", D: "d를 막는다" };
+  const { entries } = parseBranchLedger([
+    L({ branch: "B", outcome: "PASSED", detail: "통과" }),                    // 발화 0회
+    L({ branch: "C", outcome: "FIRED", detail: "대조 생략" }),                 // 단조 후보
+    L({ branch: "C", outcome: "FIRED", detail: "대조 생략" }),
+    L({ branch: "D", outcome: "FIRED", detail: "불일치 차단" }),
+    L({ branch: "D", outcome: "PASSED", detail: "일치" }),
+  ].join("\n"));
+  const rows = classifyBranches(declared, entries);
+  assert.deepEqual(rows.map((r) => [r.key, r.cls]), [["A", "unobserved"], ["B", "never-fired"], ["C", "monotone"], ["D", "observed"]]);
+  // 실측 재현: C가 제보의 모양이다 — 발화는 하는데 사유가 몇 달간 한 번도 달라지지 않았다.
+  assert.equal(rows.find((r) => r.key === "C").details, 1);
+});
+
+test("1회 기록은 단조가 아니다 — 변할 기회가 없었던 것을 고발하지 않는다", () => {
+  const { entries } = parseBranchLedger(L({ branch: "A", outcome: "FIRED", detail: "x" }));
+  assert.equal(classifyBranches({ A: "사유" }, entries)[0].cls, "observed");
+});
+
+test("선언되지 않은 키로 기록된 것은 표면화한다 — 조용히 버리면 그 기록은 없는 것과 같다", () => {
+  const { entries } = parseBranchLedger([L({ branch: "known", outcome: "FIRED" }), L({ branch: "typo", outcome: "FIRED" })].join("\n"));
+  assert.deepEqual(undeclaredBranches({ known: "사유" }, entries), ["typo"]);
+});
+
+test("사유 없는 분기 선언은 무언의 선언이다 — 무엇을 막는지 모르는 선언은 판정 근거가 못 된다", () => {
+  assert.equal(validateBranchDeclarations({ A: "" }).length, 1);
+  assert.deepEqual(validateBranchDeclarations({ A: "막는 것" }), []);
+});
+
+test("직렬화 왕복 — 기록한 줄을 그대로 다시 읽는다", () => {
+  const line = formatBranchLine({ branch: "k", outcome: "FIRED", detail: "d", at: "2026-08-10T00:00:00Z" });
+  assert.deepEqual(parseBranchLine(line), { branch: "k", outcome: "FIRED", detail: "d" });
+});
+
+test("차단 출구마다 계측이 붙어 있다 — 계측 자리를 흩으면 하나를 빠뜨린다", () => {
+  // 실측: 처음엔 spec-first 출구 하나만 계측했더니 unowned 차단 경로가 기록 없이 지나갔다.
+  // 그게 바로 제보가 지적한 결함 계열이므로, 계약으로 고정한다.
+  const src = readFileSync(new URL("../check-spec-sync.mjs", import.meta.url).pathname, "utf8");
+  const lines = src.split("\n");
+  const missing = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^\s*process\.exit\(1\);\s*$/.test(lines[i])) continue;
+    // 직전 6줄 안에 계측이 있어야 한다(메시지 여러 줄 뒤에 오는 형태를 허용).
+    const near = lines.slice(Math.max(0, i - 6), i).join("\n");
+    // **config 문법 위반 출구는 차단 분기가 아니다** — 그건 게이트가 판정을 시작조차 못 한
+    // 상태이고(SPEC-040의 계열: 정의되지 않은 값은 판정 불가), 방법론 규칙이 발화한 것이 아니다.
+    // 그걸 발화로 기록하면 원장이 "규칙이 돌았다"는 거짓을 담는다.
+    if (/값 위반/.test(near)) continue;
+    if (!near.includes("noteBranchFiring(")) missing.push(i + 1);
+  }
+  assert.deepEqual(missing, [], `계측 없는 차단 출구(라인): ${missing.join(", ")}`
+    + " — 그 경로로 막히면 발화가 원장에 남지 않아 '한 번도 안 돌았다'로 오회계된다.");
 });

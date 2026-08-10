@@ -607,6 +607,34 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
   <p class="note">영수증은 <strong>커밋한다.</strong> 실행 원장(R14)은 세션 상태라 커밋하지 않지만, 영수증은 "이 저장소가 이 방법론을 채택했다"는 <em>선언</em>이고 체크아웃마다 사라지면 선언이 아니다. 그리고 <strong>상류 대비 낡음은 판정하지 않는다</strong> — 네트워크 없이 알 수 없고, 모르는 것을 위반으로 말하지 않는다. 대신 채택 시점과 킷 커밋을 <strong>매 실행 그대로 보여줘</strong> 사람이 갱신 시점을 판단하게 한다.</p>
   <p class="note">이 규칙이 필요하다는 증거는 규칙을 만든 그 라운드에 나왔다. 어떤 소비 프로젝트가 결함 6건을 제보했는데 <strong>그중 5건이 이미 고쳐진 것</strong>이었다 — 그 프로젝트는 낡은 킷으로 몇 달을 갔고, <em>낡았다는 사실을 아무도 알려주지 않았다.</em></p>
 
+  <h4>차단 분기가 한 번도 발화하지 않았다면 그 규칙은 검증되지 않았다</h4>
+  <p>여기까지의 규칙은 모두 <strong>문서와 코드를 읽어서</strong> 판정한다. 그런데 읽어서는 원리상 보이지 않는 결함이 있다. 어떤 검증 도구에 이런 규칙이 있었다:</p>
+  <pre>상대 기록 불일치 → 마감 금지  <span class="g">✓ (테스트 통과)</span>
+상대 기록 일치   → 마감 허용  <span class="g">✓ (테스트 통과)</span></pre>
+  <p>명세·구현·단위테스트가 <strong>모두 정상</strong>이었다. 그런데 판정 기록의 저장 위치가 로컬은 작업 디렉터리, 클러스터 Job은 <strong>볼륨 없는 파드의 <code>/tmp</code></strong>였다 — 두 기록이 만날 저장소가 아예 없었다. 즉 <strong>그 교차검증은 단 한 번도 비교를 수행한 적이 없다.</strong> 소유자 결정으로 도입된 규칙이 몇 달간 명세에만 존재했다.</p>
+  <p>결함은 <strong>배선</strong>에 있었고, <em>코드를 읽는 어떤 검증기도 "정상"이라 답했을 것이다.</em> 그런데 증거는 이미 매 실행 로그에 있었다:</p>
+  <pre>교차검증: 상대 환경 판정 기록 없음 — <span class="r">대조 생략</span></pre>
+  <p>"생략"이 통과처럼 읽혔고, <strong>그 값이 몇 달간 한 번도 달라지지 않았다는 사실</strong>을 신호로 읽는 장치만 없었다. 그래서 차단 분기는 자기 발화를 원장에 남기고, 세 사실을 <strong>따로</strong> 회계한다 — 셋의 해소 방법이 다르기 때문이다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>회계</th><th>뜻</th><th>해소</th></tr>
+    <tr><td><strong>미관측</strong></td><td>기록이 0건 — 배선이 아직 없다</td><td>그 분기가 발화를 남기게 배선한다</td></tr>
+    <tr><td><strong>발화 0회</strong></td><td>기록은 있는데 차단 경로가 한 번도 돌지 않았다</td><td>왜 안 도는지 본다 — 제보의 결함이 이 모양이었다</td></tr>
+    <tr><td><strong>단조</strong></td><td>기록이 여러 번인데 <strong>사유가 한 종류뿐</strong></td><td>값이 한 번도 달라지지 않았다면 배선이 죽었을 개연성이 높다</td></tr>
+  </table></div>
+  <p class="note">이 축은 <strong>어떤 강도에서도 차단하지 않는다.</strong> 원장은 세션·CI 로컬 상태라 신선한 체크아웃에서 항상 0건이고, 그 상태를 벽으로 막으면 사람이 정책을 통째로 끈다. 대신 <strong>매 실행 부채로 표면화</strong>한다 — 이 결함이 몇 달을 살아남은 이유가 정확히 "표면화되지 않음"이었다.</p>
+  <p class="note">그리고 <strong>계측 자리를 한 곳에만 두지 않는다.</strong> 처음엔 spec-first 출구만 계측했더니 unowned 차단 경로가 기록 없이 지나가 "한 번도 안 돌았다"로 <em>오회계</em>됐다 — 제보가 지적한 결함 계열과 똑같은 모양이다. 모든 차단 출구를 계측하고 그 사실을 계약 테스트로 고정했다. 단 <strong>설정 문법 위반 출구는 제외</strong>한다: 그건 게이트가 판정을 시작조차 못 한 상태이고, 발화로 기록하면 원장이 "규칙이 돌았다"는 거짓을 담는다.</p>
+
+  <h4>배선 경로를 문자열로 가정하면 게이트 전체가 조용히 무력화된다</h4>
+  <p>가장 값비싼 실측이 이것이었다. 도입 프로젝트가 <strong>git worktree</strong> 기반이었고, 그래서 <code>commit-msg</code>·<code>pre-commit</code>·<code>pre-push</code>가 <strong>한 번도 발동한 적이 없었다.</strong> 그날의 모든 커밋이 게이트를 우회했다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>워크트리에서</th><th>결과</th></tr>
+    <tr><td><code>.git</code></td><td><strong>파일</strong>이다 → <code>[ -d .git ]</code> 가드가 실패해 배선이 통째로 스킵된다</td></tr>
+    <tr><td><code>--git-dir</code></td><td><code>.git/worktrees/&lt;이름&gt;</code> — <strong>훅이 없는</strong> 워크트리 전용 디렉터리</td></tr>
+    <tr><td><code>--git-path hooks</code></td><td class="pass">공통 디렉터리의 실제 훅 자리. <code>core.hooksPath</code>도 함께 해결한다</td></tr>
+  </table></div>
+  <p><code>--git-dir</code>과 <code>core.hooksPath</code>를 <strong>손으로 합치던 방식</strong>이 바로 그 결함의 원인이었다. git에게 한 번 묻는 것이 정답이다.</p>
+  <p class="note">그런데 이 결함을 몇 달간 가린 것은 경로 버그 자체가 아니었다. <strong>best-effort 침묵</strong>이었다 — 설치기가 "깔았다"고 말한 뒤 그 자리에 실행 가능한 훅이 실제로 있는지 <em>세지 않았다.</em> 이제 설치기가 배선 건수를 실측해 <strong>0건이면 실패로 말한다.</strong> 조용한 0건이 이 결함의 본체다.</p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>
@@ -627,7 +655,7 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">16</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">22</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">49</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">16</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">22</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">50</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

@@ -32,7 +32,12 @@ export function parseRunLine(raw) {
   const asset = String(o.asset || "").trim();
   const outcome = String(o.outcome || "").trim().toUpperCase();
   const detail = String(o.detail || "").trim();
-  if (!asset) return { malformed: true, raw: line, why: "asset 없음" };
+  // **종류가 다른 기록은 깨진 기록이 아니다.** 한 원장에 자산 기록(`asset`)과 분기 발화 기록
+  // (`branch`, SPEC-049)이 함께 산다 — 원장을 둘로 나누면 한쪽만 갱신돼 두 회계가 갈라진다.
+  // 그래서 상대 종류는 **조용히 건너뛴다**. 실측: 이 구분 없이 분기 기록을 넣자 자산 축이
+  // 그것을 "asset 없음"으로 세어 hard에서 거짓 차단이 났다(같은 파일을 두 파서가 볼 때의 기본 계약).
+  if (!asset && String(o.branch || "").trim()) return null;
+  if (!asset) return { malformed: true, raw: line, why: "asset·branch 둘 다 없음 — 무엇에 대한 기록인지 알 수 없다" };
   if (!Object.hasOwn(VERDICT_KINDS, outcome)) {
     return { malformed: true, raw: line, why: `outcome "${o.outcome}" — ${Object.keys(VERDICT_KINDS).join("|")} 중 하나` };
   }

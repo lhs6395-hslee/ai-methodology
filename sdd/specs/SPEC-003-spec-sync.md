@@ -27,6 +27,7 @@
 - range(advisory) 모드는 위반이 있어도 exit 0으로 안내만 하고, hard 차단은 staged(commit-msg) 모드에서만 일어난다.
 - FR 라인 판정은 레터 서픽스 FR 라인의 추가/삭제도 의미 있는 변경으로 인정한다 — SPEC-001/002와 동일한 요구 ID 문법(접두어는 `requirementIdPrefixes` 파생, 3자리 + 선택적 소문자 서픽스 1자). 순수 코어(`spec-sync-lib`)는 config를 직접 읽지 않으므로 호출부(`check-spec-sync`)가 파생 alternation을 주입하고, 미주입 시 기본 접두어로 하위호환 동작한다. (이 항목에 ID 예시를 안 쓰는 이유: 게이트가 예시 토큰을 이 spec의 FR 집계에 포함시키기 때문.)
 - CLI base 인자는 `--message-file` 부재 시에도 첫 positional로 인식된다 — 옵션 인덱스 계산(mi=-1 → mi+1=0)이 첫 인자를 오배제해 base가 조용히 기본값(`origin/main`)으로 대체되던 회귀 금지.
+- **차단 출구는 전부 계측된다(SPEC-049)** — 이 게이트가 막을 때 그 발화를 원장에 남긴다. 계측 자리를 한 곳에만 두면 다른 경로로 막힐 때 기록이 없어 "한 번도 안 돌았다"로 **오회계**된다(실측: spec-first 출구만 계측했더니 unowned 차단이 기록 없이 지나갔다). 계약 테스트가 모든 차단 `exit(1)` 직전의 계측을 정적으로 검사하되, **config 문법 위반 출구는 제외**한다 — 그건 판정을 시작조차 못 한 상태이고 발화로 기록하면 원장이 거짓을 담는다.
 
 ---
 
@@ -86,6 +87,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 차단 출구 4곳(spec-first·unowned·semantic drift·Draft·glob)에 분기 발화 계측 추가(SPEC-049) + 계측 계약 테스트 | 이 게이트가 킷의 가장 자주 발화하는 차단 경로이므로 실행 관측 회계의 첫 배선 대상이다. 한 곳만 계측했을 때 unowned 차단이 기록 없이 지나가는 것을 실측으로 즉시 확인했고 — 그게 제보가 지적한 결함 계열과 같은 모양이라 — 계약으로 고정했다. 원장 미선언이면 아무 일도 하지 않는다(결합 0) [검증: tooling/__tests__/verification-run.test.mjs] |
 | 2026-08-10 | `specSyncExemptGlobs` **좁힘** — 포괄 `*.html`·`docs/**`를 `docs/design/**`·`docs/examples/**`·`docs/*.md`로 대체 | SPEC-045가 소개 HTML 3종을 소유하기 시작한 순간 게이트가 **자기 모순을 지목했다**: "면제 글롭이 SPEC-045의 Files 소유를 덮는다 — 그 스펙의 spec-first 강제가 이 파일에 발화하지 않는다." 소유를 선언하고 동시에 면제로 빼는 것은 선언을 거짓으로 만드는 것이라, 면제를 좁혀 소개 문서 편집이 소유 스펙(SPEC-045) 갱신을 동반하도록 되돌렸다. 좁힘은 강화라 래칫과 충돌하지 않는다. 이 경고는 오래 출력되고 있었고 이번에 실효를 갖게 된 것이 아니라 — 이번에 **덮는 대상이 생겨서** 의미를 갖게 됐다 [검증: tooling/__tests__/spec-sync.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |

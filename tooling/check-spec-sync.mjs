@@ -4,14 +4,15 @@
 // 같은 changeset(브랜치=staged ∪ base...HEAD, §5.8)에 있어야 한다.
 // 모드: --staged --message-file <p> = hard(exit 1, commit-msg 훅) / [base] = range advisory(exit 0).
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { loadConfig, configFromString } from "./sdd-config.mjs";
+import { readFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { loadConfig, configFromString, resolveFromRoot } from "./sdd-config.mjs";
 import { parseSection } from "./ownership-keys.mjs";
 import { compileGlob, scanFilesLineIssues, stripInlineComment, hasMeaningfulSpecChange, filesLineMissingPaths } from "./spec-sync-lib.mjs";
 import { parseStatus, canLeadCode } from "./lifecycle-lib.mjs";
 import { escalations } from "./drift-lib.mjs";
 import { parseDrivers, relaxingDrivers } from "./cross-spec-lib.mjs";
+import { recordBranch } from "./branch-observation-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -19,6 +20,19 @@ armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) —
 let cfg = loadConfig();
 const args = process.argv.slice(2);
 const STAGED = args.includes("--staged");
+
+// 차단 분기 발화 기록(SPEC-049) — **이 분기가 돌았다는 사실은 이 분기만 안다.**
+// 정적 검사로는 원리상 잡히지 않는 층이다(실측 제보 사례 6: 명세·구현·테스트가 정상인데
+// 배선이 없어 비교가 단 한 번도 수행되지 않았고, 증거는 매 실행 로그의 같은 한 줄이었다).
+// 원장 미선언이면 아무 일도 하지 않는다 — 원치 않는 프로젝트에 결합 0.
+function noteBranchFiring(branch, detail) {
+  try {
+    if (!cfg.verificationRunLedger) return;
+    const abs = resolveFromRoot(cfg, cfg.verificationRunLedger);
+    mkdirSync(dirname(abs), { recursive: true });
+    recordBranch((line) => appendFileSync(abs, line), { branch, outcome: "FIRED", detail, at: new Date().toISOString() });
+  } catch { /* 기록 실패가 판정을 바꾸지 않는다 — 판정은 위에서 이미 났다 */ }
+}
 const mi = args.indexOf("--message-file");
 const MSG = mi >= 0 ? args[mi + 1] : null;
 const positional = args.filter((a, i) => !a.startsWith("--") && (mi < 0 || i !== mi + 1)); // mi=-1일 때 args[0](base)이 mi+1=0으로 오배제되던 버그 수정
@@ -264,12 +278,14 @@ for (const f of unowned) {
 }
 if (unownedHard && !violations.length) {
   console.error(`\n✗ unowned 파일(closed-world): 소유 스펙의 Files glob에 편입하거나, 의도적 예외면 specSyncExemptGlobs에 선언하라.`);
+  noteBranchFiring("spec-sync#spec-first", `unowned 파일 ${unowned.length}건 차단(closed-world)`);
   process.exit(1);
 }
 // 미지원 glob 문법은 staged(hard)에서 차단(SPEC-013) — range는 advisory 유지(점진 도입 경로).
 const globHard = STAGED && warnedGlobSpec.size > 0;
 if (globHard && !violations.length) {
   console.error(`\n✗ Files glob 미지원 문법(§4.1): **·* 만 지원 — 해당 스펙의 Files 글롭을 지원 문법으로 정정하라(매치 실패 = 소유가 조용히 풀림).`);
+  noteBranchFiring("spec-sync#spec-first", `미지원 glob 문법 ${warnedGlobSpec.size}건 차단`);
   process.exit(1);
 }
 // Files 리터럴 경로 부재도 같은 계열의 "소유가 조용히 풀림"이라 같은 강도로 차단한다.
@@ -298,14 +314,17 @@ if (violations.length && STAGED) {
   if (violations.some((v) => v.draft)) console.error(`  · Reviewed 미만 상태(Draft·Planned·enum 밖)의 스펙은 리뷰(/analyze·/checklist) 기록 후 Status를 Reviewed 이상으로 승격해야 코드 변경 가능(SPEC-008).`);
   if (unownedHard) console.error(`  · unowned 파일은 Files glob 편입 또는 specSyncExemptGlobs 선언으로 해소(closed-world).`);
   console.error(`  · 진짜 스펙 무관이면 커밋 메시지에 \`Spec-Impact: none <사유>\` 트레일러.`);
+  noteBranchFiring("spec-sync#spec-first", `spec-first 위반 ${violations.length}건 차단`);
   process.exit(1);
 }
 if (driftHard) {
   console.error(`\n✗ semantic drift(SPEC-019): 리네임된 소유 파일의 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 \`Spec-Impact: <사유>\` 트레일러를 남겨라 — ${drift.violations.join(", ")}.`);
+  noteBranchFiring("spec-sync#spec-first", `semantic drift ${drift.violations.length}건 차단`);
   process.exit(1);
 }
 if (draftHard) {
   console.error(`\n✗ draftBlockPolicy=hard: Draft 소유 코드 변경은 range 모드에서도 차단된다 — 리뷰(/analyze·/checklist) 후 Status를 Reviewed 이상으로 승격하라(SPEC-008).`);
+  noteBranchFiring("spec-sync#spec-first", "Draft 소유 코드 변경 차단(draftBlockPolicy)");
   process.exit(1);
 }
 console.log("spec-sync: advisory — node scripts/sdd-sync.mjs로 정렬 검토(Claude Code: /sdd-sync·/speckit.fix).");

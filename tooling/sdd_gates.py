@@ -129,6 +129,7 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "blockingBranches": {},
     "watchdogPolicy": "advisory",
     "watchdogReceipt": None,
     "watchdogCiGlobs": None,
@@ -779,8 +780,11 @@ def parse_run_line(raw):
     asset = str(o.get("asset") or "").strip()
     outcome = str(o.get("outcome") or "").strip().upper()
     detail = str(o.get("detail") or "").strip()
+    # 종류가 다른 기록은 깨진 기록이 아니다 — 분기 발화 기록(SPEC-049)은 조용히 건너뛴다.
+    if not asset and str(o.get("branch") or "").strip():
+        return None
     if not asset:
-        return {"malformed": True, "raw": line, "why": "asset 없음"}
+        return {"malformed": True, "raw": line, "why": "asset·branch 둘 다 없음 — 무엇에 대한 기록인지 알 수 없다"}
     if outcome not in VERDICT_KINDS:
         return {"malformed": True, "raw": line,
                 "why": f'outcome "{o.get("outcome")}" — {"|".join(VERDICT_KINDS)} 중 하나'}
@@ -2555,6 +2559,84 @@ def impl_reference_findings(units, sources):
                 out.append({"specId": u["specId"], "frId": u["frId"], "name": name,
                             "kind": kind, "refs": refs, "bar": bar, "sites": sites})
     return out
+
+
+# ── 실행 관측 회계 코어 (SPEC-049, branch-observation-lib.mjs 미러) ─────────
+BRANCH_OUTCOMES = ["FIRED", "PASSED", "SKIPPED"]
+
+
+def parse_branch_line(raw):
+    line = str(raw or "").strip()
+    if not line:
+        return None
+    try:
+        o = json.loads(line)
+    except Exception:  # noqa: BLE001
+        return {"broken": True, "raw": line}
+    if not isinstance(o, dict):
+        return {"broken": True, "raw": line}
+    branch = str(o.get("branch") or "").strip()
+    if not branch:
+        return None                       # 분기 기록이 아니다(자산 기록일 수 있다)
+    outcome = str(o.get("outcome") or "").strip()
+    detail = str(o.get("detail") or "").strip()
+    if outcome not in BRANCH_OUTCOMES:
+        return {"broken": True, "raw": line, "branch": branch}
+    return {"branch": branch, "outcome": outcome, "detail": detail}
+
+
+def parse_branch_ledger(text):
+    entries, broken = [], []
+    for line in str(text or "").split("\n"):
+        p = parse_branch_line(line)
+        if not p:
+            continue
+        if p.get("broken"):
+            broken.append(p)
+        else:
+            entries.append(p)
+    return entries, broken
+
+
+def classify_branches(declared, entries):
+    by_key = {}
+    for e in entries or []:
+        by_key.setdefault(e["branch"], []).append(e)
+    out = []
+    for key in sorted((declared or {}).keys()):
+        recs = by_key.get(key) or []
+        fired = len([r for r in recs if r["outcome"] == "FIRED"])
+        details = list(dict.fromkeys(r["detail"] for r in recs))
+        if not recs:
+            cls = "unobserved"
+        elif not fired:
+            cls = "never-fired"
+        elif len(recs) >= 2 and len(details) == 1:
+            cls = "monotone"
+        else:
+            cls = "observed"
+        out.append({"key": key, "reason": str(declared.get(key) or ""), "records": len(recs),
+                    "fired": fired, "details": len(details), "cls": cls})
+    return out
+
+
+def undeclared_branches(declared, entries):
+    known = set((declared or {}).keys())
+    return sorted({e["branch"] for e in (entries or [])} - known)
+
+
+def validate_branch_declarations(declared):
+    return [f'blockingBranches["{k}"] — 사유 필수(이 분기가 무엇을 막는가; 빈 값은 무언의 선언이다)'
+            for k, v in (declared or {}).items() if not str(v or "").strip()]
+
+
+def format_branch_line(branch, outcome, detail="", at=""):
+    o = {"branch": str(branch), "outcome": str(outcome)}
+    if detail:
+        o["detail"] = str(detail)
+    if at:
+        o["at"] = str(at)
+    return json.dumps(o, ensure_ascii=False)
 
 
 def is_spec_md_name(name):
@@ -5279,7 +5361,7 @@ def cmd_synonym(cfg):
 
 # ── verifyrun — 검증 실행 회계 (check-verification-executed.mjs) ──
 
-def cmd_verifyrun(cfg, record_args=None):
+def cmd_verifyrun(cfg, record_args=None, branch_args=None):
     policy = str(cfg.get("verificationRunPolicy") or "advisory")
     if policy not in ("off", "advisory", "hard"):
         print(f'✗ verificationRunPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
@@ -5289,6 +5371,31 @@ def cmd_verifyrun(cfg, record_args=None):
     ledger_abs = resolve(cfg, ledger_rel) if ledger_rel else None
 
     # 기록 모드 — 러너·CI 스테이지·에이전트가 자기 결과를 남긴다.
+    # 분기 발화 기록(SPEC-049) — 차단 분기가 돌았다는 사실은 그 분기만 안다.
+    if branch_args is not None:
+        if len(branch_args) < 2:
+            verdict("SKIPPED", "인자 부족 — 판정을 요청받지 못했다(usage)")
+            print(f"usage: sdd_gates.py verifyrun --record-branch <키> <{'|'.join(BRANCH_OUTCOMES)}> [사유...]",
+                  file=sys.stderr)
+            sys.exit(2)
+        branch, boutcome = branch_args[0], branch_args[1].upper()
+        bdetail = " ".join(branch_args[2:]).strip()
+        if boutcome not in BRANCH_OUTCOMES:
+            verdict("JUDGED", "위반 1건")
+            print(f'✗ 알 수 없는 분기 결과 "{branch_args[1]}" — {"|".join(BRANCH_OUTCOMES)} 중 하나(문법화, 정의되지 않은 값 금지)',
+                  file=sys.stderr)
+            sys.exit(1)
+        if not ledger_rel:
+            verdict("INERT", "verificationRunLedger 미선언 — 기록할 원장이 없다")
+            print("✗ verificationRunLedger가 선언되지 않아 기록할 곳이 없다 — sdd.config.json에 경로를 선언하라.", file=sys.stderr)
+            sys.exit(1)
+        os.makedirs(os.path.dirname(ledger_abs), exist_ok=True)
+        with open(ledger_abs, "a", encoding="utf8") as fh:
+            fh.write(format_branch_line(branch, boutcome, bdetail, _utc_now_iso()) + "\n")
+        judged(0)
+        print(f"분기 발화 기록 — {branch}: {boutcome}{f' ({bdetail})' if bdetail else ''} → {ledger_rel}")
+        sys.exit(0)
+
     if record_args is not None:
         if len(record_args) < 2:
             verdict("SKIPPED", "인자 부족 — 판정을 요청받지 못했다(usage)")
@@ -5367,6 +5474,45 @@ def cmd_verifyrun(cfg, record_args=None):
         print(f"  {tag} … 외 {len(silent) - cap}건")
     for m in malformed[:cap]:
         print(f"  {tag} 깨진 기록: {m['why']} — {m['raw'][:120]}")
+
+    # ── 실행 관측 회계(SPEC-049) — 차단 분기가 필드에서 발화한 적이 있는가.
+    # 어떤 강도에서도 차단하지 않는다(원장은 세션 상태다) — 매 실행 부채로 표면화한다.
+    raw_decl = cfg.get("blockingBranches")
+    declared = raw_decl if isinstance(raw_decl, dict) else {}
+    for e in validate_branch_declarations(declared):
+        print(f"  ⚠ {e}")
+    if not declared:
+        print("실행 관측 회계(SPEC-049): **blockingBranches 미선언 — 판정하지 않는다**."
+              ' 차단 분기(전이 금지·마감 금지 같은 거부 경로)를 `{ "<키>": "<무엇을 막는가>" }`로 선언하고'
+              " 그 분기가 `--record-branch <키> FIRED|PASSED|SKIPPED [사유]`로 남기게 하면,"
+              " **발화 0회인 차단 분기를 미검증으로 회계**한다(정적 검사로는 원리상 잡히지 않는 층이다).")
+    else:
+        br_entries, br_broken = parse_branch_ledger(text)
+        rows = classify_branches(declared, br_entries)
+        tally = {"observed": 0, "unobserved": 0, "never-fired": 0, "monotone": 0}
+        for r in rows:
+            tally[r["cls"]] += 1
+        print(f"실행 관측 회계(SPEC-049): 차단 분기 {len(rows)}종 — 관측됨 {tally['observed']}"
+              f" · 미관측 {tally['unobserved']} · **발화 0회 {tally['never-fired']}** · 단조 {tally['monotone']}")
+        for r in rows:
+            if r["cls"] == "observed":
+                continue
+            if r["cls"] == "unobserved":
+                why = "기록이 0건이다 — 이 분기가 `--record-branch`를 부르도록 배선하라(배선 없이는 관측이 없다)"
+            elif r["cls"] == "never-fired":
+                why = ("기록은 있는데 **FIRED가 0회다** — 차단 경로가 한 번도 돌지 않았다. 제보의 결함이 정확히 이 모양이었다"
+                       "(명세·구현·단위테스트가 정상인데 두 기록이 만날 저장소가 없어 비교가 단 한 번도 수행되지 않았다)")
+            else:
+                why = (f"기록 {r['records']}회가 **모두 같은 사유다** — 값이 한 번도 달라진 적이 없다면 배선이 죽었을 개연성이 높다"
+                       '("대조 생략"이 몇 달간 그대로였던 자리다)')
+            suffix = f" / 선언된 목적: {r['reason']}" if r["reason"] else ""
+            print(f"  ⚠ [{r['key']}] {why}{suffix}")
+        for b in undeclared_branches(declared, br_entries)[:cap]:
+            print(f"  ⚠ 선언되지 않은 분기 키로 기록됨: {b} — 낡은 러너이거나 오타다(조용히 버리면 그 기록은 없는 것과 같다)")
+        for b in br_broken[:cap]:
+            print(f"  ⚠ 깨진 분기 기록: {b['raw'][:120]}")
+        if not tally["unobserved"] and not tally["never-fired"] and not tally["monotone"]:
+            print("  ✓ 선언된 차단 분기 전부가 발화 기록을 갖고 결과가 한 종류에 고정돼 있지 않다.")
 
     if blocking:
         print(f"\n✗ verificationRunPolicy=hard: 선언된 증거가 돌았다는 기록이 없다({len(silent)}건)"
@@ -5894,7 +6040,10 @@ def main():
         rec = None
         if "--record" in args:
             rec = args[args.index("--record") + 1:]
-        cmd_verifyrun(cfg, rec)
+        brec = None
+        if "--record-branch" in args:
+            brec = args[args.index("--record-branch") + 1:]
+        cmd_verifyrun(cfg, rec, brec)
     elif sub == "sccoverage":
         cmd_sccoverage(cfg)
     elif sub == "introdoc":
