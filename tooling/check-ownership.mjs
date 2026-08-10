@@ -30,7 +30,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { loadConfig, resolveFromRoot, specMdFiles, walkFiles } from "./sdd-config.mjs";
-import { parseSection, normalizeKey, validateKey } from "./ownership-keys.mjs";
+import { parseSection, normalizeKey, validateKey, categoryRoleProvenance } from "./ownership-keys.mjs";
 import { ownershipCategoriesFindings, exemptGlobFindings } from "./grammar-lib.mjs";
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
@@ -308,6 +308,18 @@ const relationCycles = findCycles(relationEdges);
 if (!files.length) verdict(VERDICT_KINDS.INERT, "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다");
 else judged(0);  // 위반 건수는 아래 축별 집계 뒤 갱신된다
 console.log(`Ownership 게이트: spec ${files.length}개 중 ${declaredCount}개가 Ownership 선언.`);
+// **추측이 금지인 방법론에서 추측의 성공은 침묵할 수 없다.** 역할 선언(ownershipCategoryRoles)이
+// 없으면 이름 정규식으로 폴백하는데(SPEC-001 FR-010), 그 폴백은 **실패할 때만** 사유를 남겼다 —
+// 성공하면 판정이 추측 위에서 진행되고 아무도 모른다. 카테고리를 개명하면 조준 대상이 바뀌는데
+// 운영자는 통보받지 못한다. 막지 않는다(하위호환) — 매 실행 출처를 밝힌다.
+{
+  const prov = categoryRoleProvenance(cfg.ownershipCategories, cfg.ownershipCategoryRoles);
+  const inferred = Object.entries(prov).filter(([, v]) => v === "inferred").map(([k]) => k);
+  if (inferred.length) {
+    console.log(`  · 역할 ${inferred.length}종을 **이름으로 추론했다**(${inferred.join(", ")}) — 선언이 아니다.`
+      + " 카테고리를 개명하면 판정 조준이 조용히 바뀐다. `ownershipCategoryRoles`로 선언하면 추측이 사라진다.");
+  }
+}
 if (missing.length) {
   const tag = (STRICT || ORQ_POLICY === "hard") ? "✗" : "⚠";
   console.log(`${tag} Ownership 블록 없음(${missing.length}): ${missing.join(", ")}`);

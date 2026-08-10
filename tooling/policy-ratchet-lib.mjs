@@ -55,6 +55,7 @@ export const RATCHETED_POLICIES = [
   "specConflictPolicy",
   "diagnosisGuardPolicy",
   "completionSignalPolicy",
+  "preEditSpecFirstPolicy",
   "liveRealityCoveragePolicy",
 ];
 

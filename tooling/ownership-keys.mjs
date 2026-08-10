@@ -20,9 +20,38 @@ export function resolveCategoryRoles(categories, roles) {
     const match = cats.find((c) => String(c).trim().toLowerCase() === String(cat).trim().toLowerCase());
     if (match && !out[r]) out[r] = match;
   }
-  if (!out.entity) out.entity = cats.find((c) => /entit/i.test(c)) || null;
-  if (!out.surface) out.surface = cats.find((c) => /surface/i.test(c)) || null;
-  if (!out.capability) out.capability = cats.find((c) => /capabilit/i.test(c)) || null;
+  for (const [role, re] of Object.entries(ROLE_NAME_PATTERNS)) {
+    if (!out[role]) out[role] = cats.find((c) => re.test(c)) || null;
+  }
+  return out;
+}
+
+// 이름 정규식 폴백의 **단일 정본**. 두 곳에 적으면 판정과 출처 보고가 갈라진다(R13).
+export const ROLE_NAME_PATTERNS = Object.freeze({
+  entity: /entit/i, surface: /surface/i, capability: /capabilit/i,
+});
+
+// 역할이 **어디서 왔는가** — declared | inferred | unresolved.
+//
+// 왜 필요한가: 이름 정규식 폴백(FR-010)은 **성공했을 때 조용하다.** 실패하면 사유가 남지만
+// (capability-ownership의 "이름 폴백 실패"), 성공하면 판정이 **추측 위에서** 진행되고 아무도 모른다.
+// 카테고리를 개명하면(Entities → Aggregates) 조준 대상이 바뀌는데 운영자는 그 사실을 통보받지 못한다.
+// **추측이 금지인 방법론에서 추측의 성공은 침묵할 수 없다** — 판정 입력의 출처를 같이 낸다.
+// 순수 함수 — 판정에 쓰이는 것과 **같은 규칙**으로 계산한다(다른 규칙으로 계산하면 보고가 거짓이 된다).
+export function categoryRoleProvenance(categories, roles) {
+  const cats = categories || [];
+  const out = {};
+  const declaredFor = {};
+  for (const [cat, role] of Object.entries(roles || {})) {
+    const r = String(role || "").trim().toLowerCase();
+    const match = cats.find((c) => String(c).trim().toLowerCase() === String(cat).trim().toLowerCase());
+    if (match && !declaredFor[r]) declaredFor[r] = match;
+  }
+  for (const role of Object.keys(ROLE_NAME_PATTERNS)) {
+    if (declaredFor[role]) out[role] = "declared";
+    else if (cats.find((c) => ROLE_NAME_PATTERNS[role].test(c))) out[role] = "inferred";
+    else out[role] = "unresolved";
+  }
   return out;
 }
 

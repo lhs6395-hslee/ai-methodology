@@ -11,6 +11,7 @@
 // @covers SPEC-027/FR-008
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { DEFAULTS } from "../sdd-config.mjs";
 import { readFileSync } from "node:fs";
 import { stripFullLineComments } from "../external-target-lib.mjs";
 import { execFileSync } from "node:child_process";
@@ -100,10 +101,14 @@ test("수치 래칫 전수성: 코드가 읽는 max* 임계는 모두 래칫 감
 // 구조적 불변식 — 개수를 세지 않는다. 숫자를 박아두면 새 강도 knob이 래칫 **밖**에 태어나도
 // 테스트는 초록이다(실측: synonymPolicy 등 6종이 hard인 채로 감시 밖에 있었고, `9`를 단정한
 // 이 테스트가 그걸 통과시켰다). 그래서 "킷이 실제로 켠 강도 knob"을 진실의 원천으로 삼는다.
-test("래칫 전수성: 킷 config의 모든 강도 enum knob은 래칫 감시 안에 있어야 한다", () => {
-  const cfg = JSON.parse(readFileSync(new URL("../../sdd.config.json", import.meta.url), "utf8"));
+test("래칫 전수성: **DEFAULTS의** 모든 강도 enum knob은 래칫 감시 안에 있어야 한다", () => {
+  // 이전 판은 **킷 config에 선언된** knob만 열거했다. 그런데 knob의 존재는 DEFAULTS에서 시작하고
+  // 킷이 그것을 선언하지 않을 수도 있다 — 실측(2026-08-10): 강도 enum knob 40종 중 **18종이 킷
+  // config에 미선언**이라 이 테스트의 사정거리 밖이었고, 그 사각에서 `preEditSpecFirstPolicy`가
+  // 래칫 감시 없이 살아 있었다. 소비 프로젝트가 그 knob을 켜면 hard→advisory 한 줄로 회피할 수 있다.
+  // **열거기가 잘못된 집합을 보면 그 전수성은 전수성이 아니다** — 진실의 원천은 DEFAULTS다.
   const STRENGTH = new Set(["off", "silent", "advisory", "warn", "hard", "error"]);
-  const unwatched = Object.entries(cfg)
+  const unwatched = Object.entries(DEFAULTS)
     .filter(([k, v]) => /Policy$/.test(k) && typeof v === "string" && STRENGTH.has(v))
     .map(([k]) => k)
     .filter((k) => !RATCHETED_POLICIES.includes(k));

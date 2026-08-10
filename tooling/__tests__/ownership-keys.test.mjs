@@ -6,7 +6,7 @@
 // @covers SPEC-001/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSection, normalizeKey, validateKey, resolveCategoryRoles, splitKeys, isPlaceholder, escapeRegExp } from "../ownership-keys.mjs";
+import { parseSection, normalizeKey, validateKey, resolveCategoryRoles, splitKeys, isPlaceholder, escapeRegExp, categoryRoleProvenance, ROLE_NAME_PATTERNS } from "../ownership-keys.mjs";
 import { loadConfig } from "../sdd-config.mjs";
 
 const cfg = { ...loadConfig("/nonexistent"), capabilityVerbs: ["recommend"] };
@@ -159,4 +159,37 @@ test("escapeRegExp: 카테고리명의 정규식 메타문자가 크래시를 �
   const t = "## Ownership\n- **C++ Symbols**: a.cpp, b.cpp\n\n## Next\n";
   assert.deepEqual(parseSection(t, "Ownership", ["C++ Symbols"])["C++ Symbols"], ["a.cpp", "b.cpp"]);
   assert.equal(escapeRegExp("Jobs (async)"), "Jobs \\(async\\)");
+});
+
+// ── 추측 금지: 판정 입력의 출처를 밝힌다 ────────────────────────────────────
+// 이름 정규식 폴백(FR-010)은 **성공했을 때 조용하다.** 실패하면 사유가 남지만(capability-ownership의
+// "이름 폴백 실패") 성공하면 판정이 추측 위에서 진행되고 아무도 모른다 — 카테고리를 개명하면
+// 조준 대상이 바뀌는데 운영자는 통보받지 못한다.
+// @covers SPEC-001/FR-010
+test("역할 출처: 선언 / 이름 추론 / 미해석을 가른다 — 추측의 성공은 침묵할 수 없다", () => {
+  assert.deepEqual(categoryRoleProvenance(["Modules", "Symbols", "Capabilities"],
+    { Modules: "entity", Symbols: "surface", Capabilities: "capability" }),
+    { entity: "declared", surface: "declared", capability: "declared" });
+  // 선언 없이 이름으로 맞은 경우 — 판정은 성립하지만 **추측이다**
+  assert.deepEqual(categoryRoleProvenance(["Entities", "Surfaces", "Capabilities"], {}),
+    { entity: "inferred", surface: "inferred", capability: "inferred" });
+  // 개명 실측(감사 A-1): Entities → Aggregates면 이름 폴백이 실패한다
+  assert.deepEqual(categoryRoleProvenance(["Aggregates", "Jobs"], {}),
+    { entity: "unresolved", surface: "unresolved", capability: "unresolved" });
+  // 부분 선언 — 선언한 것만 declared, 나머지는 각자의 상태
+  assert.deepEqual(categoryRoleProvenance(["Modules", "Surfaces"], { Modules: "entity" }),
+    { entity: "declared", surface: "inferred", capability: "unresolved" });
+});
+
+test("출처 계산과 판정이 **같은 규칙**을 쓴다 — 다른 규칙으로 계산하면 보고가 거짓이 된다", () => {
+  // 폴백 패턴은 단일 정본이어야 한다(R13: 같은 규칙이 두 곳에 있으면 한쪽만 고쳐진다).
+  assert.deepEqual(Object.keys(ROLE_NAME_PATTERNS).sort(), ["capability", "entity", "surface"]);
+  for (const cats of [["Entities"], ["Surfaces"], ["Capabilities"], ["Aggregates"], []]) {
+    const resolved = resolveCategoryRoles(cats, {});
+    const prov = categoryRoleProvenance(cats, {});
+    for (const role of Object.keys(ROLE_NAME_PATTERNS)) {
+      // 해석됐다 ⇔ declared|inferred / 못 했다 ⇔ unresolved. 둘이 어긋나면 보고가 판정을 배신한다.
+      assert.equal(Boolean(resolved[role]), prov[role] !== "unresolved", `${cats}/${role}`);
+    }
+  }
 });

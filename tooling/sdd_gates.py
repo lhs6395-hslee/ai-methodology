@@ -1467,6 +1467,34 @@ def cmd_fr(cfg, strict):
 
 # ── ownership — 구조적 중복 dedup + 정규화·형식검증 (check-ownership.mjs) ──
 
+# 이름 정규식 폴백의 **단일 정본**(ownership-keys.mjs ROLE_NAME_PATTERNS 미러).
+ROLE_NAME_PATTERNS = {"entity": "entit", "surface": "surface", "capability": "capabilit"}
+
+
+def category_role_provenance(categories, roles):
+    """역할이 **어디서 왔는가** — declared | inferred | unresolved.
+
+    이름 폴백은 **성공했을 때 조용하다**: 실패하면 사유가 남지만 성공하면 판정이 추측 위에서
+    진행되고 아무도 모른다. 카테고리를 개명하면 조준 대상이 바뀌는데 운영자는 통보받지 못한다.
+    **추측이 금지인 방법론에서 추측의 성공은 침묵할 수 없다.**"""
+    cats = categories or []
+    declared_for = {}
+    for cat, role in (roles or {}).items():
+        r = str(role or "").strip().lower()
+        match = next((c for c in cats if str(c).strip().lower() == str(cat).strip().lower()), None)
+        if match and r not in declared_for:
+            declared_for[r] = match
+    out = {}
+    for role, pat in ROLE_NAME_PATTERNS.items():
+        if declared_for.get(role):
+            out[role] = "declared"
+        elif next((c for c in cats if re.search(pat, c, re.IGNORECASE)), None):
+            out[role] = "inferred"
+        else:
+            out[role] = "unresolved"
+    return out
+
+
 def resolve_category_roles(categories, roles):
     """카테고리 → 역할 해석(SPEC-001 FR-010) — ownership-keys.mjs resolveCategoryRoles 미러.
     선언 우선(대소문자 무관 카테고리 매칭) → 미선언 역할만 이름 정규식 폴백(하위호환).
@@ -1481,7 +1509,7 @@ def resolve_category_roles(categories, roles):
         match = next((c for c in cats if str(c).strip().lower() == str(cat).strip().lower()), None)
         if match and not out[r]:
             out[r] = match
-    for role, pat in (("entity", "entit"), ("surface", "surface"), ("capability", "capabilit")):
+    for role, pat in ROLE_NAME_PATTERNS.items():
         if not out[role]:
             out[role] = next((c for c in cats if re.search(pat, c, re.IGNORECASE)), None)
     return out
@@ -2307,6 +2335,12 @@ def cmd_ownership(cfg, strict):
     else:
         judged(0)
     print(f"Ownership 게이트: spec {len(files)}개 중 {declared}개가 Ownership 선언.")
+    # **추측이 금지인 방법론에서 추측의 성공은 침묵할 수 없다**(check-ownership.mjs 미러).
+    prov = category_role_provenance(cfg.get("ownershipCategories"), cfg.get("ownershipCategoryRoles"))
+    inferred = [k for k, v in prov.items() if v == "inferred"]
+    if inferred:
+        print(f'  · 역할 {len(inferred)}종을 **이름으로 추론했다**({", ".join(inferred)}) — 선언이 아니다.'
+              " 카테고리를 개명하면 판정 조준이 조용히 바뀐다. `ownershipCategoryRoles`로 선언하면 추측이 사라진다.")
     if missing:
         tag = "✗" if (strict or orq_policy == "hard") else "⚠"
         print(f"{tag} Ownership 블록 없음({len(missing)}): {', '.join(missing)}")
@@ -2550,6 +2584,9 @@ def cmd_cohesion(cfg, strict):
         verdict("INERT", "판정 대상 스펙 0건 — specDir이 비었거나 읽지 못했다")
     else:
         judged(len(violations))
+    if not roles["entity"] and categories:
+        print(f'· entity 역할을 해석하지 못해 **첫 카테고리 "{categories[0]}"로 추측했다** — 선언도 이름 폴백도 없었다.'
+              " 순서가 의미를 갖는다는 근거는 없다: `ownershipCategoryRoles`로 entity를 선언하라(추측 위의 입도 판정은 조용히 틀린다).")
     print(f"Spec 입도(cohesion) 게이트: spec {len(files)}개 검사 (키>{max_keys}/카테고리, FR>{max_frs}).")
     if violations:
         tag = "✗" if strict else "⚠"

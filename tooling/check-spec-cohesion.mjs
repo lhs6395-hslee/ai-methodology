@@ -35,7 +35,15 @@ const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
 
 // aggregate root 카테고리: config의 **역할 선언**(ownershipCategoryRoles)이 정본이고,
 // 미선언이면 이름 정규식 폴백(`__roles`가 이미 수행) → 그것도 실패하면 첫 카테고리.
-const ENT_CAT = cfg.__roles.entity || CATEGORIES[0]; // 역할 선언 우선(SPEC-001 FR-010)
+// 역할 선언 우선(SPEC-001 FR-010) → 이름 폴백 → **그마저 실패하면 첫 카테고리**.
+// 마지막 단계는 순수한 **위치 추측**이다(순서가 의미를 갖는다는 근거는 어디에도 없다). 이전 판은
+// 그것을 조용히 했다 — aggregate root 판정 대상이 엉뚱한 카테고리가 되어도 아무 출력이 없었다.
+// 막지 않는다(하위호환) — **추측했다는 사실을 매 실행 말한다.**
+const ENT_CAT = cfg.__roles.entity || CATEGORIES[0];
+if (!cfg.__roles.entity && CATEGORIES.length) {
+  console.log(`· entity 역할을 해석하지 못해 **첫 카테고리 "${CATEGORIES[0]}"로 추측했다** — 선언도 이름 폴백도 없었다.`
+    + " 순서가 의미를 갖는다는 근거는 없다: `ownershipCategoryRoles`로 entity를 선언하라(추측 위의 입도 판정은 조용히 틀린다).");
+}
 
 // 고유 FR-ID 수 — 문법은 config의 requirementIdPrefixes에서 파생(coverage와 동일 사이트 통일).
 // 정의(**FR-NNN**)만 — Change Log/근거의 FR 인용은 제외(SPEC-013 frDeclarations가 범위를 판정).
