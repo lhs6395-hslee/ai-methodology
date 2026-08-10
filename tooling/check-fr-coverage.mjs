@@ -38,6 +38,7 @@ import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 import { termCoverageFindings } from "./term-coverage-lib.mjs";
 import { externalTargetFindings } from "./external-target-lib.mjs";
+import { namedImplementations, implReferenceFindings } from "./impl-reference-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -152,6 +153,9 @@ const frDecls = new Map();
 const clRefs = new Map();  // SPEC-ID -> {declared:Map, retired:Set} (SPEC-037)
 const frEvidence = new Map(); // "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
 const frText = new Map();     // "SPEC/FR" -> FR 선언 라인 원문 (SPEC-042 의미 커버리지 입력)
+const normText = new Map();   // "SPEC/<FR|NFR|SC>" -> 규범 선언 라인 원문 (SPEC-046 지목 구현체 입력)
+// 규범 선언 라인 문법 — 요구 접두어는 config에서 파생하고(사이트 간 통일) NFR·SC는 고정 어휘다.
+const NORM_DECL = new RegExp(`^\\s*-?\\s*\\*\\*((?:${cfg.__reqAlt}|NFR|SC)-\\d{3}[a-z]?)\\*\\*`);
 const coverTags = [];         // {file, specId, frId} — 양방향 결속 판정 입력  // SPEC-ID -> [FR-ID,...] 선언 순서 그대로(중복 판정용 — Set은 중복을 삼킨다)
 for (const f of readdirSync(SPEC_DIR)) {
   if (!f.endsWith(".md") || !PREFIXES.some((p) => f.startsWith(p + "-"))) continue;
@@ -172,6 +176,16 @@ for (const f of readdirSync(SPEC_DIR)) {
     const paths = evidencePathsOf(t);
     if (paths.length) frEvidence.set(`${id}/${fr[1]}`, paths);
     if (!frText.has(`${id}/${fr[1]}`)) frText.set(`${id}/${fr[1]}`, t);
+  }
+  // 규범 선언 라인 전체(FR + NFR + SC) — 지목 구현체 참조 축(SPEC-046)의 입력.
+  // **frText와 분리한다**: frText는 SPEC-042(의미 커버리지)가 FR만 보도록 정한 집합이고,
+  // 여기서 넓히면 다른 축의 판정 범위가 조용히 바뀐다(킷 실측: 지목 구현체는 SC·NFR 라인에 많다).
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (t.startsWith("|")) continue;
+    const m = NORM_DECL.exec(t);
+    if (!m) continue;
+    if (!normText.has(`${id}/${m[1]}`)) normText.set(`${id}/${m[1]}`, t);
   }
   // Change Log가 **선언한** FR 집합(SPEC-037) — 새 검사와 결번 advisory가 같은 소스를 쓴다.
   clRefs.set(id, changeLogFrRefs(text, cfg.__reqAlt, cfg.__idAlt, {
@@ -353,6 +367,15 @@ if (TC_POLICY !== "off") {
 // 대상을 정하는데 어떤 FR도 그 대상을 인정하지 않았고, 소유·커버리지·spec-sync가 전부 초록이었다.
 // 소유의 입도를 줄 단위로 낮추지 않는다 — 좁히는 것은 **결정의 종류**다: 폴백 기본값이 외부
 // 대상(다른 시스템의 주소·계정·자격)이면 그건 구현 세부가 아니라 계약이고, 계약은 스펙이 안다.
+// 소유 파일·소스 본문 캐시 — R1d와 R1e가 같은 파일을 두 번 읽지 않게 한다.
+const fileTextCache = new Map();
+const readCached = (rel) => {
+  if (fileTextCache.has(rel)) return fileTextCache.get(rel);
+  let t = null; try { t = readFileSync(join(ROOT, rel), "utf8"); } catch { /* 읽지 못한 파일은 없는 것으로 본다 */ }
+  fileTextCache.set(rel, t);
+  return t;
+};
+
 const XT_POLICY = String(cfg.externalTargetPolicy ?? "advisory");
 if (!["off", "advisory", "hard"].includes(XT_POLICY)) {
   console.error(`✗ externalTargetPolicy 값 위반 "${XT_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
@@ -362,7 +385,8 @@ if (XT_POLICY !== "off") {
   const units = [];
   for (const u of ownershipUnits) {
     for (const rel of u.files) {
-      let text; try { text = readFileSync(join(ROOT, rel), "utf8"); } catch { continue; }
+      const text = readCached(rel);
+      if (text === null) continue;
       units.push({ path: rel, text, specId: u.specId, specText: u.specText });
     }
   }
@@ -376,6 +400,69 @@ if (XT_POLICY !== "off") {
   }
   if (xt.length > xtCap) (XT_POLICY === "hard" || STRICT ? errors : warnings).push(`결정 입도 미공개 … 외 ${xt.length - xtCap}건 (externalTargetListCap 상향으로 확인)`);
   if (!xt.length) console.log("  ✓ 소유 파일의 env 폴백 기본값 중 스펙이 모르는 외부 대상은 없다(미소유 파일은 R4가 본다).");
+}
+
+// R1e: 지목 구현체 참조(SPEC-046) — **스펙이 이름으로 지목한 메커니즘은 실행 경로에 있어야 한다.**
+// 실측 제보(사례 4): FR이 `extractDeployTickets()`를 메커니즘으로 지목했는데 표면은 그 함수를
+// 부르지 않고 쉘로 같은 일을 다시 구현했다. 두 규칙이 갈라졌고 쉘 쪽에만 결함이 둘 있어 19건이
+// 배포 범위에서 조용히 누락됐다. 커버 테스트는 **버그 있는 쉘 구현이 거기 있는지**를 단언했고,
+// 지목된 함수는 테스트만 통과하는 고아 구현이었다. 게이트는 전부 초록이었다.
+// 이름은 저자가 백틱으로 명시한 것이라 선언 없이도 오탐이 없다(SPEC-042가 거부한 자동 추출과 다르다).
+const IR_POLICY = String(cfg.implReferencePolicy ?? "advisory");
+if (!["off", "advisory", "hard"].includes(IR_POLICY)) {
+  console.error(`✗ implReferencePolicy 값 위반 "${IR_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+if (IR_POLICY !== "off") {
+  const PROSE = new RegExp(String(cfg.implReferenceProseRegex || "\\.(md|html|rst|txt|jsonl|lock)$"));
+  const isTestName = (n) => isTestFile(String(n).split("/").pop(), cfg);
+  const irUnits = [];
+  for (const [key, text] of normText) {
+    const names = namedImplementations(text, isTestName);
+    if (!names.length) continue;
+    const [specId, frId] = key.split("/");
+    irUnits.push({ specId, frId, names, key });
+  }
+  // 실행 경로 = 저장소의 비-테스트·비-산문 소스. **소유 경계를 넘는다** — 라이브러리는 다른
+  // 스펙의 파일이 정당하게 소비하고, 소유 안에서만 찾으면 정상 모듈이 거짓 고아로 뜬다(킷 실측 3건).
+  const sources = [];
+  if (irUnits.length) {
+    for (const rel of allRepoFiles) {
+      if (isTestName(rel) || PROSE.test(rel)) continue;
+      const text = readCached(rel);
+      if (text !== null) sources.push({ path: rel, text });
+    }
+  }
+  const irFindings = implReferenceFindings(irUnits, sources);
+  // ② 검증 경로 — 지목 이름이 커버 파일에도 없으면 그 테스트는 FR의 주장이 아니라 현재 구현의
+  //    형태를 단언하고 있을 개연성이 높다. 판정은 SPEC-042의 코어를 재사용한다(중복 구현 금지).
+  const irCoverFindings = [];
+  for (const u of irUnits) {
+    const files = [...(coverFiles.get(u.key) || [])].sort();
+    if (!files.length) continue;                       // 미커버는 R1/R2의 몫
+    const unit = { specId: u.specId, frId: u.frId, text: normText.get(u.key), coveringTexts: files.map((f) => coverFileText.get(f) || "") };
+    for (const f of termCoverageFindings([unit], u.names.map((n) => n.name))) irCoverFindings.push(f);
+  }
+  const irTotal = irUnits.reduce((n, u) => n + u.names.length, 0);
+  console.log(`지목 구현체 참조(implReferencePolicy=${IR_POLICY}): FR ${irUnits.length}건이 백틱으로 지목한 구현체 ${irTotal}종`
+    + ` × 소스 ${sources.length}건 — 미참조 ${irFindings.length}건 · 커버 미언급 ${irCoverFindings.length}건`);
+  const irCap = Number(cfg.implReferenceListCap) || 12;
+  const irBlock = IR_POLICY === "hard" || STRICT ? errors : warnings;
+  for (const f of irFindings.slice(0, irCap)) {
+    irBlock.push(f.refs === 0
+      ? `[${f.specId}/${f.frId}] FR이 지목한 ${f.kind === "fn" ? "함수" : "모듈"} \`${f.name}\`이 저장소의 비-테스트 소스에 **아예 없다**`
+        + ` — 스펙이 말하는 메커니즘과 실제 실행 경로가 다르다(이름이 바뀌었거나 다른 구현으로 대체됐다)`
+      : `[${f.specId}/${f.frId}] FR이 지목한 ${f.kind === "fn" ? "함수" : "모듈"} \`${f.name}\`이 정의만 있고 참조되지 않는다(등장 ${f.refs}회 < 기준 ${f.bar})`
+        + ` — **고아 구현**이다. 표면이 같은 일을 따로 구현했는지 확인하고, 그렇다면 지목된 쪽으로 통일하라(재구현은 규칙이 갈라진다)`);
+  }
+  if (irFindings.length > irCap) irBlock.push(`지목 구현체 미참조 … 외 ${irFindings.length - irCap}건 (implReferenceListCap 상향으로 확인)`);
+  for (const f of irCoverFindings.slice(0, irCap)) {
+    irBlock.push(`[${f.specId}/${f.frId}] FR이 지목한 \`${f.term}\`이 이 FR을 커버하는 어떤 파일에도 없다`
+      + ` — 그 테스트는 FR의 주장이 아니라 **현재 구현의 형태**를 단언하고 있을 수 있다(그런 테스트는 회귀를 막지 않고 수정을 막는다)`);
+  }
+  if (irCoverFindings.length > irCap) irBlock.push(`커버 미언급 … 외 ${irCoverFindings.length - irCap}건 (implReferenceListCap 상향으로 확인)`);
+  if (!irUnits.length) console.log("  · 백틱으로 구현체를 지목한 FR 0건 — 이 축은 대조할 이름이 없다(FR이 함수는 `name()`, 모듈은 `name.ext` 꼴로 지목하면 판정이 시작된다).");
+  else if (!irFindings.length && !irCoverFindings.length) console.log("  ✓ 지목된 구현체는 모두 실행 경로에서 참조되고 커버 파일이 그 이름을 안다.");
 }
 
 // 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.

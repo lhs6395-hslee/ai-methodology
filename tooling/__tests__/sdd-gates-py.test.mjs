@@ -1284,3 +1284,54 @@ test("py introdoc: 미선언 inert·규칙 누락·인용 불일치·문서 부�
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 지목 구현체 참조 패리티(SPEC-046) ──
+test("py fr: 지목 구현체 참조 — 고아·전무·통과·커버 미언급·hard 차단 바이트 동일", skip, () => {
+  const SPEC = (frBody, own) => `# S\n**Spec**: \`SPEC-001\`\n**Module**: \`m\`\n**Status**: Active\n`
+    + `## Functional Requirements\n- **FR-001** (event): THE SYSTEM SHALL ${frBody}\n`
+    + `\n## Ownership\n- **Entities**: thing\n- **Files**: ${own}\n`;
+  const CALL = "extract tickets via `extractDeployTickets()`.";
+  const scen = [
+    // ① 고아 — 정의뿐, 표면은 쉘로 다시 구현
+    { cfg: {}, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/tickets.mjs": "export function extractDeployTickets(r) { return r; }\n",
+      "src/Jenkinsfile": "DEPLOY_TICKETS=$(git log | grep -oE 'PJT-[0-9]+')\n",
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+    // ② 전무 — 이름이 아예 없다
+    { cfg: {}, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/tickets.mjs": "export function somethingElse(r) { return r; }\n",
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+    // ③ 통과 — 정의 + 호출, 커버 테스트도 그 이름을 안다
+    { cfg: {}, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/tickets.mjs": "export function extractDeployTickets(r) { return r; }\n",
+      "src/run.mjs": `import { extractDeployTickets } from "./tickets.mjs";\nextractDeployTickets(1);\n`,
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\nimport {extractDeployTickets} from '../src/tickets.mjs';\ntest('x', () => {});\n" } },
+    // ④ 커버 미언급 — 실행 경로는 멀쩡한데 테스트가 그 이름을 모른다(구현 형태 단언 의심)
+    { cfg: {}, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/tickets.mjs": "export function extractDeployTickets(r) { return r; }\n",
+      "src/run.mjs": "extractDeployTickets(1);\n",
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => { expect(s).toMatch(/DEPLOY_TICKETS=/); });\n" } },
+    // ⑤ hard 승격 — 양판이 같은 지점에서 막는다
+    { cfg: { implReferencePolicy: "hard" }, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/tickets.mjs": "export function extractDeployTickets(r) { return r; }\n",
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+    // ⑥ off — 판정하지 않는다고 선언
+    { cfg: { implReferencePolicy: "off" }, files: {
+      "sdd/specs/SPEC-001.md": SPEC(CALL, "src/**"),
+      "src/a.test.mjs": TAG + "SPEC-001/FR-001\ntest('x', () => {});\n" } },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-fr-coverage.mjs");
+      const p = runPy(root, ["fr"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

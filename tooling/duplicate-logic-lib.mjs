@@ -54,6 +54,12 @@ export function extractLiterals(text, patterns = DEFAULT_DUPLICATE_LITERAL_PATTE
     // `.replace(/^\.\//, "") : "defaults(JS/TS)"` 같은 줄이 따옴표 사이 슬래시 때문에 정규식으로
     // 오추출됐고, jq 표현식·셸 경로도 같은 방식으로 걸렸다. 지우면 그 부류가 통째로 사라진다.
     line = line.replace(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g, '""');
+    // **줄 끝 주석도 지운다** — 설명은 구현이 아니다(전줄 주석은 위에서 이미 건너뛴다).
+    // 실측: `continue;  // 미커버는 R1/R2의 몫`이 두 축에 나란히 적혀 있었고 `/ 미커버는 R1/`이
+    // 정규식 리터럴로 오추출돼 "같은 규칙이 2곳에" 위반이 됐다. 문자열을 먼저 비웠으므로
+    // `"https://…"`의 `//`는 여기 남지 않고, 앞이 공백·구분자인 `//`만 자르므로 `/[//]/` 같은
+    // 문자클래스 안의 슬래시는 건드리지 않는다.
+    line = line.replace(/(^|[\s;{}(),])\/\/.*$/, "$1");
     for (const p of patterns) {
       let re;
       try { re = new RegExp(p, "g"); } catch { continue; }  // 잘못된 패턴은 config 리뷰 몫

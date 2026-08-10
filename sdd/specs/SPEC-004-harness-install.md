@@ -57,7 +57,7 @@
 - **Symbols**: sdd-sync.mjs, sdd-init.sh, pre-commit, pre-push, sdd-session-context.sh, sdd-edit-check.sh, sdd-run.mjs
 - **Artifacts**: .git/hooks/pre-commit, .git/hooks/pre-push, .claude/settings.json, .claude/skills/sdd-sync/SKILL.md, .claude/skills/speckit-fix/SKILL.md, .kiro/steering/sdd.md, AGENTS.md
 - **Capabilities**: harness-install.install
-- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs, tooling/__tests__/ship-closure.test.mjs
+- **Files**: tooling/sdd-sync.mjs, tooling/sdd-init.sh, tooling/harness/pre-commit, tooling/harness/pre-push, tooling/harness/sdd-session-context.sh, tooling/harness/sdd-edit-check.sh, tooling/harness/speckit-fix.SKILL.md, tooling/harness/sdd-sync.SKILL.md, tooling/harness/agent-context.md, tooling/harness/self-hooks-install.sh, tooling/sdd-run.mjs, tooling/__tests__/sdd-sync.test.mjs, tooling/__tests__/init-gates.test.mjs, tooling/__tests__/init-hooks.test.mjs, tooling/__tests__/init-spec-sync.test.mjs, tooling/__tests__/pre-commit.test.mjs, tooling/__tests__/session-context.test.mjs, tooling/__tests__/edit-check.test.mjs, tooling/__tests__/ship-closure.test.mjs, docs/change_log.html
 
 ## Dependencies (참조 — dedup 제외)
 > 설치되는 게이트·spec-sync는 아래 모듈들이 소유. 하네스는 이를 배선·호출만 한다.
@@ -88,6 +88,8 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `docs/change_log.html`(생성물)을 Files 소유에 편입 | SPEC-003의 면제 글롭 좁힘으로 포괄 `docs/**`가 사라지자 이 생성물이 **미소유**로 떴다. 생성기(`gen-changelog.mjs`)를 소유한 스펙이 그 산출물도 소유하는 것이 정합이다 — 생성물의 드리프트는 재생성으로 해소한다(SPEC-028과 같은 결) [검증: tooling/__tests__/sdd-sync.test.mjs] |
+| 2026-08-10 | `sdd-init.sh` 배포 목록에 `impl-reference-lib.mjs` 추가 | 배포 폐포 계약 테스트가 누락을 즉시 잡았다 — 이 결함 계열의 **네 번째** 발생이고 처음으로 사람이 아니라 기계가 잡았다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-08-10 | 스윕 규칙표에 **R15 소개 문서 동기** 등재 + `sdd-init.sh` 배포 목록에 `intro-doc-lib`·`check-intro-doc` 추가 + `--json` 리포트 규칙 목록 계약에 R15 반영 | 오너 지시(키트 변경 시 소개 HTML 강제 갱신) → SPEC-045 신설. 배포 목록 누락은 **어제 세운 폐포 계약 테스트가 즉시 잡았다** — 규범으로 세 번 실패한 것을 기계로 옮긴 것이 하루 만에 효과를 냈다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-08-10 | `sdd-init.sh` 배포 목록에 신설 코어 3종 추가 + **배포 폐포 계약 테스트** 신설(`ship-closure.test.mjs`) | 배포 목록 누락이 세 번 재발했다(verdict-lib·verification-run-lib·term-coverage-lib) — 매번 소비 프로젝트는 게이트가 아니라 `ERR_MODULE_NOT_FOUND`를 받는다. 세 번 다 "다음엔 목록도 같이 고치자"는 규범으로 끝났고 세 번 다 안 지켜졌다. 규범으로 두 번 이상 실패한 것은 기계가 잡는다: import 전이 폐포와 규칙표 등재 게이트가 배포 목록에 모두 있는지 계약으로 강제한다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |

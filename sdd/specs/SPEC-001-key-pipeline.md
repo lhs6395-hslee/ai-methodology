@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 어댑터에 지목 구현체 참조 knob 3종(`implReferencePolicy`·`implReferenceListCap`·`implReferenceProseRegex`) 추가 | SPEC-046 신설에 따른 기본값 등재. 산문 제외 정규식은 `null` 기본(킷 기본 = md·html·rst·txt·jsonl·lock) — 문서의 언급은 실행이 아니다 [검증: tooling/__tests__/impl-reference.test.mjs] |
 | 2026-08-10 | config의 `specSyncExemptGlobs` 값 좁힘 반영(판정 로직은 SPEC-003 소유, 여기서는 config 파일 자체의 소유 귀속) | 소유 선언과 면제 선언이 같은 파일을 가리키면 소유가 거짓이 된다 — SPEC-045의 소개 문서 소유가 생기며 그 모순이 실재했고, 게이트가 지목했다. config는 판정의 입력이므로 값 변경도 스펙 동반 대상이다(SPEC-003의 config 자기보호와 같은 결) [검증: tooling/__tests__/spec-sync.test.mjs] |
 | 2026-08-10 | config 어댑터에 소개 문서 동기 knob 3종(`introDocs`·`introDocRuleSource`·`introDocPolicy`) 추가 + **spec 파일명 판정 정본화**(`isSpecMdName`) | SPEC-045 신설에 따른 기본값 등재(`introDocs` 빈 배열 = 결합 0, 미선언이면 게이트가 inert를 선언한다). 파일명 판정은 두 게이트에 복제돼 있던 것을 R13이 잡았다 — 이 판단이 흩어지면 한 게이트는 세고 다른 게이트는 안 세는 스펙이 생기고, 그 차이가 곧 조용한 사각이다 [검증: tooling/__tests__/intro-doc.test.mjs] |
 | 2026-08-10 | config 어댑터에 의미 커버리지·결정 입도·근거 적용범위 knob 9종 추가(`termGlossary`·`termCoveragePolicy`·`termCoverageListCap`·`externalTargetPolicy`·`externalTargetListCap`·`evidenceScopePolicy`·`observationMarkers`·`evidenceScopeLabels`·`environmentMarkers`) | SPEC-042·043·044 신설에 따른 기본값 등재 — 새 축의 어휘 목록은 전부 `null` 기본(킷 기본 마커)이고 프로젝트가 선언으로 교체한다. 면제가 아니라 어휘 교체다: 교체해도 축은 계속 판정한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |

@@ -129,6 +129,9 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "implReferencePolicy": "advisory",
+    "implReferenceListCap": 12,
+    "implReferenceProseRegex": None,
     "introDocs": [],
     "introDocRuleSource": "HARNESS.md",
     "introDocPolicy": "advisory",
@@ -259,6 +262,7 @@ RATCHETED_POLICIES = [
     "externalTargetPolicy",
     "evidenceScopePolicy",
     "introDocPolicy",
+    "implReferencePolicy",
     "liveRealityCoveragePolicy",
 ]
 
@@ -988,6 +992,8 @@ def cmd_fr(cfg, strict):
     cl_refs = {}   # SPEC-ID -> (declared, retired) — SPEC-037 판정 소스(새 검사·결번 문구 공용)
     fr_evidence = {}   # "SPEC/FR" -> [검증 경로…] (SPEC-039 대조 축)
     fr_text = {}       # "SPEC/FR" -> FR 선언 라인 원문 (SPEC-042 의미 커버리지 입력)
+    norm_text = {}     # "SPEC/<FR|NFR|SC>" -> 규범 선언 라인 원문 (SPEC-046 지목 구현체 입력)
+    norm_decl = re.compile(rf"^\s*-?\s*\*\*((?:{cfg['__reqAlt']}|NFR|SC)-\d{{3}}[a-z]?)\*\*")
     cover_tags = []    # {file, specId, frId} — 양방향 결속 판정 입력
     for f in spec_names:
         if not (f.endswith(".md") and any(f.startswith(p + "-") for p in cfg["__prefixes"])):
@@ -1010,6 +1016,16 @@ def cmd_fr(cfg, strict):
             if paths2:
                 fr_evidence[f"{m.group(0)}/{fr2.group(1)}"] = paths2
             fr_text.setdefault(f"{m.group(0)}/{fr2.group(1)}", t2)
+        # 규범 선언 라인 전체(FR + NFR + SC) — 지목 구현체 참조 축(SPEC-046)의 입력.
+        # fr_text와 분리한다: fr_text는 SPEC-042가 FR만 보도록 정한 집합이다.
+        for line in text.split("\n"):
+            t3 = line.strip()
+            if t3.startswith("|"):
+                continue
+            m3 = norm_decl.search(t3)
+            if not m3:
+                continue
+            norm_text.setdefault(f"{m.group(0)}/{m3.group(1)}", t3)
         cl_refs[m.group(0)] = change_log_fr_refs(text, cfg["__reqAlt"], cfg["__idAlt"], {
             "neu": cfg.get("changeLogNewVerbs"), "rev": cfg.get("changeLogReviseVerbs"),
             "ret": cfg.get("changeLogRetireVerbs")})
@@ -1189,6 +1205,68 @@ def cmd_fr(cfg, strict):
                 f"결정 입도 미공개 … 외 {len(xt) - xt_cap}건 (externalTargetListCap 상향으로 확인)")
         if not xt:
             print("  ✓ 소유 파일의 env 폴백 기본값 중 스펙이 모르는 외부 대상은 없다(미소유 파일은 R4가 본다).")
+
+    # R1e: 지목 구현체 참조(SPEC-046) — 스펙이 이름으로 지목한 메커니즘은 실행 경로에 있어야 한다.
+    ir_policy = str(cfg.get("implReferencePolicy") or "advisory")
+    if ir_policy not in ("off", "advisory", "hard"):
+        print(f'✗ implReferencePolicy 값 위반 "{ir_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if ir_policy != "off":
+        prose = re.compile(str(cfg.get("implReferenceProseRegex") or r"\.(md|html|rst|txt|jsonl|lock)$"))
+
+        def _is_test_name(n):
+            return is_test_file(os.path.basename(str(n)), cfg)
+
+        ir_units = []
+        for key, t4 in norm_text.items():
+            names = named_implementations(t4, _is_test_name)
+            if not names:
+                continue
+            sid4, frid4 = key.split("/")
+            ir_units.append({"specId": sid4, "frId": frid4, "names": names, "key": key})
+        sources = []
+        if ir_units:
+            for rel in all_repo_files:
+                if _is_test_name(rel) or prose.search(rel):
+                    continue
+                try:
+                    sources.append({"path": rel, "text": read_text(os.path.join(root, rel))})
+                except OSError:
+                    continue
+        ir_findings = impl_reference_findings(ir_units, sources)
+        ir_cover = []
+        for u in ir_units:
+            files4 = sorted(cover_files.get(u["key"]) or [])
+            if not files4:
+                continue
+            unit = {"specId": u["specId"], "frId": u["frId"], "text": norm_text.get(u["key"]),
+                    "coveringTexts": [cover_file_text.get(x, "") for x in files4]}
+            ir_cover.extend(term_coverage_findings([unit], [n["name"] for n in u["names"]]))
+        ir_total = sum(len(u["names"]) for u in ir_units)
+        print(f"지목 구현체 참조(implReferencePolicy={ir_policy}): FR {len(ir_units)}건이 백틱으로 지목한 구현체 {ir_total}종"
+              f" × 소스 {len(sources)}건 — 미참조 {len(ir_findings)}건 · 커버 미언급 {len(ir_cover)}건")
+        ir_cap = int(cfg.get("implReferenceListCap") or 12)
+        ir_block = errors if (ir_policy == "hard" or strict) else warnings
+        for f in ir_findings[:ir_cap]:
+            noun = "함수" if f["kind"] == "fn" else "모듈"
+            if f["refs"] == 0:
+                ir_block.append(f'[{f["specId"]}/{f["frId"]}] FR이 지목한 {noun} `{f["name"]}`이 저장소의 비-테스트 소스에 **아예 없다**'
+                                " — 스펙이 말하는 메커니즘과 실제 실행 경로가 다르다(이름이 바뀌었거나 다른 구현으로 대체됐다)")
+            else:
+                ir_block.append(f'[{f["specId"]}/{f["frId"]}] FR이 지목한 {noun} `{f["name"]}`이 정의만 있고 참조되지 않는다(등장 {f["refs"]}회 < 기준 {f["bar"]})'
+                                " — **고아 구현**이다. 표면이 같은 일을 따로 구현했는지 확인하고, 그렇다면 지목된 쪽으로 통일하라(재구현은 규칙이 갈라진다)")
+        if len(ir_findings) > ir_cap:
+            ir_block.append(f"지목 구현체 미참조 … 외 {len(ir_findings) - ir_cap}건 (implReferenceListCap 상향으로 확인)")
+        for f in ir_cover[:ir_cap]:
+            ir_block.append(f'[{f["specId"]}/{f["frId"]}] FR이 지목한 `{f["term"]}`이 이 FR을 커버하는 어떤 파일에도 없다'
+                            " — 그 테스트는 FR의 주장이 아니라 **현재 구현의 형태**를 단언하고 있을 수 있다(그런 테스트는 회귀를 막지 않고 수정을 막는다)")
+        if len(ir_cover) > ir_cap:
+            ir_block.append(f"커버 미언급 … 외 {len(ir_cover) - ir_cap}건 (implReferenceListCap 상향으로 확인)")
+        if not ir_units:
+            print("  · 백틱으로 구현체를 지목한 FR 0건 — 이 축은 대조할 이름이 없다(FR이 함수는 `name()`, 모듈은 `name.ext` 꼴로 지목하면 판정이 시작된다).")
+        elif not ir_findings and not ir_cover:
+            print("  ✓ 지목된 구현체는 모두 실행 경로에서 참조되고 커버 파일이 그 이름을 안다.")
 
     # 3b. 검증 회계(SPEC-007): smokeManifest 로드·검증 + strictSpecs 검증.
     #     manifest 미설정 && requireAccounting=false && strictSpecs=[] → 현행 동작(출력 동일).
@@ -2388,6 +2466,58 @@ _CODE_LEADING = {"Reviewed", "Approved", "Active", "Deprecated", "Removed"}
 
 def can_lead_code(status):
     return status is None or status in _CODE_LEADING
+
+
+# ── 지목 구현체 참조 코어 (SPEC-046, impl-reference-lib.mjs 미러) ───────────
+_FN_SPAN = re.compile(r"^([A-Za-z_$][A-Za-z0-9_$]*)\([^)]*\)$")
+_MOD_SPAN = re.compile(r"^([A-Za-z_$][A-Za-z0-9_.$-]*\.(?:mjs|cjs|js|jsx|ts|tsx|py|go|rs|rb|java|kt|sh|bash|tf|php))$")
+REFERENCE_BAR = {"fn": 2, "mod": 1}
+
+
+def named_implementations(fr_text, is_test_name=None):
+    """FR 선언 라인의 백틱 스팬에서 구현체 이름만 뽑는다(함수 호출형·모듈 파일명)."""
+    out, seen = [], set()
+    for m in re.finditer(r"`([^`]+)`", str(fr_text or "")):
+        span = m.group(1).strip()
+        fn = _FN_SPAN.match(span)
+        mod = _MOD_SPAN.match(span)
+        name = kind = None
+        if fn:
+            name, kind = fn.group(1), "fn"
+        elif mod and not (is_test_name(mod.group(1)) if is_test_name else False):
+            name, kind = mod.group(1), "mod"
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append({"name": name, "kind": kind, "span": span})
+    return out
+
+
+def reference_count(text, name):
+    """식별자 경계 매칭 — 대소문자를 구분한다(식별자는 대소문자가 의미를 가진다)."""
+    return len(re.findall(r"(?:^|[^A-Za-z0-9_$])" + re.escape(str(name)) + r"(?:[^A-Za-z0-9_$]|$)", str(text or "")))
+
+
+def impl_reference_findings(units, sources):
+    """units: [{specId, frId, names}], sources: [{path, text}] — 기준 미달만 반환."""
+    out = []
+    for u in units or []:
+        for n in u.get("names") or []:
+            name, kind = n["name"], n["kind"]
+            bar = REFERENCE_BAR.get(kind, 1)
+            refs, sites = 0, []
+            for src in sources or []:
+                path = src["path"]
+                if kind == "mod" and (path == name or str(path).endswith("/" + name)):
+                    continue
+                c = reference_count(src["text"], name)
+                if c:
+                    refs += c
+                    sites.append(path)
+            if refs < bar:
+                out.append({"specId": u["specId"], "frId": u["frId"], "name": name,
+                            "kind": kind, "refs": refs, "bar": bar, "sites": sites})
+    return out
 
 
 def is_spec_md_name(name):

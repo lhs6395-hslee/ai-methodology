@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 46건
+## Entity 키 (aggregate root) — 47건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -47,6 +47,7 @@
 | `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring` | SPEC-036 | ✓ | ✓ | ✓ |
+| `impl-reference` | SPEC-046 | ✓ | ✓ | ✓ |
 | `intro-doc` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-pipeline` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci` | CICD-001 | ✓ | ✓ | ✓ |
@@ -75,7 +76,7 @@
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 85건
+## Surface 키 — 86건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -122,6 +123,7 @@
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
 | `hooks-install-lib.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
 | `hooks.list` | SPEC-036 | ✓ | ✓ | ✓ |
+| `impl-reference-lib.mjs` | SPEC-046 | ✓ | ✓ | ✓ |
 | `intro-doc-lib.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | ✓ |
 | `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | ✓ |
@@ -165,7 +167,7 @@
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 48건
+## Capability 키 — 49건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -189,6 +191,7 @@
 | `gate-verdict.emit` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring.gate` | SPEC-036 | ✓ | ✓ | ✓ |
+| `impl-reference.trace` | SPEC-046 | ✓ | ✓ | ✓ |
 | `intro-doc.synchronise` | SPEC-045 | ✓ | ✓ | ✓ |
 | `key-pipeline.parse` | SPEC-001 | ✓ | ✓ | ✓ |
 | `kit-ci.gate` | CICD-001 | ✓ | ✓ | ✓ |
@@ -242,7 +245,7 @@
 
 ## 집계
 
-- 소유 키 총 **196건** (entity 46 · surface 85 · capability 48 · 역할없음 17)
+- 소유 키 총 **199건** (entity 47 · surface 86 · capability 49 · 역할없음 17)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

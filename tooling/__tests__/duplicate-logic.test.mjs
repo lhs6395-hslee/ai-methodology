@@ -147,3 +147,14 @@ test("게이트 e2e: 확률적 층이 후보를 내도 hard에서 차단하지 �
     assert.match(r.out, /결정적 층에서 중복 리터럴 0건/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("줄 끝 주석의 슬래시는 정규식이 아니다 — 설명은 구현이 아니다(실측 오탐의 회귀)", () => {
+  // 실측: `continue;  // 미커버는 R1/R2의 몫`이 두 축에 나란히 적혀 있었고, `/ 미커버는 R1/`이
+  // 정규식 리터럴로 오추출돼 "같은 규칙이 2곳에" 위반이 됐다. 주석은 구현이 아니다.
+  const line = "    if (!files.length) continue;                 " + "// unco" + "vered belongs to R1/R2\n";
+  assert.deepEqual(extractLiterals(line), []);
+  // 그러나 코드의 정규식은 그대로 잡힌다 — 자르는 것은 주석뿐이다.
+  assert.deepEqual(extractLiterals("const re = /abcdefghij/;\n").map((x) => x.literal), ["abcdefghij"]);
+  // 문자클래스 안의 슬래시는 건드리지 않는다(앞이 공백·구분자인 // 만 자른다).
+  assert.deepEqual(extractLiterals("const re = /[//]abcdefgh/;\n").map((x) => x.literal), ["[//]abcdefgh"]);
+});

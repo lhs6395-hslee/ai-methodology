@@ -537,6 +537,7 @@ buildx 캐시 드라이버 → <span class="r">아치 불일치(arm64 노드에 
     <tr><td>요구는 "Claude in Chrome(MCP)로 측정"인데 구현은 그냥 Chrome 실행</td><td class="pass">커버 태그가 있다</td><td>테스트는 선택자가 문자열 <code>chrome</code>을 돌려주는지만 확인 — <strong>동어반복</strong></td></tr>
     <tr><td>리눅스 1대(X 없음) 관측이 보편 규칙으로 승격</td><td class="pass">근거 칸이 비지 않았다</td><td>그 결론이 <strong>어디까지</strong> 참인지 아무도 안 적었다</td></tr>
     <tr><td><code>process.env.BASE_URL || "https://…"</code> — 폴백이 배포 대상을 정한다</td><td class="pass">파일이 스펙에 붙어 있다</td><td>소유는 <strong>파일 단위</strong>인데 결정은 파일 <strong>안</strong>에 있다</td></tr>
+    <tr><td>FR은 <code>extractDeployTickets()</code>를 지목했는데 표면은 쉘로 다시 구현</td><td class="pass">커버 테스트가 있고 표면도 소유돼 있다</td><td>그 테스트가 단언한 것은 <strong>버그 있는 쉘 구현이 거기 있는지</strong>였다</td></tr>
   </table></div>
   <p>의미가 맞는지 판정하는 것은 기계의 몫이 아니다(그 경계는 <em>존재는 기계, 질은 리뷰</em>로 이미 서 있다). 그래서 세 물음에 각각 <strong>값싸고 결정적인 조각 하나씩</strong>으로 답한다 — 재현율은 포기하고, 잡히는 것은 확실히 잡는다.</p>
   <div class="tablewrap"><table>
@@ -544,10 +545,37 @@ buildx 캐시 드라이버 → <span class="r">아치 불일치(arm64 노드에 
     <tr><td><strong>의미 커버리지</strong><br><span class="note">R1c</span></td><td>요구가 <em>이름 댄</em> 등록 용어가 그 요구를 커버하는 <strong>어떤 파일에도 없다</strong></td><td>대상을 실제로 건드리는 검증 추가, 또는 구현이 다른 이름을 쓴다면 <strong>동의어 등록</strong></td></tr>
     <tr><td><strong>근거 적용범위</strong><br><span class="note">R3</span></td><td>근거가 <em>특정 환경을 지목해</em> 관측을 주장하는데 <strong>범위 표기가 없다</strong></td><td><code>범위: &lt;이 결론이 참인 범위&gt;</code>를 근거 칸에 덧붙인다</td></tr>
     <tr><td><strong>결정 입도</strong><br><span class="note">R1d</span></td><td>env 폴백 기본값이 <strong>외부 대상</strong>(다른 시스템의 주소·계정·자격)인데 소유 스펙이 그 대상을 모른다</td><td>스펙 본문에 그 대상을 적는다(위치는 강제하지 않는다 — 호스트만 적어도 인정)</td></tr>
+    <tr><td><strong>지목 구현체 참조</strong><br><span class="note">R1e</span></td><td>FR이 백틱으로 지목한 <code>name()</code>·<code>name.ext</code>가 실행 경로에서 <strong>참조되지 않는다</strong>(정의뿐 = 고아 구현)</td><td>지목된 쪽으로 호출을 통일하거나, FR이 잘못된 메커니즘을 지목했다면 FR을 고친다</td></tr>
   </table></div>
   <p class="note">세 축의 방아쇠를 고를 때 같은 기준을 썼다: <strong>오탐이 잦은 게이트는 꺼진다.</strong> 근거 적용범위를 "관측을 주장했다"만으로 걸었더니 킷에서 <strong>77건/26스펙</strong>이 쏟아졌다 — 대부분이 "소비 프로젝트 실측"처럼 환경 무관 근거라 본 신호가 묻힌다. <em>관측 주장 × 환경 지목</em>의 곱으로 좁히니 <strong>2건</strong>이고, 그 2건이 정확히 위험한 모양이었다. 용어집도 자동 추출하지 않는다(문장 첫 단어와 Title-Case가 다 걸린다) — <strong>선언은 책임지는 행위</strong>이고, 선언하지 않은 프로젝트에는 "이 축은 판정하지 않았다"를 매 실행 말한다.</p>
   <p>왜 소유의 입도를 줄 단위로 낮추지 않는가: 모든 상수에 요구를 붙이면 <strong>스펙이 코드의 사본</strong>이 되고, 그 순간 아무도 스펙을 읽지 않는다. 좁히는 것은 입도가 아니라 <strong>결정의 종류</strong>다 — 폴백 기본값이 외부 대상이면 그건 구현 세부가 아니라 <strong>계약</strong>이고, 계약은 스펙이 안다. 같은 이유로 EARS 문장에 범위 한정자를 <em>문법으로</em> 강제하지도 않는다: 이미 쓰인 수백 개 요구가 한꺼번에 위반이 되고, 그 규모의 강제는 우회를 낳는다.</p>
   <p class="note">세 축은 만들자마자 <strong>자기 자신을 물었다.</strong> 결정 입도 게이트는 첫 실행에서 <em>판정 코어 자신의 설명 주석</em>에 적힌 예시 URL을 위반으로 잡았다(→ 주석 속 예시는 인용이지 결정이 아니다. 단 <strong>줄 안쪽의 <code>//</code>는 절대 자르지 않는다</strong> — <code>"https://host"</code>를 자르면 정확히 봐야 할 자리에서 눈이 먼다). 근거 적용범위 축을 만들며 Change Log 행 선별을 복제했더니 <strong>구현 중복 게이트(R13)가 즉시 잡았다</strong>. 그리고 자기 테스트 픽스처의 가짜 호스트가 걸렸을 때 — <strong>면제 목록이 아니라 스펙 본문에 적어</strong> 닫았다. 픽스처라도 "이 저장소가 그 문자열을 담고 있다"는 사실은 참이고, 면제였다면 나중에 진짜 대상이 섞여 들어와도 조용히 통과했을 자리다.</p>
+
+  <h4>지목은 배선이 아니다 <span class="note">(규칙 R1e)</span></h4>
+  <p>네 번째 사례는 앞의 셋보다 <strong>훨씬 잡기 쉬웠다.</strong> FR이 배포 범위 티켓 추출의 메커니즘으로 함수를 <strong>이름으로</strong> 지목했다. 그런데 실제 표면은 그 함수를 부르지 않고 쉘로 같은 일을 다시 구현했다:</p>
+  <pre><span class="c">// FR-042가 지목한 메커니즘</span>
+extract every <span class="g">`PJT-&lt;번호&gt;`</span> … deduplicate them (<span class="g">`extractDeployTickets()`</span>)
+
+<span class="c">// 표면(Jenkinsfile)이 실제로 한 것</span>
+DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0-9]+'</span> | awk '!seen[$0]++')</pre>
+  <p>두 구현의 <strong>규칙이 갈라졌고</strong>, 쉘 쪽에만 결함이 둘 있었다. 다건 커밋의 관행 표기 <code>(PJT-149,133,126,…)</code>에서 <strong>첫 건만</strong> 잡아 두 커밋에서 <strong>19건이 배포 범위에서 조용히 누락</strong>됐다(그 티켓들은 자동 실측을 한 번도 못 받았다). 그리고 근거로 인용만 한 번호가 작업 대상으로 오인됐다.</p>
+  <p>게이트는 전부 초록이었다. 커버 테스트는 있었고 표면 파일도 소유돼 있었다. 그런데 그 테스트가 단언한 것은:</p>
+  <pre>expect(qa).toMatch(<span class="r">/DEPLOY_TICKETS=\$\(git log/</span>)   <span class="c">← 버그 있는 쉘 구현이 거기 있는지</span></pre>
+  <p>FR이 지목한 함수가 실제로 호출되는지는 <strong>아무도 보지 않았다.</strong> 그 함수는 테스트는 통과하지만 프로덕션 경로에서 한 번도 실행되지 않는 <strong>고아 구현</strong>이었다.</p>
+  <p>여기서 <strong>이름의 출처가 결정적이다.</strong> 용어집을 자동 추출하지 않기로 한 것과 달리, 이 이름은 저자가 <strong>백틱으로 명시</strong>한 것이다 — 추측이 아니라 "이건 리터럴 이름이다"라는 저술 행위다. 그래서 선언 없이도 오탐이 없고, 한 줄 grep으로 끝난다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>백틱 스팬</th><th>추출</th><th>왜</th></tr>
+    <tr><td><code>extractDeployTickets()</code></td><td class="pass">함수</td><td>이름 뒤 <strong>공백 없이</strong> 여는 괄호 — 호출 형태다</td></tr>
+    <tr><td><code>deploy-tickets.mjs</code></td><td class="pass">모듈</td><td>알려진 소스 확장자를 가진다</td></tr>
+    <tr><td><code>--strict</code> · <code>hard</code> · <code>sdd.config.json</code> · <code>maxFRsPerSpec</code></td><td>거부</td><td>플래그·enum·config 키는 구현체가 아니다</td></tr>
+    <tr><td><code>EntityName (relation-type)</code></td><td>거부</td><td>이름 뒤 공백 — 호출이 아니다(킷 실측 오탐 1건)</td></tr>
+    <tr><td><code>foo.test.mjs</code></td><td>거부</td><td>테스트 파일명은 구현체가 아니라 검증 자산이다(R8·R14의 축)</td></tr>
+  </table></div>
+  <p class="note">찾는 범위는 <strong>소유 경계를 넘는다</strong> — 라이브러리는 다른 스펙의 파일이 정당하게 소비하기 때문이다. 소유 파일 안에서만 찾았더니 킷에서 정상 모듈 <strong>3건이 거짓 고아</strong>로 떴다. 반대로 모듈이 <strong>자기 파일 헤더에 자기 이름을 적은 것</strong>은 참조로 세지 않는다 — 그걸 세면 모든 모듈이 자동으로 통과한다. 그리고 참조의 <em>모양</em>(import인가 언급인가)은 판정하지 않는다: import 문법을 읽으면 언어에 결합되고, <strong>참조 0회·정의뿐</strong>이라는 가장 강한 신호만으로 실측 사례가 잡힌다.</p>
+  <h4>낡은 테스트는 회귀를 막는 게 아니라 수정을 막는다</h4>
+  <p>같은 사례의 뒷이야기가 하나 더 있다. 쉘 구현을 <strong>고치자 그 테스트가 깨졌다.</strong> 그 테스트의 존재 자체가 <strong>"구현이 곧 명세"</strong>가 되어버린 상태였고, 결과적으로 버그를 지키고 있었다.</p>
+  <p>테스트가 FR의 <em>주장</em>이 아니라 현재 구현의 <em>형태</em>를 단언하면 그런 일이 생긴다. 기계가 이 상태를 완전히 판정할 수는 없지만 — 의미 판정은 여전히 리뷰의 몫이다 — <strong>값싼 신호는 있다</strong>: FR이 이름 댄 구현체가 그 FR을 커버하는 어떤 파일에도 없다. 위 사례의 테스트가 정확히 그 모양이었다.</p>
+  <p class="note">이 판정은 <strong>의미 커버리지(R1c)의 코어를 그대로 재사용한다.</strong> 같은 대조를 두 번 구현하면 두 축이 언젠가 다른 답을 내고, 그때 사람은 어느 쪽을 믿어야 할지 모른다 — 킷이 구현 중복(R13)을 규칙으로 세운 이유가 그것이다.</p>
 
   <h4>설명이 도구보다 늦으면 그 설명은 거짓이 된다 <span class="note">(규칙 R15)</span></h4>
   <p>지금 읽고 있는 이 문서가 규칙의 대상이다. 킷은 규칙을 늘려 왔고 이 문서는 <strong>손으로</strong> 따라왔는데, 그 손이 미끄러진 자리가 실측으로 확인됐다 — 규칙표에 <strong>R14가 생겼는데 이 문서는 R13까지</strong>였고, 아무 게이트도 그 사실을 몰랐다. 문서는 어떤 축에서도 판정 대상이 아니었기 때문이다.</p>
@@ -558,7 +586,7 @@ buildx 캐시 드라이버 → <span class="r">아치 불일치(arm64 노드에 
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">14</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">20</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">46</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">14</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">20</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">47</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

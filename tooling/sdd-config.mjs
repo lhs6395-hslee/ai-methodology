@@ -159,6 +159,11 @@ export const DEFAULTS = {
   termGlossary: [],
   termCoveragePolicy: "advisory",
   termCoverageListCap: 12,
+  // 지목 구현체 참조(SPEC-046) — FR이 백틱으로 지목한 함수·모듈이 실행 경로에서 참조되는가.
+  implReferencePolicy: "advisory",
+  implReferenceListCap: 12,
+  // 실행 경로에서 제외할 산문·잠금 파일(정규식 소스). 문서의 언급은 실행이 아니다.
+  implReferenceProseRegex: null,
   // 소개 문서 동기(SPEC-045) — 설명이 도구보다 늦으면 그 설명은 거짓이 된다.
   // introDocs 미선언이면 INERT(판정 안 함). 킷 자신은 hard로 쓴다.
   introDocs: [],
