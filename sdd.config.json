@@ -154,9 +154,10 @@
   ],
   "specSyncExemptGlobs": [
     "*.md",
-    "*.html",
     ".gitignore",
-    "docs/**",
+    "docs/design/**",
+    "docs/examples/**",
+    "docs/*.md",
     "prompts/**",
     "templates/**",
     "sdd/smoke-manifest.json",

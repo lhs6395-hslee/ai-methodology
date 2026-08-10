@@ -86,6 +86,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `specSyncExemptGlobs` **좁힘** — 포괄 `*.html`·`docs/**`를 `docs/design/**`·`docs/examples/**`·`docs/*.md`로 대체 | SPEC-045가 소개 HTML 3종을 소유하기 시작한 순간 게이트가 **자기 모순을 지목했다**: "면제 글롭이 SPEC-045의 Files 소유를 덮는다 — 그 스펙의 spec-first 강제가 이 파일에 발화하지 않는다." 소유를 선언하고 동시에 면제로 빼는 것은 선언을 거짓으로 만드는 것이라, 면제를 좁혀 소개 문서 편집이 소유 스펙(SPEC-045) 갱신을 동반하도록 되돌렸다. 좁힘은 강화라 래칫과 충돌하지 않는다. 이 경고는 오래 출력되고 있었고 이번에 실효를 갖게 된 것이 아니라 — 이번에 **덮는 대상이 생겨서** 의미를 갖게 됐다 [검증: tooling/__tests__/spec-sync.test.mjs] |
 | 2026-07-02 | 초안(자기 정렬) | plan ④ |
 | 2026-07-02 | check-converge-drift.mjs + check-orphan-surfaces.mjs(+ 테스트) + FR-008·009 편입 — maxFRsPerSpec 9로 상향(sdd.config.json) | spec↔code 드리프트 탐지·고아 표면 탐지는 spec-first 강제(spec-sync)의 R2 보완 — sdd-sync R2 배선 집합의 응집 home; FR 9개는 한 capability 묶음(staged·range·escape·merge·glob·drift·orphan) |
 | 2026-07-02 | FR 라인 패턴 레터 서픽스 지원 | SPEC-001/002와 FR ID 문법 통일(사이트 간 불일치 금지) — /speckit.fix |
