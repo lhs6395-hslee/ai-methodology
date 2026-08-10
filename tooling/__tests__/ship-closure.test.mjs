@@ -68,12 +68,22 @@ test("스윕 등재 게이트는 전부 차단을 증명하는 테스트를 갖�
     .map((f) => ({ f, t: readFileSync(join(dir, f), "utf8") }));
   // 차단 단언의 형태 — 비-0 종료·예외·거부. 어느 형태든 "막았다"를 단언하면 된다.
   const BLOCKING = /code,\s*[1-9]|status\s*===?\s*[1-9]|exit\s*[1-9]|assert\.throws|toThrow|rejects/;
+  // **차단했다는 것과 옳은 이유로 차단했다는 것은 다른 사실이다.** 비-0 종료만 단언하면 게이트가
+  // 엉뚱한 이유로 죽어도(정책 enum 위반·크래시·경로 오류) 테스트는 초록이고, 심어둔 위반은
+  // 놓친 채로 남는다 — 이 계열 결함은 실패가 아니라 **통과**로 나타난다는 제보의 논거 그대로다.
+  // 그래서 차단을 단언하는 파일은 **게이트 출력도 대조해야** 한다(무엇을 찾았는지 고정).
+  // 측정(2026-08-10): 도입 시점 27/27이 이미 충족 — 이 계약은 그 상태를 **되돌아가지 못하게** 못박는다.
+  const REASON = /assert\.match\(\s*\w*\.?(?:out|stdout|stderr|output)/;
   const missing = [];
   for (const g of gates) {
     const base = g.replace(/\.mjs$/, "");
     const rel = texts.filter((x) => x.t.includes(g) || x.t.includes(base));
     if (!rel.length) { missing.push(`${g}: 이 게이트를 다루는 테스트가 없다`); continue; }
-    if (!rel.some((x) => BLOCKING.test(x.t))) missing.push(`${g}: 차단(비-0 종료·예외) 단언이 없다 — 통과 경로만 관측됐다`);
+    const blocking = rel.filter((x) => BLOCKING.test(x.t));
+    if (!blocking.length) { missing.push(`${g}: 차단(비-0 종료·예외) 단언이 없다 — 통과 경로만 관측됐다`); continue; }
+    if (!blocking.some((x) => REASON.test(x.t))) {
+      missing.push(`${g}: 차단은 단언하는데 **출력을 대조하지 않는다** — 엉뚱한 이유로 죽어도 초록이다`);
+    }
   }
   assert.deepEqual(missing, [], `차단 능력이 증명되지 않은 게이트:\n  ${missing.join("\n  ")}\n`
     + "→ 심어둔 위반으로 그 게이트가 **실제로 막는지** 단언하는 테스트를 추가하라."
