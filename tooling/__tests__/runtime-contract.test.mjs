@@ -95,3 +95,37 @@ test("④ 경로 인용 계약: 모든 런타임의 git 프로세스 기동이 c
   assert.deepEqual(offenders, [],
     `git 기동이 core.quotepath=off 없이 호출된다 — 비ASCII 경로가 8진수로 인용되면 판정이 조용히, 그리고 양방향으로 틀린다: ${offenders.join(" · ")}`);
 });
+
+// ⑤ 양판 대응 계약 — **선언되지 않은 대응은 대조되지 않는다**(SPEC-006 FR-007).
+//
+// SPEC-006은 판정 게이트에 양판을 요구하지만, 어느 게이트가 어느 Python 서브커맨드에
+// 대응하는지는 **어디에도 적혀 있지 않았다.** 그래서 미러 누락은 사람이 손으로 대조할 때만
+// 발견됐고, 실제로 그렇게 발견됐다 — 그리고 이 대조를 기계화한 첫 실행이 **두 건**을 냈다:
+// R12 훅 배선·R13 구현 중복이 여러 라운드 동안 Node 전용이었다. Python 런타임 프로젝트에서
+// 그 두 축은 아무도 보지 않는 상태였고, 그 `0건`은 진짜 0건과 구분되지 않는다.
+// @covers SPEC-006/FR-007
+test("⑤ 양판 대응: 스윕 등재 게이트 전부가 Python 서브커맨드를 선언하고 그것이 실재한다", async () => {
+  const { PY_SUBCOMMAND } = await import("../sdd-sync.mjs");
+  const { sweepGateFiles } = await import("../watchdog-lib.mjs");
+  const gates = sweepGateFiles(src("sdd-sync.mjs"));
+  assert.ok(gates && gates.length, "스윕 규칙표를 파싱하지 못했다 — 0종은 '전부 대응됨'이 아니다");
+  const py = src("sdd_gates.py");
+  const undeclared = [], missing = [], noReason = [];
+  for (const g of gates) {
+    if (!(g in PY_SUBCOMMAND)) { undeclared.push(g); continue; }
+    const v = PY_SUBCOMMAND[g];
+    if (typeof v === "string") {
+      // 디스패치에 실재해야 한다 — 선언만 있고 구현이 없으면 그 프로젝트는 조용히 판정을 잃는다.
+      if (!py.includes(`sub == "${v}"`)) missing.push(`${g} → ${v}`);
+    } else if (!String(v && v.notAJudge || "").trim()) {
+      // 빈 값은 "판정 게이트가 아니다"와 "잊었다"를 구분하지 못한다.
+      noReason.push(g);
+    }
+  }
+  assert.deepEqual(undeclared, [], `Python 대응이 선언되지 않은 스윕 게이트: ${undeclared.join(" · ")}`);
+  assert.deepEqual(missing, [], `선언된 Python 서브커맨드가 디스패치에 없다: ${missing.join(" · ")}`);
+  assert.deepEqual(noReason, [], `양판 대상이 아니라면 사유를 적어라: ${noReason.join(" · ")}`);
+  // 반대 방향도 본다 — 선언 키가 스윕에서 사라졌으면 그 줄은 죽은 선언이다.
+  const stale = Object.keys(PY_SUBCOMMAND).filter((k) => !gates.includes(k));
+  assert.deepEqual(stale, [], `스윕에 없는 게이트가 선언에 남아 있다(죽은 줄): ${stale.join(" · ")}`);
+});

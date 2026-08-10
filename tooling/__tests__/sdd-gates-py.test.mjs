@@ -13,7 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -39,17 +39,19 @@ function fixture(files, config = {}) {
   return root;
 }
 
-function runPy(root, args) {
+function runPy(root, args, env = {}) {
   try {
-    const out = execFileSync("python3", [PY, ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const out = execFileSync("python3", [PY, ...args],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: "", GITHUB_ACTIONS: "", ...env } });
     return { code: 0, out };
   } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }
 
-function runNode(root, gate, args = []) {
+function runNode(root, gate, args = [], env = {}) {
   const GATE = new URL(`../${gate}`, import.meta.url).pathname;
   try {
-    const out = execFileSync("node", [GATE, ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const out = execFileSync("node", [GATE, ...args],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: "", GITHUB_ACTIONS: "", ...env } });
     return { code: 0, out };
   } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }
@@ -1590,4 +1592,94 @@ test("py diagnosisguard: 금지·노출·명세읽기·무관·선언위반·ine
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
   console.log("DIAGGUARD PARITY OK");
+});
+
+// ── 훅 배선 실재 패리티(SPEC-036, R12) ──
+// 이 축은 여러 라운드 동안 **Node에만 있었다** — 그동안 Python 런타임 프로젝트는 훅 배선을
+// 아무도 보지 않는 상태였고 그 0건은 진짜 0건과 구분되지 않았다(SPEC-006의 양판 불변 위반).
+// @covers SPEC-006/FR-001
+// @covers SPEC-036/FR-005
+test("py hooksinstalled: 미설치·권한·남의 훅·낡음·원본 못 읽음·통과·CI 생략·off·inert 바이트 동일", skip, () => {
+  const KIT = "#!/bin/sh\n# sdd-managed-hook\nnode scripts/check-spec-sync.mjs --staged\n";
+  const OLD = "#!/bin/sh\n# sdd-managed-hook\n";          // 게이트 호출 블록이 빠진 낡은 사본
+  const FOREIGN = "#!/bin/sh\necho other\n";
+  const scen = [
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit\n" }, hooks: {} },
+    { cfg: { hooksInstalledPolicy: "advisory" }, files: { "scripts/hooks.list": "pre-commit\n" }, hooks: {} },
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit\n" }, hooks: { "pre-commit": [KIT, 0o644] } },
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit\n" }, hooks: { "pre-commit": [FOREIGN, 0o755] } },
+    // 신선도 — 원본을 선언하고 사본을 낡게 만든다(제보 실측 형태: 빠진 5행이 게이트 호출 블록이었다)
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit scripts/src-pre-commit\n", "scripts/src-pre-commit": KIT },
+      hooks: { "pre-commit": [OLD, 0o755] } },
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit scripts/src-pre-commit\n", "scripts/src-pre-commit": KIT },
+      hooks: { "pre-commit": [KIT, 0o755] } },                                        // 신선함 → 통과
+    // 원본이 **선언됐는데 없다** → source-unreadable(통과가 아니다)
+    { cfg: { hooksInstalledPolicy: "hard" }, files: { "scripts/hooks.list": "pre-commit scripts/gone\n" }, hooks: { "pre-commit": [KIT, 0o755] } },
+    { cfg: { hooksInstalledPolicy: "off" }, files: { "scripts/hooks.list": "pre-commit\n" }, hooks: {} },
+    { cfg: { hooksInstalledPolicy: "hard" }, files: {}, hooks: {} },                   // hooks.list 없음 → INERT
+  ];
+  for (const [i, { cfg, files, hooks }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      execFileSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" });
+      const hd = join(root, ".git", "hooks");
+      mkdirSync(hd, { recursive: true });
+      for (const [name, [body, mode]] of Object.entries(hooks)) {
+        writeFileSync(join(hd, name), body);
+        chmodSync(join(hd, name), mode);
+      }
+      const n = runNode(root, "check-hooks-installed.mjs");
+      const py = runPy(root, ["hooksinstalled"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  // CI 생략 — **git은 훅을 복제하지 않는다.** 두 판이 같은 문장으로 "판정하지 않았다"를 말해야 한다.
+  const root = fixture({ "scripts/hooks.list": "pre-commit\n" }, { hooksInstalledPolicy: "hard" });
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" });
+    const n = runNode(root, "check-hooks-installed.mjs", [], { CI: "true" });
+    const py = runPy(root, ["hooksinstalled"], { CI: "true" });
+    assert.equal(py.out, n.out, "CI 생략 출력 불일치");
+    assert.equal(py.code, n.code, "CI 생략 exit 불일치");
+    assert.equal(n.code, 0, "CI에서 거짓 위반을 내면 사람이 게이트를 끈다");
+    assert.match(n.out, /판정하지 않았다\(통과가 아니다\)/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── 구현 중복 패리티(SPEC-038, R13) ──
+// 이 축도 여러 라운드 동안 **Node 전용**이었다. 양판 대응 선언을 기계화한 첫 실행이 지목했다
+// (`runtime-contract.test.mjs` ⑤) — 규범으로만 적힌 의무는 반드시 새어나간다.
+// @covers SPEC-006/FR-001
+// @covers SPEC-038/FR-001
+test("py duplicatelogic: 중복·면제(사유 없음 포함)·낡은 면제·통과·off·inert 바이트 동일", skip, () => {
+  const DUP = 'const a = /같은-규칙-리터럴-A/;\nconst b = /같은-규칙-리터럴-A/;\n';
+  const ONE = 'const a = /단-한-곳-리터럴/;\n';
+  const scen = [
+    { cfg: { duplicateLogicPolicy: "hard", duplicateLiteralFileRegex: ["\\.mjs$"] }, files: { "src/x.mjs": DUP } },
+    { cfg: { duplicateLogicPolicy: "advisory", duplicateLiteralFileRegex: ["\\.mjs$"] }, files: { "src/x.mjs": DUP } },
+    // 면제 — 사유가 있으면 통과하고 **clean일 때도 보인다**
+    { cfg: { duplicateLogicPolicy: "hard", duplicateLiteralFileRegex: ["\\.mjs$"], duplicateLogicAllow: { "같은-규칙-리터럴-A": "정당한 사유" } },
+      files: { "src/x.mjs": DUP } },
+    // 면제 사유 없음 → exit 1(무언의 면제 금지)
+    { cfg: { duplicateLogicPolicy: "advisory", duplicateLiteralFileRegex: ["\\.mjs$"], duplicateLogicAllow: { "같은-규칙-리터럴-A": "" } },
+      files: { "src/x.mjs": DUP } },
+    // 낡은 면제 — 더 이상 중복이 아니다
+    { cfg: { duplicateLogicPolicy: "advisory", duplicateLiteralFileRegex: ["\\.mjs$"], duplicateLogicAllow: { "단-한-곳-리터럴": "사유" } },
+      files: { "src/x.mjs": ONE } },
+    { cfg: { duplicateLogicPolicy: "hard", duplicateLiteralFileRegex: ["\\.mjs$"] }, files: { "src/x.mjs": ONE } },  // 통과
+    // 언어 미선언 + 안 본 확장자 → INERT(킷 기본 JS/TS에 기댄 부분 판정은 전수가 아니다)
+    { cfg: { duplicateLogicPolicy: "advisory" }, files: { "src/x.mjs": ONE, "src/y.py": "x = 1\n" } },
+    { cfg: { duplicateLogicPolicy: "advisory", duplicateLiteralFileRegex: ["\\.nope$"] }, files: { "src/x.mjs": ONE } },  // 대상 0개 → INERT
+    { cfg: { duplicateLogicPolicy: "off" }, files: { "src/x.mjs": DUP } },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-duplicate-logic.mjs");
+      const py = runPy(root, ["duplicatelogic"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });

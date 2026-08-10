@@ -85,6 +85,44 @@ const RULES = [
   { rule: "R21 진단 가드 선언(조사 전에 명세를 보는가)", gates: ["check-diagnosis-guard.mjs"] },
 ];
 
+// 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
+// 어디에도 적혀 있지 않았다 — 그래서 미러 누락이 **사람이 손으로 대조할 때만** 발견됐다.
+// 실측(2026-08-10): 그 대조를 처음 기계화하자 두 건이 즉시 나왔다 — R12 훅 배선과 R13 구현 중복이
+// 여러 라운드 동안 Node 전용이었고, Python 런타임 프로젝트에서 그 두 축은 **아무도 보지 않는
+// 상태**였다. 그 0건은 진짜 0건과 구분되지 않는다.
+//
+// 판정 게이트가 아닌 항목은 **사유를 적는다** — 빈 값은 "판정 게이트가 아니다"와 "잊었다"를
+// 구분하지 못하고, 구분되지 않는 빈칸은 항상 후자를 숨긴다.
+export const PY_SUBCOMMAND = Object.freeze({
+  "check-fr-coverage.mjs": "fr",
+  "check-converge-drift.mjs": "converge",
+  "check-orphan-surfaces.mjs": "orphan",
+  "check-spec-sync.mjs": "specsync",
+  "check-ownership.mjs": "ownership",
+  "check-spec-cohesion.mjs": "cohesion",
+  "check-spec-completeness.mjs": "completeness",
+  "check-spec-consistency.mjs": "consistency",
+  "check-test-run.mjs": "testrun",
+  "check-policy-ratchet.mjs": "ratchet",
+  "check-engine-event.mjs": "engineevent",
+  "check-evidence.mjs": "evidence",
+  "check-live-reality.mjs": "livereality",
+  "check-synonym.mjs": "synonym",
+  "check-sc-coverage.mjs": "sccoverage",
+  "check-hooks-installed.mjs": "hooksinstalled",
+  "check-duplicate-logic.mjs": "duplicatelogic",
+  "check-verification-executed.mjs": "verifyrun",
+  "check-intro-doc.mjs": "introdoc",
+  "check-process-ssot.mjs": "processssot",
+  "check-watchdog.mjs": "watchdog",
+  "check-import-wiring.mjs": "importwiring",
+  "check-agent-wiring.mjs": "agentwiring",
+  "check-spec-conflict.mjs": "specconflict",
+  "check-diagnosis-guard.mjs": "diagnosisguard",
+  "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
+});
+
+
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
 
 // 스택 프레임·런타임 배너·소스 에코 — 크래시 stderr의 **구조적 소음**이다. 내용이 아니라 형태로

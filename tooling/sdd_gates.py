@@ -6936,6 +6936,381 @@ def cmd_agentwiring(cfg):
         print(f"  ✓ 선언된 에이전트 훅 {len(decls)}종이 모두 배선돼 있고 지목된 스크립트가 실재한다 — 감시자가 에이전트를 본다.")
 
 
+# ── 구현 중복 (SPEC-038, R13) — Node판 duplicate-logic-lib.mjs + check-duplicate-logic.mjs 미러 ──
+# 판정 게이트는 양판 필수다(SPEC-006). 이 축이 Node에만 있던 동안 Python 런타임 프로젝트는
+# 구현 중복을 아무도 보지 않는 상태였고, 그 0건은 진짜 0건과 구분되지 않았다.
+# 대응 선언(`PY_SUBCOMMAND`)을 기계화한 첫 실행이 이 누락을 즉시 지목했다.
+DEFAULT_DUPLICATE_LITERAL_PATTERNS = [
+    r"(?<![\w$)\]])/((?:[^/\\\n\[]|\\.|\[(?:[^\]\\]|\\.)*\])+)/[gimsuyd]*",
+]
+DEFAULT_DUPLICATE_MIN_LENGTH = 8
+DEFAULT_DUPLICATE_FILE_REGEX = [r"\.(?:m|c)?[jt]sx?$"]
+
+_DUP_COMMENT_LINE = re.compile(r"^\s*(?://|#|\*)")
+_DUP_STRINGS = re.compile(r"\"[^\"\n]*\"|'[^'\n]*'|`[^`\n]*`")
+_DUP_TRAILING = re.compile(r"(^|[\s;{}(),])//.*$")
+
+
+def extract_literals(text, patterns=None, min_length=DEFAULT_DUPLICATE_MIN_LENGTH):
+    """텍스트 → [{literal, line}]. 주석·문자열을 먼저 지운다(파서 없이 오탐을 줄이는 핵심)."""
+    pats = patterns if patterns else DEFAULT_DUPLICATE_LITERAL_PATTERNS
+    out = []
+    for i, raw in enumerate(str(text or "").split("\n")):
+        if _DUP_COMMENT_LINE.search(raw):
+            continue
+        line = _DUP_STRINGS.sub('""', raw)
+        line = _DUP_TRAILING.sub(r"\1", line)
+        for pat in pats:
+            try:
+                rex = re.compile(pat)
+            except re.error:
+                continue
+            for m in rex.finditer(line):
+                lit = m.group(1) if m.lastindex else None
+                if not lit or len(lit) < min_length:
+                    continue
+                if lit.startswith("*") or lit.startswith("/"):
+                    continue
+                out.append({"literal": lit, "line": i + 1})
+    return out
+
+
+def duplicate_literal_findings(files, allow=None):
+    """반환 {findings, errors}. **같은 파일 안의 반복도 센다**(실측 사고가 그 형태였다)."""
+    allow = allow or {}
+    errors = []
+    for lit, reason in allow.items():
+        if not str(reason or "").strip():
+            errors.append(f'duplicateLogicAllow "{lit}" — 사유 필수(왜 이 중복이 정당한가; 빈 값은 무언의 면제다)')
+    bucket = {}
+    for f in (files or []):
+        for l in (f.get("literals") or []):
+            bucket.setdefault(l["literal"], []).append({"path": f["path"], "line": l["line"]})
+    findings = []
+    for lit in sorted(bucket):
+        sites = bucket[lit]
+        if len(sites) < 2 or lit in allow:
+            continue
+        findings.append({"literal": lit, "sites": sites, "files": len({s["path"] for s in sites})})
+    return {"findings": findings, "errors": errors}
+
+
+def stale_allow_entries(files, allow=None):
+    """더 이상 중복이 아닌 면제 — 등록부는 최신일 때만 등록부다."""
+    allow = allow or {}
+    seen = {}
+    for f in (files or []):
+        for l in (f.get("literals") or []):
+            seen[l["literal"]] = seen.get(l["literal"], 0) + 1
+    return sorted(lit for lit in allow if seen.get(lit, 0) < 2)
+
+
+def parse_duplicate_candidates(stdout):
+    """확률적 층 어댑터 stdout — `<경로>:<라인>\t<경로>:<라인>\t<설명>`."""
+    out = []
+    for raw in str(stdout or "").split("\n"):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        cells = [c.strip() for c in line.split("\t") if c.strip()]
+        if len(cells) < 2:
+            continue
+        out.append({"a": cells[0], "b": cells[1], "note": " ".join(cells[2:])})
+    return out
+
+
+def cmd_duplicatelogic(cfg):
+    policy = str(cfg.get("duplicateLogicPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ duplicateLogicPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "duplicateLogicPolicy")
+        print("구현 중복 게이트 — duplicateLogicPolicy:off (판정 안 함)")
+        return
+    hard = policy == "hard"
+    pats = cfg.get("duplicateLiteralPatterns") or DEFAULT_DUPLICATE_LITERAL_PATTERNS
+    min_len = int(cfg.get("duplicateLiteralMinLength") or 0) or DEFAULT_DUPLICATE_MIN_LENGTH
+    cap = int(cfg.get("duplicateLogicListCap") or 0) or 12
+    ignore = set(cfg.get("ignoreDirs") or [])
+    test_res = [re.compile(r) for r in (cfg.get("testFileRegex") or [])]
+    # ⚠ 킷 기본값은 **킷의 언어**(JS/TS)다 — 그 사실이 소비 프로젝트에서 조용한 0건이 된다.
+    declared = bool(cfg.get("duplicateLiteralFileRegex"))
+    file_res = [re.compile(r) for r in (cfg.get("duplicateLiteralFileRegex") or DEFAULT_DUPLICATE_FILE_REGEX)]
+
+    files, matched, skipped_ext = [], 0, {}
+    for d in (cfg.get("scanDirs") or []):
+        base = resolve(cfg, d)
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = sorted(n for n in dirnames if n not in ignore)
+            for name in sorted(filenames):
+                full = os.path.join(dirpath, name)
+                r = os.path.relpath(full, cfg["__root"]).replace(os.sep, "/")
+                if not any(rex.search(r) for rex in file_res):
+                    ext = os.path.splitext(name)[1]
+                    if ext:
+                        skipped_ext[ext] = skipped_ext.get(ext, 0) + 1
+                    continue
+                if not cfg.get("duplicateLogicIncludeTests") and any(rex.search(r) for rex in test_res):
+                    continue
+                matched += 1
+                try:
+                    with open(full, encoding="utf-8") as fh:
+                        text = fh.read()
+                except OSError:
+                    continue
+                lits = extract_literals(text, pats, min_len)
+                if lits:
+                    files.append({"path": r, "literals": lits})
+    files.sort(key=lambda f: f["path"])
+
+    allow = cfg.get("duplicateLogicAllow")
+    allow = allow if isinstance(allow, dict) else {}
+    res = duplicate_literal_findings(files, allow)
+    if res["errors"]:
+        print("✗ duplicateLogicAllow 오류:", file=sys.stderr)
+        for e in res["errors"]:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    findings = res["findings"]
+
+    # ② 확률적 층 — 주입 어댑터. 비-0 = skipped(사유). "판정 못 함"과 "중복 없음"을 섞지 않는다.
+    cand = {"status": "off", "items": [], "reason": ""}
+    cmd = str(cfg.get("duplicateLogicCommand") or "").strip()
+    if cmd:
+        try:
+            r = subprocess.run(cmd, shell=True, cwd=cfg["__root"], capture_output=True, text=True,
+                               timeout=(int(cfg.get("duplicateLogicTimeoutMs") or 120000) / 1000.0))
+            if r.returncode == 0:
+                cand = {"status": "ran", "items": parse_duplicate_candidates(r.stdout), "reason": ""}
+            else:
+                why = [x for x in str(r.stderr or "").strip().split("\n") if x]
+                cand = {"status": "skipped", "items": [], "reason": why[-1] if why else f"exit {r.returncode}"}
+        except Exception as exc:
+            why = [x for x in str(exc).strip().split("\n") if x]
+            cand = {"status": "skipped", "items": [], "reason": why[-1] if why else "실행 실패"}
+
+    lit_count = sum(len(f["literals"]) for f in files)
+    skipped_list = [f"{e}×{n}" for e, n in sorted(skipped_ext.items(), key=lambda kv: (-kv[1], kv[0]))]
+    if not matched:
+        verdict("INERT", "판정 대상 파일 0개 — duplicateLiteralFileRegex가 이 프로젝트의 소스와 맞지 않는다")
+    elif not declared and skipped_list:
+        verdict("INERT", f"언어 미선언 — 킷 기본(JS/TS) 패턴으로 {matched}개만 봤고 {' '.join(skipped_list)}는 보지 않았다"
+                         " · duplicateLiteralPatterns·duplicateLiteralFileRegex를 이 프로젝트 언어로 함께 선언하라")
+    else:
+        judged(len(findings))
+    extra = f" · 면제 {len(allow)}건" if allow else ""
+    print(f"구현 중복 게이트(duplicateLogicPolicy={policy}): 파일 {len(files)}개·리터럴 {lit_count}건(하한 {min_len}자) — 중복 {len(findings)}건{extra}")
+
+    tag = "✗" if hard else "⚠"
+    for f in findings[:cap]:
+        where = " · ".join(f'{s["path"]}:{s["line"]}' for s in f["sites"])
+        print(f'  {tag} 같은 규칙이 {len(f["sites"])}곳에 있다 — /{f["literal"]}/ → {where}')
+    if len(findings) > cap:
+        print(f"  {tag} … 외 {len(findings) - cap}건 (전체는 duplicateLogicListCap 상향 또는 게이트 단독 실행)")
+
+    # 면제는 clean일 때도 보인다 — 조용한 '완료'가 되지 않게.
+    if allow:
+        print(f'· 정당한 중복으로 면제 {len(allow)}건(부채·리뷰 대상): {", ".join("/" + l + "/" for l in allow)}')
+        stale = stale_allow_entries(files, allow)
+        if stale:
+            print(f'  ⚠ 낡은 면제 {len(stale)}건 — 더 이상 중복이 아니다(지워라): {", ".join("/" + l + "/" for l in stale)}')
+
+    # 확률적 층 — 비차단. 상태를 반드시 한 줄로 말한다(침묵은 근거가 아니다).
+    if cand["status"] == "off":
+        print("· 확률적 층: duplicateLogicCommand 미선언 — 구조 중복(같은 본문·다른 이름)은 판정하지 않았다(미판정, 위반 없음이 아니다)")
+    elif cand["status"] == "skipped":
+        print(f'· 확률적 층: skipped — {cand["reason"]}(도구 실패를 \'중복 없음\'으로 읽지 않는다)')
+    elif not cand["items"]:
+        print("· 확률적 층: 후보 0건")
+    else:
+        print(f'· 확률적 층 후보 {len(cand["items"])}건(비차단 — 확률적 판정에는 차단력을 주지 않는다):')
+        for c in cand["items"][:cap]:
+            note = f' — {c["note"]}' if c["note"] else ""
+            print(f'    ⚠ {c["a"]} ↔ {c["b"]}{note}')
+
+    if findings and hard:
+        print("\n✗ duplicateLogicPolicy=hard: 같은 규칙이 두 곳에 구현돼 있다 — 하나로 통합하고 나머지는 그것을 호출하라.", file=sys.stderr)
+        print("  · 정말 무관한 중복이면 duplicateLogicAllow에 **사유와 함께** 등록하라(면제는 부채로 매 실행 표면화된다).", file=sys.stderr)
+        print("  · 실측 계기: 병렬 작업자들이 격리 지시를 성실히 따르며 각자 헬퍼를 만들어 같은 규칙이 세 갈래로 갈렸다 — 게이트 4종 전부 green이었다.", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print("구현 중복 게이트: OK — 결정적 층에서 중복 리터럴 0건.")
+
+
+# ── 훅 배선 실재 (SPEC-036, R12) — Node판 hooks-install-lib.mjs + check-hooks-installed.mjs 미러 ──
+# 판정 게이트는 양판 필수다(SPEC-006). 이 축이 Node에만 있던 동안 Python 런타임 프로젝트는
+# **훅 배선을 아무도 보지 않는 상태**였고, 그 0건은 진짜 0건과 구분되지 않았다.
+SDD_HOOK_MARKER = "sdd-managed-hook"
+
+
+def parse_hook_entries(text):
+    """hooks.list 한 줄 → {name, source}. `source`는 미선언이면 None."""
+    out = []
+    for raw in str(text or "").split("\n"):
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        name = parts[0]
+        source = parts[1] if len(parts) > 1 else None
+        if any(e["name"] == name for e in out):
+            continue
+        out.append({"name": name, "source": source})
+    return out
+
+
+def parse_hook_list(text):
+    return [e["name"] for e in parse_hook_entries(text)]
+
+
+def hook_findings(expected, installed):
+    """반환 findings[] — kind: missing | not-executable | foreign | stale | source-unreadable.
+
+    `source`의 세 상태를 **구분한다**: 키 없음(미선언, 판정 안 함) / None(읽기 실패,
+    확인 못 함) / 문자열(대조). 셋을 합치면 이 축이 다시 거짓 green을 만든다."""
+    findings = []
+    for name in (expected or []):
+        h = (installed or {}).get(name)
+        if not h or not h.get("exists"):
+            findings.append({"kind": "missing", "name": name})
+            continue
+        if not h.get("executable"):
+            findings.append({"kind": "not-executable", "name": name})
+            continue
+        if SDD_HOOK_MARKER not in str(h.get("content") or ""):
+            findings.append({"kind": "foreign", "name": name})
+            continue
+        if "source" not in h:
+            continue
+        if h["source"] is None:
+            findings.append({"kind": "source-unreadable", "name": name})
+            continue
+        if str(h["content"]) != str(h["source"]):
+            findings.append({"kind": "stale", "name": name})
+    return findings
+
+
+HOOK_FINDING_TEXT = {
+    "missing": "설치되지 않았다 — 이 훅이 부르기로 된 게이트는 한 번도 발동하지 않는다",
+    "not-executable": "실행 권한이 없다 — git이 조용히 건너뛴다",
+    "foreign": "킷 훅이 아니다(마커 없음) — 남의 훅이 그 이름을 점유했고 결과는 미설치와 같다",
+    "stale": "설치본이 원본과 다르다(**낡은 사본**) — 원본에 배선된 게이트 호출이 이 사본에는 없을 수 있다."
+             " 미설치와 동급이다: 실측 제보에서 누락된 5행이 게이트 호출 블록 전체였고, hard 정책이 한 번도 발동하지 못했다",
+    "source-unreadable": "원본을 읽지 못해 신선도를 **확인하지 못했다** — 통과가 아니다(검사 못 함과 통과는 다른 사실이다)",
+}
+
+_INSTALL_HINT = " 설치: sh scripts/sdd-hooks-install.sh (킷: sh tooling/harness/self-hooks-install.sh)"
+
+
+def cmd_hooksinstalled(cfg):
+    policy = str(cfg.get("hooksInstalledPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ hooksInstalledPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "hooksInstalledPolicy")
+        print("훅 배선 게이트 — hooksInstalledPolicy:off (판정 안 함)")
+        return
+    hard = policy == "hard"
+    root = cfg["__root"]
+
+    # **git은 훅을 복제하지 않는다** — 갓 체크아웃한 작업본에 훅이 없는 것은 미채택의 증거가 아니다.
+    # CI에서 거짓 위반을 내면 hard 프로젝트 빌드가 깨지고, 그 다음은 정해져 있다 — 사람이 게이트를 끈다.
+    # 강제가 사라지지도 않는다: CI에서 채택의 관측 가능한 대리물은 채택 영수증이고 R17이 판정한다.
+    for key in (cfg.get("hooksInstalledSkipEnv") or ["CI"]):
+        val = str(os.environ.get(str(key)) or "").strip()
+        if val and val != "false":
+            verdict("SKIPPED", f"{key} 환경 — git은 훅을 복제하지 않으므로 갓 체크아웃한 작업본에서 훅 설치는 관측되지 않는다")
+            print(f"훅 배선 게이트 — {key} 환경이라 **판정하지 않았다(통과가 아니다)**."
+                  " git은 훅을 복제하지 않으므로 체크아웃 직후에 훅이 없는 것은 미채택의 증거가 아니다."
+                  " 이 축은 **로컬 채택 축**이고, CI에서 채택의 관측 가능한 대리물은 채택 영수증이다 — R17(감시자 실재)이 그것을 판정한다.")
+            return
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    list_path = None
+    for cand in [os.path.join(root, "scripts", "hooks.list"),
+                 os.path.join(root, "tooling", "harness", "hooks.list"),
+                 os.path.join(here, "harness", "hooks.list")]:
+        if os.path.exists(cand):
+            list_path = cand
+            break
+    if not list_path:
+        verdict("INERT", "hooks.list 없음 — 어떤 훅이 있어야 하는지 선언이 없다")
+        print("훅 배선 게이트 — hooks.list 없음(판정 대상 미선언, no-op)")
+        return
+    with open(list_path, encoding="utf-8") as fh:
+        entries = parse_hook_entries(fh.read())
+    expected = [e["name"] for e in entries]
+    source_of = {e["name"]: e["source"] for e in entries}
+
+    if _git(cfg, ["rev-parse", "--git-dir"]) is None:
+        verdict("INERT", "git 저장소 아님 — 훅이 설치될 자리가 없다")
+        print("훅 배선 게이트 — git 저장소 아님(no-op)")
+        return
+    # 훅 디렉토리는 **git에게 묻는다** — `--git-dir` + `core.hooksPath`를 손으로 합치면
+    # 워크트리에서 훅 없는 전용 디렉토리를 얻어 "미설치"라는 거짓 판정이 된다(SPEC-036 실측).
+    hooks_path = _git(cfg, ["rev-parse", "--git-path", "hooks"])
+    if hooks_path is None or not hooks_path.strip():
+        verdict("INERT", "훅 경로를 git에게서 얻지 못했다 — 판정할 자리를 모른다")
+        print("훅 배선 게이트 — `git rev-parse --git-path hooks` 실패(판정 안 함)")
+        return
+    hooks_path = hooks_path.strip()
+    hooks_dir = hooks_path if os.path.isabs(hooks_path) else os.path.join(root, hooks_path)
+
+    try:
+        present = os.listdir(hooks_dir)
+    except OSError:
+        present = []
+    installed = {}
+    for name in expected:
+        pth = os.path.join(hooks_dir, name)
+        exists = name in present and os.path.exists(pth)
+        executable, content = False, ""
+        if exists:
+            executable = os.access(pth, os.X_OK)
+            try:
+                with open(pth, encoding="utf-8") as fh:
+                    content = fh.read()
+            except OSError:
+                content = ""
+        rec = {"exists": exists, "executable": executable, "content": content}
+        src = source_of.get(name)
+        if src:
+            sp = src if os.path.isabs(src) else os.path.join(root, *str(src).split("/"))
+            try:
+                with open(sp, encoding="utf-8") as fh:
+                    rec["source"] = fh.read()
+            except OSError:
+                rec["source"] = None      # 읽기 실패 — 코어가 "확인 못 함"으로 계상한다
+        installed[name] = rec
+
+    findings = hook_findings(expected, installed)
+    rel = hooks_dir.replace(root + "/", "")
+    judged(len(findings))
+    print(f"훅 배선 게이트(hooksInstalledPolicy={policy}): 선언 {len(expected)}종 · 설치 {len(expected) - len(findings)}종 — {rel}")
+    tag = "✗" if hard else "⚠"
+    for f in findings:
+        hint = _INSTALL_HINT if f["kind"] in ("missing", "stale") else ""
+        print(f'  {tag} {f["name"]}: {HOOK_FINDING_TEXT[f["kind"]]}{hint}')
+    # 신선도를 판정하지 **않은** 훅을 매 실행 밝힌다 — 안 본 것을 조용히 초록에 합산하지 않는다.
+    flagged = {f["name"] for f in findings}
+    unjudged = [n for n in expected if not source_of.get(n) and n not in flagged]
+    if unjudged:
+        print(f'  · 신선도 미판정 {len(unjudged)}종({", ".join(unjudged)}) — hooks.list에 원본 경로가 선언되지 않았다.'
+              " 존재·실행권한·킷 마커는 판정했고 **내용 신선도는 보지 않았다**(낡은 사본은 미설치와 동급이다 — 원본 경로를 선언하면 대조한다).")
+    if findings and hard:
+        print(f"\n✗ hooksInstalledPolicy=hard: 훅 {len(findings)}종이 배선되지 않았다 — 게이트 스크립트가 있어도 발동하지 않으므로 이 상태의 green은 거짓이다.",
+              file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        fresh = len(expected) - len(unjudged)
+        extra = f" (그중 {fresh}종은 원본과 내용 일치까지 확인)" if fresh else ""
+        print(f"훅 배선 게이트: OK — 선언된 훅이 모두 설치·실행 가능하며 킷 훅이다{extra}.")
+
+
 def cmd_importwiring(cfg):
     policy = str(cfg.get("importWiringPolicy") or "advisory")
     if policy not in ("off", "advisory", "hard"):
@@ -7203,6 +7578,10 @@ def main():
         cmd_processssot(cfg)
     elif sub == "watchdog":
         cmd_watchdog(cfg)
+    elif sub == "duplicatelogic":
+        cmd_duplicatelogic(cfg)
+    elif sub == "hooksinstalled":
+        cmd_hooksinstalled(cfg)
     elif sub == "importwiring":
         cmd_importwiring(cfg)
     elif sub == "agentwiring":
