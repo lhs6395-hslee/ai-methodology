@@ -145,6 +145,13 @@ DEFAULTS = {
     # 면제 등록부·면제 knob 목록(SPEC-027 확장) — 미등록 면제는 위반, 개수는 래칫된다.
     "exemptionRegistry": {},
     "exemptionKnobs": None,
+    # 명세 자기모순 감사(SPEC-052) — 감사의 결정적 절반.
+    "specConflictPolicy": "advisory",
+    "specConflictMinTokens": None,
+    "specConflictMaxDocFreq": None,
+    "specConflictStopwords": None,
+    "specConflictNegationMarkers": None,
+    "specConflictClauseBreaks": None,
     "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
@@ -6274,6 +6281,178 @@ def merge_hook_settings(existing, decls, command_for):
     return merged
 
 
+# ── 명세 자기모순 감사 (SPEC-052, R20) — Node판 spec-conflict-lib.mjs 미러 ─────
+# 오너 지시: "명세가 충돌되는 것도 없도록 — spec 1은 A를 해라, spec 2는 A를 하지 말아라.
+# 애초에 이런 구멍도 없어야 한다." 같은 대상에 SHALL과 SHALL NOT이 공존하면 급할 때 에이전트는
+# 자기가 먼저 본 쪽을 따른다(실측: 오너가 여러 세션에 걸쳐 금지한 경로가 재발했다).
+DEFAULT_NEGATION_MARKERS = ["NOT", "NEVER"]
+DEFAULT_CLAUSE_BREAKS = [";", "WHERE", "WHEN", "WHILE", "IF", "THEN", " so that "]
+DEFAULT_CONFLICT_STOPWORDS = [
+    "a", "an", "the", "its", "their", "that", "this", "those", "these", "of", "to", "for", "in", "on", "at", "by",
+    "with", "and", "or", "not", "be", "is", "are", "as", "so", "it", "they", "them", "from", "into", "than",
+    "then", "when", "if", "while", "where", "only", "rather",
+]
+DEFAULT_CONFLICT_MIN_TOKENS = 2
+DEFAULT_CONFLICT_MAX_DOC_FREQ = 3
+
+
+def line_directives(line, negation_markers=None, clause_breaks=None):
+    negs = "|".join(re.escape(m) for m in (negation_markers or DEFAULT_NEGATION_MARKERS))
+    src = str(line or "")
+    marks = [(m.start(), len(m.group(0)), bool(m.group(1)))
+             for m in re.finditer(r"\bSHALL(\s+(?:%s))?\b" % negs, src)]
+    breaks = clause_breaks or DEFAULT_CLAUSE_BREAKS
+    brk = "|".join((r"\b%s\b" % re.escape(b)) if re.fullmatch(r"[A-Z]+", b) else re.escape(b) for b in breaks)
+    out = []
+    for i, (at, ln, neg) in enumerate(marks):
+        frm = at + ln
+        to = marks[i + 1][0] if i + 1 < len(marks) else len(src)
+        out.append({"neg": neg, "predicate": re.split(brk, src[frm:to])[0]})
+    return out
+
+
+def predicate_tokens(predicate, stopwords=None):
+    stop = set(str(w).lower() for w in (stopwords or DEFAULT_CONFLICT_STOPWORDS))
+    t = str(predicate or "").lower().replace("`", "").replace("**", "")
+    t = re.sub(r"[^\w\s-]", " ", t, flags=re.UNICODE)
+    out = set()
+    for w in t.split():
+        w = re.sub(r"'s$", "", w)
+        w = re.sub(r"s$", "", w)
+        if w and w not in stop:
+            out.add(w)
+    return out
+
+
+def collect_directives(specs, is_decl_line, opts=None):
+    opts = opts or {}
+    min_tokens = opts.get("minTokens") or DEFAULT_CONFLICT_MIN_TOKENS
+    out = []
+    for sp in specs or []:
+        for line in str(sp.get("text") or "").split("\n"):
+            if not is_decl_line(line):
+                continue
+            for d in line_directives(line, opts.get("negationMarkers"), opts.get("clauseBreaks")):
+                toks = predicate_tokens(d["predicate"], opts.get("stopwords"))
+                if len(toks) < min_tokens:
+                    continue
+                out.append({"specId": sp["id"], "file": sp.get("file"), "neg": d["neg"],
+                            "predicate": d["predicate"].strip(), "tokens": toks})
+    return out
+
+
+def doc_frequency(directives):
+    df = {}
+    for d in directives or []:
+        for t in d["tokens"]:
+            df.setdefault(t, set()).add(d["specId"])
+    return df
+
+
+def spec_conflicts(directives, opts=None):
+    opts = opts or {}
+    max_df = opts.get("maxDocFreq") or DEFAULT_CONFLICT_MAX_DOC_FREQ
+    df = doc_frequency(directives)
+    lst = directives or []
+    conflicts, same_spec = [], []
+    for i in range(len(lst)):
+        for j in range(i + 1, len(lst)):
+            a, b = lst[i], lst[j]
+            if a["neg"] == b["neg"]:
+                continue
+            if not (a["tokens"] <= b["tokens"] or b["tokens"] <= a["tokens"]):
+                continue
+            shared = a["tokens"] if len(a["tokens"]) <= len(b["tokens"]) else b["tokens"]
+            if not any(len(df.get(t, set())) <= max_df for t in shared):
+                continue
+            pair = {"positive": b if a["neg"] else a, "negative": a if a["neg"] else b,
+                    "shared": sorted(shared)}
+            (same_spec if a["specId"] == b["specId"] else conflicts).append(pair)
+    return {"conflicts": conflicts, "sameSpec": same_spec, "directives": len(lst)}
+
+
+def format_conflict(pair):
+    p, n = pair["positive"], pair["negative"]
+    return [
+        f'{p["specId"]} {"SHALL NOT" if p["neg"] else "SHALL"} {p["predicate"]}',
+        f'{n["specId"]} {"SHALL NOT" if n["neg"] else "SHALL"} {n["predicate"]}',
+        f'공유 대상: {" · ".join(pair["shared"])} — 어느 쪽이 정본인지 결정해 한쪽을 고쳐라(게이트는 정하지 않는다)',
+    ]
+
+
+def cmd_specconflict(cfg):
+    policy = str(cfg.get("specConflictPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ specConflictPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "specConflictPolicy")
+        print("명세 모순 감사 게이트 — specConflictPolicy:off (판정 안 함)")
+        return
+    spec_dir = resolve(cfg, cfg["specDir"])
+    try:
+        names = sorted(n for n in os.listdir(spec_dir) if n.endswith(".md"))
+    except OSError:
+        names = []
+    if not names:
+        verdict("INERT", "스펙 0건 — 대조할 코퍼스가 없다")
+        print("[안 봄(판정 입력 없음)] 명세 모순 감사 게이트 — 스펙이 0건이다"
+              " — **0건은 '깨끗함'이 아니라 '볼 것이 없음'이다**.")
+        return
+    specs = []
+    for n in names:
+        try:
+            text = read_text(os.path.join(spec_dir, n))
+        except OSError:
+            continue
+        m = cfg["__specId"].search(text)
+        specs.append({"id": m.group(0) if m else n[:-3], "file": f'{cfg["specDir"]}/{n}', "text": text})
+    req_alt = cfg.get("__reqAlt") or "FR"
+    opts = {
+        "minTokens": cfg.get("specConflictMinTokens"),
+        "maxDocFreq": cfg.get("specConflictMaxDocFreq"),
+        "stopwords": cfg.get("specConflictStopwords"),
+        "negationMarkers": cfg.get("specConflictNegationMarkers"),
+        "clauseBreaks": cfg.get("specConflictClauseBreaks"),
+    }
+    directives = collect_directives(specs, lambda l: _is_fr_decl_line(l, req_alt), opts)
+    if not directives:
+        verdict("INERT", "SHALL 지시 0건 — EARS 문법이 없어 극성을 판정할 수 없다")
+        print(f"[안 봄(판정 입력 없음)] 명세 모순 감사 게이트 — 스펙 {len(specs)}건에서 SHALL 지시를 찾지 못했다."
+              " 이 축은 EARS 극성(SHALL ↔ SHALL NOT)으로 판정하므로 그 문법이 없으면 **판정하지 않는다**"
+              "(어휘가 다르면 `specConflictNegationMarkers`를 갈아끼워라 — 면제가 아니라 어휘 교체다).")
+        return
+    res = spec_conflicts(directives, opts)
+    conflicts, same_spec = res["conflicts"], res["sameSpec"]
+    total = len(conflicts) + len(same_spec)
+    judged(total if policy == "hard" else 0)
+    print(f"명세 모순 감사 게이트(specConflictPolicy={policy}): 스펙 {len(specs)}건 · 지시 {len(directives)}건 대조"
+          f" — 교차 스펙 모순 {len(conflicts)} · 한 스펙 내 모순 {len(same_spec)}")
+    tag = "✗" if policy == "hard" else "⚠"
+    if total:
+        if policy == "hard":
+            print(f"\n✗ 명세가 스스로와 모순이다 {total}건 — 급할 때 에이전트는 자기가 먼저 본 쪽을 따른다:",
+                  file=sys.stderr)
+        def emit(line):
+            print(line, file=sys.stderr) if policy == "hard" else print(line)
+        for label, pairs in (("한 스펙 내", same_spec), ("교차 스펙", conflicts)):
+            for pr in pairs:
+                a, b, why = format_conflict(pr)
+                emit(f"  {tag} [{label}] {a}")
+                emit(f'     {" " * 11}{b}')
+                emit(f"     → {why}")
+        if policy == "hard":
+            print("\n→ 해소는 **어느 지시가 정본인지 결정해 한쪽을 고치는 것**뿐이다(면제 경로 없음)."
+                  " 실측: 명세 안에 반대 방향 지시가 공존한 탓에 소유자가 여러 세션에 걸쳐 금지한 경로가 재발했다.",
+                  file=sys.stderr)
+            sys.exit(1)
+        return
+    print("  ✓ 상반된 지시 0건 — 같은 대상에 SHALL과 SHALL NOT이 공존하지 않는다.")
+    print("  · 이 축은 감사의 **결정적 절반**이다 — \"같은 기능에 1은 A, 2는 B\" 같은 의미 충돌은"
+          " 확률적 판정이라 차단력을 주지 않는다(그 층은 쌍을 전수 열거해 사람·LLM이 판정한다).")
+
+
 def cmd_agentwiring(cfg):
     root = cfg["__root"]
     policy = str(cfg.get("agentWiringPolicy") or "advisory")
@@ -6588,6 +6767,8 @@ def main():
         cmd_importwiring(cfg)
     elif sub == "agentwiring":
         cmd_agentwiring(cfg)
+    elif sub == "specconflict":
+        cmd_specconflict(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

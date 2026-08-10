@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 52건
+## Entity 키 (aggregate root) — 53건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -67,6 +67,7 @@
 | `sc-coverage` | SPEC-034 | ✓ | ✓ | ✓ |
 | `semantic-drift` | SPEC-019 | ✓ | ✓ | ✓ |
 | `smoke-scan` | SPEC-010 | ✓ | ✓ | ✓ |
+| `spec-conflict` | SPEC-052 | ✓ | ✓ | ✓ |
 | `spec-grammar-hardening` | SPEC-013 | ✓ | ✓ | ✓ |
 | `spec-id-numbering` | SPEC-014 | ✓ | ✓ | ✓ |
 | `spec-lifecycle` | SPEC-008 | ✓ | ✓ | ✓ |
@@ -81,7 +82,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 96건
+## Surface 키 — 98건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -113,6 +114,7 @@
 | `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
 | `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-spec-completeness.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-spec-conflict.mjs` | SPEC-052 | ✓ | ✓ | ✓ |
 | `check-spec-consistency.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-spec-sync.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-synonym.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
@@ -173,6 +175,7 @@
 | `sdd-start.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
 | `sdd-sync.mjs` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
+| `spec-conflict-lib.mjs` | SPEC-052 | ✓ | ✓ | ✓ |
 | `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `synonym-lib.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
 | `term-coverage-lib.mjs` | SPEC-042 | ✓ | ✓ | ✓ |
@@ -182,7 +185,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 54건
+## Capability 키 — 55건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -226,6 +229,7 @@
 | `sc-coverage.account` | SPEC-034 | ✓ | ✓ | ✓ |
 | `semantic-drift.judge` | SPEC-019 | ✓ | ✓ | ✓ |
 | `smoke-scan.scan` | SPEC-010 | ✓ | ✓ | ✓ |
+| `spec-conflict.audit` | SPEC-052 | ✓ | ✓ | ✓ |
 | `spec-grammar-hardening.judge` | SPEC-013 | ✓ | ✓ | ✓ |
 | `spec-id-numbering.judge` | SPEC-014 | ✓ | ✓ | ✓ |
 | `spec-lifecycle.judge` | SPEC-008 | ✓ | ✓ | ✓ |
@@ -266,7 +270,7 @@
 
 ## 집계
 
-- 소유 키 총 **220건** (entity 52 · surface 96 · capability 54 · 역할없음 18)
+- 소유 키 총 **224건** (entity 53 · surface 98 · capability 55 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **1건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

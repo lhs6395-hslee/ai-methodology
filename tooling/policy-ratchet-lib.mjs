@@ -52,6 +52,7 @@ export const RATCHETED_POLICIES = [
   "watchdogPolicy",
   "importWiringPolicy",
   "agentWiringPolicy",
+  "specConflictPolicy",
   "liveRealityCoveragePolicy",
 ];
 

@@ -12,6 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { stripFullLineComments } from "../external-target-lib.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -85,8 +86,11 @@ test("수치 임계 래칫: 상향=완화(위반) · 하향=강화(통과) · �
 
 // 캡을 읽는 게이트가 늘어날 때 래칫 등록을 잊는 것이 이 구멍의 재발 경로다.
 test("수치 래칫 전수성: 코드가 읽는 max* 임계는 모두 래칫 감시 안에 있어야 한다", () => {
+  // 주석은 판정 대상이 아니다 — 킷의 주석 제거기를 재사용한다(SPEC-044).
+  // 실측: 새 knob을 설명하는 주석에 내부 opts 키(`maxDocFreq`)를 적었더니 이 테스트가 그것을
+  // config 임계로 오인했다. 주석 속 이름은 인용이지 선언이 아니다.
   const srcs = ["../check-spec-cohesion.mjs", "../sdd-config.mjs"]
-    .map((f) => readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");
+    .map((f) => stripFullLineComments(readFileSync(new URL(f, import.meta.url), "utf8"))).join("\n");
   const used = [...new Set([...srcs.matchAll(/\bmax[A-Z][A-Za-z]*\b/g)].map((m) => m[0]))];
   const unwatched = used.filter((k) => !RATCHETED_LIMITS.includes(k));
   assert.deepEqual(unwatched, [],

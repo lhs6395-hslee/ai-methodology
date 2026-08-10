@@ -1502,3 +1502,51 @@ test("py agentwiring: 설정 부재·미배선·매처 좁음·스크립트 부�
   }
   console.log("AGENTWIRING PARITY OK");
 });
+
+// ── 명세 모순 감사 패리티(SPEC-052) ──
+test("py specconflict: 교차 모순·한 스펙 내 모순·흔한 술어·통과·advisory·off·inert 바이트 동일", skip, () => {
+  const FR = (body) => `**Spec**: \`SPEC-9XX\`\n## Functional Requirements\n${body}`;
+  const common = {};
+  for (let i = 0; i < 6; i++) common[`SPEC-${910 + i}`] = FR(`- **FR-001** THE SYSTEM SHALL report a violation.\n`);
+  common["SPEC-950"] = FR("- **FR-001** THE SYSTEM SHALL NOT report a violation.\n");
+  const scen = [
+    // ① 제보의 형태 — 교차 스펙 상반
+    { cfg: { specConflictPolicy: "hard" }, specs: {
+      "SPEC-900": FR("- **FR-001** THE SYSTEM SHALL use ArgoCD for deployment synchronisation.\n"),
+      "SPEC-901": FR("- **FR-001** THE SYSTEM SHALL NOT use ArgoCD for deployment synchronisation.\n") } },
+    // ② 짧은 술어(포함 관계)
+    { cfg: { specConflictPolicy: "hard" }, specs: {
+      "SPEC-900": FR("- **FR-001** THE SYSTEM SHALL use ArgoCD for deployment synchronisation.\n"),
+      "SPEC-903": FR("- **FR-001** THE SYSTEM SHALL NOT use ArgoCD.\n") } },
+    // ③ 한 스펙 내 모순
+    { cfg: { specConflictPolicy: "hard" }, specs: {
+      "SPEC-900": FR("- **FR-001** THE SYSTEM SHALL use ArgoCD for sync.\n- **FR-002** THE SYSTEM SHALL NOT use ArgoCD for sync.\n") } },
+    // ④ 다른 목적어 — 모순 아님
+    { cfg: { specConflictPolicy: "hard" }, specs: {
+      "SPEC-900": FR("- **FR-001** THE SYSTEM SHALL block the commit and SHALL NOT block the push.\n") } },
+    // ⑤ 흔한 술어 — 희귀 토큰 없음 → 후보 아님
+    { cfg: { specConflictPolicy: "hard" }, specs: common },
+    // ⑥ advisory 비차단
+    { cfg: { specConflictPolicy: "advisory" }, specs: {
+      "SPEC-900": FR("- **FR-001** THE SYSTEM SHALL use ArgoCD for sync.\n"),
+      "SPEC-901": FR("- **FR-001** THE SYSTEM SHALL NOT use ArgoCD for sync.\n") } },
+    { cfg: { specConflictPolicy: "off" }, specs: {} },
+    // ⑦ SHALL 0건 → INERT
+    { cfg: { specConflictPolicy: "hard" }, specs: { "SPEC-900": FR("- **FR-001** 이 시스템은 항목을 만든다.\n") } },
+    // ⑧ 스펙 0건 → INERT
+    { cfg: { specConflictPolicy: "hard" }, specs: {} },
+    // ⑨ 값 위반
+    { cfg: { specConflictPolicy: "loose" }, specs: {} },
+  ];
+  for (const [i, sc] of scen.entries()) {
+    const root = fixture({}, sc.cfg);
+    try {
+      for (const [name, body] of Object.entries(sc.specs)) writeFileSync(join(root, "sdd", "specs", `${name}.md`), body);
+      const n = runNode(root, "check-spec-conflict.mjs");
+      const py = runPy(root, ["specconflict"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  console.log("SPECCONFLICT PARITY OK");
+});

@@ -207,6 +207,20 @@ export const DEFAULTS = {
   // 면제 knob 목록. null이면 이름 규약(`Exempt`·`Exception`)으로 **자동 탐지** —
   // 손 목록을 두면 새 면제 knob이 감시 밖에서 태어난다(강도 래칫이 이미 겪은 드리프트).
   exemptionKnobs: null,
+
+  // 명세 자기모순 감사(SPEC-052) — **감사의 결정적 절반.** 같은 대상에 SHALL과 SHALL NOT이
+  // 공존하면 급할 때 에이전트는 자기가 먼저 본 쪽을 따른다(실측: 오너가 여러 세션에 걸쳐 금지한
+  // 경로가 재발했다 — 명세 안에 반대 방향 지시가 함께 있었기 때문이다).
+  specConflictPolicy: "advisory",
+  // 판정 파라미터. null이면 킷 기본 — 도입 전 킷 코퍼스(지시 441건)로 오탐 0을 측정한 값이다.
+  //   MinTokens  최소 내용 토큰(1토큰 술어끼리의 겹침은 신호가 아니다)
+  //   MaxDocFreq 희귀 토큰 기준(이 수 이하의 스펙에만 나오는 토큰이 구별력을 갖는다)
+  //              — 흔한 술어("report a violation")를 어휘 목록 없이 통계로 가른다
+  specConflictMinTokens: null,
+  specConflictMaxDocFreq: null,
+  specConflictStopwords: null,
+  specConflictNegationMarkers: null,
+  specConflictClauseBreaks: null,
   sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.
