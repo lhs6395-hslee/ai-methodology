@@ -79,6 +79,7 @@ spec ID 접두어(`specIdPrefixes`)와 요구 ID 접두어(`requirementIdPrefixe
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | Python 미러 — 순차 프로세스 SSOT 코어 6종 + `cmd_processssot` + 하드코딩 제거 knob 4종 반영, 패리티 테스트 8시나리오 | 판정 게이트는 양판 필수. 미선언 inert·SSOT 부재·빠진 단계·조각 보유·저장소 미선언/미소유·통과·config 문법·off 각 갈래를 바이트 동일로 고정. ⚠ 이 라운드에서 Python 치환이 이스케이프 때문에 **조용히 안 먹은** 사례가 있었고 패리티 테스트가 그것을 잡았다 — 미러는 눈으로 확인하지 않고 테스트로 확인한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | Python 미러 — 증거 등급 method 인정(`DEFAULT_BROWSER_GRADE_METHODS`·`DEFAULT_DEPLOY_GRADE_METHODS` + `evidence_findings` 인자 2종) | 판정 게이트는 양판 필수. evidence·ownership·sccoverage 세 게이트 출력이 바이트 동일함을 확인 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | Python 미러 — 지목 구현체 참조 코어(`named_implementations`·`reference_count`·`impl_reference_findings`·`REFERENCE_BAR`) + `fr` 게이트 R1e 배선, 패리티 테스트 6시나리오 | 판정 게이트는 양판 필수 — 한쪽에만 있으면 Python 사이트에서 R1e가 조용히 사라진다. 고아·전무·통과·커버 미언급·hard 차단·off 각 갈래를 바이트 동일로 고정 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | Python 미러 — 소개 문서 동기 코어(`rule_ids_of`·`missing_rule_ids`·`cited_counts`·`count_mismatches`·`companion_missing`) + `cmd_introdoc` + `is_spec_md_name` 정본화, 패리티 테스트 7시나리오 | 판정 게이트는 양판 필수 — 한쪽에만 있으면 Python 사이트에서 R15가 조용히 사라진다. 미선언 inert·규칙 누락(hard/advisory)·인용 불일치·미지원 키·문서 부재·규칙표 부재·off 각 갈래를 바이트 동일로 고정 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |

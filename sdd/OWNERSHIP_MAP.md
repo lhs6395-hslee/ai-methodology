@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 47건
+## Entity 키 (aggregate root) — 48건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -57,6 +57,7 @@
 | `ownership-reality` | SPEC-029 | ✓ | ✓ | ✓ |
 | `policy-ratchet` | SPEC-027 | ✓ | ✓ | ✓ |
 | `prefix-class-consistency` | SPEC-012 | ✓ | ✓ | ✓ |
+| `process-ssot` | SPEC-047 | ✓ | ✓ | ✓ |
 | `retag` | SPEC-011 | ✓ | ✓ | ✓ |
 | `runtime-parity` | SPEC-006 | ✓ | ✓ | ✓ |
 | `runtime-schema-drift` | SPEC-022 | ✓ | ✓ | ✓ |
@@ -76,7 +77,7 @@
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 86건
+## Surface 키 — 88건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -98,6 +99,7 @@
 | `check-ownership.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
 | `check-pre-edit.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
+| `check-process-ssot.mjs` | SPEC-047 | ✓ | ✓ | ✓ |
 | `check-sc-coverage.mjs` | SPEC-034 | ✓ | ✓ | ✓ |
 | `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
 | `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -137,6 +139,7 @@
 | `pre-commit` | SPEC-004 | ✓ | ✓ | ✓ |
 | `pre-push` | SPEC-004 | ✓ | ✓ | ✓ |
 | `prefix-class-lib.mjs` | SPEC-012 | ✓ | ✓ | ✓ |
+| `process-ssot-lib.mjs` | SPEC-047 | ✓ | ✓ | ✓ |
 | `relation-lib.mjs` | SPEC-017 | ✓ | ✓ | ✓ |
 | `retire-lib.mjs` | SPEC-018 | ✓ | ✓ | ✓ |
 | `sc-coverage-lib.mjs` | SPEC-034 | ✓ | ✓ | ✓ |
@@ -167,7 +170,7 @@
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 49건
+## Capability 키 — 50건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -201,6 +204,7 @@
 | `ownership-reality.judge` | SPEC-029 | ✓ | ✓ | ✓ |
 | `policy-ratchet.judge` | SPEC-027 | ✓ | ✓ | ✓ |
 | `prefix-class-consistency.judge` | SPEC-012 | ✓ | ✓ | ✓ |
+| `process-ssot.consolidate` | SPEC-047 | ✓ | ✓ | ✓ |
 | `retag.migrate` | SPEC-011 | ✓ | ✓ | ✓ |
 | `runtime-parity.mirror` | SPEC-006 | ✓ | ✓ | ✓ |
 | `runtime-schema-drift.judge` | SPEC-022 | ✓ | ✓ | ✓ |
@@ -245,7 +249,7 @@
 
 ## 집계
 
-- 소유 키 총 **199건** (entity 47 · surface 86 · capability 49 · 역할없음 17)
+- 소유 키 총 **203건** (entity 48 · surface 88 · capability 50 · 역할없음 17)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

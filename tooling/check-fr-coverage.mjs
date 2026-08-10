@@ -38,7 +38,7 @@ import { frDeclarations } from "./grammar-lib.mjs";
 import { testInfraFinding } from "./test-domain-lib.mjs";
 import { termCoverageFindings } from "./term-coverage-lib.mjs";
 import { externalTargetFindings } from "./external-target-lib.mjs";
-import { namedImplementations, implReferenceFindings } from "./impl-reference-lib.mjs";
+import { namedImplementations, implReferenceFindings, DEFAULT_IMPL_PROSE_REGEX } from "./impl-reference-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -390,7 +390,7 @@ if (XT_POLICY !== "off") {
       units.push({ path: rel, text, specId: u.specId, specText: u.specText });
     }
   }
-  const xt = externalTargetFindings(units);
+  const xt = externalTargetFindings(units, cfg.localHostPatterns);
   console.log(`결정 입도(externalTargetPolicy=${XT_POLICY}): 소유 파일 ${units.length}건에서 env 폴백 기본값 검사 — 미공개 외부 대상 ${xt.length}건`);
   const xtCap = Number(cfg.externalTargetListCap) || 12;
   for (const f of xt.slice(0, xtCap)) {
@@ -414,11 +414,11 @@ if (!["off", "advisory", "hard"].includes(IR_POLICY)) {
   process.exit(1);
 }
 if (IR_POLICY !== "off") {
-  const PROSE = new RegExp(String(cfg.implReferenceProseRegex || "\\.(md|html|rst|txt|jsonl|lock)$"));
+  const PROSE = new RegExp(String(cfg.implReferenceProseRegex || DEFAULT_IMPL_PROSE_REGEX));
   const isTestName = (n) => isTestFile(String(n).split("/").pop(), cfg);
   const irUnits = [];
   for (const [key, text] of normText) {
-    const names = namedImplementations(text, isTestName);
+    const names = namedImplementations(text, isTestName, cfg.implModuleExtensions);
     if (!names.length) continue;
     const [specId, frId] = key.split("/");
     irUnits.push({ specId, frId, names, key });

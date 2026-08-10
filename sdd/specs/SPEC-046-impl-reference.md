@@ -97,4 +97,5 @@ FR이 백틱으로 함수·모듈을 지목했다면 그것이 이 시스템의 
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 모듈 확장자·산문 정규식을 선언으로 승격(`DEFAULT_IMPL_MODULE_EXTENSIONS`·`DEFAULT_IMPL_PROSE_REGEX` + `implModuleExtensions`) | 오너 규범(하드코딩 지양). 확장자를 코어 정규식에 박으면 목록 밖 언어(`.cs`·`.swift` 등)의 모듈 지목이 통째로 안 잡히고 그 0건이 진짜 0건과 구분되지 않는다 [검증: tooling/__tests__/impl-reference.test.mjs] |
 | 2026-08-10 | 초안 — `implReferencePolicy`(off\|advisory\|hard, 기본 advisory) + `implReferenceListCap`·`implReferenceProseRegex` + `impl-reference-lib`(백틱 구현체 추출·참조 계수·기준 판정) + `check-fr-coverage` R1e 배선(실행 경로 축 + SPEC-042 코어 재사용한 커버 파일 축) | 제보 사례 4: FR이 `extractDeployTickets()`를 지목했는데 표면이 쉘로 다시 구현해 규칙이 갈라졌고, 그 쪽에만 있던 결함으로 19건이 배포 범위에서 조용히 누락됐다. 커버 테스트는 버그 있는 쉘 구현의 존재를 단언했고 지목 함수는 고아였다 — 게이트 전부 초록. 이름이 백틱이라 **선언 없이도 오탐이 없다**(SPEC-042가 거부한 자동 추출과 다르다). 방아쇠 폭은 킷 자기적용으로 골랐다: 함수 호출형은 이름 뒤 공백 불허(실측 오탐 1건 제거), 테스트 파일명 제외(SPEC-031의 축), bare 식별자 제외(config 키와 구별 불가), 소유 경계를 넘어 탐색(소유 안에서만 찾으니 정상 모듈 3건이 거짓 고아). 범위: 이 폭 실측은 이 킷 저장소의 규범 선언 라인 대상이며, 백틱 관습이 다른 프로젝트에서는 추출 0건으로 판정 대상이 없다고 밝힌다 [검증: tooling/__tests__/impl-reference.test.mjs] |

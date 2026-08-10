@@ -1335,3 +1335,32 @@ test("py fr: 지목 구현체 참조 — 고아·전무·통과·커버 미언�
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 순차 프로세스 SSOT 패리티(SPEC-047) ──
+test("py processssot: 미선언 inert·SSOT 부재·빠진 단계·조각 보유·저장소 미선언/미소유 바이트 동일", skip, () => {
+  const CHAIN = ["로컬 실측", "커밋·푸시", "배포", "개발 실측", "교차검증 일치", "dev-done"];
+  const OWN = (files) => `# S\n**Spec**: \`SPEC-001\`\n로컬 실측을 다룬다.\n## Ownership\n- **Entities**: run\n- **Files**: ${files}\n`;
+  const scen = [
+    { cfg: {}, files: {} },                                                            // 미선언 → INERT
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } }, processSsotPolicy: "hard" }, files: {} },  // SSOT 부재
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } } },
+      files: { "docs/C.md": "# c\n로컬 실측만 있다\n" } },                              // 빠진 단계 + 조각 보유
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n" } },                     // 저장소 미선언(교차검증)
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: [...CHAIN.slice(0, 4), { name: "교차검증 일치", state: ".sdd/runs.jsonl" }, "dev-done"] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n", "sdd/specs/SPEC-001.md": OWN("src/**") } },  // 미소유 저장소
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: [...CHAIN.slice(0, 4), { name: "교차검증 일치", state: ".sdd/runs.jsonl" }, "dev-done"] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n", "sdd/specs/SPEC-001.md": OWN(".sdd/**, docs/C.md") } },  // 통과
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: ["a"] } } }, files: {} },      // config 문법(1단계)
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } }, processSsotPolicy: "off" }, files: {} },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-process-ssot.mjs");
+      const p = runPy(root, ["processssot"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

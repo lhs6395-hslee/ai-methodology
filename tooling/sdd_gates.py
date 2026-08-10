@@ -129,6 +129,15 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "syncRulesFile": None,
+    "implModuleExtensions": None,
+    "localHostPatterns": None,
+    "processDocRegex": None,
+    "processes": {},
+    "processSsotPolicy": "advisory",
+    "processSsotListCap": 12,
+    "processFragmentMinStages": 2,
+    "statefulStageMarkers": None,
     "browserGradeMethods": None,
     "deployGradeMethods": None,
     "implReferencePolicy": "advisory",
@@ -265,6 +274,7 @@ RATCHETED_POLICIES = [
     "evidenceScopePolicy",
     "introDocPolicy",
     "implReferencePolicy",
+    "processSsotPolicy",
     "liveRealityCoveragePolicy",
 ]
 
@@ -1192,7 +1202,7 @@ def cmd_fr(cfg, strict):
                 except OSError:
                     continue
                 xt_units.append({"path": rel, "text": body, "specId": u["specId"], "specText": u["specText"]})
-        xt = external_target_findings(xt_units)
+        xt = external_target_findings(xt_units, cfg.get("localHostPatterns"))
         print(f"결정 입도(externalTargetPolicy={xt_policy}): 소유 파일 {len(xt_units)}건에서 env 폴백 기본값 검사"
               f" — 미공개 외부 대상 {len(xt)}건")
         xt_cap = int(cfg.get("externalTargetListCap") or 12)
@@ -1215,14 +1225,14 @@ def cmd_fr(cfg, strict):
               file=sys.stderr)
         sys.exit(1)
     if ir_policy != "off":
-        prose = re.compile(str(cfg.get("implReferenceProseRegex") or r"\.(md|html|rst|txt|jsonl|lock)$"))
+        prose = re.compile(str(cfg.get("implReferenceProseRegex") or DEFAULT_IMPL_PROSE_REGEX))
 
         def _is_test_name(n):
             return is_test_file(os.path.basename(str(n)), cfg)
 
         ir_units = []
         for key, t4 in norm_text.items():
-            names = named_implementations(t4, _is_test_name)
+            names = named_implementations(t4, _is_test_name, cfg.get("implModuleExtensions"))
             if not names:
                 continue
             sid4, frid4 = key.split("/")
@@ -2482,17 +2492,27 @@ def can_lead_code(status):
 
 # ── 지목 구현체 참조 코어 (SPEC-046, impl-reference-lib.mjs 미러) ───────────
 _FN_SPAN = re.compile(r"^([A-Za-z_$][A-Za-z0-9_$]*)\([^)]*\)$")
-_MOD_SPAN = re.compile(r"^([A-Za-z_$][A-Za-z0-9_.$-]*\.(?:mjs|cjs|js|jsx|ts|tsx|py|go|rs|rb|java|kt|sh|bash|tf|php))$")
+DEFAULT_IMPL_MODULE_EXTENSIONS = [
+    "mjs", "cjs", "js", "jsx", "ts", "tsx", "py", "go", "rs", "rb", "java", "kt", "sh", "bash", "tf", "php", "cs", "swift",
+]
+DEFAULT_IMPL_PROSE_REGEX = r"\.(md|markdown|html|rst|adoc|txt|jsonl|lock)$"
+
+
+def _mod_span_re(exts):
+    lst = exts if exts else DEFAULT_IMPL_MODULE_EXTENSIONS
+    alt = "|".join(re.escape(str(e).lstrip(".")) for e in lst)
+    return re.compile(r"^([A-Za-z_$][A-Za-z0-9_.$-]*\.(?:" + alt + r"))$")
 REFERENCE_BAR = {"fn": 2, "mod": 1}
 
 
-def named_implementations(fr_text, is_test_name=None):
+def named_implementations(fr_text, is_test_name=None, module_extensions=None):
     """FR 선언 라인의 백틱 스팬에서 구현체 이름만 뽑는다(함수 호출형·모듈 파일명)."""
+    mod_span = _mod_span_re(module_extensions)
     out, seen = [], set()
     for m in re.finditer(r"`([^`]+)`", str(fr_text or "")):
         span = m.group(1).strip()
         fn = _FN_SPAN.match(span)
-        mod = _MOD_SPAN.match(span)
+        mod = mod_span.match(span)
         name = kind = None
         if fn:
             name, kind = fn.group(1), "fn"
@@ -2659,26 +2679,36 @@ def env_fallbacks(text):
     return out
 
 
-_LOCAL_HOSTS = re.compile(
-    r"^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal|example\.com|example\.org|.*\.example|.*\.local|.*\.test|.*\.invalid)$",
-    re.I)
+DEFAULT_LOCAL_HOST_PATTERNS = [
+    "localhost", r"127\.0\.0\.1", r"0\.0\.0\.0", r"\[::1\]", r"host\.docker\.internal",
+    r"example\.com", r"example\.org", r".*\.example", r".*\.local", r".*\.test", r".*\.invalid",
+]
+
+
+def _local_hosts_re(pats):
+    lst = pats if pats else DEFAULT_LOCAL_HOST_PATTERNS
+    return re.compile("^(" + "|".join(lst) + ")$", re.I)
+
+
+_LOCAL_HOSTS = _local_hosts_re(None)
 _URL_HOST = re.compile(r"^[a-z][a-z0-9+.-]*://([^/?#\s:]+)", re.I)
 _FQDN = re.compile(r"^(?!\d+(\.\d+)*$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d+)?$", re.I)
 
 
-def external_target_kind(value):
+def external_target_kind(value, local_host_patterns=None):
+    local = _local_hosts_re(local_host_patterns) if local_host_patterns else _LOCAL_HOSTS
     v = str(value or "").strip()
     if not v:
         return None
     m = _URL_HOST.match(v)
     if m:
-        return None if _LOCAL_HOSTS.match(m.group(1)) else "url"
+        return None if local.match(m.group(1)) else "url"
     if re.match(r"^arn:[a-z-]+:", v, re.I):
         return "arn"
     if re.match(r"^\d{12}$", v):
         return "account"
     if _FQDN.match(v):
-        return None if _LOCAL_HOSTS.match(re.sub(r":\d+$", "", v)) else "endpoint"
+        return None if local.match(re.sub(r":\d+$", "", v)) else "endpoint"
     return None
 
 
@@ -2694,7 +2724,7 @@ def spec_knows_target(spec_text, value):
     return bool(host) and host in s
 
 
-def external_target_findings(units):
+def external_target_findings(units, local_host_patterns=None):
     """units: [{path, text, specId, specText}] — 미소유(specId 없음)는 판정하지 않는다."""
     out = []
     for u in units or []:
@@ -2702,7 +2732,7 @@ def external_target_findings(units):
             continue
         seen = set()
         for fb in env_fallbacks(u.get("text")):
-            kind = external_target_kind(fb["value"])
+            kind = external_target_kind(fb["value"], local_host_patterns)
             if not kind:
                 continue
             key = f"{fb['env']} {fb['value']}"
@@ -4734,7 +4764,7 @@ def cmd_sccoverage(cfg):
     sys.exit(0)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc|processssot> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -5485,6 +5515,183 @@ def cmd_introdoc(cfg):
         print("  ✓ 규칙 ID 누락 0건 · 인용 수치 불일치 0건 — 설명이 도구를 따라잡고 있다.")
 
 
+# ── 순차 프로세스 SSOT 코어 (SPEC-047, process-ssot-lib.mjs 미러) ──────────
+DEFAULT_PROCESS_DOC_REGEX = r"\.(md|markdown|html|rst|adoc|txt)$"
+
+DEFAULT_STATEFUL_STAGE_MARKERS = [
+    "교차검증", "교차 검증", "대조", "비교", "합의", "일치", "집계", "취합",
+    "cross-check", "crosscheck", "cross check", "reconcile", "compare", "agree", "aggregate",
+]
+
+
+def stage_of(entry):
+    if isinstance(entry, str):
+        return {"name": entry, "state": ""}
+    e = entry or {}
+    return {"name": str(e.get("name") or ""), "state": str(e.get("state") or "").strip()}
+
+
+def stages_of(proc):
+    return [s for s in (stage_of(x) for x in ((proc or {}).get("stages") or [])) if s["name"]]
+
+
+def validate_processes(processes):
+    errors = []
+    for name, proc in (processes or {}).items():
+        if not isinstance(proc, dict):
+            errors.append(f'processes["{name}"] — 객체여야 한다({{ ssot, stages }})')
+            continue
+        if not str(proc.get("ssot") or "").strip():
+            errors.append(f'processes["{name}"].ssot — 전 구간을 담는 문서 경로 필수(빈 값은 소유자 없음과 같다)')
+        if len(stages_of(proc)) < 2:
+            errors.append(f'processes["{name}"].stages — 2단계 이상 선언 필수(1단계는 사슬이 아니다)')
+    return errors
+
+
+def ssot_missing_stages(ssot_text, stages):
+    s = str(ssot_text or "")
+    return [st["name"] for st in (stages or []) if st["name"] not in s]
+
+
+def fragment_findings(docs, stages, ssot_path, min_stages=2):
+    names = [st["name"] for st in (stages or [])]
+    out = []
+    for d in docs or []:
+        if not d or d["path"] == ssot_path:
+            continue
+        text = str(d.get("text") or "")
+        held = [n for n in names if n in text]
+        if len(held) < min_stages:
+            continue
+        if ssot_path in text:
+            continue
+        out.append({"path": d["path"], "stages": held})
+    return out
+
+
+def stateless_stage_findings(stages, markers=None):
+    lst = markers if markers else DEFAULT_STATEFUL_STAGE_MARKERS
+    return [st["name"] for st in (stages or [])
+            if not st["state"] and any(str(m).lower() in st["name"].lower() for m in lst)]
+
+
+def unowned_state_findings(stages, is_owned=None):
+    own = is_owned if callable(is_owned) else (lambda p: True)
+    return [{"stage": st["name"], "state": st["state"]}
+            for st in (stages or []) if st["state"] and not own(st["state"])]
+
+
+def cmd_processssot(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("processSsotPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ processSsotPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "processSsotPolicy")
+        print("순차 프로세스 게이트 — processSsotPolicy:off (판정 안 함)")
+        return
+    raw = cfg.get("processes")
+    processes = raw if isinstance(raw, dict) else {}
+    names = sorted(processes.keys())
+    if not names:
+        verdict("INERT", "processes 미선언 — 판정할 순차 사슬이 없다")
+        print("순차 프로세스 게이트 — **processes 미선언: 판정하지 않는다**."
+              " 여러 스펙에 걸친 순차 사슬(배포 close-out·승인 흐름 등)이 있으면 `processes`에"
+              " `{ ssot: <전 구간 문서>, stages: [<단계>…] }`로 선언하라. 그러면 ①전 구간이 그 문서 하나에 있는지"
+              " ②조각을 든 다른 문서가 그 문서를 참조하는지 ③비교·합의 단계가 기록이 만날 저장소를 선언하고"
+              " 그 저장소가 소유되는지를 본다.")
+        return
+    cfg_errors = validate_processes(processes)
+    if cfg_errors:
+        judged(len(cfg_errors))
+        print(f"순차 프로세스 게이트(processSsotPolicy={policy}): 프로세스 {len(names)}종 선언")
+        for e in cfg_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    spec_dir = resolve(cfg, cfg["specDir"])
+    try:
+        spec_names = sorted(f for f in os.listdir(spec_dir) if is_spec_md_name(f))
+    except OSError:
+        spec_names = []
+    owned_globs, spec_texts = [], []
+    for n in spec_names:
+        text = read_text(os.path.join(spec_dir, n))
+        spec_texts.append({"path": f"{cfg['specDir']}/{n}", "text": text})
+        for g in parse_section(text, "Ownership", ["Files"])["Files"]:
+            g2 = strip_inline_comment(g)
+            if g2:
+                owned_globs.append(compile_glob(g2))
+
+    def is_owned(p):
+        return any(rx.search(str(p)) for rx in owned_globs)
+
+    prose = re.compile(str(cfg.get("processDocRegex") or DEFAULT_PROCESS_DOC_REGEX))
+    docs = list(spec_texts)
+    seen = {d["path"] for d in docs}
+    for rel in walk_all_rel(root, cfg):
+        if not prose.search(rel) or rel in seen:
+            continue
+        try:
+            docs.append({"path": rel, "text": read_text(os.path.join(root, rel))})
+        except OSError:
+            continue
+
+    errors, warnings = [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    cap = int(cfg.get("processSsotListCap") or 12)
+    min_stages = int(cfg.get("processFragmentMinStages") or 2)
+    stage_total = state_total = 0
+    for name in names:
+        proc = processes[name]
+        stages = stages_of(proc)
+        ssot_path = str(proc["ssot"]).strip()
+        stage_total += len(stages)
+        state_total += len([s for s in stages if s["state"]])
+        ssot_abs = os.path.join(root, ssot_path)
+        if not os.path.exists(ssot_abs):
+            block(f'프로세스 "{name}": SSOT 문서가 없다 — {ssot_path}. 선언했는데 없는 문서는 소유자가 없는 것과 같다')
+            continue
+        ssot_text = read_text(ssot_abs)
+        miss = ssot_missing_stages(ssot_text, stages)
+        if miss:
+            block(f'프로세스 "{name}": SSOT({ssot_path})가 전 구간을 담지 않는다 — 빠진 단계 {len(miss)}건: {" · ".join(miss)}.'
+                  " 어느 문서를 읽어도 사슬의 일부만 보이면 세션마다 flow를 재구성하고 매번 다른 곳이 빠진다")
+        frags = fragment_findings(docs, stages, ssot_path, min_stages)
+        for f in frags[:cap]:
+            more = " …" if len(f["stages"]) > 3 else ""
+            block(f'프로세스 "{name}": {f["path"]}가 단계 {len(f["stages"])}건({" · ".join(f["stages"][:3])}{more})을 담았는데'
+                  f' SSOT({ssot_path})를 참조하지 않는다 — 조각을 든 문서는 전체를 가리켜야 한다(참조는 경로를 적으면 성립한다)')
+        if len(frags) > cap:
+            block(f'프로세스 "{name}": 조각 보유 문서 … 외 {len(frags) - cap}건 (processSsotListCap 상향으로 확인)')
+        for st in stateless_stage_findings(stages, cfg.get("statefulStageMarkers")):
+            block(f'프로세스 "{name}": 단계 "{st}"는 실행 사이의 비교·합의를 요구하는데 **기록이 만날 저장소를 선언하지 않았다**'
+                  ' — 비교는 두 기록이 같은 자리에서 만나야 성립한다. 저장소가 없으면 그 비교는 "상대 기록 없음 → 통과"로 조용히 무행동이 된다'
+                  "(실측: 로컬은 작업 디렉터리, 클러스터 Job은 볼륨 없는 파드의 /tmp였다). stages 항목을 { name, state: <경로> }로 선언하라")
+        for u in unowned_state_findings(stages, is_owned):
+            block(f'프로세스 "{name}": 단계 "{u["stage"]}"의 저장소 "{u["state"]}"를 **어느 스펙도 소유하지 않는다**'
+                  " — 인프라 산출물인데 스펙 밖에 있으면 그쪽 리뷰에서도 빠진다(실측: 저장소 요구가 어느 FR에도 없고 코드 주석에만 있었다)."
+                  " 어느 스펙의 Ownership Files에 편입하라")
+
+    judged(len(errors))
+    print(f"순차 프로세스 게이트(processSsotPolicy={policy}): 프로세스 {len(names)}종 · 단계 {stage_total}건"
+          f" · 저장소 선언 {state_total}건 · 문서 {len(docs)}건 대조({prose.pattern})")
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 순차 사슬이 흩어져 있다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if not warnings:
+        print("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐다.")
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -5567,6 +5774,8 @@ def main():
         cmd_sccoverage(cfg)
     elif sub == "introdoc":
         cmd_introdoc(cfg)
+    elif sub == "processssot":
+        cmd_processssot(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

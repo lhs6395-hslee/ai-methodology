@@ -104,9 +104,13 @@ function main() {
 // 검산 가능한 실제 값. 여기 없는 키를 문서가 인용하면 ②가 미지원 키로 잡는다.
 function actualCounts(cfg, ROOT, ruleIds) {
   const out = { rules: ruleIds.length };
-  // 게이트 종수 — 스윕 규칙표(sdd-sync.mjs)에 등재된 게이트 파일의 유일 개수가 정본이다.
-  const sync = join(ROOT, "tooling", "sdd-sync.mjs");
-  if (existsSync(sync)) {
+  // 게이트 종수 — 스윕 규칙표에 등재된 게이트 파일의 유일 개수가 정본이다.
+  // **경로를 고정하지 않는다**: 킷 저장소는 `tooling/`, 소비 프로젝트는 `sdd-init.sh`가 `scripts/`에
+  // 깔고, 프로젝트가 다른 곳에 둘 수도 있다. 고정하면 소비 사이트에서 이 키가 조용히 미지원이 되고,
+  // 문서가 인용한 숫자는 "오타난 키"로 오진된다(훅 목록 탐색과 같은 후보 해석 방식, SPEC-036 선례).
+  const sync = [cfg.syncRulesFile, "tooling/sdd-sync.mjs", "scripts/sdd-sync.mjs", "sdd-sync.mjs"]
+    .filter(Boolean).map((rel) => join(ROOT, ...String(rel).split("/"))).find((abs) => existsSync(abs));
+  if (sync) {
     const src = readFileSync(sync, "utf8");
     const i = src.indexOf("const RULES = [");
     if (i >= 0) {
@@ -114,6 +118,8 @@ function actualCounts(cfg, ROOT, ruleIds) {
       out.gates = new Set([...blk.matchAll(/"((?:check|gen)-[a-z-]+\.mjs)"/g)].map((m) => m[1])).size;
     }
   }
+  // 스윕 규칙표를 못 찾으면 `gates`는 **미지원 키로 남는다** — 0으로 세면 문서의 인용이
+  // "실제는 0"이라는 거짓 판정을 받는다. 모르는 것을 숫자로 말하지 않는다.
   // 스펙 종수 — specDir의 <PREFIX>-NNN.md 개수.
   try {
     out.specs = readdirSync(resolveFromRoot(cfg, cfg.specDir)).filter(isSpecMdName).length;

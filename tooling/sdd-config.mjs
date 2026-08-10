@@ -159,6 +159,27 @@ export const DEFAULTS = {
   termGlossary: [],
   termCoveragePolicy: "advisory",
   termCoverageListCap: 12,
+  // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
+  // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.
+  // 스윕 규칙표 파일 — 킷은 `tooling/`, sdd-init.sh 배포 사이트는 `scripts/`. 고정하면 소비
+  // 사이트에서 게이트 종수 인용이 조용히 미지원 키가 된다(실측: 이식성 결함).
+  syncRulesFile: null,
+  // 지목 구현체로 인정할 모듈 확장자 / 실행 경로에서 제외할 산문 정규식(SPEC-046).
+  implModuleExtensions: null,
+  // 외부 대상이 아닌 로컬·자리표시자 호스트 패턴(SPEC-044) — 사내 개발 도메인을 추가할 자리.
+  localHostPatterns: null,
+  // 사슬의 조각을 담을 수 있는 문서 종류(SPEC-047).
+  processDocRegex: null,
+  // 순차 프로세스 SSOT(SPEC-047) — 여러 스펙에 걸친 사슬은 한 문서가 전 구간을 소유한다.
+  //   processes: { "<이름>": { ssot: "<전 구간 문서>", stages: ["단계", {name, state}, …] } }
+  // 미선언이면 INERT(결합 0) — 순차 사슬이 없는 프로젝트에 사슬을 요구하면 거짓 요구다.
+  processes: {},
+  processSsotPolicy: "advisory",
+  processSsotListCap: 12,
+  // 단계를 몇 개 담으면 "조각 보유"로 볼지 — 1이면 사슬을 언급만 해도 걸려 오탐이 폭주한다.
+  processFragmentMinStages: 2,
+  // 실행 사이 비교·합의를 요구하는 단계 마커. null이면 킷 기본(어휘가 다르면 교체).
+  statefulStageMarkers: null,
   // 증거 등급을 증언하는 매니페스트 method 값(SPEC-031 확장). null이면 킷 기본.
   // 경로 판정의 **대안이 아니라 보완**이다 — 안 받으면 프로젝트가 등급을 얻으려고 증거 파일을
   // 물리적으로 쪼개야 한다(실측 제보). method가 자기신고여도 무방한 이유: 태그↔매니페스트

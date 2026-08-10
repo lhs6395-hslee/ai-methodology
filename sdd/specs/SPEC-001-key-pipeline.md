@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 어댑터에 순차 프로세스 knob 5종 + 하드코딩 제거 knob 4종 추가(`processes`·`processSsotPolicy`·`processSsotListCap`·`processFragmentMinStages`·`statefulStageMarkers` / `syncRulesFile`·`implModuleExtensions`·`localHostPatterns`·`processDocRegex`) | SPEC-047 신설 + 오너 규범(하드코딩 지양). 판정에 쓰이는 값은 전부 null 기본으로 두고 게이트가 자기가 쓴 값을 출력에 밝힌다 — 고정하면 목록 밖 프로젝트에서 판정이 조용히 사라진다 [검증: tooling/__tests__/process-ssot.test.mjs] |
 | 2026-08-10 | config 어댑터에 증거 등급 method knob 2종(`browserGradeMethods`·`deployGradeMethods`) 추가 | SPEC-031 확장 — 등급을 경로만으로 판정하면 프로젝트가 증거 파일을 물리적으로 쪼개야 한다(실측 제보). null 기본이고 열거 밖 method는 등급을 주지 않는다 [검증: tooling/__tests__/evidence.test.mjs] |
 | 2026-08-10 | config 어댑터에 지목 구현체 참조 knob 3종(`implReferencePolicy`·`implReferenceListCap`·`implReferenceProseRegex`) 추가 | SPEC-046 신설에 따른 기본값 등재. 산문 제외 정규식은 `null` 기본(킷 기본 = md·html·rst·txt·jsonl·lock) — 문서의 언급은 실행이 아니다 [검증: tooling/__tests__/impl-reference.test.mjs] |
 | 2026-08-10 | config의 `specSyncExemptGlobs` 값 좁힘 반영(판정 로직은 SPEC-003 소유, 여기서는 config 파일 자체의 소유 귀속) | 소유 선언과 면제 선언이 같은 파일을 가리키면 소유가 거짓이 된다 — SPEC-045의 소개 문서 소유가 생기며 그 모순이 실재했고, 게이트가 지목했다. config는 판정의 입력이므로 값 변경도 스펙 동반 대상이다(SPEC-003의 config 자기보호와 같은 결) [검증: tooling/__tests__/spec-sync.test.mjs] |

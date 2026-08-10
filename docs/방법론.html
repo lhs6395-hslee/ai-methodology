@@ -577,6 +577,27 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
   <p>테스트가 FR의 <em>주장</em>이 아니라 현재 구현의 <em>형태</em>를 단언하면 그런 일이 생긴다. 기계가 이 상태를 완전히 판정할 수는 없지만 — 의미 판정은 여전히 리뷰의 몫이다 — <strong>값싼 신호는 있다</strong>: FR이 이름 댄 구현체가 그 FR을 커버하는 어떤 파일에도 없다. 위 사례의 테스트가 정확히 그 모양이었다.</p>
   <p class="note">이 판정은 <strong>의미 커버리지(R1c)의 코어를 그대로 재사용한다.</strong> 같은 대조를 두 번 구현하면 두 축이 언젠가 다른 답을 내고, 그때 사람은 어느 쪽을 믿어야 할지 모른다 — 킷이 구현 중복(R13)을 규칙으로 세운 이유가 그것이다.</p>
 
+  <h4>사슬을 누가 소유하는가 <span class="note">(규칙 R16)</span></h4>
+  <p>다섯째 사례는 앞의 넷과 층이 다르다. 한 스펙 안의 문제가 아니라 <strong>여러 스펙에 걸친 순차 프로세스</strong>의 문제다. 어떤 프로젝트의 close-out 사슬은 8단계였다:</p>
+  <pre>로컬 실측 → 커밋·푸시 → main 머지 → 배포 → 개발 실측
+→ 로컬·개발 교차검증 일치 → dev-done → 리포터 확인 → confirmed</pre>
+  <p>조각이 <strong>6개 문서에 흩어져</strong> 있었고 전 구간을 담은 문서는 <strong>없었다.</strong> "로컬 실측"과 "교차검증"은 한 스펙에, "dev-done"과 "리포터"는 다른 넷에, "브랜치·배포 순서"는 또 다른 둘에. 어느 문서를 읽어도 사슬의 일부만 보이므로 세션마다 flow를 재구성했고, <strong>매번 다른 곳이 빠졌다.</strong></p>
+  <p>그리고 그 흩어짐이 <strong>코드의 무행동으로</strong> 나타났다.</p>
+  <pre>if (!peers.length) return { agree: <span class="r">true</span>, … };   <span class="c">← 상대 기록 없으면 통과</span></pre>
+  <p>게다가 양쪽 실행의 판정 기록이 <strong>만날 저장소가 아예 없었다</strong> — 로컬은 작업 디렉터리, 클러스터 Job은 볼륨 없는 파드의 <code>/tmp</code>. 즉 그 교차검증은 <strong>단 한 번도 비교를 수행한 적이 없다.</strong> 소유자가 결정한 "교차검증 일치 시에만 전이"는 명세에만 존재했고, 저장소 요구는 어느 FR에도 없이 <em>코드 주석에만</em> 있었다(인프라 산출물인데 인프라 스펙 밖이라 그쪽 리뷰에서도 빠졌다).</p>
+  <div class="tablewrap"><table>
+    <tr><th>축</th><th>보는 사실</th><th>해소</th></tr>
+    <tr><td><strong>전 구간 소유</strong></td><td>선언된 단계가 <strong>전부</strong> SSOT 문서 하나에 있는가</td><td>흩어진 조각을 한 문서에 모은다</td></tr>
+    <tr><td><strong>조각은 전체를 가리킨다</strong></td><td>단계를 둘 이상 담은 문서가 SSOT를 <strong>참조</strong>하는가</td><td>그 문서에 SSOT 경로를 적는다(새 문법 없음)</td></tr>
+    <tr><td><strong>비교의 만날 자리</strong></td><td>대조·합의를 요구하는 단계가 기록이 만날 <strong>저장소를 선언</strong>했고 그 저장소가 <strong>소유</strong>되는가</td><td>저장소를 선언하고 어느 스펙의 Files에 편입한다</td></tr>
+  </table></div>
+  <p class="note">사슬을 스펙들에서 <strong>자동 재구성하지 않는다.</strong> 그러면 게이트가 사슬의 저자가 되고, 재구성이 실제 의도와 다를 때 아무도 그걸 모른다 — 사슬은 사람이 한 문서에 쓴다. 모든 단계에 저장소를 요구하지도 않는다: 대부분의 단계는 상태가 필요 없고(커밋·머지), 전부 요구하면 사람이 빈 값을 채운다. <strong>비교·합의 마커와의 곱</strong>으로 좁혔다 — 근거 적용범위(R3)에서 방아쇠를 곱으로 좁힌 것과 같은 판단이다.</p>
+
+  <h4>하드코딩을 지양한다 — 박아 넣은 어휘는 다른 프로젝트에서 눈을 감는다</h4>
+  <p>이건 규칙이 아니라 <strong>모든 규칙에 걸리는 제약</strong>이다. 언어·어휘·문서 종류·파일 배치는 프로젝트마다 다르다. 게이트가 그것을 고정하면 목록 밖 프로젝트에서 판정이 <strong>통째로 사라지고</strong>, 그 <code>0건</code>은 진짜 0건과 구분되지 않는다.</p>
+  <p>그래서 판정에 쓰이는 값은 전부 <code>null</code> 기본(= 킷 기본값을 <em>선언</em>)으로 두고 config로 교체할 수 있게 하며, 게이트는 <strong>자기가 무엇을 썼는지 출력에 밝힌다.</strong></p>
+  <p class="note">실측으로 잡힌 이식성 결함: 소개 문서 게이트가 스윕 규칙표를 <code>tooling/sdd-sync.mjs</code>로 <strong>고정해</strong> 읽었다. 그런데 설치기는 게이트를 <code>scripts/</code>에 깐다 — 소비 사이트에서는 게이트 종수 인용이 조용히 <strong>미지원 키</strong>가 되고, 문서의 정직한 숫자가 "오타난 키"로 오진됐다. 후보 경로 해석으로 고쳤고, 못 찾으면 <strong>0으로 세지 않고 미지원으로 남긴다</strong> — <em>모르는 것을 숫자로 말하지 않는다.</em></p>
+
   <h4>설명이 도구보다 늦으면 그 설명은 거짓이 된다 <span class="note">(규칙 R15)</span></h4>
   <p>지금 읽고 있는 이 문서가 규칙의 대상이다. 킷은 규칙을 늘려 왔고 이 문서는 <strong>손으로</strong> 따라왔는데, 그 손이 미끄러진 자리가 실측으로 확인됐다 — 규칙표에 <strong>R14가 생겼는데 이 문서는 R13까지</strong>였고, 아무 게이트도 그 사실을 몰랐다. 문서는 어떤 축에서도 판정 대상이 아니었기 때문이다.</p>
   <p><strong>새로 배우는 사람은 코드가 아니라 이 문서로 방법론을 만난다.</strong> 문서가 낡으면 그 사람은 존재하지 않는 규칙 체계를 배우고, 그 오해는 조용히 오래 간다. 그래서 소개 문서는 부산물이 아니라 <strong>산출물</strong>이고, 산출물은 게이트가 본다. 세 축 전부 결정적이다:</p>
@@ -586,7 +607,7 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">14</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">20</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">47</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">15</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">21</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">48</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

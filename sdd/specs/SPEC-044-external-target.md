@@ -94,4 +94,5 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 로컬·자리표시자 호스트 목록을 선언으로 승격(`DEFAULT_LOCAL_HOST_PATTERNS` + `localHostPatterns`) | 오너 규범(하드코딩 지양). 사내 개발 도메인(`*.dev.internal` 등)을 쓰는 프로젝트가 목록을 늘릴 수 없으면 개발 기본값이 매번 계약으로 오인된다 [검증: tooling/__tests__/external-target.test.mjs] |
 | 2026-08-10 | 초안 — `externalTargetPolicy`(off\|advisory\|hard, 기본 advisory) + `externalTargetListCap` + `external-target-lib`(폴백 추출·외부 대상 판별·공개 판정) + `check-fr-coverage` R1d 배선 | 소비 프로젝트 제보: 소유·커버리지·spec-sync 전부 초록인 파일 안의 env 폴백 한 줄이 배포 대상을 정하고 있었고 어떤 요구도 그 대상을 인정하지 않았다. 소유 입도를 낮추면 스펙이 코드의 사본이 되므로 **결정의 종류**로 좁혔다 — 폴백 기본값이 외부 대상이면 그건 계약이다. 킷 자기적용 첫 실행에서 판정 코어 자신의 설명 주석에 적힌 예시 URL이 잡혀, 전체가 주석인 줄만 걷어내는 규칙을 추가했다(줄 안쪽 `//`를 자르면 `https://`를 못 본다) [검증: tooling/__tests__/external-target.test.mjs] |

@@ -29,8 +29,18 @@
 // 함수 호출형 — `NAME(...)`. 이름 뒤에 **공백 없이** 여는 괄호여야 한다(실측: `EntityName
 // (relation-type)`이 공백 허용 시 함수로 오인됐다).
 const FN_SPAN = /^([A-Za-z_$][A-Za-z0-9_$]*)\([^)]*\)$/;
-// 모듈 파일명 — 확장자로만 인정한다. 확장자 없는 이름을 모듈로 보면 config 키·enum이 다 걸린다.
-const MOD_SPAN = /^([A-Za-z_$][A-Za-z0-9_.$-]*\.(?:mjs|cjs|js|jsx|ts|tsx|py|go|rs|rb|java|kt|sh|bash|tf|php))$/;
+// 모듈로 인정할 소스 확장자 — **게이트에 박지 않고 선언한다.** 프로젝트 언어가 목록 밖이면
+// 그 언어의 모듈 지목이 통째로 안 잡히고, 그 0건은 진짜 0건과 구분되지 않는다(SPEC-038·040의
+// "0건은 무엇의 0건인가"). 프로젝트는 `implModuleExtensions`로 교체한다.
+export const DEFAULT_IMPL_MODULE_EXTENSIONS = [
+  "mjs", "cjs", "js", "jsx", "ts", "tsx", "py", "go", "rs", "rb", "java", "kt", "sh", "bash", "tf", "php", "cs", "swift",
+];
+// 실행 경로에서 제외할 산문·잠금 파일 — 문서의 언급은 실행이 아니다.
+export const DEFAULT_IMPL_PROSE_REGEX = "\\.(md|markdown|html|rst|adoc|txt|jsonl|lock)$";
+
+const modSpanRe = (exts) => new RegExp(
+  `^([A-Za-z_$][A-Za-z0-9_.$-]*\\.(?:${(exts && exts.length ? exts : DEFAULT_IMPL_MODULE_EXTENSIONS)
+    .map((e) => String(e).replace(/^\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}))$`);
 
 // 참조로 인정할 최소 등장 수. 함수는 정의(1) + 호출(1) = 2, 모듈은 자기 파일을 제외하고 1.
 export const REFERENCE_BAR = Object.freeze({ fn: 2, mod: 1 });
@@ -38,7 +48,8 @@ export const REFERENCE_BAR = Object.freeze({ fn: 2, mod: 1 });
 // FR 선언 라인의 백틱 스팬에서 **구현체 이름**만 뽑는다. 반환 [{name, kind, span}](등장 순, 중복 제거).
 // isTestName(name) → true면 제외한다: 테스트 파일명은 구현체가 아니라 검증 자산이고,
 // 그것이 실재하는지는 SPEC-031·041이 이미 본다(같은 사실을 두 축이 고발하지 않는다).
-export function namedImplementations(frText, isTestName = () => false) {
+export function namedImplementations(frText, isTestName = () => false, moduleExtensions = null) {
+  const MOD_SPAN = modSpanRe(moduleExtensions);
   const out = [], seen = new Set();
   for (const m of String(frText || "").matchAll(/`([^`]+)`/g)) {
     const span = m[1].trim();
