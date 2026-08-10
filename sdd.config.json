@@ -232,7 +232,10 @@
     "resolve",
     "retire",
     "run",
-    "scan"
+    "scan",
+    "audit",
+    "expose",
+    "classify"
   ],
   "capabilityOwnershipPolicy": "hard",
   "ownershipRequiredPolicy": "hard",
