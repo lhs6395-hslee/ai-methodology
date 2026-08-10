@@ -13,11 +13,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const PY = new URL("../sdd_gates.py", import.meta.url).pathname;
+const TOOLING = new URL("..", import.meta.url).pathname;
+// 배선 무결성 패리티가 픽스처 복사 목록을 폐포에서 계산하는 데 쓴다(손 목록은 다음 드리프트다).
+import { localImports } from "../import-wiring-lib.mjs";
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 let hasPython = true;
@@ -1388,4 +1391,57 @@ test("py watchdog: CI 미배선·영수증 부재/형식·게이트 삭제·통�
       assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+// ── 배선 무결성 패리티(SPEC-050) ──
+// ⚠ 이 게이트는 **자기 디렉터리**를 판정 대상으로 삼는다(설치된 게이트 집합이 곧 판정 범위다).
+// 그래서 패리티 픽스처는 두 런타임을 같은 `scripts/`에 나란히 깔고 그 안에 구판 lib을 심는다 —
+// 정본 디렉터리를 보게 하면 두 판이 똑같이 "킷은 깨끗하다"를 내어 대조가 아무것도 증명하지 않는다.
+test("py importwiring: export 없음·파일 없음·확인 못 함·통과·off·inert 바이트 동일", skip, () => {
+  const closure = (entry) => {
+    const seen = new Set(); const stack = [entry];
+    while (stack.length) {
+      const f = stack.pop();
+      if (seen.has(f)) continue;
+      seen.add(f);
+      let t; try { t = readFileSync(join(TOOLING, f), "utf8"); } catch { continue; }
+      for (const imp of localImports(t)) stack.push(imp.specifier.replace(/^\.\//, ""));
+    }
+    return [...seen];
+  };
+  const scen = [
+    // ① 제보의 형태: 파일은 있는데 export가 없다(부분 동기화)
+    { cfg: { importWiringPolicy: "hard" }, plant: { "stale-lib.mjs": "export function present() {}\n", "consumer.mjs": 'import { present, absent } from "./stale-lib.mjs";\n' } },
+    // ② 파일 자체가 없다(복사 목록 누락)
+    { cfg: { importWiringPolicy: "hard" }, plant: { "consumer.mjs": 'import { x } from "./gone.mjs";\n' } },
+    // ③ 확인 못 함 — 비-로컬 재수출은 위반이 아니다
+    { cfg: { importWiringPolicy: "hard" }, plant: { "facade.mjs": 'export * from "some-package";\n', "consumer.mjs": 'import { maybe } from "./facade.mjs";\n' } },
+    // ④ 통과
+    { cfg: { importWiringPolicy: "hard" }, plant: {} },
+    // ⑤ advisory는 막지 않는다
+    { cfg: { importWiringPolicy: "advisory" }, plant: { "stale-lib.mjs": "export function present() {}\n", "consumer.mjs": 'import { present, absent } from "./stale-lib.mjs";\n' } },
+    { cfg: { importWiringPolicy: "off" }, plant: {} },
+    // ⑥ 모듈 0건 → INERT(0건은 '깨끗함'이 아니다)
+    { cfg: { importWiringPolicy: "hard", importWiringExtensions: ["nosuchext"] }, plant: {} },
+    // ⑦ 값 위반은 양판이 같은 문장으로 거부한다
+    { cfg: { importWiringPolicy: "loose" }, plant: {} },
+  ];
+  for (const [i, { cfg, plant }] of scen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      mkdirSync(join(root, "scripts"), { recursive: true });
+      for (const f of closure("check-import-wiring.mjs")) cpSync(join(TOOLING, f), join(root, "scripts", f));
+      cpSync(PY, join(root, "scripts", "sdd_gates.py"));
+      for (const [name, body] of Object.entries(plant)) writeFileSync(join(root, "scripts", name), body);
+      const runIn = (cmd, args) => {
+        try { return { code: 0, out: execFileSync(cmd, args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+        catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+      };
+      const n = runIn("node", [join(root, "scripts", "check-import-wiring.mjs")]);
+      const py = runIn("python3", [join(root, "scripts", "sdd_gates.py"), "importwiring"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  console.log("IMPORTWIRING PARITY OK");
 });

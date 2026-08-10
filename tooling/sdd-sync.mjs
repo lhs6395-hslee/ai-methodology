@@ -11,9 +11,9 @@
 import { execFileSync } from "node:child_process";
 import { loadConfig } from "./sdd-config.mjs";
 import { dirname, join } from "node:path";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { VERDICT_KINDS, parseVerdict, stripVerdictLines, isJudged, KIND_LABEL } from "./verdict-lib.mjs";
+import { VERDICT_KINDS, parseVerdict, stripVerdictLines, isJudged, KIND_LABEL, isMainEntry } from "./verdict-lib.mjs";
 
 const STRICT = process.argv.includes("--strict");
 const JSON_OUT = process.argv.includes("--json");
@@ -67,9 +67,42 @@ const RULES = [
   // R17(SPEC-048): 감시자 자신이 실재하는가. 무시하는 프로젝트는 게이트를 안 돌리므로 이 축은
   // **우회 불가한 채널(CI)**의 배선을 본다 — 훅은 우회되고 게이트 파일은 지워도 조용하다.
   { rule: "R17 감시자 실재(우회 불가한 채널이 있는가)", gates: ["check-watchdog.mjs"] },
+  // R18(SPEC-050): 게이트가 애초에 **로드될 수 있는가**. 다른 축은 전부 게이트가 돈다고 가정하는데,
+  // 부분 동기화된 설치에서는 게이트가 판정이 아니라 SyntaxError를 낸다. 이 축만 아무 게이트도
+  // 실행하지 않고 판정한다 — import 그래프는 정적으로 결정 가능하다.
+  { rule: "R18 배선 무결성(게이트가 로드되는가)", gates: ["check-import-wiring.mjs"] },
 ];
 
 const lastLine = (s) => (s || "").trim().split("\n").pop() || "";
+
+// 스택 프레임·런타임 배너·소스 에코 — 크래시 stderr의 **구조적 소음**이다. 내용이 아니라 형태로
+// 가른다(특정 런타임 어휘에 기대면 다른 런타임에서 통째로 빗나간다).
+const CRASH_NOISE = [
+  /^\s+at\s/,                      // 스택 프레임
+  /^\s*\^+\s*$/,                   // 오류 위치 캐럿
+  /^[\w.]+\s+v\d+\.\d+/,           // 런타임 배너(`Node.js v22.22.2`)
+  /^\s*$/,                         // 빈 줄
+];
+
+// 크래시 요약 — **가장 정보량 있는 줄**을 고른다.
+//
+// 실측 제보(2026-08-10): 부분 동기화로 게이트가 이렇게 죽었는데
+//     SyntaxError: The requested module './ownership-keys.mjs'
+//                  does not provide an export named 'bodyBeforeOwnership'
+//         at ModuleJob._instantiate (node:internal/…)
+//     Node.js v22.22.2
+// `lastLine(stderr)`이 뽑은 요약은 **`Node.js v22.22.2`** 였다. 원인 줄은 스택 위에 묻히고
+// 스윕은 런타임 버전을 사유로 보고했으므로, 제보자가 스택을 직접 읽어 원인을 찾아야 했다.
+// 마지막 줄이 요약인 것은 **게이트가 협조적으로 끝났을 때만** 참이다 — 크래시는 협조가 아니다.
+export function crashSummary(stderr) {
+  const lines = String(stderr || "").split("\n").filter((l) => !CRASH_NOISE.some((re) => re.test(l)));
+  if (!lines.length) return "";
+  // 던져진 오류 줄을 우선한다(`SyntaxError:`·`TypeError:`·`Error:` 꼴). 형태 판정이라
+  // 메시지 본문이 어떤 언어든 무관하다.
+  const thrown = lines.find((l) => /^[\w$.]*(Error|Exception)\b\s*:/.test(l.trim()));
+  // 오류 줄이 없으면 첫 줄이다 — 크래시 stderr의 첫 줄은 대개 원인이고, 마지막 줄은 대개 배너다.
+  return (thrown || lines[0]).trim();
+}
 
 // 순수 판정: 게이트 실행 결과(부재·크래시·stdout) → {flagged, summary}.
 // **게이트의 stdout이 판정의 정본**이라는 계약 위에 서 있다 — 게이트는 자기 판정 줄만 stdout에
@@ -95,7 +128,9 @@ export function gateOutcome({ file, missing = false, crashed = false, stdout = "
 
   const v = parseVerdict(stdout);
   const body = stripVerdictLines(stdout);
-  const summary = lastLine(body) || lastLine(stderr) || (crashed ? "(비정상 종료)" : "");
+  // 크래시면 stderr의 **원인 줄**을 찾는다(마지막 줄이 아니다 — 그건 런타임 배너다).
+  const summary = lastLine(body) || (crashed ? crashSummary(stderr) : lastLine(stderr))
+    || (crashed ? "(비정상 종료)" : "");
 
   // 판정 타입 미선언 — 배선 누락이거나 arm 이전에 터진 것. 어느 쪽이든 **통과가 아니다**.
   // (출력 0줄도 여기로 떨어진다 — 무음 미실행은 판정 줄조차 없으므로 같은 결론이다.)
@@ -228,12 +263,8 @@ export function tallyLine(t) {
   return `게이트 ${t.total}종 = 판정 ${t.judged} · 안 봄 ${unseen}${why ? `(${why})` : ""} · 미판정 ${t.untyped}`;
 }
 
-// 엔트리 판정은 realpath 비교다 — `file://${argv[1]}` 문자열 비교는 비-ASCII 경로(%-인코딩)·
-// 심볼릭 링크(/var↔/private/var)에서 갈려 main 블록이 **조용히 미실행**된다(SPEC-021 실측 결함).
-function isMainEntry(metaUrl) {
-  try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(process.argv[1]); }
-  catch { return false; }
-}
+// 엔트리 판정은 `verdict-lib`의 `isMainEntry`다(realpath 비교) — 정의가 한 곳에 있는 이유와
+// 문자열 비교가 왜 조용히 미실행을 만드는지는 그 함수의 주석에 있다.
 
 if (isMainEntry(import.meta.url)) {
   const rules = collect();

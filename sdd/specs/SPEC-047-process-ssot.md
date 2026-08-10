@@ -98,4 +98,5 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 엔트리 가드를 공용 `isMainEntry`(realpath 비교)로 교체 | 이 게이트가 `import.meta.url === \`file://${argv[1]}\`` 문자열 비교를 쓰고 있었다. 그 형태는 경로에 비-ASCII가 있거나 심볼릭 링크가 끼면 갈리고, 갈리면 main 블록이 **실행되지 않은 채 exit 0** — 통과가 아니라 무음 미실행이다. 킷은 이 결함을 이미 한 번 고쳤는데(SPEC-021 실측) 정의가 세 파일에 복사돼 있었고 이 게이트가 그 규범을 모른 채 깨진 형태로 태어났다. 정의를 `verdict-lib` 한 곳으로 모으고 재유입을 계약 테스트가 금지한다(SPEC-040 FR-005) [검증: tooling/__tests__/import-wiring.test.mjs] |
 | 2026-08-10 | 초안 — `processes`·`processSsotPolicy`(off\|advisory\|hard, 기본 advisory)·`processSsotListCap`·`processFragmentMinStages`·`statefulStageMarkers` + `process-ssot-lib`(단계 정규화·config 문법·빠진 단계·조각 보유·비교 마커·미소유 저장소) + `check-process-ssot` + 스윕 R16 등재 | 제보 사례 5: 8단계 close-out 사슬의 조각이 6개 문서에 흩어져 전 구간 문서가 없었고, 어느 문서를 읽어도 일부만 보여 세션마다 flow를 재구성하며 매번 다른 곳이 빠졌다. 그 흩어짐이 코드의 무행동으로 나타났다 — 교차검증이 상대 기록 없으면 통과했고 두 기록이 만날 저장소가 아예 없어 **비교가 한 번도 수행된 적이 없다**. 사슬을 자동 재구성하는 길은 기각했다(게이트가 사슬의 저자가 되고, 재구성이 의도와 다를 때 아무도 모른다). 모든 단계에 저장소를 요구하는 길도 기각했다(대부분의 단계는 상태가 필요 없고, 전부 요구하면 사람이 빈 값을 채운다) — 비교·합의 마커와의 곱으로 좁혔다 [검증: tooling/__tests__/process-ssot.test.mjs] |

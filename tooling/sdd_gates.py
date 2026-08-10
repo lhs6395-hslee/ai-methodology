@@ -133,6 +133,10 @@ DEFAULTS = {
     "watchdogPolicy": "advisory",
     "watchdogReceipt": None,
     "watchdogCiGlobs": None,
+    # 배선 무결성(SPEC-050) — 게이트가 애초에 로드되는가. 부분 동기화(게이트 최신·lib 구판)는
+    # 배포 폐포 계약으로도 안 잡힌다: 그건 파일 실재, 이건 export 실재다.
+    "importWiringPolicy": "advisory",
+    "importWiringExtensions": None,
     "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
@@ -5889,6 +5893,213 @@ def ci_wiring(ci_files, markers=None):
     return {"wired": wired, "files": len(ci_files or [])}
 
 
+# ── 배선 무결성 (SPEC-050, R18) — Node판 import-wiring-lib.mjs 미러 ──────────
+# 실측 제보: update 절차의 diff가 공유 lib을 빠뜨려 게이트는 최신·lib은 구판인 **부분 동기화**가
+# 됐고, 소비처는 판정이 아니라 `SyntaxError: … does not provide an export named …`를 받았다.
+# 파일이 없는 것도 아니어서 배포 폐포 계약(SPEC-004)으로도 안 잡힌다 — 그건 파일 실재, 이건
+# export 실재다. 판정 게이트이므로 양판 필수(SPEC-006).
+DEFAULT_WIRING_EXTENSIONS = ["mjs", "js"]
+_LOCAL_SPEC = re.compile(r"^\.\.?/")
+# 문장 경계 — `^`로 앵커하면 `const x = 1; export { x };`를 놓치고, 놓친 export는 "없다"로
+# 읽혀 오탐(있는 export를 없다고 차단)이 된다.
+_AT = r"(?:^|[;}]\s*)"
+# 별칭 구분자·네임스페이스 절 — import·export 양쪽에서 쓰이므로 한 곳에 둔다(Node판과 같은 구조).
+_ALIAS_SPLIT = r"\s+as\s+"
+_NAMESPACE_CLAUSE = r"\*\s+as\s+[\w$]+"
+
+
+def local_imports(text):
+    out = []
+    src = strip_full_line_comments(text)
+    for m in re.finditer(r"\bimport\s+([\s\S]*?)\s+from\s*[\"']([^\"']+)[\"']", src):
+        spec = m.group(2)
+        if not _LOCAL_SPEC.match(spec):
+            continue
+        clause = m.group(1)
+        names = []
+        brace = re.search(r"\{([\s\S]*?)\}", clause)
+        if brace:
+            for raw in brace.group(1).split(","):
+                t = raw.strip()
+                if t:
+                    names.append(re.split(_ALIAS_SPLIT, t)[0].strip())
+        namespace = bool(re.search(_NAMESPACE_CLAUSE, clause))
+        lead = re.sub(_NAMESPACE_CLAUSE, "", re.sub(r"\{[\s\S]*?\}", "", clause, count=1)).replace(",", "").strip()
+        out.append({"specifier": spec, "names": names, "namespace": namespace, "hasDefault": bool(lead)})
+    for m in re.finditer(r"\bimport\s*[\"']([^\"']+)[\"']", src):
+        if _LOCAL_SPEC.match(m.group(1)):
+            out.append({"specifier": m.group(1), "names": [], "namespace": False, "hasDefault": False})
+    return out
+
+
+def module_exports(text):
+    src = strip_full_line_comments(text)
+    names, star_from, unmodeled = set(), [], []
+    for m in re.finditer(_AT + r"export\s+(?:async\s+)?function\s*\*?\s*([\w$]+)", src, re.M):
+        names.add(m.group(1))
+    for m in re.finditer(_AT + r"export\s+class\s+([\w$]+)", src, re.M):
+        names.add(m.group(1))
+    for m in re.finditer(_AT + r"export\s+(?:const|let|var)\s+([\w$]+)", src, re.M):
+        names.add(m.group(1))
+    for m in re.finditer(_AT + r"export\s*\{([\s\S]*?)\}", src, re.M):
+        for raw in m.group(1).split(","):
+            t = raw.strip()
+            if not t:
+                continue
+            parts = re.split(_ALIAS_SPLIT, t)
+            names.add((parts[1] if len(parts) > 1 else parts[0]).strip())
+    for m in re.finditer(_AT + r"export\s+\*\s*(?:as\s+([\w$]+)\s*)?from\s*[\"']([^\"']+)[\"']", src, re.M):
+        if m.group(1):
+            names.add(m.group(1))
+        elif _LOCAL_SPEC.match(m.group(2)):
+            star_from.append(m.group(2))
+        else:
+            unmodeled.append('export * from "%s"' % m.group(2))
+    if re.search(_AT + r"export\s+default\b", src, re.M):
+        names.add("default")
+    for m in re.finditer(_AT + r"export\s+(?:const|let|var)\s*[\[{]", src, re.M):
+        unmodeled.append(m.group(0).strip())
+    return {"names": names, "starFrom": star_from, "unmodeled": unmodeled}
+
+
+def wiring_findings(entries, read, resolve):
+    violations, unchecked = [], []
+    visited, exports_of = set(), {}
+
+    def resolve_exports(key, seen=None):
+        if key in exports_of:
+            return exports_of[key]
+        seen = seen or set()
+        if key in seen:
+            return {"names": set(), "unresolved": []}
+        seen.add(key)
+        src = read(key)
+        if src is None:
+            return None
+        ex = module_exports(src)
+        names = set(ex["names"])
+        unresolved = list(ex["unmodeled"])
+        for spec in ex["starFrom"]:
+            child = resolve_exports(resolve(key, spec), seen)
+            if child is None:
+                unresolved.append('export * from "%s" — 대상 파일 없음' % spec)
+                continue
+            names |= child["names"]
+            unresolved.extend(child["unresolved"])
+        val = {"names": names, "unresolved": unresolved}
+        exports_of[key] = val
+        return val
+
+    stack = list(entries or [])
+    while stack:
+        key = stack.pop()
+        if key in visited:
+            continue
+        visited.add(key)
+        src = read(key)
+        if src is None:
+            continue
+        for imp in local_imports(src):
+            target = resolve(key, imp["specifier"])
+            tex = resolve_exports(target)
+            if tex is None:
+                violations.append({"kind": "missing-file", "from": key, "specifier": imp["specifier"], "name": ""})
+                continue
+            stack.append(target)
+            if tex["unresolved"]:
+                for why in tex["unresolved"]:
+                    unchecked.append({"key": target, "why": why})
+                continue
+            wanted = list(imp["names"]) + (["default"] if imp["hasDefault"] else [])
+            for n in wanted:
+                if n not in tex["names"]:
+                    violations.append({"kind": "missing-export", "from": key, "specifier": imp["specifier"], "name": n})
+    seen_v, dedup_v = set(), []
+    for v in violations:
+        k = "%s %s %s %s" % (v["kind"], v["from"], v["specifier"], v["name"])
+        if k not in seen_v:
+            seen_v.add(k)
+            dedup_v.append(v)
+    seen_u, dedup_u = set(), []
+    for u in unchecked:
+        k = "%s %s" % (u["key"], u["why"])
+        if k not in seen_u:
+            seen_u.add(k)
+            dedup_u.append(u)
+    order = {"missing-file": 0, "missing-export": 1}
+    dedup_v.sort(key=lambda v: (order[v["kind"]], v["from"], v["specifier"], v["name"]))
+    dedup_u.sort(key=lambda u: (u["key"], u["why"]))
+    return {"violations": dedup_v, "unchecked": dedup_u, "walked": len(visited)}
+
+
+def format_wiring_violation(v):
+    if v["kind"] == "missing-file":
+        return ("%s → `%s` 파일이 없다 — 복사 목록 누락(소비처는 게이트 대신 ERR_MODULE_NOT_FOUND를 받는다)"
+                % (v["from"], v["specifier"]))
+    return ("%s → `%s`에 export `%s`가 없다 — **부분 동기화**(게이트는 최신, lib은 구판). 정본에서 `%s`를 다시 복사하라"
+            % (v["from"], v["specifier"], v["name"], re.sub(r"^\./", "", v["specifier"])))
+
+
+def cmd_importwiring(cfg):
+    policy = str(cfg.get("importWiringPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ importWiringPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "importWiringPolicy")
+        print("배선 무결성 게이트 — importWiringPolicy:off (판정 안 함)")
+        return
+    gate_dir = os.path.dirname(os.path.abspath(__file__))
+    exts = ["." + str(e).lstrip(".") for e in (cfg.get("importWiringExtensions") or DEFAULT_WIRING_EXTENSIONS)]
+    try:
+        entries = sorted(f for f in os.listdir(gate_dir) if any(f.endswith(e) for e in exts))
+    except OSError:
+        entries = []
+    if not entries:
+        verdict("INERT", "모듈 0건 — %s 파일이 없다" % "·".join(exts))
+        print("[안 봄(판정 입력 없음)] 배선 무결성 게이트 — 이 디렉터리에 %s 모듈이 없다."
+              " Python 런타임 전용 설치라면 정상이다(대조할 import 그래프가 없다) —"
+              " **0건은 '깨끗함'이 아니라 '볼 것이 없음'이다**." % "·".join(exts))
+        return
+
+    def read(key):
+        try:
+            return read_text(os.path.join(gate_dir, key))
+        except OSError:
+            return None
+
+    def resolve(from_key, spec):
+        base = os.path.dirname(os.path.join(gate_dir, from_key))
+        return os.path.relpath(os.path.normpath(os.path.join(base, spec)), gate_dir)
+
+    res = wiring_findings(entries, read, resolve)
+    violations, unchecked = res["violations"], res["unchecked"]
+    judged(len(violations) if policy == "hard" else 0)
+    miss_file = sum(1 for v in violations if v["kind"] == "missing-file")
+    miss_export = sum(1 for v in violations if v["kind"] == "missing-export")
+    print(f'배선 무결성 게이트(importWiringPolicy={policy}): 모듈 {len(entries)}종 · 걸어본 {res["walked"]}종'
+          f" — 파일 없음 {miss_file} · export 없음 {miss_export} · 확인 못 함 {len(unchecked)}")
+    for u in unchecked[:8]:
+        print(f'  · [확인 못 함] {u["key"]}: {u["why"]} — 이 대상의 export 집합을 확정할 수 없어 **없다고 단정하지 않는다**')
+    if len(unchecked) > 8:
+        print(f"  · [확인 못 함] … 외 {len(unchecked) - 8}건")
+    if not violations:
+        print("  ✓ 로컬 import 전부가 실재하는 파일의 실재하는 export를 가리킨다 — 부분 동기화 0건.")
+        return
+    lines = [format_wiring_violation(v) for v in violations]
+    if policy == "hard":
+        print(f"\n✗ 배선이 깨졌다 {len(violations)}건 — 이 게이트들은 판정이 아니라 크래시를 낸다:", file=sys.stderr)
+        for l in lines:
+            print(f"  ✗ {l}", file=sys.stderr)
+        print("\n→ 정본에서 해당 모듈을 다시 복사하라(`prompts/update.md` 2단계 — **게이트가 import하는 모듈까지 전이적으로** diff 대상이다).",
+              file=sys.stderr)
+        sys.exit(1)
+    for l in lines:
+        print(f"  ⚠ {l}")
+    print("→ 해소는 정본 재복사 하나뿐이다(면제 경로 없음). 깨진 배선은 정책 강도와 무관하게 게이트를 죽인다.")
+
+
 def cmd_watchdog(cfg):
     root = cfg["__root"]
     policy = str(cfg.get("watchdogPolicy") or "advisory")
@@ -6052,6 +6263,8 @@ def main():
         cmd_processssot(cfg)
     elif sub == "watchdog":
         cmd_watchdog(cfg)
+    elif sub == "importwiring":
+        cmd_importwiring(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)

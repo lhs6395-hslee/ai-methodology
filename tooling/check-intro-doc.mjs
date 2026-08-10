@@ -13,7 +13,7 @@ import { execSync } from "node:child_process";
 import { loadConfig, resolveFromRoot, isSpecMdName } from "./sdd-config.mjs";
 import { ruleIdsOf, missingRuleIds, citedCounts, countMismatches, companionMissing } from "./intro-doc-lib.mjs";
 
-import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
 
 function main() {
   const cfg = loadConfig();
@@ -127,4 +127,4 @@ function actualCounts(cfg, ROOT, ruleIds) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { armVerdict(); main(); }
+if (isMainEntry(import.meta.url)) { armVerdict(); main(); }

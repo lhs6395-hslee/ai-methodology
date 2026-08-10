@@ -50,6 +50,7 @@ export const RATCHETED_POLICIES = [
   "implReferencePolicy",
   "processSsotPolicy",
   "watchdogPolicy",
+  "importWiringPolicy",
   "liveRealityCoveragePolicy",
 ];
 

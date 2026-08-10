@@ -17,7 +17,7 @@ import {
   DEFAULT_WATCHDOG_RECEIPT, DEFAULT_WATCHDOG_CI_GLOBS,
 } from "./watchdog-lib.mjs";
 
-import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
 
 function main() {
   const cfg = loadConfig();
@@ -89,4 +89,4 @@ function main() {
   if (!warnings.length) console.log("  ✓ 우회 불가한 채널(CI)에 스윕이 배선돼 있고 채택 영수증이 실재한다.");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { armVerdict(); main(); }
+if (isMainEntry(import.meta.url)) { armVerdict(); main(); }

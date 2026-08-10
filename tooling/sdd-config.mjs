@@ -176,6 +176,15 @@ export const DEFAULTS = {
   // ⚠ `.sdd/`에 두지 않는다 — 그쪽은 gitignore라 채택 선언이 체크아웃마다 사라진다.
   watchdogReceipt: null,
   watchdogCiGlobs: null,
+
+  // 배선 무결성(SPEC-050) — **게이트가 애초에 로드되는가.** 실측 제보: update 절차의 diff가
+  // 공유 lib 27개를 빠뜨려 게이트는 최신·lib은 구판인 **부분 동기화**가 됐고, 소비처는 판정이
+  // 아니라 `SyntaxError: … does not provide an export named …`를 받았다. 파일이 없는 것도
+  // 아니어서 배포 폐포 계약(SPEC-004)으로도 안 잡힌다 — 그건 파일 실재, 이건 export 실재다.
+  importWiringPolicy: "advisory",
+  // 판정 대상 확장자. null이면 킷 기본(`["mjs","js"]`) — 코드에 고정하면 목록 밖 설치에서
+  // 판정이 통째로 사라지고 그 0건이 진짜 0건과 구분되지 않는다(SPEC-038 계열).
+  importWiringExtensions: null,
   sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.

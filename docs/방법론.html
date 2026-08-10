@@ -635,6 +635,27 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
   <p><code>--git-dir</code>과 <code>core.hooksPath</code>를 <strong>손으로 합치던 방식</strong>이 바로 그 결함의 원인이었다. git에게 한 번 묻는 것이 정답이다.</p>
   <p class="note">그런데 이 결함을 몇 달간 가린 것은 경로 버그 자체가 아니었다. <strong>best-effort 침묵</strong>이었다 — 설치기가 "깔았다"고 말한 뒤 그 자리에 실행 가능한 훅이 실제로 있는지 <em>세지 않았다.</em> 이제 설치기가 배선 건수를 실측해 <strong>0건이면 실패로 말한다.</strong> 조용한 0건이 이 결함의 본체다.</p>
 
+  <h4>절반만 새것인 설치는 게이트가 아니라 크래시를 낸다 <span class="note">(규칙 R18)</span></h4>
+  <p>여기까지의 모든 규칙은 <strong>게이트가 실행된다</strong>는 전제에 서 있다. R17이 "게이트를 돌리는가"를 물었다면, 이 규칙은 한 칸 더 앞을 묻는다 — <strong>돌리려 해도 로드가 되는가?</strong></p>
+  <p>실측 제보는 이렇게 왔다. 어떤 프로젝트가 킷 최신화 절차를 따라 게이트를 갱신했는데, diff를 "내용이 다른 파일" 기준으로 훑는 방식이어서 <strong>공유 lib 27개가 목록에서 빠졌다.</strong> 그중 하나가 구판으로 남은 결과 다른 게이트가 판정 대신 이것을 냈다:</p>
+  <pre><span class="r">SyntaxError</span>: The requested module './ownership-keys.mjs'
+             does not provide an export named 'bodyBeforeOwnership'</pre>
+  <p><strong>부분 동기화</strong>다. 게이트 코드는 최신이고 lib은 구판이다. 이 상태가 기존 어떤 축에도 걸리지 않은 이유가 중요하다 — 킷에는 이미 "배포 목록의 전이 폐포" 계약이 있었는데, 그것은 <em>파일이 배포되는가</em>를 보고 이 결함은 <em>배포된 파일이 요구된 export를 갖는가</em>다. <strong>파일은 거기 있었다.</strong> 한 칸 더 안쪽이었다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>회계</th><th>뜻</th><th>소비처가 받는 것</th></tr>
+    <tr><td><strong>파일 없음</strong></td><td>복사 목록 누락</td><td><code>ERR_MODULE_NOT_FOUND</code></td></tr>
+    <tr><td><strong>export 없음</strong></td><td><strong>부분 동기화</strong> — 제보의 결함이 이것이다</td><td><code>SyntaxError</code></td></tr>
+    <tr><td><strong>확인 못 함</strong></td><td>파서가 export 집합을 확정할 수 없는 형태</td><td class="note">위반도 clean도 아니다 — 표면화하고 차단하지 않는다</td></tr>
+  </table></div>
+  <p>이 축은 <strong>아무 게이트도 실행하지 않고</strong> 판정한다. import 그래프는 정적으로 결정 가능하고, <em>정적으로 결정 가능한 것을 사람에게 맡기지 않는다.</em> 판정 시작점은 게이트 자신이 놓인 디렉터리의 모듈 전부다 — 설치 위치를 물어보지 않는다(게이트는 자기가 어디 있는지 안다). 모듈이 0건이면 <strong>INERT</strong>다: Python 런타임 전용 설치라면 정상이고, <strong>0건은 '깨끗함'이 아니라 '볼 것이 없음'이다.</strong></p>
+  <p class="note">오탐이 이 축의 사망 원인이므로(오탐이 잦은 게이트는 꺼진다) 킷 전체를 교정 집합으로 먼저 재고 도입했다 — <strong>명명 import 456건 대조, 오탐 0건.</strong> 그리고 파서가 모델하지 못하는 export 형태를 만나면 "없다"고 단정하지 않고 <strong>확인 못 함으로 자백한다.</strong> 실측 한 토막: 이 게이트를 처음 돌렸을 때 유일한 발견이 <em>자기 자신의 주석에 있던 예시 코드</em>였다 — 주석 속 예시는 인용이지 결정이 아니다.</p>
+
+  <h4>크래시의 마지막 줄은 원인이 아니다</h4>
+  <p>같은 제보가 부수적으로 드러낸 것. 위 <code>SyntaxError</code>가 났을 때 스윕이 사유로 보고한 문장은 이것이었다:</p>
+  <pre>(미판정: 판정 타입 없이 비정상 종료) — <span class="r">Node.js v22.22.2</span></pre>
+  <p>스윕은 게이트 출력의 <strong>마지막 줄</strong>을 요약으로 뽑았고, 크래시 stderr의 마지막 줄은 <strong>런타임 버전 배너</strong>였다. 원인 줄은 스택 프레임 위에 묻혀 있었으므로 제보자가 스택을 직접 읽어야 했다. <em>마지막 줄이 요약인 것은 게이트가 협조적으로 끝났을 때만 참이다 — 크래시는 협조가 아니다.</em></p>
+  <p class="note">이제 요약은 스택 프레임·캐럿·버전 배너를 <strong>형태로</strong> 걸러낸 뒤 던져진 오류 줄을 고른다(특정 런타임의 어휘에 기대면 다른 런타임에서 통째로 빗나간다). 침묵이 아니라 <strong>오진</strong>이었던 사례다 — 게이트 크래시는 원래도 미판정으로 계상돼 초록이 아니었지만, 사유가 쓸모없으면 사람이 원인까지 가는 길이 없다.</p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>
@@ -655,7 +676,7 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">16</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">22</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">50</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">17</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">23</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">51</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 

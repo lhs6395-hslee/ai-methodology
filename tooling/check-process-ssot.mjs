@@ -18,7 +18,7 @@ import {
   statelessStageFindings, unownedStateFindings, DEFAULT_PROCESS_DOC_REGEX,
 } from "./process-ssot-lib.mjs";
 
-import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
+import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
 
 function main() {
   const cfg = loadConfig();
@@ -137,4 +137,4 @@ function main() {
   if (!warnings.length) console.log("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐다.");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) { armVerdict(); main(); }
+if (isMainEntry(import.meta.url)) { armVerdict(); main(); }

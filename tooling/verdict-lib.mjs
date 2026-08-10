@@ -100,7 +100,8 @@ export function inertReasons(policy, checks) {
 // ⚠ `console.log`를 쓰지 않는 이유: stdout이 파이프일 때 Node의 쓰기는 비동기라
 // `process.on("exit")` 안에서는 유실될 수 있다. 스윕은 게이트를 파이프로 잡으므로
 // 그 유실이 곧 "판정 줄 없음"= UNTYPED 오분류가 된다. `fs.writeSync(1, …)`은 동기다.
-import { writeSync } from "node:fs";
+import { writeSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 let PENDING = null;
 
@@ -127,4 +128,23 @@ export function armVerdict(opts = {}) {
 // 흔한 판정을 한 줄로 — 위반 건수만 주면 JUDGED의 사유 문구가 통일된다(어휘 표류 방지).
 export function judged(violations = 0) {
   verdict(VERDICT_KINDS.JUDGED, violations > 0 ? `위반 ${violations}건` : "위반 0건");
+}
+
+// 이 파일이 직접 실행된 엔트리인가 — **realpath 비교다.**
+//
+// `import.meta.url === \`file://${process.argv[1]}\`` 문자열 비교는 두 곳에서 갈린다:
+//   (a) 경로에 비-ASCII가 있으면 `import.meta.url`만 퍼센트 인코딩된다
+//       (`…/한글경로/g.mjs` → `…/%ED%95%9C…/g.mjs`)
+//   (b) macOS `/var`↔`/private/var` 심볼릭 링크
+// 갈리면 main 블록이 **조용히 실행되지 않고** 게이트는 한 줄도 없이 exit 0 — 통과가 아니라
+// 무음 미실행인데 exit 코드만 보는 확인은 초록으로 읽는다(SPEC-021 실측: 한글 경로 소비
+// 프로젝트에서 `runTestsPolicy: hard`가 여러 라운드 거짓 green).
+//
+// 이 함수가 **공용**인 이유: 킷은 이 결함을 한 번 고쳤는데(check-test-run·check-schema-drift·
+// sdd-sync) 세 곳에 각자 복사됐고, 그 뒤 새로 만든 게이트 3종이 **깨진 형태를 다시 도입했다**
+// (R15·R16·R17). 규범이 세 번 복사되면 네 번째는 규범을 모른다 — 그래서 정의를 한 곳에 두고,
+// 깨진 형태의 재유입은 `verdict-contract.test.mjs`가 금지한다(고친 것으로 끝내지 않는다).
+export function isMainEntry(metaUrl) {
+  try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(process.argv[1]); }
+  catch { return false; }
 }

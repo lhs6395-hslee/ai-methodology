@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { gateOutcome } from "../sdd-sync.mjs";
+import { gateOutcome, crashSummary } from "../sdd-sync.mjs";
 
 const SYNC = new URL("../sdd-sync.mjs", import.meta.url).pathname;
 
@@ -117,7 +117,7 @@ test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내�
   assert.equal(rep.schemaVersion, 2);   // SPEC-040: tally·kind 추가
   assert.equal(typeof rep.clean, "boolean");
   assert.ok(Array.isArray(rep.flaggedRules));
-  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17"]);
+  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18"]);
   for (const rule of rep.rules) {
     assert.equal(typeof rule.title, "string");
     assert.equal(typeof rule.flagged, "boolean");
@@ -145,4 +145,43 @@ test("--json 위반 프로젝트 → clean:false·flaggedRules 반영, --strict�
   const rule3 = rep.rules.find((x) => x.id === "R3");
   assert.equal(rule3.flagged, true);
   assert.equal(run(dir, ["--json", "--strict"]).code, 1);
+});
+
+// ── 크래시 요약 — 원인 줄을 고른다(SPEC-050 동반) ────────────────────────────
+// 실측 제보(2026-08-10): 부분 동기화로 게이트가 SyntaxError로 죽었는데 스윕이 사유로 보고한 것은
+// **`Node.js v22.22.2`** 였다. `lastLine(stderr)`이 뽑은 마지막 줄이 런타임 배너였기 때문이다.
+// 마지막 줄이 요약인 것은 게이트가 협조적으로 끝났을 때만 참이다 — 크래시는 협조가 아니다.
+// @covers SPEC-050/FR-005
+const ESM_EXPORT_CRASH = [
+  "file:///p/scripts/check-spec-consistency.mjs:8",
+  'import { parseSection, bodyBeforeOwnership } from "./ownership-keys.mjs";',
+  "                       ^^^^^^^^^^^^^^^^^^^",
+  "SyntaxError: The requested module './ownership-keys.mjs' does not provide an export named 'bodyBeforeOwnership'",
+  "    at ModuleJob._instantiate (node:internal/modules/esm/module_job:226:21)",
+  "    at async ModuleJob.run (node:internal/modules/esm/module_job:335:5)",
+  "",
+  "Node.js v22.22.2",
+  "",
+].join("\n");
+
+test("크래시 요약은 런타임 배너가 아니라 던져진 오류 줄이다 — 제보의 오진을 닫는다", () => {
+  const s = crashSummary(ESM_EXPORT_CRASH);
+  assert.match(s, /does not provide an export named 'bodyBeforeOwnership'/);
+  assert.doesNotMatch(s, /^Node\.js v/);
+});
+
+test("스택 프레임·캐럿·빈 줄은 요약 후보가 아니다 — 형태로 가른다(런타임 어휘에 기대지 않는다)", () => {
+  const s = crashSummary("    at foo (x:1:2)\n   ^^^\n\nTypeError: bad\nNode.js v20.0.0");
+  assert.equal(s, "TypeError: bad");
+});
+
+test("오류 줄이 없으면 첫 줄이다 — 크래시 stderr의 첫 줄은 대개 원인, 마지막 줄은 대개 배너다", () => {
+  assert.equal(crashSummary("설정 파일을 읽을 수 없다: sdd.config.json\nNode.js v22.0.0"),
+    "설정 파일을 읽을 수 없다: sdd.config.json");
+});
+
+test("gateOutcome이 크래시에서 그 요약을 쓴다 — 배선까지 확인한다(코어만 고쳐도 소용없다)", () => {
+  const o = gateOutcome({ file: "check-spec-consistency.mjs", crashed: true, stdout: "", stderr: ESM_EXPORT_CRASH });
+  assert.match(o.summary, /does not provide an export named/);
+  assert.equal(o.flagged, true);
 });
