@@ -26,8 +26,19 @@ T="$PWD"
 say(){ printf '%s\n' "$1"; }
 warn(){ printf '%s\n' "$1" >&2; }   # 경고는 stderr — 조용한 스킵 금지
 GITWARN=0                            # .git 부재로 훅 배선을 건너뛰면 1 (완료 안내에서 재요약)
-copy(){ # $1=src $2=dst : 없을 때만(또는 --force)
+copy(){ # $1=src $2=dst : 없을 때만(또는 --force) — **프로젝트가 편집하는 씨앗 파일**용
+  # (sdd.config.json·템플릿·MODULE_MAP 등). 여기서 갱신하면 사용자 편집을 덮어쓴다.
   if [ -e "$2" ] && [ "$FORCE" -eq 0 ]; then say "· 유지(이미 있음): ${2#"$T"/}"
+  else mkdir -p "$(dirname "$2")"; cp "$1" "$2"; say "+ ${2#"$T"/}"; fi
+}
+sync_copy(){ # $1=src $2=dst : **킷 소유 산출물**용 — 내용이 다르면 항상 갱신한다.
+  # 실측 제보(2026-08-10): `copy`가 "있으면 skip"이라 재실행이 게이트·하네스 스크립트를 **갱신하지
+  # 않았다.** 그래서 훅에 새 게이트를 배선한 커밋이 머지돼도 실제 커밋 경로는 낡은 사본을 계속
+  # 실행했고, 그 상태에서 감시 게이트가 한 번도 발동하지 못했다(hard 정책인데도).
+  # 킷 소유 파일은 프로젝트가 편집할 대상이 아니므로 덮어쓰기가 정답이다 — 편집해야 하는 것은
+  # config이고, 그건 위 `copy`가 보존한다. **존재만 확인하고 skip하지 않는다.**
+  if [ -e "$2" ] && cmp -s "$1" "$2"; then say "· 최신(동일): ${2#"$T"/}"
+  elif [ -e "$2" ]; then mkdir -p "$(dirname "$2")"; cp "$1" "$2"; say "↻ 갱신(낡은 사본 교체): ${2#"$T"/}"
   else mkdir -p "$(dirname "$2")"; cp "$1" "$2"; say "+ ${2#"$T"/}"; fi
 }
 
@@ -99,7 +110,7 @@ case "$GATE" in
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
                  verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs; do
-          copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
+          sync_copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
 
@@ -119,19 +130,19 @@ fi
 # ── 2b. 하네스 (선택) — 인터랙티브 spec↔code sync (Claude Code 1차) ──
 # 하네스 detector는 Node 게이트를 쓰므로 --gate=node 일 때만 설치.
 if [ "$GATE" = "node" ]; then
-  copy "$KIT/tooling/sdd-sync.mjs"               "$T/scripts/sdd-sync.mjs"
-  copy "$KIT/tooling/harness/sdd-sync.SKILL.md"  "$T/.claude/skills/sdd-sync/SKILL.md"
-  copy "$KIT/tooling/harness/pre-push"           "$T/scripts/sdd-pre-push.sh"
+  sync_copy "$KIT/tooling/sdd-sync.mjs"               "$T/scripts/sdd-sync.mjs"
+  sync_copy "$KIT/tooling/harness/sdd-sync.SKILL.md"  "$T/.claude/skills/sdd-sync/SKILL.md"
+  sync_copy "$KIT/tooling/harness/pre-push"           "$T/scripts/sdd-pre-push.sh"
   say "  → pre-push는 아래 훅 배선 단계에서 설치된다(선택 아님 — 미설치면 R4 sync가 한 번도 안 돈다)"
   say "  → 계약: $KIT/HARNESS.md  · 스킬: /sdd-sync"
 
   # ── hook 세트 배선: 채택 순간 = 상시 강제 궤도 ─────────────────
-  copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
-  copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
-  copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
-  copy "$KIT/tooling/harness/sdd-deploy-precheck.sh"  "$T/scripts/sdd-deploy-precheck.sh"
-  copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
-  copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
+  sync_copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
+  sync_copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"
+  sync_copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
+  sync_copy "$KIT/tooling/harness/sdd-deploy-precheck.sh"  "$T/scripts/sdd-deploy-precheck.sh"
+  sync_copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
+  sync_copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
   # 배포 부채 파일은 **로컬 세션 기억 장치**다(SPEC-035) — 커밋 대상이 아니다.
   # 추적되면 부채가 팀 diff에 섞이고, 더 나쁘게는 "커밋해서 없앤다"가 갚는 방법이 된다.
   if [ -f "$T/.gitignore" ] && ! grep -qx '\.sdd/' "$T/.gitignore"; then
@@ -158,9 +169,9 @@ if [ "$GATE" = "node" ]; then
   fi
 
   # commit-msg 훅 + speckit-fix 스킬
-  copy "$KIT/tooling/harness/commit-msg" "$T/scripts/sdd-commit-msg.sh"
+  sync_copy "$KIT/tooling/harness/commit-msg" "$T/scripts/sdd-commit-msg.sh"
   mkdir -p "$T/.claude/skills/speckit-fix"
-  copy "$KIT/tooling/harness/speckit-fix.SKILL.md" "$T/.claude/skills/speckit-fix/SKILL.md"
+  sync_copy "$KIT/tooling/harness/speckit-fix.SKILL.md" "$T/.claude/skills/speckit-fix/SKILL.md"
   if [ -n "$HOOKS_DIR" ]; then
     printf '#!/bin/sh\nsh scripts/sdd-commit-msg.sh "$1"\n' > "$HOOKS_DIR/commit-msg"
     chmod +x "$HOOKS_DIR/commit-msg"
@@ -173,7 +184,7 @@ if [ "$GATE" = "node" ]; then
   # prompts/의 정본 절차를 일관되게 실행하는 설치형 슬래시 명령(SPEC-005). SSOT는 prompts/.
   for sk in sdd-start sdd-readopt sdd-update sdd-migrate; do
     mkdir -p "$T/.claude/skills/$sk"
-    copy "$KIT/tooling/harness/$sk.SKILL.md" "$T/.claude/skills/$sk/SKILL.md"
+    sync_copy "$KIT/tooling/harness/$sk.SKILL.md" "$T/.claude/skills/$sk/SKILL.md"
   done
   say "  → 수명주기 스킬 설치: /sdd-start · /sdd-readopt · /sdd-update · /sdd-migrate"
 
@@ -190,7 +201,7 @@ if [ "$GATE" = "node" ]; then
   # ⚠ 훅 목록을 여기 하드코딩하지 않는다 — 선언은 `agent-hooks.list` 하나이고 설치기와 게이트가
   # 같은 파일을 읽는다(SPEC-036에서 배운 것). 이전 판은 이 자리에 JSON을 박아뒀고, 그 JSON이
   # 사실상 정본인데 **어떤 검사도 그것과 대조되지 않았다.**
-  copy "$KIT/tooling/harness/agent-hooks.list" "$T/scripts/agent-hooks.list"
+  sync_copy "$KIT/tooling/harness/agent-hooks.list" "$T/scripts/agent-hooks.list"
   mkdir -p "$T/.claude"
   SETTINGS="$T/.claude/settings.json"
   # 병합은 게이트가 계산하고(선언 하나에서 설치·판정이 함께 나온다) 쓰기는 여기서 한다.

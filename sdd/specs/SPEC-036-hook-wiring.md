@@ -21,6 +21,10 @@
 - 목록 탐색은 **프로젝트 선언이 킷 기본값을 이긴다** — 킷 경로를 먼저 보면 소비 프로젝트를 검사할 때 그 프로젝트가 선언하지도 않은 훅을 미설치로 지목한다(테스트가 실측으로 잡은 버그).
 - 기본 `advisory`. 훅 배선은 채택 절차의 산물이라 즉시 hard로 두면 초기 채택이 막힌다 — 배선 완료 후 `hard`로 올린다(래칫이 하향을 막는다).
 - **훅 디렉토리는 git에게 묻는다 — `.git/hooks`를 문자열로 가정하지 않는다.** 실측 제보(2026-08-10): 워크트리에서 `.git`은 **파일**이라 `[ -d .git ]` 가드가 실패하고 배선이 통째로 스킵됐으며, `--git-dir`도 답이 아니다(워크트리 전용 디렉토리에는 hooks가 없다). 그 스킵이 best-effort 침묵이라 도입 프로젝트는 commit-msg·pre-commit·pre-push가 **한 번도 발동한 적이 없는 상태로 몇 달을 갔고 그날의 모든 커밋이 게이트를 우회했다.** `git rev-parse --git-path hooks` 한 번이 worktree·`core.hooksPath`·bare를 동시에 해결한다 — 손 조합이 바로 그 결함의 원인이었다. 그리고 **설치 0건을 조용히 넘기지 않는다**: 설치기가 실측으로 세어 0건이면 실패로 말한다(조용한 0건이 이 결함의 본체다).
+- **낡은 사본은 미설치와 동급이다** — 훅이 있고 실행 가능하고 킷 마커까지 있어도 내용이 낡으면 그 훅이 부르기로 된 게이트는 발동하지 않는다. 실측: 누락된 5행이 게이트 호출 블록 전체였고 `processCompliancePolicy: hard`가 한 번도 발동하지 못했다.
+- **원본 미선언과 원본 읽기 실패는 다른 사실이다** — 전자는 신선도를 판정하지 않고(위반 아님), 후자는 "확인 못 함"으로 계상한다(통과 아님). 미선언을 읽기 실패로 취급하면 원본이 없는 훅 전부가 소음이 되고, 소음이 되는 순간 사람이 정책을 끈다.
+- **신선도는 마커·권한 판정 뒤에 온다** — 미설치·남의 훅 점유가 `stale`로 가려지면 해소 방법이 뒤바뀐다.
+- **설치기는 킷 소유 사본을 '있으면 skip'하지 않는다** — 그것이 이 결함의 원인 절반이었다. 단 **프로젝트가 편집하는 씨앗 파일**(config·템플릿)은 반대로 보존한다: 거기서 덮어쓰면 사용자 편집이 사라진다. 두 의미를 한 함수에 담지 않는다(`copy` vs `sync_copy`).
 
 ---
 
@@ -30,6 +34,7 @@
 - **FR-001** (state): WHILE `hooksInstalledPolicy` is off, **check-hooks-installed.mjs** (S) SHALL perform no evaluation and exit zero. — capability: **hook-wiring.gate** (C).
 - **FR-002** (event): WHEN the policy is advisory or hard, the **hook-wiring** (E) core in **hooks-install-lib.mjs** (S) SHALL read the declared hook names from **hooks.list** (S) and classify each declared hook as missing, not executable, or foreign to the kit.
 - **FR-003** (unwanted): IF any declared hook is unwired while the policy is hard, THEN THE SYSTEM SHALL report that gate scripts exist without ever firing and exit non-zero.
+- **FR-005** (unwanted): IF an installed hook's content differs from the source declared for it in the hook list, THEN the **hooks-install** (E) core in **hooks-install-lib.mjs** (S) SHALL report it as stale and treat it as equivalent to not installed; IF that source was declared but could not be read, THEN it SHALL report that the freshness could not be checked rather than reporting the hook as clean; and the installer SHALL refresh a kit-owned copy whose content differs rather than skipping it because the destination exists.
 - **FR-004** (state): WHILE resolving the hook directory, THE SYSTEM SHALL honour the repository's configured hooks path, SHALL prefer a project-local hook list over the kit's own, and SHALL stay silent outside a git repository.
 
 ### Key Entities
@@ -78,5 +83,6 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | FR-005 신설 — 신선도 축 2종(`stale`·`source-unreadable`) + `hooks.list`의 선택적 원본 경로 컬럼(`parseHookEntries` 단일 파서, `parseHookList`는 그 투영) + 게이트가 미판정 훅을 매 실행 밝힘 + 설치기에 `sync_copy`(킷 소유 사본은 내용이 다르면 항상 갱신, 씨앗 파일은 `copy`로 보존) | **SPEC-036이 막으려던 실패의 재발**(실측 제보, gsn-ai-pm-management-tool): 이 게이트가 **낡은 사본을 green으로 보고했고** hard로 켜둔 감시 게이트가 한 번도 발동하지 못했다 — `scripts/sdd-commit-msg.sh`(31행)에는 게이트 호출이 있는데 `.git/hooks/commit-msg`(26행)에는 없었고 누락된 5행이 호출 블록 전체였다. 게이트를 직접 부르면 exit 1·위반 3건이었으니 **게이트는 옳았고 배선이 낡았을 뿐이다.** 이 스펙의 전제는 "훅이 없으면 아무것도 발동하지 않는다"였는데 **훅이 있어도 낡으면 같은 결과**라는 경우가 판정에서 빠져 있었다 — 훅 경로를 문자열로 가정해 워크트리에서 조용히 skip한 선례와 같은 층이다. 원인 절반은 설치기였다: `copy`가 "있으면 skip"이라 재실행이 사본을 갱신하지 않았다. `copy`를 통째로 바꾸지 않은 이유는 그 함수가 `sdd.config.json`·템플릿도 옮기기 때문이다 — 거기서 덮어쓰면 사용자 편집이 사라지므로 **의미가 다른 두 복사를 분리**했다. 미선언(`source` 키 없음)과 읽기 실패(`null`)를 가른 이유: 합치면 원본이 없는 훅 전부가 `source-unreadable` 소음이 되고 오탐이 잦은 게이트는 꺼진다 [검증: tooling/__tests__/hooks-install.test.mjs] |
 | 2026-08-10 | 훅 경로 해석을 `git rev-parse --git-path hooks` 단일 호출로 전환(게이트·`sdd-init.sh`·`self-hooks-install.sh` 3사이트) + 설치기가 **배선 건수를 실측해 0건이면 실패**로 알림 + 워크트리 회귀 테스트 4종(경로 해석 전제·채택 e2e·`core.hooksPath`·손 조합 금지 계약) | 실측 제보: 도입 프로젝트가 워크트리 기반이라 게이트 훅이 **한 번도 발동한 적이 없었다** — 워크트리에서 `.git`은 파일이고 `--git-dir`은 hooks 없는 디렉토리를 준다. 손 조합(`--git-dir` + `core.hooksPath`)이 원인이었고, git에게 한 번 묻는 것이 정답이다. best-effort 침묵이 이 결함을 몇 달간 가렸으므로 설치 건수를 실측해 말한다. 손 조합 금지는 계약 테스트로 고정했고, 그 테스트는 **주석을 코드로 읽지 않도록** SPEC-044의 정본 헬퍼로 전줄 주석을 걷어낸다. 범위: 이 해석은 git 2.5+ (worktree 도입) 이후 모든 git에서 성립한다 [검증: tooling/__tests__/hooks-install.test.mjs] |
 | 2026-08-02 | 초안 — `hooksInstalledPolicy` + `hooks.list`(단일 선언) + `hooks-install-lib`(파싱·3분기) + `check-hooks-installed` 게이트 + sdd-sync R12, 설치기 마커·자기검증 | 실측 제보: 게이트 스크립트는 있는데 `.git/hooks`가 비어 있어 강제가 한 번도 발동하지 않았고, 그 상태가 green으로 읽혔다. 게이트의 inert만 보고 훅의 inert를 안 보면 "설치 안 된 강제"가 통과한다. 킷 자신에게 돌리자마자 이 컨테이너의 실제 미설치 4종을 잡았다. 범위: 미설치 4종은 이 개발 컨테이너 1대의 관측이고, 여기서 끌어낸 규칙은 "선언된 훅이 `.git/hooks`에 없으면 표면화한다"는 것뿐이다 — 훅 경로는 `core.hooksPath`로 바뀔 수 있어 게이트는 설정된 경로를 읽는다(1대 관측을 경로 가정으로 굳히지 않는다) [검증: tooling/__tests__/hooks-install.test.mjs] |

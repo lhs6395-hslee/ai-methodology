@@ -679,6 +679,23 @@ DEPLOY_TICKETS=$(git log --format=%B "$RANGE" | grep -oE <span class="r">'PJT-[0
   <p class="note">매처는 <strong>부분집합</strong>으로 판정한다. 프로젝트가 감시 도구를 넓히는 것(<code>Write|Edit</code> → <code>Write|Edit|MultiEdit</code>)은 정당한 강화인데 정확 일치를 요구하면 그것이 전부 위반이 되고, 오탐이 잦은 게이트는 꺼진다. 좁혀서 어떤 도구가 감시 밖으로 나가면 <strong>그 도구를 이름으로</strong> 말한다.</p>
   <p class="note"><strong>자동 치유는 두지 않았다.</strong> 게이트가 설정을 직접 고쳐 배선할 수도 있었지만, 판정 게이트가 판정 대상을 고치면 그 게이트는 언제나 초록이고 <em>초록의 의미가 사라진다.</em> 생성 모드는 배선을 <strong>산출만</strong> 하고 쓰기는 설치기가 한다. 그리고 이 축은 <strong>배선의 실재만</strong> 판정한다 — 훅이 발동한 뒤 에이전트가 경고를 따르는지는 다른 층이고(차단 분기 발화 회계), 두 사실을 합치면 "훅이 깔렸다"가 "에이전트가 따랐다"로 읽힌다.</p>
 
+  <h4>훅이 있어도 낡으면 없는 것과 같다</h4>
+  <p>훅 배선 축(R12)은 "훅이 없으면 아무것도 발동하지 않는다"는 전제로 만들어졌다. 그 전제에 빠진 경우가 있었다 — <strong>훅이 있는데 낡은 경우</strong>다. 실측 제보:</p>
+  <pre>scripts/sdd-commit-msg.sh  (저장소본, 31행)  게이트 호출 <span class="g">있음</span>
+.git/hooks/commit-msg      (설치본,   26행)  그 호출 <span class="r">없음</span>  ← 누락 5행이 호출 블록 전체
+processCompliancePolicy = hard                게이트 직접 호출 → exit 1, 위반 3건
+check-hooks-installed                         <span class="r">OK (선언 3종 · 설치 3종)</span></pre>
+  <p><strong>게이트는 옳았다.</strong> 배선이 낡았을 뿐이고, 판정이 존재·실행권한·킷 마커 3종만 봤기 때문에 배선이 빠진 사본이 "설치됨"으로 계산됐다. 그 결과 hard로 켜둔 감시 게이트가 <em>한 번도 발동하지 못했다.</em></p>
+  <p>원인은 두 층이었고, 둘 다 이 킷이 이미 한 번 배운 실패의 재발이다:</p>
+  <div class="tablewrap"><table>
+    <tr><th>층</th><th>무엇이 잘못됐나</th><th>같은 계열의 선례</th></tr>
+    <tr><td>설치기</td><td>사본이 <strong>있으면 skip</strong> — 원본이 바뀌어도 갱신하지 않았다</td><td>워크트리에서 훅 경로를 문자열로 가정해 조용히 skip</td></tr>
+    <tr><td>판정</td><td>존재·권한·마커만 보고 <strong>내용 신선도</strong>를 대조하지 않았다</td><td>"존재는 실행이 아니다"의 한 층 더 안쪽</td></tr>
+  </table></div>
+  <p>판정 종류에 둘을 더했다. <strong><code>stale</code></strong>(설치본이 원본과 다르다 — <em>미설치와 동급</em>으로 다룬다)과 <strong><code>source-unreadable</code></strong>(원본을 읽지 못해 신선도를 확인하지 못했다 — <em>통과가 아니다</em>). 그리고 설치기는 킷 소유 사본을 내용이 다르면 항상 갱신한다.</p>
+  <p class="note">단 <strong>모든 복사를 갱신하게 만들지는 않았다.</strong> 같은 함수가 <code>sdd.config.json</code>·템플릿도 옮기는데, 거기서 덮어쓰면 <em>사용자 편집이 사라진다.</em> 킷이 소유한 것은 갱신하고 프로젝트가 편집하는 씨앗은 보존한다 — 의미가 다른 두 복사를 한 함수에 담지 않는다.</p>
+  <p class="note">그리고 <strong>원본 미선언과 원본 읽기 실패를 가른다.</strong> 원본이 선언되지 않은 훅은 신선도를 <em>판정하지 않고</em>(위반이 아니다), 선언됐는데 못 읽으면 "확인 못 함"으로 계상한다. 둘을 합치면 원본이 없는 훅 전부가 소음이 되고, <em>소음이 되는 순간 사람이 정책을 끈다.</em> 미판정 훅은 매 실행 이름과 함께 표면화된다 — 안 본 것을 조용히 초록에 합산하지 않는다.</p>
+
   <h4>결정적인 것과 옳은 것은 다르다 — 게이트도 고장 난다</h4>
   <p>"게이트는 결정적이라 신뢰할 수 있다"는 논거는 <strong>절반만 맞다.</strong> 틀린 게이트는 <strong>틀린 답을 결정적으로 재현한다.</strong> 그리고 검증 도구의 고장은 실패가 아니라 <strong>통과</strong>로 나타나므로 일반 테스트로 드러나지 않는다 — 실측 제보에서 어떤 게이트는 티켓 19건을 흘리면서 green이었다.</p>
   <p>그래서 스윕에 등재된 게이트는 <strong>자기 차단 능력을 증명하는 테스트</strong>를 가져야 한다. <strong>통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.</strong></p>

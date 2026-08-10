@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SDD_HOOK_MARKER, parseHookList, hookFindings } from "../hooks-install-lib.mjs";
+import { SDD_HOOK_MARKER, parseHookList, hookFindings , parseHookEntries, HOOK_FINDING_TEXT } from "../hooks-install-lib.mjs";
 
 const GATE = new URL("../check-hooks-installed.mjs", import.meta.url).pathname;
 
@@ -53,7 +53,7 @@ test("게이트 e2e: 미설치는 advisory ⚠ · hard ✗ / 설치되면 침묵
 
     const adv = run("advisory");
     assert.equal(adv.code, 0);
-    assert.match(adv.out, /pre-commit 미설치/);
+    assert.match(adv.out, /pre-commit: 설치되지 않았다/);
     assert.match(adv.out, /한 번도 발동하지 않는다/);
 
     const hard = run("hard");
@@ -148,4 +148,67 @@ test("배선 사이트가 훅 경로를 손으로 조합하지 않는다 — `--
   const self = code("tooling/harness/self-hooks-install.sh");
   assert.match(self, /rev-parse --git-path hooks/);
   assert.doesNotMatch(self, /mkdir -p \.git\/hooks/, "`.git/hooks` 문자열 가정이 남아 있다");
+});
+
+// ── 신선도 축(SPEC-036 재발 봉합) — 낡은 사본은 미설치와 동급이다 ─────────────
+// 실측 제보(2026-08-10, gsn-ai-pm-management-tool): 이 게이트가 **낡은 사본을 green으로 보고했고**
+// hard로 켜둔 감시 게이트가 한 번도 발동하지 못했다.
+//     scripts/sdd-commit-msg.sh (31행) — 게이트 호출 있음
+//     .git/hooks/commit-msg     (26행) — 그 호출 **없음**(누락 5행이 호출 블록 전체)
+//     게이트 직접 호출 시 exit 1·위반 3건 — 게이트는 옳았고, 배선이 낡았을 뿐이다
+// 판정 종류가 존재·실행권한·마커 3종뿐이라 배선이 빠진 사본이 "설치됨"으로 계산됐다.
+// @covers SPEC-036/FR-005
+const FRESH_MARKER = `# ${SDD_HOOK_MARKER}\n`;
+const FRESH_SRC = `${FRESH_MARKER}node scripts/check-ticket-ref.mjs\nnode scripts/check-process-compliance.mjs\n`;
+const FRESH_STALE = `${FRESH_MARKER}node scripts/check-ticket-ref.mjs\n`;   // 게이트 호출 한 줄 누락
+const one = (rec) => hookFindings(["commit-msg"], new Map([["commit-msg", rec]]));
+
+test("원본과 같으면 위반 0건 — 신선한 사본은 통과다", () => {
+  assert.deepEqual(one({ exists: true, executable: true, content: FRESH_SRC, source: FRESH_SRC }), []);
+});
+
+test("사본이 원본과 다르면 stale — 그 훅이 부르기로 된 게이트는 발동하지 않는다", () => {
+  const f = one({ exists: true, executable: true, content: FRESH_STALE, source: FRESH_SRC });
+  assert.equal(f.length, 1);
+  assert.equal(f[0].kind, "stale");
+  assert.equal(f[0].name, "commit-msg");
+});
+
+test("원본을 읽지 못하면 source-unreadable — 검사 못 함을 통과로 출력하지 않는다", () => {
+  const f = one({ exists: true, executable: true, content: FRESH_SRC, source: null });
+  assert.equal(f.length, 1);
+  assert.equal(f[0].kind, "source-unreadable");
+});
+
+test("원본 미선언은 신선도를 판정하지 않는다 — 미선언을 위반으로 만들면 오탐이 폭주한다", () => {
+  // `source` 키 자체가 없는 경우(선언 안 함) ≠ null(선언했는데 못 읽음).
+  assert.deepEqual(one({ exists: true, executable: true, content: FRESH_SRC }), []);
+});
+
+test("신선도는 마커·권한 판정 뒤에 온다 — 미설치·남의 훅이 stale로 가려지지 않는다(회귀)", () => {
+  assert.equal(one({ exists: false, executable: false, content: "", source: FRESH_SRC })[0].kind, "missing");
+  assert.equal(one({ exists: true, executable: false, content: FRESH_SRC, source: FRESH_SRC })[0].kind, "not-executable");
+  assert.equal(one({ exists: true, executable: true, content: "#!/bin/sh\nhusky\n", source: FRESH_SRC })[0].kind, "foreign");
+});
+
+test("다섯 판정 종류 전부가 사람이 읽는 문장을 갖는다 — 종류를 늘리고 문구를 빠뜨리면 undefined가 출력된다", () => {
+  for (const k of ["missing", "not-executable", "foreign", "stale", "source-unreadable"]) {
+    assert.equal(typeof HOOK_FINDING_TEXT[k], "string", `${k} 문구 없음`);
+    assert.ok(HOOK_FINDING_TEXT[k].length > 10, `${k} 문구가 비었다`);
+  }
+});
+
+// ── hooks.list 원본 선언 문법 ────────────────────────────────────────────────
+// @covers SPEC-036/FR-005
+test("hooks.list는 이름만도, 이름+원본 경로도 받는다 — 파서는 하나다", () => {
+  const e = parseHookEntries("# 주석\npre-commit\ncommit-msg  scripts/sdd-commit-msg.sh\n\npre-commit\n");
+  assert.deepEqual(e, [
+    { name: "pre-commit", source: null },
+    { name: "commit-msg", source: "scripts/sdd-commit-msg.sh" },
+  ]);
+});
+
+test("이름 투영은 같은 파서를 쓴다 — 파서가 둘이면 한쪽만 고쳐진다", () => {
+  const text = "pre-commit\ncommit-msg  scripts/x.sh\n";
+  assert.deepEqual(parseHookList(text), parseHookEntries(text).map((x) => x.name));
 });

@@ -14,7 +14,7 @@ import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { loadConfig } from "./sdd-config.mjs";
-import { parseHookList, hookFindings } from "./hooks-install-lib.mjs";
+import { parseHookEntries, hookFindings, HOOK_FINDING_TEXT } from "./hooks-install-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -44,7 +44,9 @@ if (!listPath) {
   verdict(VERDICT_KINDS.INERT, "hooks.list 없음 — 어떤 훅이 있어야 하는지 선언이 없다");
   console.log("훅 배선 게이트 — hooks.list 없음(판정 대상 미선언, no-op)"); process.exit(0);
 }
-const expected = parseHookList(readFileSync(listPath, "utf8"));
+const entries = parseHookEntries(readFileSync(listPath, "utf8"));
+const expected = entries.map((e) => e.name);
+const sourceOf = new Map(entries.map((e) => [e.name, e.source]));
 
 const git = (a) => { try { return execSync(`git ${a}`, { cwd: cfg.__root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } };
 // 훅 디렉토리는 **git에게 묻는다** — 손으로 조합하지 않는다.
@@ -76,7 +78,17 @@ for (const name of expected) {
     try { accessSync(p, constants.X_OK); executable = true; } catch { executable = false; }
     try { content = readFileSync(p, "utf8"); } catch { content = ""; }
   }
-  installed.set(name, { exists, executable, content });
+  const rec = { exists, executable, content };
+  // 신선도 축 — 원본이 **선언된 훅만** 대조한다. 선언이 없으면 `source` 키를 넣지 않는다:
+  // 코어가 "키 없음(미선언)"과 "null(읽기 실패)"을 다르게 판정하므로, 미선언을 null로 넘기면
+  // 신선도를 알 수 없는 훅이 전부 `source-unreadable` 소음이 된다(오탐이 잦은 게이트는 꺼진다).
+  const src = sourceOf.get(name);
+  if (src) {
+    const sp = isAbsolute(src) ? src : join(cfg.__root, ...src.split("/"));
+    // 읽기 실패는 null로 넘긴다 — 코어가 "확인 못 함"으로 계상한다(통과가 아니다).
+    try { rec.source = readFileSync(sp, "utf8"); } catch { rec.source = null; }
+  }
+  installed.set(name, rec);
 }
 
 const findings = hookFindings(expected, installed);
@@ -85,13 +97,25 @@ judged(findings.length);
 console.log(`훅 배선 게이트(hooksInstalledPolicy=${POLICY}): 선언 ${expected.length}종 · 설치 ${expected.length - findings.length}종 — ${rel}`);
 
 const tag = HARD ? "✗" : "⚠";
+const INSTALL_HINT = " 설치: sh scripts/sdd-hooks-install.sh (킷: sh tooling/harness/self-hooks-install.sh)";
 for (const f of findings) {
-  if (f.kind === "missing") console.log(`  ${tag} ${f.name} 미설치 — 이 훅이 담당하는 게이트는 **한 번도 발동하지 않는다**(게이트 파일이 있어도 무의미). 설치: sh scripts/sdd-hooks-install.sh (킷: sh tooling/harness/self-hooks-install.sh)`);
-  else if (f.kind === "not-executable") console.log(`  ${tag} ${f.name} 실행 권한 없음 — git이 조용히 건너뛴다(파일은 있는데 안 도는 상태). chmod +x`);
-  else console.log(`  ${tag} ${f.name}이 킷 훅이 아니다(마커 없음) — 다른 도구(husky 등)가 같은 이름을 점유했다면 킷 게이트는 발동하지 않는다. 두 훅을 합치거나 킷 훅에서 위임하라`);
+  const hint = (f.kind === "missing" || f.kind === "stale") ? INSTALL_HINT : "";
+  console.log(`  ${tag} ${f.name}: ${HOOK_FINDING_TEXT[f.kind]}${hint}`);
+}
+// 신선도를 판정하지 **않은** 훅을 매 실행 밝힌다 — 안 본 것을 조용히 초록에 합산하지 않는다.
+// (킷 자신의 훅은 설치기가 heredoc으로 매 실행 다시 쓰므로 대조할 원본 파일이 없다.)
+const flagged = new Set(findings.map((f) => f.name));
+// 이미 미설치·권한·마커로 지목된 훅은 세지 않는다 — 그 훅의 신선도는 물을 단계가 아니다.
+const unjudged = expected.filter((n) => !sourceOf.get(n) && !flagged.has(n));
+if (unjudged.length) {
+  console.log(`  · 신선도 미판정 ${unjudged.length}종(${unjudged.join(", ")}) — hooks.list에 원본 경로가 선언되지 않았다.`
+    + " 존재·실행권한·킷 마커는 판정했고 **내용 신선도는 보지 않았다**(낡은 사본은 미설치와 동급이다 — 원본 경로를 선언하면 대조한다).");
 }
 if (findings.length && HARD) {
   console.error(`\n✗ hooksInstalledPolicy=hard: 훅 ${findings.length}종이 배선되지 않았다 — 게이트 스크립트가 있어도 발동하지 않으므로 이 상태의 green은 거짓이다.`);
   process.exit(1);
 }
-if (!findings.length) console.log("훅 배선 게이트: OK — 선언된 훅이 모두 설치·실행 가능하며 킷 훅이다.");
+if (!findings.length) {
+  const fresh = expected.length - unjudged.length;
+  console.log(`훅 배선 게이트: OK — 선언된 훅이 모두 설치·실행 가능하며 킷 훅이다${fresh ? ` (그중 ${fresh}종은 원본과 내용 일치까지 확인)` : ""}.`);
+}
