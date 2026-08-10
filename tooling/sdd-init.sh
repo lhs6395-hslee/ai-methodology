@@ -78,7 +78,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs; do
+                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs; do
           copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -213,6 +213,62 @@ if [ ! -e "$PTR" ] || [ "$FORCE" -eq 1 ]; then
   } > "$PTR"
   say "+ sdd/README.md (키트 참조 포인터)"
 fi
+
+# ── 2d. 감시자 필수 생성 (SPEC-048) ─────────────────────────────
+# 오너 실측: **각 프로젝트가 방법론을 무시한다.** 무시는 순환 때문에 안 잡힌다 — 무시하면
+# 게이트를 안 돌리고, 그러면 게이트가 무시를 고발할 기회가 없다. 순환을 끊는 것은 우회 불가한
+# 채널뿐이고 그건 서버측 CI다(로컬 훅은 --no-verify로 우회되고 웹 UI 머지는 훅을 안 탄다).
+# 그래서 채택은 ①CI 워크플로 ②채택 영수증을 **반드시** 남긴다 — 선택 단계가 아니다.
+CIDIR="$T/.github/workflows"
+CIFILE="$CIDIR/sdd-gates.yml"
+if [ -e "$CIFILE" ]; then
+  say "· 유지(이미 있음): .github/workflows/sdd-gates.yml"
+else
+  mkdir -p "$CIDIR"
+  # 러너 분기에 맞는 스윕 호출 — 게이트 런타임이 무엇이든 진입점은 하나다.
+  case "$GATE" in
+    py) SWEEP="python3 scripts/sdd_gates.py fr && python3 scripts/sdd_gates.py ownership" ;;
+    *)  SWEEP="node scripts/sdd-sync.mjs --strict" ;;
+  esac
+  {
+    echo "# SDD 강제 궤도 — **우회 불가한 채널**(SPEC-048 R17)."
+    echo "# 로컬 훅은 --no-verify로 우회되고 웹 UI 머지는 훅을 아예 타지 않는다."
+    echo "# 커밋한 사람이 끌 수 없는 것은 이 워크플로뿐이므로, 이것이 감시자의 본체다."
+    echo "name: sdd-gates"
+    echo "on: [push, pull_request]"
+    echo "jobs:"
+    echo "  gates:"
+    echo "    runs-on: ubuntu-latest"
+    echo "    steps:"
+    echo "      - uses: actions/checkout@v4"
+    echo "        with: { fetch-depth: 0 }   # spec-sync·래칫이 base와 비교한다"
+    echo "      - uses: actions/setup-node@v4"
+    echo "        with: { node-version: '20' }"
+    echo "      - run: $SWEEP"
+  } > "$CIFILE"
+  say "+ .github/workflows/sdd-gates.yml (우회 불가한 감시 채널)"
+fi
+
+# 채택 영수증 — "채택했다"를 자기신고에서 기계가 읽는 사실로 바꾼다.
+# ⚠ `.sdd/`에 두지 않는다: 그쪽은 gitignore라 채택 선언이 체크아웃마다 사라진다.
+RECEIPT="$T/sdd/adoption.json"
+KITCOMMIT=$(git -C "$KIT" rev-parse HEAD 2>/dev/null || echo "")
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "")
+{
+  echo "{"
+  echo "  \"_\": \"SDD 채택 영수증(SPEC-048) — 설치기가 남긴다. **커밋한다**: 세션 상태가 아니라 채택 선언이다.\","
+  echo "  \"kitCommit\": \"$KITCOMMIT\","
+  echo "  \"installedAt\": \"$NOW\","
+  echo "  \"gate\": \"$GATE\","
+  echo "  \"gates\": ["
+  ( cd "$T" && ls scripts 2>/dev/null | grep -E '^(check|gen)-' | sed 's|^|    "scripts/|; s|$|",|' | sed '$ s|,$||' )
+  echo "  ],"
+  echo "  \"hooks\": ["
+  ( cd "$T" && ls .git/hooks 2>/dev/null | grep -vE '\.sample$' | sed 's|^|    ".git/hooks/|; s|$|",|' | sed '$ s|,$||' )
+  echo "  ]"
+  echo "}"
+} > "$RECEIPT"
+say "+ sdd/adoption.json (채택 영수증 — 커밋하라)"
 
 say ""
 say "완료. 고정 레이아웃 생성됨. 다음:"

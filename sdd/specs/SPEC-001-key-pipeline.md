@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 어댑터에 감시자 knob 4종 추가(`watchdogPolicy`·`watchdogReceipt`·`watchdogCiGlobs`·`sweepInvocationMarkers`) | SPEC-048 신설. 영수증 기본 경로는 `sdd/adoption.json` — `.sdd/`에 두지 않는다(gitignore라 채택 선언이 체크아웃마다 사라진다) [검증: tooling/__tests__/watchdog.test.mjs] |
 | 2026-08-10 | config 어댑터에 순차 프로세스 knob 5종 + 하드코딩 제거 knob 4종 추가(`processes`·`processSsotPolicy`·`processSsotListCap`·`processFragmentMinStages`·`statefulStageMarkers` / `syncRulesFile`·`implModuleExtensions`·`localHostPatterns`·`processDocRegex`) | SPEC-047 신설 + 오너 규범(하드코딩 지양). 판정에 쓰이는 값은 전부 null 기본으로 두고 게이트가 자기가 쓴 값을 출력에 밝힌다 — 고정하면 목록 밖 프로젝트에서 판정이 조용히 사라진다 [검증: tooling/__tests__/process-ssot.test.mjs] |
 | 2026-08-10 | config 어댑터에 증거 등급 method knob 2종(`browserGradeMethods`·`deployGradeMethods`) 추가 | SPEC-031 확장 — 등급을 경로만으로 판정하면 프로젝트가 증거 파일을 물리적으로 쪼개야 한다(실측 제보). null 기본이고 열거 밖 method는 등급을 주지 않는다 [검증: tooling/__tests__/evidence.test.mjs] |
 | 2026-08-10 | config 어댑터에 지목 구현체 참조 knob 3종(`implReferencePolicy`·`implReferenceListCap`·`implReferenceProseRegex`) 추가 | SPEC-046 신설에 따른 기본값 등재. 산문 제외 정규식은 `null` 기본(킷 기본 = md·html·rst·txt·jsonl·lock) — 문서의 언급은 실행이 아니다 [검증: tooling/__tests__/impl-reference.test.mjs] |

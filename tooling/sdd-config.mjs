@@ -159,6 +159,16 @@ export const DEFAULTS = {
   termGlossary: [],
   termCoveragePolicy: "advisory",
   termCoverageListCap: 12,
+  // 감시자 실재(SPEC-048) — **각 프로젝트가 방법론을 무시한다**(오너 실측)의 답.
+  // 무시는 순환 때문에 안 잡힌다(무시하면 게이트를 안 돌리고, 그러면 고발 기회가 없다).
+  // 순환을 끊는 것은 **우회 불가한 채널**뿐이고 그건 서버측 CI다 — 로컬 훅은 --no-verify로
+  // 우회되고 웹 UI 머지는 훅을 타지 않는다. 그래서 이 축은 CI 배선을 항상 본다.
+  watchdogPolicy: "advisory",
+  // 채택 영수증 경로. null이면 킷 기본(`sdd/adoption.json`).
+  // ⚠ `.sdd/`에 두지 않는다 — 그쪽은 gitignore라 채택 선언이 체크아웃마다 사라진다.
+  watchdogReceipt: null,
+  watchdogCiGlobs: null,
+  sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.
   // 스윕 규칙표 파일 — 킷은 `tooling/`, sdd-init.sh 배포 사이트는 `scripts/`. 고정하면 소비

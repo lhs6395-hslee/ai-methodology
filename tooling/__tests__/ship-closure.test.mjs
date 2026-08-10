@@ -7,7 +7,7 @@
 // @covers SPEC-004/FR-005
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const TOOLING = new URL("..", import.meta.url).pathname;
@@ -50,4 +50,32 @@ test("스윕 규칙표에 등재된 게이트는 전부 배포 목록에 있다 
   const shipped = shippedFiles();
   const missing = gates.filter((g) => !shipped.has(g)).sort();
   assert.deepEqual(missing, [], `규칙표에 있는데 배포 안 되는 게이트: ${missing.join(", ")}`);
+});
+
+// ── 게이트 카나리아 계약(SPEC-048, 제보 조건 4) ─────────────────────────────
+// 제보의 논거: "결정적이라 신뢰할 수 있다"는 절반만 맞다 — **결정적인 것과 옳은 것은 다르다.**
+// 틀린 게이트는 틀린 답을 결정적으로 재현하고, 그 고장은 실패가 아니라 **통과**로 나타나므로
+// 일반 테스트로 드러나지 않는다(실측: 게이트가 19건을 흘리면서 green이었다).
+// 그래서 스윕에 등재된 게이트는 **자기 차단 능력을 증명하는 테스트**를 가져야 한다.
+// 이 계약은 정적으로 결정 가능하므로 실행이나 에이전트에 맡기지 않는다(제보 조건 1).
+// @covers SPEC-048/FR-004
+test("스윕 등재 게이트는 전부 차단을 증명하는 테스트를 갖는다 — 결정적인 것과 옳은 것은 다르다", () => {
+  const src = readFileSync(join(TOOLING, "sdd-sync.mjs"), "utf8");
+  const block = src.slice(src.indexOf("const RULES = ["), src.indexOf("\n];", src.indexOf("const RULES = [")));
+  const gates = [...new Set([...block.matchAll(/"((?:check|gen)-[a-z-]+\.mjs)"/g)].map((m) => m[1]))];
+  const dir = join(TOOLING, "__tests__");
+  const texts = readdirSync(dir).filter((f) => f.endsWith(".test.mjs"))
+    .map((f) => ({ f, t: readFileSync(join(dir, f), "utf8") }));
+  // 차단 단언의 형태 — 비-0 종료·예외·거부. 어느 형태든 "막았다"를 단언하면 된다.
+  const BLOCKING = /code,\s*[1-9]|status\s*===?\s*[1-9]|exit\s*[1-9]|assert\.throws|toThrow|rejects/;
+  const missing = [];
+  for (const g of gates) {
+    const base = g.replace(/\.mjs$/, "");
+    const rel = texts.filter((x) => x.t.includes(g) || x.t.includes(base));
+    if (!rel.length) { missing.push(`${g}: 이 게이트를 다루는 테스트가 없다`); continue; }
+    if (!rel.some((x) => BLOCKING.test(x.t))) missing.push(`${g}: 차단(비-0 종료·예외) 단언이 없다 — 통과 경로만 관측됐다`);
+  }
+  assert.deepEqual(missing, [], `차단 능력이 증명되지 않은 게이트:\n  ${missing.join("\n  ")}\n`
+    + "→ 심어둔 위반으로 그 게이트가 **실제로 막는지** 단언하는 테스트를 추가하라."
+    + " 통과 경로만 관측된 게이트는 clean이 아니라 미검증이다.");
 });

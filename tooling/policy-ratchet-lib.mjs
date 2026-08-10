@@ -49,6 +49,7 @@ export const RATCHETED_POLICIES = [
   "introDocPolicy",
   "implReferencePolicy",
   "processSsotPolicy",
+  "watchdogPolicy",
   "liveRealityCoveragePolicy",
 ];
 

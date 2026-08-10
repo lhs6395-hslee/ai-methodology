@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 48건
+## Entity 키 (aggregate root) — 49건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -76,8 +76,9 @@
 | `test-execution` | SPEC-021 | ✓ | ✓ | ✓ |
 | `verification-accounting` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
+| `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 88건
+## Surface 키 — 90건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -110,6 +111,7 @@
 | `check-test-adequacy.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
 | `check-test-run.mjs` | SPEC-021 | ✓ | ✓ | ✓ |
 | `check-verification-executed.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
+| `check-watchdog.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 | `covers-backlink-lib.mjs` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard-lib.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
@@ -169,8 +171,9 @@
 | `verdict-lib.mjs` | SPEC-040 | ✓ | ✓ | ✓ |
 | `verification-accounting.mjs` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
+| `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 50건
+## Capability 키 — 51건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -224,8 +227,9 @@
 | `verification-accounting.account` | SPEC-007 | ✓ | ✓ | ✓ |
 | `verification-run.account` | SPEC-041 | ✓ | ✓ | ✓ |
 | `verification-run.record` | SPEC-041 | ✓ | ✓ | ✓ |
+| `watchdog.attest` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## 역할 없는 카테고리 키 — 17건
+## 역할 없는 카테고리 키 — 18건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -241,6 +245,7 @@
 | `.git/hooks/pre-push` | SPEC-004 | ✓ | — | — |
 | `.github/workflows/sdd-gates.yml` | CICD-001 | ✓ | — | — |
 | `.kiro/steering/sdd.md` | SPEC-004 | ✓ | — | — |
+| `adoption-receipt` | SPEC-048 | ✓ | — | — |
 | `agents.md` | SPEC-004 | ✓ | — | — |
 | `sdd/derivation.json` | SPEC-009 | ✓ | — | — |
 | `sdd/duplicate-candidates.tsv` | SPEC-038 | ✓ | — | — |
@@ -249,7 +254,7 @@
 
 ## 집계
 
-- 소유 키 총 **203건** (entity 48 · surface 88 · capability 50 · 역할없음 17)
+- 소유 키 총 **208건** (entity 49 · surface 90 · capability 51 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **0건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

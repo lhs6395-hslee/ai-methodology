@@ -1364,3 +1364,28 @@ test("py processssot: 미선언 inert·SSOT 부재·빠진 단계·조각 보유
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 감시자 실재 패리티(SPEC-048) ──
+test("py watchdog: CI 미배선·영수증 부재/형식·게이트 삭제·통과·off 바이트 동일", skip, () => {
+  const R = { kitCommit: "abc1234def", installedAt: "2026-08-10T00:00:00Z", gate: "node", gates: ["scripts/g.mjs"], hooks: [] };
+  const CI = "name: sdd\non: [push]\njobs:\n  g:\n    steps:\n      - run: node scripts/sdd-sync.mjs --strict\n";
+  const scen = [
+    { cfg: { watchdogPolicy: "hard" }, files: {} },                                          // CI·영수증 둘 다 없음
+    { cfg: { watchdogPolicy: "hard" }, files: { ".github/workflows/s.yml": CI } },            // 영수증만 없음
+    { cfg: { watchdogPolicy: "hard" }, files: { ".github/workflows/s.yml": CI, "sdd/adoption.json": "not json" } },
+    { cfg: { watchdogPolicy: "hard" }, files: { ".github/workflows/s.yml": CI, "sdd/adoption.json": JSON.stringify({ gates: ["x"] }) } },
+    { cfg: { watchdogPolicy: "hard" }, files: { ".github/workflows/s.yml": CI, "sdd/adoption.json": JSON.stringify(R) } },  // 게이트 삭제
+    { cfg: { watchdogPolicy: "hard" }, files: { ".github/workflows/s.yml": CI, "sdd/adoption.json": JSON.stringify(R), "scripts/g.mjs": "//\n" } },  // 통과
+    { cfg: {}, files: {} },                                                                   // advisory 비차단
+    { cfg: { watchdogPolicy: "off" }, files: {} },
+  ];
+  for (const [i, { cfg, files }] of scen.entries()) {
+    const root = fixture(files, cfg);
+    try {
+      const n = runNode(root, "check-watchdog.mjs");
+      const p = runPy(root, ["watchdog"]);
+      assert.equal(p.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(p.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

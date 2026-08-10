@@ -117,7 +117,7 @@ test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내�
   assert.equal(rep.schemaVersion, 2);   // SPEC-040: tally·kind 추가
   assert.equal(typeof rep.clean, "boolean");
   assert.ok(Array.isArray(rep.flaggedRules));
-  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16"]);
+  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17"]);
   for (const rule of rep.rules) {
     assert.equal(typeof rule.title, "string");
     assert.equal(typeof rule.flagged, "boolean");

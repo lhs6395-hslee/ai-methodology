@@ -129,6 +129,10 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "watchdogPolicy": "advisory",
+    "watchdogReceipt": None,
+    "watchdogCiGlobs": None,
+    "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
     "localHostPatterns": None,
@@ -275,6 +279,7 @@ RATCHETED_POLICIES = [
     "introDocPolicy",
     "implReferencePolicy",
     "processSsotPolicy",
+    "watchdogPolicy",
     "liveRealityCoveragePolicy",
 ]
 
@@ -4764,7 +4769,7 @@ def cmd_sccoverage(cfg):
     sys.exit(0)
 
 
-USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc|processssot> [...]"
+USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc|processssot|watchdog> [...]"
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -5692,6 +5697,126 @@ def cmd_processssot(cfg):
         print("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐다.")
 
 
+# ── 감시자 실재 코어 (SPEC-048, watchdog-lib.mjs 미러) ─────────────────────
+DEFAULT_SWEEP_INVOCATION_MARKERS = ["sdd-sync", "sdd_gates.py", "sdd-run", "sdd-gates"]
+DEFAULT_WATCHDOG_RECEIPT = "sdd/adoption.json"
+DEFAULT_WATCHDOG_CI_GLOBS = [".github/workflows/**", ".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml", ".circleci/**"]
+
+
+def parse_receipt(raw):
+    errors = []
+    data = raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+        except Exception:  # noqa: BLE001
+            # 파서 예외 문구는 런타임마다 다르다 — 판정 문장에 넣으면 바이트 동일이 깨진다.
+            return None, ["채택 영수증이 JSON으로 파싱되지 않는다 — 형식이 깨졌거나 빈 파일이다"]
+    if not isinstance(data, dict):
+        return None, ["채택 영수증은 객체여야 한다({ kitCommit, installedAt, gate, gates, hooks })"]
+
+    def arr(v):
+        return [str(x) for x in v if str(x)] if isinstance(v, list) else []
+
+    receipt = {
+        "kitCommit": str(data.get("kitCommit") or "").strip(),
+        "installedAt": str(data.get("installedAt") or "").strip(),
+        "gate": str(data.get("gate") or "").strip(),
+        "gates": arr(data.get("gates")),
+        "hooks": arr(data.get("hooks")),
+    }
+    if not receipt["installedAt"]:
+        errors.append("채택 영수증에 installedAt이 없다 — 언제 채택했는지가 갱신 판단의 유일한 근거다")
+    if not receipt["gates"]:
+        errors.append("채택 영수증에 gates가 없다 — 무엇이 깔렸는지 모르면 사라진 것도 모른다")
+    return receipt, errors
+
+
+def missing_gates(receipt, exists=None):
+    has = exists if callable(exists) else (lambda g: True)
+    return [g for g in ((receipt or {}).get("gates") or []) if not has(g)]
+
+
+def ci_wiring(ci_files, markers=None):
+    lst = markers if markers else DEFAULT_SWEEP_INVOCATION_MARKERS
+    wired = [f["path"] for f in (ci_files or []) if any(str(m) in str(f.get("text") or "") for m in lst)]
+    return {"wired": wired, "files": len(ci_files or [])}
+
+
+def cmd_watchdog(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("watchdogPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ watchdogPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "watchdogPolicy")
+        print("감시자 게이트 — watchdogPolicy:off (판정 안 함)")
+        return
+    rel = str(cfg.get("watchdogReceipt") or DEFAULT_WATCHDOG_RECEIPT)
+    abs_path = os.path.join(root, *rel.split("/"))
+    errors, warnings = [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    ci_globs = [compile_glob(g) for g in (cfg.get("watchdogCiGlobs") or DEFAULT_WATCHDOG_CI_GLOBS)]
+    ci_files = []
+    for p in walk_all_rel(root, cfg):
+        if not any(rx.search(p) for rx in ci_globs):
+            continue
+        try:
+            ci_files.append({"path": p, "text": read_text(os.path.join(root, p))})
+        except OSError:
+            continue
+    ci = ci_wiring(ci_files, cfg.get("sweepInvocationMarkers"))
+    if not ci["wired"]:
+        block(f'CI에 스윕이 배선되지 않았다(CI 파일 {ci["files"]}건 검사) — **우회 불가한 감시 채널이 없다**.'
+              " 로컬 훅은 --no-verify로 우회되고 웹 UI 머지는 훅을 타지 않으며, 게이트 파일은 지워도 아무 일도 일어나지 않는다."
+              " 커밋한 사람이 끌 수 없는 것은 서버측 CI뿐이다 — 스윕을 도는 워크플로를 추가하라(sdd-init.sh가 템플릿을 깐다)")
+
+    receipt = None
+    if not os.path.exists(abs_path):
+        block(f'채택 영수증이 없다 — {rel}. "채택했다"는 말이 자기신고로만 존재하면 무엇이 깔렸는지·언제 깔렸는지'
+              " 아무도 모르고, 지워진 감시자도 지워진 사실을 알리지 않는다. `sh scripts/sdd-init.sh`가 영수증을 남긴다"
+              "(⚠ 영수증은 **커밋한다** — 실행 원장과 달리 이것은 세션 상태가 아니라 채택 선언이다)")
+    else:
+        receipt, errs = parse_receipt(read_text(abs_path))
+        for e in errs:
+            block(f"{rel}: {e}")
+        if receipt:
+            gone = missing_gates(receipt, lambda g: os.path.exists(os.path.join(root, *str(g).split("/"))))
+            if gone:
+                more = " …" if len(gone) > 6 else ""
+                block(f'영수증이 선언한 게이트 {len(gone)}건이 지금 없다: {", ".join(gone[:6])}{more}'
+                      " — 감시자가 지워졌는데 아무도 알리지 않았다(지워진 강제는 강제가 아니다)")
+
+    judged(len(errors))
+    if receipt:
+        stamp = f'채택 {receipt["installedAt"] or "(시점 미기록)"}'
+        if receipt["kitCommit"]:
+            stamp += f' · 킷 {receipt["kitCommit"][:10]}'
+        stamp += f' · 게이트 {len(receipt["gates"])}종'
+        if receipt["gate"]:
+            stamp += f' · 런타임 {receipt["gate"]}'
+    else:
+        stamp = "영수증 없음"
+    tail = f' ({", ".join(ci["wired"][:3])})' if ci["wired"] else ""
+    print(f'감시자 게이트(watchdogPolicy={policy}): {stamp} · CI 배선 {len(ci["wired"])}/{ci["files"]}건{tail}')
+    if receipt:
+        print("  · 킷 최신화는 prompts/update.md 절차로 한다 — 위 채택 시점이 오래됐다면 그것이 신호다(게이트는 상류를 모른다).")
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 감시자가 실재하지 않는다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if not warnings:
+        print("  ✓ 우회 불가한 채널(CI)에 스윕이 배선돼 있고 채택 영수증이 실재한다.")
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -5776,6 +5901,8 @@ def main():
         cmd_introdoc(cfg)
     elif sub == "processssot":
         cmd_processssot(cfg)
+    elif sub == "watchdog":
+        cmd_watchdog(cfg)
     else:
         print(f"unknown subcommand: {sub}", file=sys.stderr)
         sys.exit(2)
