@@ -120,3 +120,102 @@ export function classifyRatchet(baseCfg, curCfg, exceptions = []) {
   }
   return { violations, allowedDowngrades };
 }
+
+// ─── 면제 래칫 (SPEC-027 확장, 2026-08-10) ──────────────────────────────────
+// 실측 제보: 이 저장소의 게이트 다수가 **면제로 무력화**돼 있었다. 면제는 "지금 green을 만들기
+// 위해" 추가되고 **그 뒤 아무도 걷어내지 않는다.** 제보자의 자기관찰이 이 축의 근거다 — 새 게이트를
+// 세우자 결손 1건이 표면화됐고 그의 반사적 선택지가 "면제해서 green 만들기"였다. 오너가 그것을
+// 막았다("왜 필요할 때는 제외시키면 안 되지"). **게이트를 세우는 순간이 면제 유혹이 가장 큰 시점**
+// 이므로 래칫이 필요하다.
+//
+// ⚠ 면제를 한 종류로 다루지 않는다. 두 종류이고 **요구 필드가 다르다**:
+//   · boundary — 구조적 경계(미소유 파일 카테고리 등). 영구이고 기한이 없다.
+//                기한을 요구하면 **거짓 날짜**가 생기고, 거짓 날짜는 날짜 없음보다 나쁘다.
+//                대신 "왜 영구인가"를 요구한다.
+//   · debt     — 임시 부채. 제보가 요구한 4필드(사유·해소조건·기한·위험수용자) 전부 필수.
+// 종류 미선언은 위반이다 — 분류를 강제해야 "급할 때 debt를 boundary로 위장"이 흔적을 남긴다.
+export const EXEMPTION_KINDS = Object.freeze(["boundary", "debt"]);
+
+// 면제 knob은 **이름 규약으로 자동 탐지**한다. 손 목록을 두면 새 면제 knob이 감시 밖에서
+// 태어난다 — 강도 래칫이 이미 그 드리프트를 겪었다(`outOfBandDeployPolicy` 등 도입 시 누락).
+const EXEMPTION_KNOB_RE = /(Exempt|Exception)/;
+// 예외 선언 knob의 정본 이름 — 개수 래칫의 자기참조 출구(아래 classifyExemptionRatchet 주석).
+export const RATCHET_EXCEPTION_KNOB = "policyRatchetExceptions";
+export function exemptionKnobs(cfg, declared = null) {
+  if (Array.isArray(declared) && declared.length) return [...declared].sort();
+  return Object.keys(cfg || {}).filter((k) => EXEMPTION_KNOB_RE.test(k)).sort();
+}
+
+// knob 값 → 면제 항목 문자열 목록. 배열·객체(키가 항목)·null을 받는다.
+export function exemptionEntries(value) {
+  if (Array.isArray(value)) return value.map(String);
+  if (value && typeof value === "object") return Object.keys(value);
+  return [];
+}
+
+// 항목별 등록부 레코드 검증. 반환 findings[] — kind: unregistered | bad-kind | missing-field
+// registry: { "<knob>": { "<항목>": {kind, reason, clearBy, due, acceptor, whyPermanent} } }
+export function exemptionFindings(cfg, registry, declaredKnobs = null) {
+  const findings = [];
+  const reg = registry && typeof registry === "object" ? registry : {};
+  for (const knob of exemptionKnobs(cfg, declaredKnobs)) {
+    const entries = exemptionEntries(cfg[knob]);
+    const perKnob = (reg[knob] && typeof reg[knob] === "object") ? reg[knob] : {};
+    for (const entry of entries) {
+      const rec = perKnob[entry];
+      if (!rec || typeof rec !== "object") {
+        findings.push({ kind: "unregistered", knob, entry });
+        continue;
+      }
+      const k = String(rec.kind || "");
+      if (!EXEMPTION_KINDS.includes(k)) {
+        findings.push({ kind: "bad-kind", knob, entry, got: k });
+        continue;
+      }
+      // 종류별 요구 필드 — debt는 제보가 요구한 4종, boundary는 사유 + 영구 근거.
+      const need = k === "debt"
+        ? ["reason", "clearBy", "due", "acceptor"]
+        : ["reason", "whyPermanent"];
+      for (const f of need) {
+        if (!String(rec[f] ?? "").trim()) findings.push({ kind: "missing-field", knob, entry, field: f, exKind: k });
+      }
+    }
+    // 등록부에만 남은 레코드 — 면제는 지웠는데 기록이 남았다. 위반은 아니지만 부패의 시작이므로 표면화.
+    for (const entry of Object.keys(perKnob)) {
+      if (!entries.includes(entry)) findings.push({ kind: "stale-record", knob, entry });
+    }
+  }
+  return findings;
+}
+
+// 개수 래칫 — **줄어드는 방향만 허용한다.** base보다 늘면 위반이다.
+// 정당한 신규 면제가 필요하면 다른 면제를 걷어내거나 `policyRatchetExceptions`에 그 knob을
+// 선언한다(그 선언 자체가 부채로 표면화되므로 조용한 증가가 되지 않는다).
+export function classifyExemptionRatchet(baseCfg, curCfg, declaredKnobs = null, exceptions = []) {
+  const ex = new Set(exceptions || []);
+  const grown = [], allowedGrowth = [];
+  const knobs = new Set([
+    ...exemptionKnobs(baseCfg || {}, declaredKnobs),
+    ...exemptionKnobs(curCfg || {}, declaredKnobs),
+  ]);
+  for (const knob of [...knobs].sort()) {
+    // ⚠ 예외 선언 자체는 개수 래칫에서 뺀다 — **교착의 해소는 캡을 푸는 것이 아니라 출구를 만드는
+    //    것이다.** 정당한 롤백을 선언하려면 이 목록에 항목을 넣어야 하는데, 그 증가를 막으면 남는
+    //    길은 "조용히 하는 것"뿐이고 그게 더 나쁘다. 무한정 자라지 않는 이유는 따로 있다:
+    //    이 목록의 항목도 debt 4필드(사유·해소조건·기한·수용자)를 요구받고 매 실행 부채로
+    //    표면화된다 — 증가가 자유로운 것이 아니라 **큰 소리로 책임지는 것**이다.
+    if (knob === RATCHET_EXCEPTION_KNOB) continue;
+    if (!baseCfg || !(knob in baseCfg)) continue;         // base 기준 없음 — 하위호환
+    const from = exemptionEntries(baseCfg[knob]).length;
+    const to = exemptionEntries(curCfg ? curCfg[knob] : undefined).length;
+    if (to > from) (ex.has(knob) ? allowedGrowth : grown).push({ knob, from, to });
+  }
+  return { grown, allowedGrowth };
+}
+
+export const EXEMPTION_FINDING_TEXT = Object.freeze({
+  unregistered: "면제가 **사유·분류 없이** 존재한다 — `exemptionRegistry`에 등록하라(넷이 없는 면제는 이월이 아니라 방치다)",
+  "bad-kind": `면제 종류가 ${EXEMPTION_KINDS.join("|")} 중 하나가 아니다 — boundary(구조적·영구) / debt(임시 부채)로 분류하라`,
+  "missing-field": "면제 레코드에 필수 필드가 없다",
+  "stale-record": "등록부에만 남은 레코드 — 면제는 걷어냈는데 기록이 남았다(등록부 부패의 시작)",
+});

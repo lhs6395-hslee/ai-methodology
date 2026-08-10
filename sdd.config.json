@@ -194,7 +194,11 @@
     "prompts"
   ],
   "symbolRealityPolicy": "hard",
-  "introDocs": ["docs/방법론.html", "docs/ownership-key.html", "docs/ownership-key-easy.html"],
+  "introDocs": [
+    "docs/방법론.html",
+    "docs/ownership-key.html",
+    "docs/ownership-key-easy.html"
+  ],
   "introDocRuleSource": "HARNESS.md",
   "introDocPolicy": "hard",
   "importWiringPolicy": "hard",
@@ -332,5 +336,93 @@
     "R12",
     "R13"
   ],
-  "syncHookDelegatedTo": "CI(.github/workflows/sdd-gates.yml) · 완료 주장 시점의 수동 실행"
+  "syncHookDelegatedTo": "CI(.github/workflows/sdd-gates.yml) · 완료 주장 시점의 수동 실행",
+  "exemptionRegistry": {
+    "specSyncExemptGlobs": {
+      "*.md": {
+        "kind": "boundary",
+        "reason": "루트 산문(README·HARNESS·METHODOLOGY 등) — 코드 표면이 아니다",
+        "whyPermanent": "소유 축은 코드·산출물을 판정한다. 루트 산문의 신선도는 R15(소개 문서 동기)가 별도로 판정하므로 spec-first 대상이 아니다"
+      },
+      ".gitignore": {
+        "kind": "boundary",
+        "reason": "git 도구 설정 — 방법론 산출물이 아니다",
+        "whyPermanent": "버전관리 도구의 설정이고 어떤 FR도 이것을 요구하지 않는다"
+      },
+      "docs/design/**": {
+        "kind": "boundary",
+        "reason": "설계 기록 — 과거 시점의 판단을 보존하는 문서다",
+        "whyPermanent": "개정 대상이 아니라 이력이다. 고치면 그때의 근거가 사라지므로 스펙 동반을 요구할 대상이 아니다"
+      },
+      "docs/examples/**": {
+        "kind": "boundary",
+        "reason": "붙여넣기용 예시 — 소비 프로젝트가 복사해 쓰는 조각",
+        "whyPermanent": "예시는 실행 경로가 아니고 소유 키를 갖지 않는다"
+      },
+      "docs/*.md": {
+        "kind": "boundary",
+        "reason": "설명 문서 — 코드 표면이 아니다",
+        "whyPermanent": "소개 문서 3종은 R15가 인용 수치·규칙 ID·동반 갱신까지 hard로 판정한다. spec-first를 겹쳐 걸면 같은 사실을 두 축이 요구한다"
+      },
+      "prompts/**": {
+        "kind": "boundary",
+        "reason": "절차 문서(update·migrate·readopt) — 규범 텍스트다",
+        "whyPermanent": "이 문서들의 변경은 SPEC-005·025 Change Log로 추적된다(이번 라운드에도 자발적으로 남겼다). 파일 자체에 소유 키가 없다"
+      },
+      "templates/**": {
+        "kind": "boundary",
+        "reason": "소비 프로젝트 씨앗 — 킷의 실행 경로가 아니다",
+        "whyPermanent": "설치 시 복사되는 시작점이고, 그 내용의 문법은 SPEC-013이 스펙 문법으로 판정한다"
+      },
+      "sdd/smoke-manifest.json": {
+        "kind": "boundary",
+        "reason": "생성 산출물 — 사람이 쓰는 파일이 아니다",
+        "whyPermanent": "SPEC-010이 드리프트를 판정한다. 생성물에 spec-first를 요구하면 생성 자체가 차단된다"
+      },
+      "sdd/derivation.json": {
+        "kind": "boundary",
+        "reason": "재도출 매니페스트 — 생성·갱신 대상 데이터",
+        "whyPermanent": "SPEC-009가 소스 클래스 회계로 판정한다"
+      },
+      "sdd/similarity-candidates.tsv": {
+        "kind": "boundary",
+        "reason": "유사 후보 데이터 — LLM·툴이 채우는 입력",
+        "whyPermanent": "SPEC-033의 확률적 층 입력이고, 그 층은 어떤 강도에서도 차단하지 않는다"
+      },
+      "sdd/OWNERSHIP_MAP.md": {
+        "kind": "boundary",
+        "reason": "생성 산출물 — `gen-ownership-map.mjs`가 만든다",
+        "whyPermanent": "SPEC-028의 `--check` 모드가 맵 드리프트를 매 스윕 판정한다(R3). spec-first를 겹치면 재생성 커밋마다 스펙 동반을 요구해 교착이 된다"
+      },
+      "sdd/MODULE_MAP.md": {
+        "kind": "boundary",
+        "reason": "프로젝트 모듈 지도 — 사람이 유지하는 안내 문서",
+        "whyPermanent": "스펙이 아니라 스펙들의 목차이고, 소유 키를 갖지 않는다"
+      },
+      "tooling/*.md": {
+        "kind": "boundary",
+        "reason": "툴링 디렉터리의 산문(설계 노트·프리셋 표)",
+        "whyPermanent": "판정 대상은 게이트 코드다. 산문은 R15·SPEC-013이 각자의 축에서 본다"
+      },
+      "tooling/*.yml": {
+        "kind": "boundary",
+        "reason": "툴·CI 설정 — 실행 로직이 아니다",
+        "whyPermanent": "워크플로의 실재는 R17(감시자 실재)이 CI 배선으로 판정한다"
+      },
+      "tooling/vitest.config.ts": {
+        "kind": "debt",
+        "reason": "테스트 러너 설정 — 현재 어떤 스펙의 Files에도 없다",
+        "clearBy": "SPEC-021(test-execution)의 Files에 편입해 소유를 부여하고 이 면제를 제거한다",
+        "due": "2026-09-30",
+        "acceptor": "킷 오너(lhs6395-hslee)"
+      },
+      "tooling/gen-changelog.mjs": {
+        "kind": "debt",
+        "reason": "pre-commit 훅이 `docs/change_log.html`을 자동 재생성·스테이징하므로 이 생성기 변경에 스펙 동반을 요구하면 훅 경로가 교착된다 — **그러나 생성기 자체는 소유 대상이다**",
+        "clearBy": "SPEC-004 Files에 `tooling/gen-changelog.mjs`를 등재하고, 면제는 생성 **산출물**(`docs/change_log.html`)에만 남긴다",
+        "due": "2026-09-30",
+        "acceptor": "킷 오너(lhs6395-hslee)"
+      }
+    }
+  }
 }

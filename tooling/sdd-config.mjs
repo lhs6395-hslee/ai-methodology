@@ -196,6 +196,17 @@ export const DEFAULTS = {
   agentSettingsFile: null,
   agentHookDecl: null,
   agentScriptDir: null,
+
+  // 면제 등록부(SPEC-027 확장) — 면제 항목마다 분류·사유를 기록한다.
+  //   { "<면제 knob>": { "<항목>": { kind:"boundary"|"debt", reason, … } } }
+  //   boundary → reason·whyPermanent 필수(구조적·영구. 기한을 요구하면 거짓 날짜가 생긴다)
+  //   debt     → reason·clearBy·due·acceptor 필수(임시 부채)
+  // 미등록 면제는 위반이다 — 실측: 소비 저장소의 게이트 다수가 면제로 무력화돼 있었고 아무도
+  // 걷어내지 않았다. 면제 **개수**도 래칫된다(줄어드는 방향만 허용).
+  exemptionRegistry: {},
+  // 면제 knob 목록. null이면 이름 규약(`Exempt`·`Exception`)으로 **자동 탐지** —
+  // 손 목록을 두면 새 면제 knob이 감시 밖에서 태어난다(강도 래칫이 이미 겪은 드리프트).
+  exemptionKnobs: null,
   sweepInvocationMarkers: null,
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.

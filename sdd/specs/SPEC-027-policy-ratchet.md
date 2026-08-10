@@ -22,6 +22,11 @@
 - 정당한 하향(진짜 롤백·오설정 정정)은 `policyRatchetExceptions`에 knob 이름을 선언해 통과 — 단 선언된 하향도 **매 실행 부채로 표면화**된다(entitySchemaExemptEntities 동형 — "예외라 통과"를 정상으로 오인 금지, 재승격 대상).
 - `policyRatchetPolicy` 기본은 `advisory`(경고) — 새 강제가 기존 hard를 소급 범람시키지 않게(graduation, update.md #18). 깨끗해지면 hard 승격을 update가 권장.
 - 킷 자신·config를 낮춘 적 없는 프로젝트는 위반 0이라 무영향(inert).
+- **면제는 두 종류이고 요구 필드가 다르다** — `boundary`(구조적·영구)에 기한을 요구하면 **거짓 날짜**가 생기고, 거짓 날짜는 날짜 없음보다 나쁘다. 대신 "왜 영구인가"를 요구한다. `debt`는 제보가 요구한 4필드 전부 필수다.
+- **종류 미선언은 위반이다** — 분류를 강제해야 "급할 때 debt를 boundary로 위장"이 흔적을 남긴다.
+- **면제 knob은 이름 규약으로 자동 탐지한다** — 손 목록을 두면 새 면제 knob이 감시 밖에서 태어난다(강도 래칫이 이미 겪은 드리프트다).
+- **예외 선언 knob 자신은 개수 래칫에서 제외한다** — 정당한 롤백을 선언하려면 그 목록에 항목을 넣어야 하는데 그 증가를 막으면 남는 길은 "조용히 하는 것"뿐이다(교착의 해소는 캡을 푸는 것이 아니라 출구를 만드는 것이다). 무한정 자라지 않는 이유는 그 항목도 debt 4필드를 요구받고 매 실행 부채로 표면화되기 때문이다.
+- **등록부에만 남은 레코드는 차단하지 않는다** — 부패 신호이지 위반이 아니다. 표면화만 한다.
 
 ---
 
@@ -35,6 +40,7 @@
 - **FR-005** (state): WHILE any downgrade is permitted via `policyRatchetExceptions`, THE SYSTEM SHALL surface each permitted downgrade as a review-debt line on every run regardless of policy strength — so an exception cannot silently read as clean — naming the knob and marking it a re-promotion target.
 - **FR-006** (unwanted): IF the `policyRatchetPolicy` value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it clearly and exit non-zero (without leaking a runtime stack trace).
 - **FR-007** (unwanted): IF the current `policyRatchetPolicy` is weaker than the base ref's, THEN THE SYSTEM SHALL include `policyRatchetPolicy` itself among the ratcheted knobs, SHALL report the self-weakening with its from→to, and SHALL judge that run at the base ref's strength — so lowering the ratchet's own knob cannot silence the evaluation; WHERE the current value is stronger, THE SYSTEM SHALL judge at the current strength.
+- **FR-009** (unwanted): IF an exemption entry in any exemption knob has no record in the exemption registry, or its record declares no kind, or omits a field required by its kind — reason and permanence rationale for a boundary, reason and clearing condition and due date and risk acceptor for a debt — THEN the **policy-ratchet** (E) core in **policy-ratchet-lib.mjs** (S) SHALL report it as a violation; and IF the number of exemption entries for a knob grew relative to base, THEN it SHALL report that growth as a violation unless that knob is declared in the ratchet exception list, so that exemptions may only decrease.
 - **FR-008** (unwanted): IF a commit raises a ratcheted numeric threshold above its base value, THEN THE SYSTEM SHALL report it as a loosening violation naming the threshold and both values, and SHALL treat a lowered value as a permitted tightening.
 
 ### Key Entities
@@ -85,6 +91,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | FR-009 신설 — **면제 래칫**: `exemptionRegistry`(항목별 분류·사유) 필수 + 종류별 요구 필드(boundary=사유·영구근거 / debt=사유·해소조건·기한·수용자) + 면제 **개수 단조 감소** + 면제 knob 이름 규약 자동 탐지. 킷 자신의 면제 16건을 전수 분류·등록, 양판 바이트 동일 | 실측 제보: 소비 저장소의 게이트 다수가 **면제로 무력화**돼 있었다(`frSymbolRealityPolicy=advisory`·`specSyncExemptGlobs`·`e2eTestsPolicy=off`·`symbolRealityPolicy=advisory`). 면제는 "지금 green을 만들기 위해" 추가되고 **그 뒤 아무도 걷어내지 않는다.** 제보자의 자기관찰이 이 축의 직접 근거다 — 새 게이트를 세우자 결손 1건이 표면화됐고 그의 반사적 선택지가 "면제해서 green 만들기"였으며 오너가 그것을 막았다("왜 필요할 때는 제외시키면 안 되지"). **게이트를 세우는 순간이 면제 유혹이 가장 큰 시점**이라 래칫이 필요하다. 강도·임계 래칫이 knob을 지키는 동안 면제 목록이 우회로였다 — 이제 같은 게이트가 셋을 함께 본다. 면제를 한 종류로 다루지 않은 이유: 구조적 경계에 기한을 요구하면 거짓 날짜가 생긴다. 도그푸딩이 즉시 부채 2건을 드러냈다 — `tooling/vitest.config.ts`·`tooling/gen-changelog.mjs`가 **어떤 스펙의 Files에도 없이** 면제돼 있었다(해소 기한 2026-09-30으로 등록). 등록이 곧 리뷰다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `agentWiringPolicy` 추가 | SPEC-051 동반. 구조적 완전성 테스트가 이번에도 새 knob을 지목했다 — 감시 배선 정책이 래칫 밖에서 태어나면 조용히 하향될 수 있고, 그 하향은 정확히 이 라운드가 고친 결함(감시 없음)으로 되돌아간다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `importWiringPolicy` 추가 | SPEC-050 동반. 새 강제 knob이 래칫 밖에서 태어나면 그 knob은 조용히 하향될 수 있다 — 이 스펙의 구조적 완전성 테스트가 이번에도 새 knob을 지목했다(라운드마다 발화하는 것이 이 축의 정상 동작이다) [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | 래칫 감시 목록에 `watchdogPolicy` 추가 — 양판 | 감시자 정책이 감시 밖이면 hard→advisory 한 줄로 감시자 요구를 회피할 수 있다. 감시자를 끄는 것이 가장 값싼 우회이므로 특히 래칫 안에 있어야 한다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |

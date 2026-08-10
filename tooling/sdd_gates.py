@@ -142,6 +142,9 @@ DEFAULTS = {
     "agentSettingsFile": None,
     "agentHookDecl": None,
     "agentScriptDir": None,
+    # 면제 등록부·면제 knob 목록(SPEC-027 확장) — 미등록 면제는 위반, 개수는 래칫된다.
+    "exemptionRegistry": {},
+    "exemptionKnobs": None,
     "sweepInvocationMarkers": None,
     "syncRulesFile": None,
     "implModuleExtensions": None,
@@ -4863,6 +4866,80 @@ def cmd_sccoverage(cfg):
 USAGE = "usage: python sdd_gates.py <fr|ownership|cohesion|completeness|consistency|adequacy|orphan|converge|specsync|derivation|smokescan|retag|run|testrun|schemadrift|ratchet|engineevent|evidence|livereality|synonym|sccoverage|verifyrun|introdoc|processssot|watchdog> [...]"
 
 
+# ── 면제 래칫 (SPEC-027 확장) — Node판 policy-ratchet-lib.mjs 미러 ─────────────
+# 면제는 "지금 green을 만들기 위해" 추가되고 아무도 걷어내지 않는다. 강도·임계 래칫이 knob을
+# 지키는 동안 **면제 목록이 게이트를 무력화하는 우회로**였다(실측 제보).
+EXEMPTION_KINDS = ["boundary", "debt"]
+_EXEMPTION_KNOB_RE = re.compile(r"(Exempt|Exception)")
+RATCHET_EXCEPTION_KNOB = "policyRatchetExceptions"
+
+
+def exemption_knobs(cfg, declared=None):
+    if isinstance(declared, list) and declared:
+        return sorted(declared)
+    return sorted(k for k in (cfg or {}) if _EXEMPTION_KNOB_RE.search(k))
+
+
+def exemption_entries(value):
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    if isinstance(value, dict):
+        return list(value.keys())
+    return []
+
+
+def exemption_findings(cfg, registry, declared_knobs=None):
+    findings = []
+    reg = registry if isinstance(registry, dict) else {}
+    for knob in exemption_knobs(cfg, declared_knobs):
+        entries = exemption_entries((cfg or {}).get(knob))
+        per = reg.get(knob) if isinstance(reg.get(knob), dict) else {}
+        for entry in entries:
+            rec = per.get(entry)
+            if not isinstance(rec, dict):
+                findings.append({"kind": "unregistered", "knob": knob, "entry": entry})
+                continue
+            k = str(rec.get("kind") or "")
+            if k not in EXEMPTION_KINDS:
+                findings.append({"kind": "bad-kind", "knob": knob, "entry": entry, "got": k})
+                continue
+            need = ["reason", "clearBy", "due", "acceptor"] if k == "debt" else ["reason", "whyPermanent"]
+            for f in need:
+                if not str(rec.get(f) or "").strip():
+                    findings.append({"kind": "missing-field", "knob": knob, "entry": entry, "field": f, "exKind": k})
+        for entry in per.keys():
+            if entry not in entries:
+                findings.append({"kind": "stale-record", "knob": knob, "entry": entry})
+    return findings
+
+
+def classify_exemption_ratchet(base_cfg, cur_cfg, declared_knobs=None, exceptions=None):
+    ex = set(exceptions or [])
+    grown, allowed_growth = [], []
+    knobs = set(exemption_knobs(base_cfg or {}, declared_knobs)) | set(exemption_knobs(cur_cfg or {}, declared_knobs))
+    for knob in sorted(knobs):
+        # 예외 선언 자체는 개수 래칫에서 뺀다 — 교착의 해소는 캡을 푸는 것이 아니라 출구를 만드는
+        # 것이다. 대신 그 항목도 debt 4필드를 요구받고 매 실행 부채로 표면화된다.
+        if knob == RATCHET_EXCEPTION_KNOB:
+            continue
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = len(exemption_entries(base_cfg[knob]))
+        to = len(exemption_entries((cur_cfg or {}).get(knob)))
+        if to > frm:
+            rec = {"knob": knob, "from": frm, "to": to}
+            (allowed_growth if knob in ex else grown).append(rec)
+    return {"grown": grown, "allowedGrowth": allowed_growth}
+
+
+EXEMPTION_FINDING_TEXT = {
+    "unregistered": "면제가 **사유·분류 없이** 존재한다 — `exemptionRegistry`에 등록하라(넷이 없는 면제는 이월이 아니라 방치다)",
+    "bad-kind": "면제 종류가 boundary|debt 중 하나가 아니다 — boundary(구조적·영구) / debt(임시 부채)로 분류하라",
+    "missing-field": "면제 레코드에 필수 필드가 없다",
+    "stale-record": "등록부에만 남은 레코드 — 면제는 걷어냈는데 기록이 남았다(등록부 부패의 시작)",
+}
+
+
 def cmd_ratchet(cfg, base_arg):
     cur_policy = cfg.get("policyRatchetPolicy") or "advisory"
     if cur_policy not in ("off", "advisory", "hard"):
@@ -4911,15 +4988,44 @@ def cmd_ratchet(cfg, base_arg):
         why = ("임계 완화 금지 — 캡 초과는 **분할 또는 병합**으로 해소하는 것이지 자를 늘려 재는 것이 아니다"
                if v.get("kind") == "limit" else "강도 하향 금지(단조 증가만)")
         print(f'  · {v["knob"]}: {v["from"]} → {v["to"]} — {why}. 정당한 재조정이면 policyRatchetExceptions에 "{v["knob"]}" 선언(부채로 표면화)')
-    judged(len(violations))
-    if violations:
-        msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지)."
+    ex_knobs = exemption_knobs(cfg, cfg.get("exemptionKnobs"))
+    ex_total = sum(len(exemption_entries(cfg.get(k))) for k in ex_knobs)
+    ex_findings = exemption_findings(cfg, cfg.get("exemptionRegistry"), cfg.get("exemptionKnobs"))
+    ex_ratchet = classify_exemption_ratchet(base_cfg, cfg, cfg.get("exemptionKnobs"), cfg.get("policyRatchetExceptions") or [])
+    grown, allowed_growth = ex_ratchet["grown"], ex_ratchet["allowedGrowth"]
+    ex_blocking = [f for f in ex_findings if f["kind"] != "stale-record"]
+
+    print(f"면제 래칫: knob {len(ex_knobs)}종 · 면제 {ex_total}건 — 미등록·형식 위반 {len(ex_blocking)} · 증가 {len(grown)}")
+    for g in allowed_growth:
+        print(f'  · [부채] {g["knob"]}: 면제 {g["from"]} → {g["to"]} (policyRatchetExceptions로 허용된 증가 — 걷어낼 대상)')
+    for g in grown:
+        print(f'  · {g["knob"]}: 면제가 {g["from"]} → {g["to"]}건으로 **늘었다** — 래칫은 줄어드는 방향만 허용한다.'
+              " 정당한 신규 면제가 필요하면 다른 면제를 걷어내거나 policyRatchetExceptions에 그 knob을 선언하라(부채로 표면화된다)")
+    for f in ex_findings[:20]:
+        tail = f' — `{f["field"]}` 없음({f["exKind"]})' if f["kind"] == "missing-field" else ""
+        mark = "·" if f["kind"] == "stale-record" else " "
+        print(f'  {mark} {f["knob"]}[{f["entry"]}]: {EXEMPTION_FINDING_TEXT[f["kind"]]}{tail}')
+    if len(ex_findings) > 20:
+        print(f"   … 외 {len(ex_findings) - 20}건")
+
+    total_violations = len(violations) + len(ex_blocking) + len(grown)
+    judged(total_violations)
+    if total_violations:
+        parts = []
+        if violations:
+            parts.append("강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화)")
+        if ex_blocking:
+            parts.append("면제가 사유·분류 없이 존재한다(넷이 없는 면제는 이월이 아니라 방치다)")
+        if grown:
+            parts.append("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)")
+        msg = ("정책 래칫 위반 — " + " / ".join(parts)
+               + ". 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).")
         if hard:
             print(f"\n✗ {msg}", file=sys.stderr)
             sys.exit(1)
         print(f"\n⚠ {msg} (policyRatchetPolicy:advisory — 경고)")
         sys.exit(0)
-    print("정책 래칫 게이트: OK — 강도 하향·임계 완화 없음.")
+    print(f"정책 래칫 게이트: OK — 강도 하향·임계 완화 없음, 면제 {ex_total}건 전부 분류·사유 등록됨.")
     sys.exit(0)
 
 

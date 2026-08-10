@@ -190,7 +190,8 @@ test("게이트: base advisory(기본) → 워킹트리 off는 advisory로 판�
 test("게이트: 자기 하향도 policyRatchetExceptions로 loud 선언하면 부채 표면화 + exit 0", () => {
   const root = gitRepo(
     { policyRatchetPolicy: "hard" },
-    { policyRatchetPolicy: "off", policyRatchetExceptions: ["policyRatchetPolicy"] });
+    { policyRatchetPolicy: "off", policyRatchetExceptions: ["policyRatchetPolicy"],
+      exemptionRegistry: { policyRatchetExceptions: { policyRatchetPolicy: { kind: "debt", reason: "테스트 픽스처 — 예외 경로 검증용", clearBy: "픽스처 제거 시 함께 사라진다", due: "2026-12-31", acceptor: "테스트" } } } });
   try {
     const r = run(root);
     assert.equal(r.code, 0, r.out);
@@ -242,7 +243,8 @@ test("게이트: 상향·동일 → OK exit 0", () => {
 test("게이트: 예외 선언된 하향은 통과하되 부채로 표면화(조용한 우회 방지)", () => {
   const root = gitRepo(
     { frKeyAnchorPolicy: "hard" },
-    { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard", policyRatchetExceptions: ["frKeyAnchorPolicy"] });
+    { frKeyAnchorPolicy: "off", policyRatchetPolicy: "hard", policyRatchetExceptions: ["frKeyAnchorPolicy"],
+      exemptionRegistry: { policyRatchetExceptions: { frKeyAnchorPolicy: { kind: "debt", reason: "테스트 픽스처 — 예외 경로 검증용", clearBy: "픽스처 제거 시 함께 사라진다", due: "2026-12-31", acceptor: "테스트" } } } });
   try {
     const r = run(root);
     assert.equal(r.code, 0, r.out);
@@ -267,4 +269,93 @@ test("게이트: base ref 조회 불가(없는 ref) → skip exit 0 (FR-002)", (
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /조회 불가|건너뜀/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── 면제 래칫(SPEC-027 확장) — 면제는 추가되고 아무도 걷어내지 않는다 ──────────
+// 실측 제보: 소비 저장소의 게이트 다수가 면제로 무력화돼 있었고, 제보자 자신이 새 게이트를
+// 세운 직후 "면제해서 green 만들기"를 반사적으로 선택했다(오너가 막았다).
+// **게이트를 세우는 순간이 면제 유혹이 가장 큰 시점**이라 이 래칫이 필요하다.
+// @covers SPEC-027/FR-009
+import {
+  exemptionKnobs, exemptionEntries, exemptionFindings, classifyExemptionRatchet,
+  EXEMPTION_KINDS, EXEMPTION_FINDING_TEXT,
+} from "../policy-ratchet-lib.mjs";
+
+test("면제 knob은 이름 규약으로 자동 탐지된다 — 손 목록은 새 knob을 놓친다", () => {
+  const cfg = { specSyncExemptGlobs: [], policyRatchetExceptions: [], fooExemptBars: [], unrelated: 1 };
+  assert.deepEqual(exemptionKnobs(cfg), ["fooExemptBars", "policyRatchetExceptions", "specSyncExemptGlobs"]);
+});
+
+test("선언이 있으면 그것이 이긴다 — 자동 탐지는 기본값이지 강제가 아니다", () => {
+  assert.deepEqual(exemptionKnobs({ aExempt: [], bException: [] }, ["aExempt"]), ["aExempt"]);
+});
+
+test("면제 목록은 배열·객체 둘 다 받는다", () => {
+  assert.deepEqual(exemptionEntries(["a", "b"]), ["a", "b"]);
+  assert.deepEqual(exemptionEntries({ a: {}, b: {} }), ["a", "b"]);
+  assert.deepEqual(exemptionEntries(null), []);
+});
+
+test("등록되지 않은 면제는 위반이다 — 넷이 없는 면제는 이월이 아니라 방치다", () => {
+  const f = exemptionFindings({ xExemptList: ["a"] }, {});
+  assert.equal(f.length, 1);
+  assert.equal(f[0].kind, "unregistered");
+});
+
+test("종류 미선언은 위반이다 — 분류를 강제해야 debt를 boundary로 위장한 흔적이 남는다", () => {
+  const f = exemptionFindings({ xExemptList: ["a"] }, { xExemptList: { a: { reason: "그냥" } } });
+  assert.equal(f[0].kind, "bad-kind");
+  assert.deepEqual([...EXEMPTION_KINDS], ["boundary", "debt"]);
+});
+
+test("debt는 4필드 전부 필수다 — 사유·해소조건·기한·위험수용자", () => {
+  const f = exemptionFindings({ xExemptList: ["a"] },
+    { xExemptList: { a: { kind: "debt", reason: "임시" } } });
+  assert.deepEqual(f.map((x) => x.field).sort(), ["acceptor", "clearBy", "due"]);
+});
+
+// 구조적 경계에 기한을 요구하면 **거짓 날짜**가 생기고, 거짓 날짜는 날짜 없음보다 나쁘다.
+test("boundary는 기한을 요구하지 않는다 — 대신 왜 영구인지를 요구한다", () => {
+  const ok = exemptionFindings({ xExemptList: ["a"] },
+    { xExemptList: { a: { kind: "boundary", reason: "산문", whyPermanent: "코드 표면이 아니다" } } });
+  assert.deepEqual(ok, []);
+  const bad = exemptionFindings({ xExemptList: ["a"] },
+    { xExemptList: { a: { kind: "boundary", reason: "산문" } } });
+  assert.deepEqual(bad.map((x) => x.field), ["whyPermanent"]);
+});
+
+test("등록부에만 남은 레코드는 표면화하되 차단하지 않는다 — 부패 신호이지 위반이 아니다", () => {
+  const f = exemptionFindings({ xExemptList: [] }, { xExemptList: { gone: { kind: "boundary", reason: "r", whyPermanent: "w" } } });
+  assert.equal(f.length, 1);
+  assert.equal(f[0].kind, "stale-record");
+});
+
+test("면제 개수가 늘면 위반이다 — 래칫은 줄어드는 방향만 허용한다", () => {
+  const r = classifyExemptionRatchet({ xExemptList: ["a"] }, { xExemptList: ["a", "b"] });
+  assert.deepEqual(r.grown, [{ knob: "xExemptList", from: 1, to: 2 }]);
+  assert.deepEqual(r.allowedGrowth, []);
+});
+
+test("줄어드는 것은 통과다 — 걷어내기가 정상 경로다", () => {
+  assert.deepEqual(classifyExemptionRatchet({ xExemptList: ["a", "b"] }, { xExemptList: ["a"] }).grown, []);
+});
+
+test("policyRatchetExceptions 선언이 있으면 증가가 부채로 표면화된다 — 조용한 증가가 되지 않는다", () => {
+  const r = classifyExemptionRatchet({ xExemptList: ["a"] }, { xExemptList: ["a", "b"] }, null, ["xExemptList"]);
+  assert.deepEqual(r.grown, []);
+  assert.equal(r.allowedGrowth.length, 1);
+});
+
+test("다섯 판정 종류 전부가 사람이 읽는 문장을 갖는다", () => {
+  for (const k of ["unregistered", "bad-kind", "missing-field", "stale-record"]) {
+    assert.ok(String(EXEMPTION_FINDING_TEXT[k] || "").length > 10, `${k} 문구 없음`);
+  }
+});
+
+// ── 킷 자기적용 — 등록하는 순간 부채가 드러난다 ──────────────────────────────
+test("킷의 면제 전부가 분류·사유를 갖는다(도그푸딩) — 등록이 곧 리뷰다", () => {
+  const cfg = JSON.parse(readFileSync(new URL("../../sdd.config.json", import.meta.url).pathname, "utf8"));
+  const f = exemptionFindings(cfg, cfg.exemptionRegistry, cfg.exemptionKnobs)
+    .filter((x) => x.kind !== "stale-record");
+  assert.deepEqual(f, [], `킷 면제에 미등록·형식 위반이 남아 있다:\n${JSON.stringify(f, null, 2)}`);
 });

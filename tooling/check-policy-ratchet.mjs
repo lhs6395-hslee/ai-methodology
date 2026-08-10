@@ -8,7 +8,11 @@
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { loadConfig, configFromString } from "./sdd-config.mjs";
-import { classifyRatchet, effectiveRatchetPolicy } from "./policy-ratchet-lib.mjs";
+import {
+  classifyRatchet, effectiveRatchetPolicy,
+  exemptionFindings, classifyExemptionRatchet, exemptionKnobs, exemptionEntries,
+  EXEMPTION_FINDING_TEXT,
+} from "./policy-ratchet-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -76,11 +80,39 @@ for (const v of violations) {
   console.log(`  · ${v.knob}: ${v.from} → ${v.to} — ${why}. 정당한 재조정이면 policyRatchetExceptions에 "${v.knob}" 선언(부채로 표면화)`);
 }
 
-judged(violations.length);
-if (violations.length) {
-  const msg = "정책 래칫 위반 — 강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화). 위반을 knob 조정으로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).";
+// ── 면제 래칫 — 면제는 "지금 green을 만들기 위해" 추가되고 아무도 걷어내지 않는다.
+//    강도·임계 래칫이 knob을 지키는 동안 **면제 목록이 게이트를 무력화하는 우회로**였다.
+const exKnobs = exemptionKnobs(cfg, cfg.exemptionKnobs);
+const exTotal = exKnobs.reduce((n, k) => n + exemptionEntries(cfg[k]).length, 0);
+const exFindings = exemptionFindings(cfg, cfg.exemptionRegistry, cfg.exemptionKnobs);
+const { grown, allowedGrowth } = classifyExemptionRatchet(baseCfg, cfg, cfg.exemptionKnobs, cfg.policyRatchetExceptions || []);
+// stale-record는 부패 신호이지 위반이 아니다 — 표면화하고 차단하지 않는다.
+const exBlocking = exFindings.filter((f) => f.kind !== "stale-record");
+
+console.log(`면제 래칫: knob ${exKnobs.length}종 · 면제 ${exTotal}건 — 미등록·형식 위반 ${exBlocking.length} · 증가 ${grown.length}`);
+for (const g of allowedGrowth) {
+  console.log(`  · [부채] ${g.knob}: 면제 ${g.from} → ${g.to} (policyRatchetExceptions로 허용된 증가 — 걷어낼 대상)`);
+}
+for (const g of grown) {
+  console.log(`  · ${g.knob}: 면제가 ${g.from} → ${g.to}건으로 **늘었다** — 래칫은 줄어드는 방향만 허용한다.`
+    + " 정당한 신규 면제가 필요하면 다른 면제를 걷어내거나 policyRatchetExceptions에 그 knob을 선언하라(부채로 표면화된다)");
+}
+for (const f of exFindings.slice(0, 20)) {
+  const tail = f.kind === "missing-field" ? ` — \`${f.field}\` 없음(${f.exKind})` : "";
+  console.log(`  ${f.kind === "stale-record" ? "·" : " "} ${f.knob}[${f.entry}]: ${EXEMPTION_FINDING_TEXT[f.kind]}${tail}`);
+}
+if (exFindings.length > 20) console.log(`   … 외 ${exFindings.length - 20}건`);
+
+const totalViolations = violations.length + exBlocking.length + grown.length;
+judged(totalViolations);
+if (totalViolations) {
+  const parts = [];
+  if (violations.length) parts.push("강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화)");
+  if (exBlocking.length) parts.push("면제가 사유·분류 없이 존재한다(넷이 없는 면제는 이월이 아니라 방치다)");
+  if (grown.length) parts.push("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)");
+  const msg = `정책 래칫 위반 — ${parts.join(" / ")}. 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).`;
   if (HARD) { console.error(`\n✗ ${msg}`); process.exit(1); }
   console.log(`\n⚠ ${msg} (policyRatchetPolicy:advisory — 경고)`);
   process.exit(0);
 }
-console.log("정책 래칫 게이트: OK — 강도 하향·임계 완화 없음.");
+console.log(`정책 래칫 게이트: OK — 강도 하향·임계 완화 없음, 면제 ${exTotal}건 전부 분류·사유 등록됨.`);

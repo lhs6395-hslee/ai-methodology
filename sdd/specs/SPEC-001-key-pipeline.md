@@ -90,6 +90,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | config 표면에 `exemptionRegistry`(면제 항목별 분류·사유)·`exemptionKnobs`(null=이름 규약 자동 탐지) 추가, Node·Python DEFAULTS 동시 + 킷 자신의 면제 16건 등록 | SPEC-027 확장 동반. 면제 knob을 손 목록으로 두지 않은 이유는 강도 래칫의 실측 드리프트다 — `outOfBandDeployPolicy`·`changeLogFrRefPolicy`가 도입 시 목록에서 빠져 감시 밖이었다. 이름 규약(`Exempt`·`Exception`) 자동 탐지는 **새 면제 knob이 감시 밖에서 태어날 수 없게** 한다 [검증: tooling/__tests__/policy-ratchet.test.mjs] |
 | 2026-08-10 | config 표면에 `agentWiringPolicy`(advisory 기본, 킷 hard)·`agentSettingsFile`·`agentHookDecl`·`agentScriptDir`(전부 null=킷 기본) 추가 + `entityRegistry`에 `agent-wiring` 등재(사유 포함), Node·Python DEFAULTS 동시 | SPEC-051 동반. 경로를 코드에 고정하지 않는 이유는 이 라운드가 실측한 그대로다 — 편집 가드가 코드 경로를 하드코딩해 킷의 `scanDirs`(`tooling`)에서 **발화할 수 없었고** 그 0건이 진짜 0건과 구분되지 않았다. 킷은 `agentHookDecl`·`agentScriptDir`를 `tooling/harness`로 인스턴스화해 자기적용한다 [검증: tooling/__tests__/agent-wiring.test.mjs] |
 | 2026-08-10 | config 표면에 `importWiringPolicy`(advisory 기본, 킷 hard)·`importWiringExtensions`(null=킷 기본) 추가 + `entityRegistry`에 `import-wiring` 등재(사유 포함), Node·Python DEFAULTS 동시 | SPEC-050 동반. 확장자를 코드에 고정하지 않는 이유는 이 킷의 반복된 실측이다 — 게이트가 어휘·확장자를 고정하면 목록 밖 프로젝트에서 판정이 통째로 사라지고 **그 0건이 진짜 0건과 구분되지 않는다**(SPEC-038·040 계열). entity는 임의 신설 금지 규범대로 사유와 함께 등록했고, capability verb는 새 어휘를 늘리지 않고 등록된 `resolve`를 썼다 [검증: tooling/__tests__/import-wiring.test.mjs] |
 | 2026-08-10 | config 어댑터에 `blockingBranches` 추가(사유 필수 선언, SPEC-049) | 차단 분기가 무엇인지는 의미 판정이라 자동 발견하지 않는다(모든 early-return을 잡아 오탐이 폭주한다) — 선언은 책임지는 행위다. 미선언이면 판정하지 않는다 [검증: tooling/__tests__/verification-run.test.mjs] |
