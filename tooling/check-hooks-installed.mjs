@@ -54,6 +54,10 @@ if (ciEnv) {
 // 탐색 순서 — **프로젝트 선언이 킷 기본값을 이긴다.** HERE(킷 tooling)를 먼저 보면 소비 프로젝트를
 // 검사할 때 킷 자신의 목록이 이겨서 그 프로젝트가 선언하지도 않은 훅을 미설치로 지목한다(테스트가 잡음).
 const listPath = [
+  // 킷 전용 선언이 있으면 그것이 이긴다 — `source` 열은 **설치 방식에 종속**이고(킷은 사본,
+  // 소비처는 생성된 래퍼) 두 사실을 한 파일에 적으면 소비처에서 거짓 위반이 난다.
+  // 이 파일은 배포 목록에 없으므로 소비 프로젝트의 판정은 무변이다.
+  join(cfg.__root, "tooling", "harness", "self", "hooks.list"),
   join(cfg.__root, "scripts", "hooks.list"),
   join(cfg.__root, "tooling", "harness", "hooks.list"),
   join(HERE, "harness", "hooks.list"),

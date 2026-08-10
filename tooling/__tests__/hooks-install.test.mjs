@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SDD_HOOK_MARKER, parseHookList, hookFindings , parseHookEntries, HOOK_FINDING_TEXT } from "../hooks-install-lib.mjs";
@@ -226,4 +226,31 @@ test("hooks.list는 이름만도, 이름+원본 경로도 받는다 — 파서�
 test("이름 투영은 같은 파서를 쓴다 — 파서가 둘이면 한쪽만 고쳐진다", () => {
   const text = "pre-commit\ncommit-msg  scripts/x.sh\n";
   assert.deepEqual(parseHookList(text), parseHookEntries(text).map((x) => x.name));
+});
+
+// ── 킷 자기적용: 이 축을 킷이 스스로 판정받는다 ─────────────────────────────
+// 이전 판은 설치기 안 heredoc이 훅 본문의 정본이라 **대조할 원본이 없었고**, 그래서 신선도 축이
+// 킷 자신에게는 영구히 "미판정"이었다 — 자기 축을 자기가 도그푸딩하지 못한 자리다.
+// 본문을 `harness/self/`의 파일로 빼고 킷 전용 hooks.list가 그 경로를 선언한다.
+// @covers SPEC-036/FR-005
+test("킷 자신의 훅이 신선도 판정 대상이다 — 설치기 안 heredoc은 정본이 될 수 없다", () => {
+  const listSrc = readFileSync(new URL("../harness/self/hooks.list", import.meta.url), "utf8");
+  const entries = parseHookEntries(listSrc);
+  const declared = parseHookList(readFileSync(new URL("../harness/hooks.list", import.meta.url), "utf8"));
+  // 선언 집합은 소비처 목록과 같아야 한다 — 킷이 자기만 검사하는 훅을 갖는 순간 두 목록이 갈라진다.
+  assert.deepEqual(entries.map((e) => e.name).sort(), [...declared].sort());
+  for (const e of entries) {
+    assert.ok(e.source, `${e.name}: 킷 목록은 원본 경로를 선언해야 한다(미선언이면 신선도 미판정이다)`);
+    // 원본이 실재해야 한다 — 없으면 게이트가 source-unreadable로 매 실행 고발한다.
+    const abs = new URL(`../../${e.source}`, import.meta.url).pathname;
+    assert.ok(existsSync(abs), `${e.name}: 선언한 원본이 없다 — ${e.source}`);
+    assert.match(readFileSync(abs, "utf8"), /sdd-managed-hook/, `${e.name}: 킷 마커가 원본에 있어야 한다`);
+  }
+  // 설치기는 **파일을 복사한다** — heredoc으로 되돌아가면 이 축이 다시 눈을 감는다.
+  const installer = readFileSync(new URL("../harness/self-hooks-install.sh", import.meta.url), "utf8");
+  assert.doesNotMatch(installer, /cat > "\$HOOKS"/, "설치기 안 heredoc이 정본이 되면 대조할 원본이 사라진다");
+  for (const e of entries) {
+    if (e.name === "pre-merge-commit") continue;        // pre-commit의 사본(설치기가 cp로 만든다)
+    assert.match(installer, new RegExp(`cp "\\$SELF"/self/${e.name}`), `${e.name}: 파일 복사 배선 부재`);
+  }
 });

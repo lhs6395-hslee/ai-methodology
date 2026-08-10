@@ -1,0 +1,6 @@
+#!/bin/sh
+# sdd-managed-hook
+DIR=$(git rev-parse --show-toplevel) || exit 1
+cd "$DIR"
+git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && { echo "self commit-msg: merge skip" >&2; exit 0; }
+node tooling/check-spec-sync.mjs --staged --message-file "$1"

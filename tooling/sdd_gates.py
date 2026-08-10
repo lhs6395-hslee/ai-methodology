@@ -7346,7 +7346,8 @@ def cmd_hooksinstalled(cfg):
 
     here = os.path.dirname(os.path.abspath(__file__))
     list_path = None
-    for cand in [os.path.join(root, "scripts", "hooks.list"),
+    for cand in [os.path.join(root, "tooling", "harness", "self", "hooks.list"),
+                 os.path.join(root, "scripts", "hooks.list"),
                  os.path.join(root, "tooling", "harness", "hooks.list"),
                  os.path.join(here, "harness", "hooks.list")]:
         if os.path.exists(cand):

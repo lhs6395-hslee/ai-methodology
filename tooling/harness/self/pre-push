@@ -1,0 +1,8 @@
+#!/bin/sh
+# sdd-managed-hook
+DIR=$(git rev-parse --show-toplevel) || exit 1
+cd "$DIR"
+# --hook: config의 syncHookRules로 무거운 규칙을 선언적으로 위임(위임처는 syncHookDelegatedTo).
+# --budget: 안전망 — 초과분은 조용히 통과가 아니라 "미판정"으로 표면화된다.
+# 훅이 몇 초를 넘기면 사람이 --no-verify로 우회하고, 그 순간 훅 전체가 무의미해진다.
+node tooling/sdd-sync.mjs --hook --budget "${SDD_SYNC_BUDGET_MS:-15000}" || true

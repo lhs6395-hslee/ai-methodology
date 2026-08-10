@@ -48,7 +48,7 @@
 - **Symbols**: hooks-install-lib.mjs, check-hooks-installed.mjs, hooks.list
 - **Artifacts**: —
 - **Capabilities**: hook-wiring.gate
-- **Files**: tooling/hooks-install-lib.mjs, tooling/check-hooks-installed.mjs, tooling/harness/hooks.list, tooling/__tests__/hooks-install.test.mjs
+- **Files**: tooling/hooks-install-lib.mjs, tooling/check-hooks-installed.mjs, tooling/harness/hooks.list, tooling/harness/self/**, tooling/__tests__/hooks-install.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 훅을 **설치하는** 쪽(sdd-init·self-hooks-install)과 스윕 배선은 SPEC-004 소유. 이 spec은 설치 결과가 실재하는지만 판정한다. config knob·Python 복제는 각 소유 스펙(001/006).
@@ -89,3 +89,4 @@
 | 2026-08-10 | `check-hooks-installed`의 `git` 래퍼에 `core.quotepath=off` 적용 | 훅 디렉토리를 git에게 묻는 축이라 경로 인용이 곧 판정 입력이다. 비ASCII 디렉토리 아래에서 인용된 경로로 파일을 못 찾으면 그 실패가 **"훅 없음"이라는 거짓 위반**이 된다 — 이 스펙이 이미 겪은 "낡음을 green으로"의 반대 방향이다 |
 | 2026-08-10 | `CI` 환경에서 이 축을 **SKIPPED로 선언**한다(`hooksInstalledSkipEnv`) | **git은 훅을 복제하지 않는다** — 갓 체크아웃한 작업본에 훅이 없는 것은 미채택의 증거가 아니다. R17이 스윕을 CI에 배선하게 만든 순간(그것이 유일한 우회 불가 채널이다) 이 축은 CI에서 **언제나 거짓 위반**을 내게 되고, `hard` 프로젝트의 빌드가 거짓으로 깨지면 그 다음은 정해져 있다 — 사람이 게이트를 끈다. 완화가 아니다: 관측 불가한 사실을 위반이라 말하지 않는 것이고(SPEC-054의 3분류), 강제도 사라지지 않는다 — CI에서 채택의 관측 가능한 대리물은 **채택 영수증**이고 그것은 R17이 판정한다(영수증에 훅 목록이 실린다). 이 축은 **로컬 채택 축**으로 정직하게 남는다 |
 | 2026-08-10 | **Python 미러 신설**(`cmd_hooksinstalled` + `parse_hook_entries`·`parse_hook_list`·`hook_findings`·`HOOK_FINDING_TEXT`) — 10 시나리오 바이트 패리티 | 이 축은 여러 라운드 동안 **Node 전용**이었고, 그동안 Python 런타임 프로젝트는 훅 배선을 **아무도 보지 않는 상태**였다 — 그 0건은 진짜 0건과 구분되지 않는다. SPEC-006의 "판정 게이트는 양판 필수" 불변 위반이었고, 그 사실이 이번에 기계화된 대응 검산(SPEC-006 FR-007)에 걸려 나왔다 |
+| 2026-08-10 | 킷 자신의 훅 본문을 설치기 heredoc에서 **파일**(`tooling/harness/self/`)로 빼고 킷 전용 `hooks.list`가 원본 경로를 선언한다 — 신선도 4/4 판정(양판) | 이전 판은 설치기 안 heredoc이 훅 본문의 정본이라 **대조할 원본이 없었고**, 그래서 이 스펙이 신설한 신선도 축이 **킷 자신에게는 영구히 "미판정"**이었다 — 자기 축을 자기가 도그푸딩하지 못한 자리다(SPEC-051에서 같은 계열을 겪었다: 킷에 `.claude/`가 없어 에이전트 배선 축만 도그푸딩 0이었다). 킷 전용 목록을 **따로** 둔 이유: `source` 열은 설치 방식에 종속이다 — 킷의 `.git/hooks/<이름>`은 사본이라 바이트 대조가 성립하지만 소비처의 그것은 `scripts/sdd-*.sh`를 부르는 **생성된 3행 래퍼**라 대조할 사본 관계가 없다. 한 파일에 적으면 소비처에서 있지도 않은 원본을 "읽지 못했다"고 보고하고, **거짓 위반은 오탐이고 오탐이 잦은 게이트는 꺼진다.** 그 파일은 배포 목록에 없어 소비 프로젝트의 판정은 무변이다 |

@@ -1,0 +1,15 @@
+# 킷 **자신의** 훅 선언 — 소비 프로젝트에 배포되지 않는다(sdd-init는 `harness/hooks.list`만 복사한다).
+#
+# 이 파일이 별도로 존재하는 이유: `source` 열은 **설치 방식에 종속**이다.
+#   · 킷      — `.git/hooks/<이름>`이 `harness/self/<이름>`의 **사본**이다 → 바이트 대조가 성립한다.
+#   · 소비처  — `.git/hooks/<이름>`은 `scripts/sdd-*.sh`를 부르는 **생성된 3행 래퍼**다 → 대조할
+#               사본 관계가 없다(그 경우 신선도는 판정하지 않고, 게이트가 매 실행 그 사실을 밝힌다).
+# 두 사실을 한 파일에 적으면 소비처에서 있지도 않은 원본을 "읽지 못했다"고 보고한다 —
+# **거짓 위반은 오탐이고, 오탐이 잦은 게이트는 꺼진다.**
+#
+# 형식: `<훅 이름>  <원본 경로>`(원본 미선언은 이름만).
+# pre-merge-commit은 pre-commit의 사본이므로 같은 원본을 지목한다(설치기가 `cp`로 만든다).
+pre-commit        tooling/harness/self/pre-commit
+pre-merge-commit  tooling/harness/self/pre-commit
+commit-msg        tooling/harness/self/commit-msg
+pre-push          tooling/harness/self/pre-push
