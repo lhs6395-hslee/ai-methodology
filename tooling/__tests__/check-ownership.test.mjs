@@ -232,3 +232,48 @@ test("G1·G2·G3 off → 검출 안 함(하위호환)", () => {
   assert.equal(r.code, 0, r.out);
   assert.doesNotMatch(r.out, /카테고리 간 동일 키|Files 겹침/);
 });
+
+// ── 지원 계층 출구(SPEC-024 확장, 제보 ④) ──────────────────────────────────
+// aggregate 없는 부가 계층은 세 hard 규칙이 맞물려 **출구가 없었다**: 캡 초과라 분할해야 하는데
+// 분리 스펙은 entity가 없어 capability를 소유할 수 없고, 그러면 Ownership 키 0이라 이 게이트가 막았다.
+// @covers SPEC-024/FR-004
+function runCfg(files, config) {
+  const root = mkdtempSync(join(tmpdir(), "sdd-sup-"));
+  mkdirSync(join(root, "sdd", "specs"), { recursive: true });
+  writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", ...config }));
+  for (const [rel, body] of Object.entries(files)) {
+    mkdirSync(join(root, rel, ".."), { recursive: true });
+    writeFileSync(join(root, rel), body);
+  }
+  try {
+    const out = execFileSync("node", [join(process.cwd(), "tooling/check-ownership.mjs")],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    return { code: 0, out };
+  } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+  finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+const SUP_MAIN = "# S\n**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: ticket\n";
+const SUP_FILES = "# K\n**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: —\n- **Files**: src/knowledge.py\n";
+
+test("등록 없이 Ownership 키 0이면 여전히 막힌다 — 출구는 선언한 자에게만 열린다", () => {
+  const r = runCfg({ "sdd/specs/SPEC-001.md": SUP_MAIN, "sdd/specs/SPEC-002.md": SUP_FILES, "src/knowledge.py": "x\n" },
+    { ownershipRequiredPolicy: "hard" });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /미선언 1건: SPEC-002/);
+});
+
+test("지원 계층 등록 + Files 선언이면 충족한다 — Files는 dedup 사각이 아니다(G3가 판정)", () => {
+  const r = runCfg({ "sdd/specs/SPEC-001.md": SUP_MAIN, "sdd/specs/SPEC-002.md": SUP_FILES, "src/knowledge.py": "x\n" },
+    { ownershipRequiredPolicy: "hard", supportLayerSpecs: { "SPEC-002": "무상태 문자열만 반환하는 근거 주입 계층 — aggregate가 없다" } });
+  assert.equal(r.code, 0, r.out);
+  // 면제는 조용히 "완료"가 되지 않는다 — 매 실행 표면화한다.
+  assert.match(r.out, /지원 계층 SPEC-002: Ownership 키 0이지만 Files 선언으로 충족/);
+});
+
+test("등록만 하고 Files도 없으면 막힌다 — 등록은 백지수표가 아니다", () => {
+  const r = runCfg({ "sdd/specs/SPEC-001.md": SUP_MAIN, "sdd/specs/SPEC-002.md": "# K\n**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: —\n" },
+    { ownershipRequiredPolicy: "hard", supportLayerSpecs: { "SPEC-002": "사유 있음" } });
+  assert.equal(r.code, 1);
+  assert.match(r.out, /미선언 1건: SPEC-002/);
+});

@@ -129,6 +129,8 @@ DEFAULTS = {
     "deployMarkers": None,
     "coversBacklinkPolicy": "advisory",
     "coversBacklinkListCap": 12,
+    "browserGradeMethods": None,
+    "deployGradeMethods": None,
     "implReferencePolicy": "advisory",
     "implReferenceListCap": 12,
     "implReferenceProseRegex": None,
@@ -1692,6 +1694,9 @@ DEFAULT_BROWSER_EVIDENCE_PATTERNS = ["e2e", "playwright", "cypress", "puppeteer"
 
 # 배포 등급 증거(evidence-lib.mjs 패리티) — "단위테스트 통과"와 "배포본에서 실제 실행됨"은 다른 사실이다.
 # 실측(2026-08-10 qa에이전트): 아치 불일치·이미지 안 모듈 누락은 단위테스트 100% 통과해도 남는다.
+DEFAULT_BROWSER_GRADE_METHODS = ["browser_smoke", "browser", "e2e", "ui_smoke"]
+DEFAULT_DEPLOY_GRADE_METHODS = ["deployment", "deploy_smoke", "canary", "smoke"]
+
 DEFAULT_DEPLOY_EVIDENCE_PATTERNS = ["smoke", "e2e", "live", "deploy", "runbook", "canary", "staging"]
 DEFAULT_DEPLOY_MARKERS = [
     "이미지", "컨테이너", "레지스트리", "배포", "파이프라인", "스테이지", "클러스터", "노드",
@@ -1750,12 +1755,15 @@ def is_browser_grade_evidence(path, patterns):
 
 
 def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, browser_patterns=None,
-                      manifest_of=None, deploy_markers=None, deploy_patterns=None):
+                      manifest_of=None, deploy_markers=None, deploy_patterns=None,
+                      browser_grade_methods=None, deploy_grade_methods=None):
     vs = verbs if verbs else DEFAULT_EXECUTION_VERBS
     bpat = browser_patterns if browser_patterns else DEFAULT_BROWSER_EVIDENCE_PATTERNS
     bmark = browser_markers if browser_markers else DEFAULT_BROWSER_MARKERS
     dpat = deploy_patterns if deploy_patterns else DEFAULT_DEPLOY_EVIDENCE_PATTERNS
     dmark = deploy_markers if deploy_markers else DEFAULT_DEPLOY_MARKERS
+    bgm = browser_grade_methods if browser_grade_methods else DEFAULT_BROWSER_GRADE_METHODS
+    dgm = deploy_grade_methods if deploy_grade_methods else DEFAULT_DEPLOY_GRADE_METHODS
     man_of = manifest_of if callable(manifest_of) else (lambda s, c: None)
     out = []
     for u in units or []:
@@ -1781,13 +1789,17 @@ def evidence_findings(units, asset_exists, verbs=None, browser_markers=None, bro
                     if not asset_exists(p):
                         out.append((u["specId"], c["id"], c["kind"], "missing-asset", f"증거 자산 없음: {p}"))
                 low = str(c["text"] or "").lower()
-                if any(marker_hits(low, m) for m in bmark) and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"]):
+                # 등급은 **경로 또는 매니페스트 method** 둘 중 하나로 성립한다(evidence-lib.mjs 미러).
+                if (any(marker_hits(low, m) for m in bmark)
+                        and not any(is_browser_grade_evidence(p, bpat) for p in tag["paths"])
+                        and not (man and str(man.get("method") or "") in bgm)):
                     out.append((u["specId"], c["id"], c["kind"], "browser-needs-ui-evidence",
                                 f"UI/브라우저 대상인데 증거가 브라우저 등급 아님({', '.join(tag['paths'])}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다"))
                 # 트리거는 **소유 + 주장** 둘 다다 — 마커만 걸면 배포를 *다루는* 스펙까지 잡힌다.
                 if (u.get("ownsDeployArtifact")
                         and any(marker_hits(low, m) for m in dmark)
-                        and not any(is_deploy_grade_evidence(p, dpat) for p in tag["paths"])):
+                        and not any(is_deploy_grade_evidence(p, dpat) for p in tag["paths"])
+                        and not (man and str(man.get("method") or "") in dgm)):
                     out.append((u["specId"], c["id"], c["kind"], "deploy-needs-live-evidence",
                                 f"배포 산출물 대상인데 증거가 배포 등급 아님({', '.join(tag['paths'])}) — 저장소 안 단위테스트는 배포본의 아치·이미지 내용·전제 자원에 닿지 않는다(smoke·e2e·live·runbook 등급 증거 또는 실행 원장 기록으로 올려라)"))
                 continue
@@ -5001,7 +5013,8 @@ def cmd_evidence(cfg):
         units.append({"specId": spec_id, "claims": claims, "ownsDeployArtifact": owns_deploy})
 
     findings = evidence_findings(units, asset_exists, verbs, bmark, bpat, manifest_of,
-                                 cfg.get("deployMarkers"), cfg.get("deployEvidencePatterns"))
+                                 cfg.get("deployMarkers"), cfg.get("deployEvidencePatterns"),
+                                 cfg.get("browserGradeMethods"), cfg.get("deployGradeMethods"))
     claim_count = sum(len(u["claims"]) for u in units)
     judged(len(findings))
     print(f"실행 증거 게이트(executionEvidencePolicy={policy}): spec {len(units)}개·주장 {claim_count}건 검사 — 위반 {len(findings)}건")

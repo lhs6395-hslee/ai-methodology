@@ -51,6 +51,16 @@ export const DEFAULT_BROWSER_EVIDENCE_PATTERNS = [
 // 배포 등급 증거 — **"단위테스트가 통과했다"와 "배포본에서 실제로 돌았다"는 다른 사실이다**(제보 ④).
 // 실측(2026-08-10 qa에이전트): 아치 불일치·이미지 안 모듈 누락은 단위테스트가 100% 통과해도
 // 남는다. 그 둘이 깨지는 곳은 **배포된 이미지의 런타임**이고, 저장소 안 테스트는 거기 닿지 않는다.
+// 매니페스트 `method`가 등급을 증언하는 값 — **경로 판정의 대안이 아니라 보완**이다.
+// 왜 경로가 기본인가: 파일 위치는 게이트가 저장소에서 확인할 수 있는 사실이고, 라벨은 자기신고다.
+// 그런데 이 프로젝트의 `method`는 순수 자기신고가 아니다 — `@verifies` 태그와 매니페스트 사이의
+// 드리프트를 sdd-smoke-scan이 대조하므로, 라벨은 **다른 축이 검산하는 선언**이다.
+// 그래서 method를 등급 증언으로 받는다: 안 받으면 프로젝트가 등급을 얻으려고 증거 파일을
+// 물리적으로 쪼개야 하고(실측 제보: pipeline·runtime·browser 증거가 한 파일에 섞이면 UI 주장이
+// 등급을 못 받아 `BROWSER-SMOKE.md`로 분리했다), 그 강요는 방법론이 문서 구조를 지시하는 것이다.
+export const DEFAULT_BROWSER_GRADE_METHODS = ["browser_smoke", "browser", "e2e", "ui_smoke"];
+export const DEFAULT_DEPLOY_GRADE_METHODS = ["deployment", "deploy_smoke", "canary", "smoke"];
+
 export const DEFAULT_DEPLOY_EVIDENCE_PATTERNS = [
   "smoke", "e2e", "live", "deploy", "runbook", "canary", "staging",
 ];
@@ -122,6 +132,8 @@ export function evidenceFindings(units, assetExists, opts = {}) {
   const bmark = opts.browserMarkers && opts.browserMarkers.length ? opts.browserMarkers : DEFAULT_BROWSER_MARKERS;
   const dpat = opts.deployPatterns && opts.deployPatterns.length ? opts.deployPatterns : DEFAULT_DEPLOY_EVIDENCE_PATTERNS;
   const dmark = opts.deployMarkers && opts.deployMarkers.length ? opts.deployMarkers : DEFAULT_DEPLOY_MARKERS;
+  const bgm = opts.browserGradeMethods && opts.browserGradeMethods.length ? opts.browserGradeMethods : DEFAULT_BROWSER_GRADE_METHODS;
+  const dgm = opts.deployGradeMethods && opts.deployGradeMethods.length ? opts.deployGradeMethods : DEFAULT_DEPLOY_GRADE_METHODS;
   const isDeployClaim = (t) => {
     const s = String(t || "").toLowerCase();
     return dmark.some((m) => markerHits(s, m));
@@ -159,7 +171,10 @@ export function evidenceFindings(units, assetExists, opts = {}) {
           }
         }
         // UI/브라우저 대상인데 증거가 브라우저 등급이 아니면 표면화(API 단독 검증 불인정 — 실측 교훈).
-        if (isBrowserClaim(c.text) && !tag.paths.some((p) => isBrowserGradeEvidence(p, bpat))) {
+        // 등급은 **경로 또는 매니페스트 method** 둘 중 하나로 성립한다 — method를 안 받으면
+        // 프로젝트가 등급을 얻으려고 증거 파일을 물리적으로 쪼개야 한다(실측 제보).
+        if (isBrowserClaim(c.text) && !tag.paths.some((p) => isBrowserGradeEvidence(p, bpat))
+            && !(man && bgm.includes(String(man.method || "")))) {
           out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "browser-needs-ui-evidence",
             detail: `UI/브라우저 대상인데 증거가 브라우저 등급 아님(${tag.paths.join(", ")}) — API 단독 검증은 변수 보간·렌더 단계 결함을 통과시킨다` });
         }
@@ -170,7 +185,8 @@ export function evidenceFindings(units, assetExists, opts = {}) {
         // 그 주장이 배포 대상을 말할 때. 마커만으로 걸면 "배포 가드의 판정 로직"처럼 배포를
         // *다루는* 스펙까지 잡혀 31건이 쏟아진다(킷 시운전 실측) — 그런 스펙의 정답 증거는
         // 단위테스트가 맞다. 소유 없는 마커는 화제이지 대상이 아니다.
-        if (u.ownsDeployArtifact && isDeployClaim(c.text) && !tag.paths.some((p) => isDeployGradeEvidence(p, dpat))) {
+        if (u.ownsDeployArtifact && isDeployClaim(c.text) && !tag.paths.some((p) => isDeployGradeEvidence(p, dpat))
+            && !(man && dgm.includes(String(man.method || "")))) {
           out.push({ specId: u.specId, claimId: c.id, kind: c.kind, finding: "deploy-needs-live-evidence",
             detail: `배포 산출물 대상인데 증거가 배포 등급 아님(${tag.paths.join(", ")}) — 저장소 안 단위테스트는 배포본의 아치·이미지 내용·전제 자원에 닿지 않는다(smoke·e2e·live·runbook 등급 증거 또는 실행 원장 기록으로 올려라)` });
         }

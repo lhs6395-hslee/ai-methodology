@@ -159,6 +159,12 @@ export const DEFAULTS = {
   termGlossary: [],
   termCoveragePolicy: "advisory",
   termCoverageListCap: 12,
+  // 증거 등급을 증언하는 매니페스트 method 값(SPEC-031 확장). null이면 킷 기본.
+  // 경로 판정의 **대안이 아니라 보완**이다 — 안 받으면 프로젝트가 등급을 얻으려고 증거 파일을
+  // 물리적으로 쪼개야 한다(실측 제보). method가 자기신고여도 무방한 이유: 태그↔매니페스트
+  // 드리프트를 sdd-smoke-scan(SPEC-010)이 대조하므로 **다른 축이 검산하는 선언**이다.
+  browserGradeMethods: null,
+  deployGradeMethods: null,
   // 지목 구현체 참조(SPEC-046) — FR이 백틱으로 지목한 함수·모듈이 실행 경로에서 참조되는가.
   implReferencePolicy: "advisory",
   implReferenceListCap: 12,

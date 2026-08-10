@@ -20,6 +20,7 @@
 - **UI/브라우저 경로가 있는 대상은 API 단독 검증을 실행 등급으로 인정하지 않는다**(실측 교훈) — 주장 라인에 UI 마커(대시보드·화면·패널…)가 있는데 증거 경로가 브라우저 등급 패턴(e2e·playwright·cypress…)에 맞지 않으면 표면화한다. 이는 **근사**다(경로 이름 기반) — 정확한 판정은 사람 몫이고 게이트는 "이 증거로는 렌더 단계를 못 본다"는 의심만 제기한다.
 - 증거 경로는 파일·디렉토리 모두 인정하고 `*`·`?` 글롭을 지원한다(`tests/e2e/**` 형태의 스위트 지목 허용).
 - 기본 `off` — 기존 프로젝트에 소급 범람하지 않는다. 깨끗해지면 `hard` 승격(graduation, 킷 자신은 hard).
+- **등급은 경로 또는 매니페스트 `method`로 성립한다** — 경로 판정이 기본인 이유는 **파일 위치는 게이트가 저장소에서 확인할 수 있는 사실이고 라벨은 자기신고**이기 때문이다. 그런데 매니페스트 `method`는 순수 자기신고가 아니다: 태그↔매니페스트 드리프트를 `sdd-smoke-scan`(SPEC-010)이 대조하므로 **다른 축이 검산하는 선언**이다. 그래서 `browserGradeMethods`·`deployGradeMethods`에 열거된 method는 등급을 증언한다 — 안 받으면 프로젝트가 등급을 얻으려고 증거 파일을 물리적으로 쪼개야 하고(실측 제보: pipeline·runtime·browser 증거가 한 파일에 섞여 있었다), 그 강요는 방법론이 문서 구조를 지시하는 것이다. 열거 밖 method는 등급을 주지 않는다 — 아무 라벨이나 통과시키면 라벨이 곧 면제가 된다.
 
 ---
 
@@ -83,6 +84,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 등급 판정에 매니페스트 `method` 인정 — `browserGradeMethods`·`deployGradeMethods`(null이면 킷 기본) 신설, 양판 | 실측 제보 부수 논점: `isBrowserGradeEvidence`가 **경로 문자열만** 보므로 pipeline·runtime·browser 증거가 한 파일에 섞이면 UI 주장이 등급을 못 받고, 그래서 `BROWSER-SMOKE.md`로 파일을 갈라야 했다. `@verifies` 태그가 이미 method를 명시하고 그 태그↔매니페스트 드리프트는 SPEC-010이 대조하므로 method는 **검산되는 선언**이다 — 등급 증언으로 받을 근거가 있다. 경로 판정은 기본으로 유지하고 그 이유(위치는 검증 가능한 사실, 라벨은 자기신고)를 문서에 명시했다. 열거 밖 method를 받지 않는 것이 이 확장이 면제로 변질되지 않는 지점이다 [검증: tooling/__tests__/evidence.test.mjs] |
 | 2026-07-30 | 초안 — `executionEvidencePolicy`(off\|advisory\|hard) + `executionVerbs`·`browserMarkers`·`browserEvidencePatterns` knob + `evidence-lib`(태그 파싱·등급 판정) + `check-evidence` 게이트 + sdd-sync R8, Node·Python 바이트 패리티. 킷 자신 hard 채택 | owner 개정 요청 R1(실측 gsn-ai-pm): 게이트 8종 green인데 대시보드 패널 30여 개 사망 — `[검증]`이 산문 자기신고로 소비되고 렌더 확인 코드가 0줄이었다. API 단독 검증도 통과하는 결함(변수 보간)이라 UI 대상엔 브라우저 등급을 요구 |
 | 2026-08-02 | 브라우저 마커 대조를 부분일치에서 **ASCII 단어 경계 일치**로 교정(`markerHits`) — 한글 마커는 교착어라 부분일치를 유지. Node·Python 동시 | 실측 제보(gsn-aiops-finops-module): `ui` 마커가 `TicketPackage`·`REQUIRED`·`pricing-guide`에 걸려 무관한 FR을 브라우저 주장으로 오분류했다. 오탐이 잦은 게이트는 꺼지므로 오탐 억제가 곧 강도다 [검증: tooling/__tests__/evidence.test.mjs] |
 | 2026-08-02 | 본문↔회계 매니페스트 대조 신설(FR-007·SC-003) — `[미확인]`인데 매니페스트가 실측을 주장하면 `unknown-vs-manifest`, 실행 태그가 있는데 매니페스트에도 엔트리면 `manifest-vs-tag`. NFR 라인도 대조 대상으로 수집(실행 동사 규칙은 SC 전용 유지). Node·Python 바이트 동일 | 실측 제보(gsn-aiops-finops-module): `[미확인]` 선언 FR이 smokeManifest에 실측 증거를 갖고 있었는데 어느 게이트도 그 모순을 판정하지 않아, "정직한 미확인"과 "회계된 검증"이 동시에 참인 채로 통과했다. 본문과 매니페스트는 같은 주장에 대한 두 개의 선언이다 [검증: tooling/__tests__/evidence.test.mjs] |

@@ -135,6 +135,7 @@ const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
 const files = specFiles();
 const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
 const missing = [], formatIssues = [];
+const supportFilesOnly = [];  // 지원 계층 스펙이 Files만으로 충족한 것 — 면제가 아니므로 매 실행 표면화
 const specDeps = []; // {specId, entities:[{name,type}]} — 관계 판정용(SPEC-017)
 let relStructCount = 0, relFreeCount = 0; // 관계 판정 발화량(침묵 표면화용)
 let declaredCount = 0;
@@ -154,7 +155,21 @@ for (const file of files) {
   const own = parseSection(text, "Ownership", CATEGORIES);
   const hasAny = CATEGORIES.some((c) => own[c].length);
 
-  if (!hasAny) { missing.push(specId); continue; }
+  if (!hasAny) {
+    // 교착 출구(SPEC-024 확장) — **지원 계층 스펙은 Files만으로 선언을 충족한다.**
+    // 실측 제보: aggregate가 없는 부가 계층(무상태 문자열만 반환하는 근거 주입 계층)은
+    // ① 캡 초과라 분할해야 하는데 ② 분리 스펙은 entity가 없어 capability를 소유할 수 없고
+    // ③ 그러면 Ownership 키가 0이라 이 게이트가 막았다 — 출구가 없는 상태였다.
+    // Files 선언이 있으면 **중복 검사의 사각이 아니다**: G3(filesOverlapPolicy)가 그 글롭의
+    // 실파일 겹침을 판정한다. 그래서 이 출구는 dedup을 약화시키지 않는다.
+    // 조용한 면제가 아니다 — supportLayerSpecs는 사유가 필수이고(cohesion이 강제) 아래에서
+    // 매 실행 표면화한다. 등록 없이 키 0이면 여전히 막힌다.
+    const supportReason = String((cfg.supportLayerSpecs || {})[specId] ?? "").trim();
+    const filesOnly = supportReason && parseFilesLine(text).length > 0;
+    if (filesOnly) { supportFilesOnly.push(specId); continue; }
+    missing.push(specId);
+    continue;
+  }
   declaredCount++;
 
   for (const cat of CATEGORIES) {
@@ -493,6 +508,12 @@ if (conflicts.length) {
     console.error(`  [${c.cat}] "${c.key}" ← ${c.specs.join(" + ")}  → 한 spec으로 통합/개정 필요`);
   }
   process.exit(1);
+}
+
+// 지원 계층 출구는 **항상 보인다** — 면제는 조용히 "완료"가 되지 않는다(킷 규범).
+for (const id of supportFilesOnly) {
+  console.log(`· 지원 계층 ${id}: Ownership 키 0이지만 Files 선언으로 충족 — supportLayerSpecs 등록(사유 있음).`
+    + " 이 스펙의 중복 판정은 Files 겹침(G3)이 담당한다. aggregate가 생기면 등록을 지워라.");
 }
 
 // G1: Ownership 선언 강제(미선언 = dedup 사각). ORQ hard면 --strict 없이도 차단.

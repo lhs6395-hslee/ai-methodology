@@ -220,3 +220,24 @@ test("배포 등급 증거를 대면 통과한다 — 막는 것은 등급 미�
   const r = evidenceFindings([{ specId: "S1", claims, ownsDeployArtifact: true }], () => true);
   assert.equal(r.filter((f) => f.finding === "deploy-needs-live-evidence").length, 0);
 });
+
+test("등급은 경로 또는 매니페스트 method로 성립한다 — 등급 때문에 증거 파일을 쪼개지 않는다", () => {
+  // 실측 제보: pipeline·runtime·browser 증거가 한 파일에 섞이면 UI 주장이 등급을 못 받아
+  // 파일을 물리적으로 분리해야 했다. `@verifies` 태그가 이미 method를 명시하고, 태그↔매니페스트
+  // 드리프트는 sdd-smoke-scan이 대조하므로 method는 **다른 축이 검산하는 선언**이다.
+  const units = [{ specId: "SPEC-001", claims: [{ id: "FR-001", kind: "FR", text: "대시보드 화면을 렌더한다 [검증: docs/OPERATIONS.md]" }] }];
+  const exists = () => true;
+  // ① method 없음 → 경로가 브라우저 등급이 아니라 표면화
+  const bare = evidenceFindings(units, exists);
+  assert.equal(bare.filter((f) => f.finding === "browser-needs-ui-evidence").length, 1);
+  // ② 매니페스트가 browser_smoke를 증언하면 등급이 성립한다
+  const withMethod = evidenceFindings(units, exists, {
+    manifestOf: () => ({ source: "smokeManifest", method: "browser_smoke" }),
+  });
+  assert.equal(withMethod.filter((f) => f.finding === "browser-needs-ui-evidence").length, 0);
+  // ③ 무관한 method는 등급을 주지 않는다 — 아무 라벨이나 통과시키면 라벨이 면제가 된다
+  const wrongMethod = evidenceFindings(units, exists, {
+    manifestOf: () => ({ source: "smokeManifest", method: "pipeline" }),
+  });
+  assert.equal(wrongMethod.filter((f) => f.finding === "browser-needs-ui-evidence").length, 1);
+});

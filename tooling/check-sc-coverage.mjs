@@ -15,7 +15,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
 import { compileGlob } from "./spec-sync-lib.mjs";
-import { parseScLine, validateEvidenceManifest, classifyScCoverage } from "./sc-coverage-lib.mjs";
+import { parseScLine, validateEvidenceManifest, classifyScCoverage, scDeclDrift } from "./sc-coverage-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) — 선언 안 하면 UNTYPED로 자백된다
@@ -57,6 +57,7 @@ let names;
 try { names = readdirSync(SPEC_DIR).sort(); } catch { console.error(`✗ spec 디렉토리 없음: ${SPEC_DIR}`); process.exit(1); }
 
 const items = [];
+const drift = [];   // 선언 형식 드리프트 — 회계에서 조용히 빠진 항목(게이트의 자기 사각)
 for (const n of names.filter((x) => /\.md$/.test(x))) {
   const text = readFileSync(join(SPEC_DIR, n), "utf8");
   const specId = (text.match(cfg.__specIdRe) || [n.replace(/\.md$/, "")])[0];
@@ -64,6 +65,7 @@ for (const n of names.filter((x) => /\.md$/.test(x))) {
     const it = parseScLine(line);
     if (it) items.push({ specId, ...it });
   }
+  for (const d of scDeclDrift(text)) drift.push({ specId, ...d });
 }
 
 const { classes, counts } = classifyScCoverage(items, entries, kindsCompiled, matcher);
@@ -72,6 +74,17 @@ for (const [, v] of classes) if (v.kind) byKind[v.kind] = (byKind[v.kind] || 0) 
 const kindTag = Object.keys(byKind).sort().map((k) => `${k}:${byKind[k]}`).join(" ") || "—";
 
 console.log(`SC·NFR 회계 게이트(scCoveragePolicy=${POLICY}): 항목 ${items.length}건 — verified ${counts.verified}·evidence ${counts.evidence}·deferred ${counts.deferred}·미회계 ${counts.unaccounted} | 종류(${kindTag})`);
+
+// 형식 드리프트는 **어떤 강도에서도** 표면화한다 — 회계에서 빠진 항목이 조용히 사라지는 것이
+// 이 제보의 요지였다. 강도는 차단 여부만 정하고, 사실의 노출은 정책과 무관하다.
+if (drift.length) {
+  console.log(`  ⚠ 선언 형식 불일치 ${drift.length}건 — 라인 머리가 굵은 SC/NFR 토큰인데 선언으로 파싱되지 않아 **회계에서 빠졌다**:`);
+  for (const d of drift.slice(0, 12)) {
+    console.log(`      [${d.specId}/${d.id}] ${d.line.slice(0, 90)}`);
+  }
+  if (drift.length > 12) console.log(`      … 외 ${drift.length - 12}건`);
+  console.log("      템플릿 형식은 `- **SC-001**: …`(불릿 + 콜론, 분류 접미 `(security)` 허용)이다.");
+}
 
 const tag = HARD ? "✗" : "⚠";
 // 항목 0건은 "깨끗함"이 아니라 "볼 것이 없었음"이다 — SC 문법이 안 잡힌 상태와 구분되지 않는다.

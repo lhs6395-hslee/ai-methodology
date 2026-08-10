@@ -27,6 +27,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 - 참조 entity(Dependencies) 위의 capability도 위반이다 — 참조는 읽기/호출 선언이지 능력 소유 근거가 아니며, 그 능력은 entity 소유 스펙의 FR이다(owner 확정: verb가 달라도 같은 스펙).
 - 위반 해소는 두 방향: (a) capability를 entity 소유 스펙으로 이관(+FR 이동), (b) 이 스펙이 실제 그 aggregate면 Entities에 소유 선언(그러면 dedup이 타 스펙과의 충돌을 검증).
 - 기본 `advisory` — 핵심 경계 규칙이라 off가 아닌 advisory로 태어나되 빌드는 안 깬다(기존 위반 스펙의 마이그레이션은 update 백로그 경로).
+- **지원 계층 출구는 `ownershipRequiredPolicy`까지 연다** — `supportLayerSpecs`에 사유와 함께 등록된 스펙은 **Files 선언만으로** Ownership 요구를 충족한다. 실측 제보: aggregate 없는 부가 계층이 ①캡 초과라 분할해야 하는데 ②분리 스펙은 entity가 없어 capability를 소유할 수 없고 ③그러면 키가 0이라 Ownership 게이트가 막아 **출구가 없었다**. Files가 있으면 중복 검사의 사각이 아니다 — `filesOverlapPolicy`(G3)가 그 글롭의 실파일 겹침을 판정하므로 이 출구는 dedup을 약화시키지 않는다. 등록 없이 키 0이면 여전히 막히고, 등록만 하고 Files도 없으면 막힌다(등록은 백지수표가 아니다). 그리고 이 출구는 **매 실행 표면화**한다.
 
 ---
 
@@ -85,6 +86,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | 지원 계층 출구를 `ownershipRequiredPolicy`까지 확장 — `supportLayerSpecs` 등록 + Files 선언이면 Ownership 요구 충족(매 실행 표면화) | 실측 제보 ④: 세 hard 규칙이 맞물려 **출구가 없는 상태**가 나왔다. `supportLayerSpecs`는 cohesion의 `entity(min)`만 면제했고 Ownership 요구는 그대로라, 무상태 근거 주입 계층의 분리 스펙을 실제로 작성했다가 롤백해야 했다. 남은 선택지가 (a) advisory 방치 (b) 억지 TypedDict로 entity 세우기뿐이었고 **둘 다 방법론이 경계하는 것**이다. 킷 규범대로 캡을 풀지 않고 **막힌 출구를 열었다** — Files 선언이 있으면 dedup 사각이 아니라는 사실(G3가 판정한다)이 근거이고, 그래서 이 출구는 강제를 약화시키지 않는다. 범위: 이 판정은 저장소 안 Files 글롭이 실재할 때 성립하며, 레포 밖 실체만 가진 계층은 여전히 키 선언이 필요하다 [검증: tooling/__tests__/check-ownership.test.mjs] |
 | 2026-07-20 | 초안 — `capabilityOwnershipPolicy`(off\|advisory\|hard, 기본 advisory) + `capability-ownership-lib`(귀속 판정) + ownership 게이트 배선, Node·Python 패리티. METHODOLOGY "Dependencies의 entity여도 무방" 탈출구 문장 개정 동반 | 소비 프로젝트 실측(budget-engine — Entities 0개+capability 4개, owner 판정: "이 스펙은 생성되면 안 되는 것"): 스펙 경계=entity 기준에 기계 신호가 없어 기술 계층 스펙이 태어남. 픽스처 재현에서 위반 4건 전부 지목·양판 바이트 동일 확인 |
 | 2026-07-27 | FR-005 신설(`capabilityInertReasons` — 정책 on + 카테고리 불일치 사유) + FR-001 개정(off만 무판정) + Edge Case "inert는 침묵하지 않는다", Node·Python 패리티 | 감사 이슈 #21 A-1 실측: 카테고리를 `Entities`→`Aggregates`로 개명하면 `capabilityOwnershipPolicy: hard`가 완전 no-op이 되고 스킵 신호가 한 줄도 없어 유령 entity가 `✓ 구조적 중복 없음` exit 0으로 통과. SPEC-026 FR-005가 *개별 면제*를 부채로 표면화하는 것과 동형으로 *정책 전체의 inert*도 표면화 — 정당한 inert는 명시적 `off`가 탈출구 |
 | 2026-07-27 | `capabilityCheckActive`·`capabilityInertReasons`가 카테고리 배열 대신 역할(`{entity,surface,capability}`)을 받는다 | SPEC-001 FR-010 동반: 이름 추측 제거 — 카테고리를 개명해도 선언이 있으면 판정이 유지된다 |

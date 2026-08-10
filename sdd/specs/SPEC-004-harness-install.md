@@ -88,6 +88,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `change_log.html` 재생성(SPEC-024·031·034 개정 반영) | 생성물은 소스가 바뀌면 재생성한다 — 드리프트를 남기지 않는다 [검증: tooling/__tests__/sdd-sync.test.mjs] |
 | 2026-08-10 | `docs/change_log.html`(생성물)을 Files 소유에 편입 | SPEC-003의 면제 글롭 좁힘으로 포괄 `docs/**`가 사라지자 이 생성물이 **미소유**로 떴다. 생성기(`gen-changelog.mjs`)를 소유한 스펙이 그 산출물도 소유하는 것이 정합이다 — 생성물의 드리프트는 재생성으로 해소한다(SPEC-028과 같은 결) [검증: tooling/__tests__/sdd-sync.test.mjs] |
 | 2026-08-10 | `sdd-init.sh` 배포 목록에 `impl-reference-lib.mjs` 추가 | 배포 폐포 계약 테스트가 누락을 즉시 잡았다 — 이 결함 계열의 **네 번째** 발생이고 처음으로 사람이 아니라 기계가 잡았다 [검증: tooling/__tests__/ship-closure.test.mjs] |
 | 2026-08-10 | 스윕 규칙표에 **R15 소개 문서 동기** 등재 + `sdd-init.sh` 배포 목록에 `intro-doc-lib`·`check-intro-doc` 추가 + `--json` 리포트 규칙 목록 계약에 R15 반영 | 오너 지시(키트 변경 시 소개 HTML 강제 갱신) → SPEC-045 신설. 배포 목록 누락은 **어제 세운 폐포 계약 테스트가 즉시 잡았다** — 규범으로 세 번 실패한 것을 기계로 옮긴 것이 하루 만에 효과를 냈다 [검증: tooling/__tests__/ship-closure.test.mjs] |

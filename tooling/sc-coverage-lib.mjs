@@ -39,6 +39,25 @@ export function parseScLine(line) {
   };
 }
 
+// 선언 **형식 드리프트** — 이 게이트의 자기 사각을 게이트가 본다.
+// 실측 제보의 진짜 요지는 "정규식이 한 형태를 놓쳤다"가 아니라 **"놓친 것이 경고 없이 사라졌다"**였다.
+// 정규식은 고쳤지만(분류 접미 허용) 다음 형태 변이는 또 조용히 빠질 것이다 — 그래서 형태 변이
+// 자체를 표면화한다: 라인 **머리**가 굵은 SC/NFR 토큰인데 선언으로 파싱되지 않으면 형식 불일치다.
+// 라인 머리로 한정하는 이유: 산문 중간의 "**SC-002**가 그것을 본다" 같은 언급은 선언이 아니다
+// (SPEC-002의 팬텀 FR 교훈 — 전문 스캔은 인용을 선언으로 센다).
+const SC_HEAD_RE = /^\s*(?:[-*]\s+)?\*\*(SC|NFR)-(\d+)\*\*/;
+export function scDeclDrift(text) {
+  const out = [];
+  for (const line of String(text || "").split("\n")) {
+    if (/^\s*\|/.test(line)) continue;                 // 표 행은 이력이지 선언이 아니다
+    const head = SC_HEAD_RE.exec(line);
+    if (!head) continue;
+    if (SC_DECL_RE.test(line)) continue;                // 정상 선언
+    out.push({ id: `${head[1]}-${head[2]}`, line: line.trim() });
+  }
+  return out;
+}
+
 // 경로 → 검증 종류. verificationKinds = { load: ["tests/load/**"], pentest: [...], ... }
 // 첫 매치가 이긴다(선언 순서가 우선순위). 어디에도 안 걸리면 "other" — 회계는 되지만 분류 불명.
 export function kindOfPointer(pointer, kinds, matcher) {

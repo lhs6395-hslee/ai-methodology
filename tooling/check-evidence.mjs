@@ -117,7 +117,8 @@ const manifestOf = (specId, claimId) =>
 
 const units = specUnits();
 const findings = evidenceFindings(units, assetExists, { verbs: VERBS, browserMarkers: BROWSER_MARKERS, browserPatterns: BROWSER_PATTERNS,
-  deployMarkers: cfg.deployMarkers, deployPatterns: cfg.deployEvidencePatterns, manifestOf });
+  deployMarkers: cfg.deployMarkers, deployPatterns: cfg.deployEvidencePatterns, manifestOf,
+  browserGradeMethods: cfg.browserGradeMethods, deployGradeMethods: cfg.deployGradeMethods });
 const claimCount = units.reduce((n, u) => n + u.claims.length, 0);
 
 judged(findings.length);

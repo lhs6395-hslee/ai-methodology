@@ -85,6 +85,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-10 | `check-ownership`에 지원 계층 출구 배선(SPEC-024 판정 소비) + `check-sc-coverage`에 선언 형식 드리프트 표면화(SPEC-034 판정 소비) | 두 판정 모두 소유 스펙이 규범을 정하고 이 spec은 **배선만** 갖는다(품질 게이트군의 소비 지점). 형식 드리프트는 강도 무관 표면화다 — 사실의 노출은 정책이 정하는 것이 아니다 [검증: tooling/__tests__/check-ownership.test.mjs] |
 | 2026-08-10 | `check-fr-coverage`에 R1e(지목 구현체 참조, SPEC-046) 배선 + 규범 선언 라인(FR·NFR·SC) 별도 수집 + 파일 본문 읽기 캐시 | 제보 사례 4: FR이 지목한 함수가 표면에서 불리지 않고 쉘 재구현이 대신 돌아 19건이 배포 범위에서 조용히 누락됐다. 규범 선언 집합을 SPEC-042의 FR-only 집합과 **분리**한 이유는 넓히면 다른 축의 판정 범위가 조용히 바뀌기 때문이다(킷 실측: 지목 구현체는 SC·NFR 라인에 많다). R1d·R1e가 같은 파일을 두 번 읽지 않게 캐시를 둔다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | `check-fr-coverage`가 spec 파일명 판정을 SPEC-001의 정본(`isSpecMdName`)으로 위임 | 자체 정규식을 들고 있던 것을 R13 구현 중복이 잡았다. 판정 동작은 불변(출력 바이트 동일) [검증: tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-10 | `check-fr-coverage`에 R1c(의미 커버리지, SPEC-042)·R1d(결정 입도, SPEC-044) 배선, `check-spec-completeness`에 근거 적용범위(SPEC-043) 배선 + 개별 축의 hard 승급이 `--strict` 없이도 그 항목만 차단하도록 렌더·종료 경로 확장 | 소비 프로젝트 제보: 스펙과 코드가 어긋난 채 모든 게이트가 green을 유지한 사례 3건 — 공통 원인은 게이트가 "연결의 존재"만 보고 "연결의 진위"를 안 본다는 것이다. 판정 코어는 각 spec이 소유하고 이 spec은 **배선만** 갖는다(품질 게이트군의 소비 지점). hard 승급이 `--strict`에서만 실효를 가지면 "hard로 올렸다"는 선언이 거짓이 되므로 승급 축은 즉시 차단한다 [검증: tooling/__tests__/sdd-gates-py.test.mjs] |

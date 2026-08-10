@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { compileGlob } from "../spec-sync-lib.mjs";
 import {
   parseScLine, kindOfPointer, validateEvidenceManifest, classifyScCoverage,
+  scDeclDrift,
 } from "../sc-coverage-lib.mjs";
 
 const GATE = new URL("../check-sc-coverage.mjs", import.meta.url).pathname;
@@ -159,4 +160,20 @@ test("게이트: 매니페스트 무결성 위반은 판정 전 exit 1 / hard인
   const badPolicy = run(fixture({ scCoveragePolicy: "strict" }, "- **SC-001**: x.\n"));
   assert.equal(badPolicy.code, 1);
   assert.match(badPolicy.out, /scCoveragePolicy 값 위반/);
+});
+
+test("선언 형식 드리프트를 표면화한다 — 놓친 것이 경고 없이 사라지는 것이 결함이었다", () => {
+  // 실측 제보의 요지는 "정규식이 한 형태를 놓쳤다"가 아니라 "놓친 것이 조용히 빠졌다"였다.
+  const text = [
+    "- **SC-001**: ok",
+    "- **NFR-001** (security): 분류 접미는 정상 선언이다",
+    "**SC-002** 90%",                                  // 불릿·콜론 없음 → 회계에서 빠진다
+    "| 2026-08-10 | **SC-003** 신규 | 근거 |",           // 표 행은 이력이지 선언이 아니다
+    "산문 중간의 **SC-009**가 그것을 본다",                // 인용은 선언이 아니다(팬텀 방지)
+  ].join("\n");
+  assert.deepEqual(scDeclDrift(text), [{ id: "SC-002", line: "**SC-002** 90%" }]);
+});
+
+test("정상 선언은 드리프트가 아니다 — 분류 접미도 통과한다", () => {
+  assert.deepEqual(scDeclDrift("- **SC-001**: a\n* **NFR-002** (performance): b\n"), []);
 });
