@@ -6984,6 +6984,90 @@ def cmd_agentwiring(cfg):
         print(f"  ✓ 선언된 에이전트 훅 {len(decls)}종이 모두 배선돼 있고 지목된 스크립트가 실재한다 — 감시자가 에이전트를 본다.")
 
 
+# ── 편집 시점 spec-first (SPEC-003 FR-001 확장) — Node판 check-pre-edit.mjs 미러 ──────
+# 이 축은 2026-08-03에 "훅 편의 계층이라 Node 전용" 결정을 받았고, 재검토 조건은 "sdd-sync 규칙으로
+# 승격되면"이었다. 그런데 2026-08-10에 **차단 강도**를 갖게 됐다 — 조건이 예상하지 못한 방아쇠다.
+# 차단할 수 있는 층이 한 런타임에만 있으면 다른 런타임 프로젝트는 `hard`를 켜고도 보호가 0이다:
+# **hard 선언 + 무판정 = 거짓 안전.** 그래서 조건을 고치고(SPEC-006) 그 처방대로 복제했다.
+# 원래 결정의 근거("미러가 있어도 호출부가 없다")도 함께 해소한다 — 훅 쉘이 런타임을 골라 부른다.
+def cmd_preedit(cfg, positional, args):
+    policy = str(cfg.get("preEditSpecFirstPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ preEditSpecFirstPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    target = positional[0] if positional else None
+    if not target:
+        return
+    if policy == "off":
+        return
+    hard = policy == "hard"
+    root = cfg["__root"]
+
+    # 코드 경로 질의 — 판정이 아니다. config `scanDirs`가 정본이다(하드코딩 경로는 다른 프로젝트에서 눈을 감는다).
+    if "--is-code-path" in args:
+        relq = str(target).lstrip("./")
+        dirs = [str(d).lstrip("./").rstrip("/") for d in (cfg.get("scanDirs") or [])]
+        hit = any(d and (relq == d or relq.startswith(d + "/") or ("/" + d + "/") in relq) for d in dirs)
+        verdict("SKIPPED", "경로 질의 모드(판정 아님) — 코드 경로 여부만 답한다")
+        sys.exit(0 if hit else 1)
+
+    rel = str(target).lstrip("./")
+    if rel.startswith(root + "/"):
+        rel = rel[len(root) + 1:]
+
+    spec_dir = resolve(cfg, cfg.get("specDir"))
+    try:
+        names = sorted(n for n in os.listdir(spec_dir) if n.endswith(".md"))
+    except OSError:
+        return
+    owners = []
+    for n in names:
+        try:
+            with open(os.path.join(spec_dir, n), encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        # Files glob 파싱은 이 런타임의 기존 사이트와 **같은 식**을 쓴다(다른 식을 쓰면 두 판의
+        # 소유 판정이 갈라지고, 그 차이는 패리티 테스트가 잡는다).
+        globs = [compile_glob(g) for g in
+                 (strip_inline_comment(x) for x in parse_section(text, "Ownership", ["Files"])["Files"]) if g]
+        if not globs:
+            continue
+        if any(rx.search(rel) for rx in globs):
+            m = cfg["__specId"].search(text)
+            owners.append({"specId": m.group(0) if m else n, "file": f'{cfg.get("specDir")}/{n}'})
+    if not owners:
+        return                                    # 미소유 경로 — 침묵(오탐 금지)
+
+    base = os.environ.get("SDD_DIFF_BASE") or cfg.get("specSyncBase") or "origin/main"
+    touched = set()
+    for a in (["diff", "--name-only"], ["diff", "--cached", "--name-only"],
+              ["diff", "--name-only", f"{base}...HEAD"]):
+        out = _git(cfg, a)
+        if out:
+            touched.update(x.strip() for x in out.split("\n") if x.strip())
+    if not touched:
+        return                                    # 변경 집합 미해석 — 판정 못 하는 자리는 막지 않는다
+
+    stale = [o for o in owners if o["file"] not in touched]
+    if not stale:
+        return
+
+    judged(len(stale))
+    stream = sys.stderr if hard else sys.stdout
+    print(f'[SDD spec-first — 편집 전 순서 {"차단" if hard else "확인"}] {rel}', file=stream)
+    for o in stale:
+        print(f'  {"✗" if hard else "⚠"} 소유 스펙 {o["specId"]}({o["file"]})이 이 브랜치에서 아직 미수정 — 코드보다 명세가 먼저다', file=stream)
+        print(f'     어디: {o["file"]} 의 {" · ".join(DEFAULT_GUIDE_SECTIONS)}(결정 이력이 사는 절)', file=stream)
+    tail = "" if hard else "(커밋 시점엔 commit-msg 훅이 hard로 막는다)"
+    print(f"  → 먼저 그 스펙의 FR/Edge Cases/Change Log를 갱신하고 편집하라{tail}.", file=stream)
+    if hard:
+        print("  · 이 차단을 걷어내는 길은 **명세 편집**이다 — 우회가 아니라 결정의 갱신이다"
+              "(정말 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>`로 사유를 남긴다).", file=stream)
+        sys.exit(2)
+
+
 # ── 완료 판정 신호 강도 (SPEC-055, R22) — Node판 completion-signal-lib.mjs 미러 ──────
 # 실측 제보: 배포 완료를 **파생 신호로 판정했다.** 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서
 # 완료로 보고했는데 migrate Job이 실패해 배포 스테이지가 스킵된 상태였다.
@@ -7650,8 +7734,9 @@ def main():
     # 도는 계층은 발동 조건이 아니면 아무것도 출력하지 않는 것이 계약이고, 여기에 판정 줄을
     # 강제하면 모든 Bash 명령마다 한 줄이 붙어 소음이 된다 — 소음이 되는 순간 사람이 훅을 끈다.
     # 그래서 Node판의 `armVerdict({quietWhenSilent:true})`와 같은 조건으로만 침묵을 허용한다.
-    HOOK_LAYER_SUBS = ("diagnosisguard",)
-    arm_verdict(quiet_when_silent=(sub in HOOK_LAYER_SUBS and "--hook" in args))
+    HOOK_LAYER_SUBS = ("diagnosisguard", "preedit")
+    # preedit은 발동 조건이 아니면 **침묵이 계약**이다(Node판 armVerdict({quietWhenSilent:true}) 미러).
+    arm_verdict(quiet_when_silent=(sub == "preedit" or (sub in HOOK_LAYER_SUBS and "--hook" in args)))
     cfg = load_config()
     positional = []
     i = 1
@@ -7731,6 +7816,8 @@ def main():
         cmd_processssot(cfg)
     elif sub == "watchdog":
         cmd_watchdog(cfg)
+    elif sub == "preedit":
+        cmd_preedit(cfg, positional, args)
     elif sub == "completionsignal":
         cmd_completionsignal(cfg)
     elif sub == "duplicatelogic":

@@ -1710,3 +1710,51 @@ test("py completionsignal: 파생·자기신고·미선언·오타·통과·iner
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// ── 편집 시점 spec-first 패리티(SPEC-003 FR-001 확장) ──
+// 이 축은 "훅 편의 계층이라 Node 전용" 결정을 받았고 재검토 조건은 "스윕 규칙으로 승격되면"이었다.
+// 그런데 **차단 강도**를 갖게 됐다 — 조건이 예상하지 못한 방아쇠다. 차단할 수 있는 층이 한
+// 런타임에만 있으면 다른 런타임 프로젝트는 `hard`를 켜고도 보호가 0이다(**hard 선언 + 무판정**).
+// @covers SPEC-006/FR-001
+// @covers SPEC-003/FR-001
+test("py preedit: 미수정 경고·차단(exit 2)·미소유 침묵·git 없음 침묵·off·enum 밖 바이트 동일", skip, () => {
+  const SPEC = "# S\n**Spec**: `SPEC-001`\n\n## Ownership\n- **Files**: src/**\n";
+  const mk = (policy, { git = true, owned = true } = {}) => {
+    const root = fixture({ "sdd/specs/SPEC-001.md": SPEC, "src/a.ts": "export const a = 1;\n" },
+      { scanDirs: ["src"], preEditSpecFirstPolicy: policy });
+    if (git) {
+      execFileSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" });
+      execFileSync("git", ["config", "user.email", "t@t"], { cwd: root, stdio: "ignore" });
+      execFileSync("git", ["config", "user.name", "t"], { cwd: root, stdio: "ignore" });
+      execFileSync("git", ["add", "-A"], { cwd: root, stdio: "ignore" });
+      execFileSync("git", ["commit", "-qm", "base"], { cwd: root, stdio: "ignore" });
+      writeFileSync(join(root, "src/a.ts"), "export const a = 2;\n");   // 코드만 변경
+    }
+    return { root, rel: owned ? "src/a.ts" : "other.txt" };
+  };
+  const scen = [
+    ["advisory", {}], ["hard", {}],
+    ["hard", { owned: false }],          // 미소유 → 침묵
+    ["hard", { git: false }],            // 변경 집합 미해석 → 침묵(판정 못 하는 자리는 막지 않는다)
+    ["off", {}], ["deny", {}],           // off / enum 밖
+  ];
+  for (const [i, [policy, opts]] of scen.entries()) {
+    const { root, rel } = mk(policy, opts);
+    try {
+      const n = runNode(root, "check-pre-edit.mjs", [rel]);
+      const py = runPy(root, ["preedit", rel]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1}(${policy}) 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1}(${policy}) exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  // 코드 경로 질의 모드도 같은 답을 내야 한다 — 쉘이 체크리스트 표시를 이 답에 걸어둔다.
+  const { root } = mk("advisory");
+  try {
+    for (const rel of ["src/a.ts", "docs/x.md"]) {
+      const n = runNode(root, "check-pre-edit.mjs", ["--is-code-path", rel]);
+      const py = runPy(root, ["preedit", "--is-code-path", rel]);
+      assert.equal(py.code, n.code, `질의 모드 ${rel} exit 불일치`);
+      assert.equal(py.out, n.out, `질의 모드 ${rel} 출력 불일치`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
