@@ -87,6 +87,14 @@ const RULES = [
   // 대한 이야기다. 실측 제보: 파이프라인 로그와 초록 CI로 배포 완료를 보고했는데 migrate Job이
   // 실패해 배포 스테이지가 스킵된 상태였다. 완료 주장 검사 0건이면 게이트가 스스로 INERT다.
   { rule: "R22 완료 판정 신호(대상 상태를 봤는가)", gates: ["check-completion-signal.mjs"] },
+  // R23(SPEC-056): FR 정의가 FR 섹션 밖에 있으면 grammar-lib의 frDeclarations가 스캔 범위 밖이라
+  // "선언 자체가 없다"로 사라지고, 그 사라짐이 dangling @covers라는 **다른 축**의 결함으로
+  // 재등장한다. 이 축은 사라짐의 원인 자리를 직접 잡는다(실측: 같은 실수가 하루에 세 번 났다).
+  { rule: "R23 FR 배치(섹션 밖 정의)", gates: ["check-fr-placement.mjs"] },
+  // R24(SPEC-057): 감시자가 있고 사유도 매번 정확했는데 "이게 오늘 세 번째"라는 **기억**이
+  // 없었다. 판정 방출기(armVerdict)가 모든 게이트의 차단을 원장에 자동으로 적고, 이 게이트가
+  // 같은 (게이트,클래스)가 임계치를 넘겼는데 전용 가드가 없으면 가드를 만들라고 말한다.
+  { rule: "R24 게이트 실패 에스컬레이션(반복이 기억되는가)", gates: ["check-gate-escalation.mjs"] },
 ];
 
 // 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
@@ -124,6 +132,8 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-spec-conflict.mjs": "specconflict",
   "check-diagnosis-guard.mjs": "diagnosisguard",
   "check-completion-signal.mjs": "completionsignal",
+  "check-fr-placement.mjs": "frplacement",
+  "check-gate-escalation.mjs": "gateescalation",
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 

@@ -230,6 +230,17 @@ export const DEFAULTS = {
   diagnosisGuardPolicy: "advisory",
   completionSignalPolicy: "advisory",
   diagnosisSpecMap: [],
+  // FR 배치(SPEC-056) — FR 정의는 `## Functional Requirements` 섹션 안에 있어야 한다.
+  // 실측: 에이전트가 하루에 같은 실수를 세 번 했다(FR을 Dedup-Review·Ownership 섹션에 썼다).
+  frPlacementPolicy: "advisory",
+  // 게이트 실패 에스컬레이션(SPEC-057) — 원장(.sdd/gate-failures.jsonl)에서 같은 (게이트,클래스)가
+  // 임계치를 넘겼는데 전용 가드가 없으면 말한다. 목적은 벌이 아니라 **기억**이다.
+  gateFailureEscalationPolicy: "advisory",
+  gateFailureEscalationThreshold: 3,
+  gateFailureLedger: null,          // null = 킷 기본(.sdd/gate-failures.jsonl)
+  // 전용 가드가 이미 있다고 등록된 (gate,class) — [{ gate, class, guard, note }]. guard 파일의
+  // 실재는 게이트가 확인한다(선언만으로 믿지 않는다). note는 필수(왜 이 클래스가 해소됐는가).
+  gateFailureGuards: [],
   // 명세를 **읽는** 명령으로 인정할 패턴. null이면 킷 기본 —
   // 명세 읽기를 막으면 "읽어라"면서 읽기를 막는 자기모순이 되고 그 순간 사람이 훅을 끈다.
   diagnosisSpecReadPatterns: null,

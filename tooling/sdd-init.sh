@@ -97,7 +97,9 @@ case "$GATE" in
           # pre-merge-commit(M5): merge commit에도 fr·ownership — 병합 시점 번호 경쟁 차단.
           cp "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit"
           # merge commit은 skip(§5.6) — harness/commit-msg와 동일 의미론.
-          printf '#!/bin/sh\n# sdd-managed-hook\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1"\n' > "$HOOKS_DIR/commit-msg"
+          # frplacement은 specsync 뒤(SPEC-056) — 스펙 동반 여부를 먼저 보고 그 안 배치를 본다.
+          # gateescalation은 그 뒤(SPEC-057) — 원장을 읽어 반복된 미가드 실패 클래스를 말한다.
+          printf '#!/bin/sh\n# sdd-managed-hook\ngit rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && exit 0\npython3 scripts/sdd_gates.py specsync --staged --message-file "$1" && python3 scripts/sdd_gates.py frplacement && python3 scripts/sdd_gates.py gateescalation\n' > "$HOOKS_DIR/commit-msg"
           chmod +x "$HOOKS_DIR/pre-commit" "$HOOKS_DIR/pre-merge-commit" "$HOOKS_DIR/commit-msg"
           say "  → git pre-commit·pre-merge-commit·commit-msg 훅 연결됨(Python 게이트 — spec-first 포함)"
         else
@@ -109,7 +111,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs spec-conflict-lib.mjs check-spec-conflict.mjs diagnosis-guard-lib.mjs check-diagnosis-guard.mjs check-outcome-lib.mjs completion-signal-lib.mjs check-completion-signal.mjs; do
+                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs spec-conflict-lib.mjs check-spec-conflict.mjs diagnosis-guard-lib.mjs check-diagnosis-guard.mjs check-outcome-lib.mjs completion-signal-lib.mjs check-completion-signal.mjs fr-placement-lib.mjs check-fr-placement.mjs gate-failure-lib.mjs check-gate-escalation.mjs; do
           sync_copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac

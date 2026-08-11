@@ -129,3 +129,22 @@ test("⑤ 양판 대응: 스윕 등재 게이트 전부가 Python 서브커맨�
   const stale = Object.keys(PY_SUBCOMMAND).filter((k) => !gates.includes(k));
   assert.deepEqual(stale, [], `스윕에 없는 게이트가 선언에 남아 있다(죽은 줄): ${stale.join(" · ")}`);
 });
+
+// ⑥ 래칫 목록 양판 대응 — Node·Python의 RATCHETED_POLICIES가 **같은 집합**이어야 한다.
+//
+// 실측(2026-08-11, 이 스레드 자기적용): `preEditSpecFirstPolicy`를 Node 래칫에 추가하면서 Python
+// 쪽 추가가 빠졌다. Node 전수성 테스트(policy-ratchet.test.mjs)는 **Node DEFAULTS**만 보므로
+// 이 드리프트를 잡지 못했다 — 잡으려면 두 런타임의 목록을 직접 대조해야 한다. 손으로 두 목록을
+// 나란히 유지하는 동안 한쪽은 반드시 뒤처진다(같은 날 CI 손목록·양판 대응표가 겪은 것과 같은 결함).
+// @covers SPEC-006/FR-001
+test("⑥ 래칫 목록 양판 대응: Node·Python의 RATCHETED_POLICIES가 같은 집합이다", async () => {
+  const { RATCHETED_POLICIES: nodeList } = await import("../policy-ratchet-lib.mjs");
+  const py = src("sdd_gates.py");
+  const m = py.match(/RATCHETED_POLICIES = \[([\s\S]*?)\]/);
+  assert.ok(m, "Python RATCHETED_POLICIES를 찾지 못했다");
+  const pyList = [...m[1].matchAll(/"([A-Za-z0-9]+)"/g)].map((x) => x[1]);
+  const missingInPy = nodeList.filter((k) => !pyList.includes(k));
+  const extraInPy = pyList.filter((k) => !nodeList.includes(k));
+  assert.deepEqual(missingInPy, [], `Node에만 있고 Python엔 없는 knob: ${missingInPy.join(" · ")}`);
+  assert.deepEqual(extraInPy, [], `Python에만 있고 Node엔 없는 knob: ${extraInPy.join(" · ")}`);
+});

@@ -1758,3 +1758,80 @@ test("py preedit: 미수정 경고·차단(exit 2)·미소유 침묵·git 없음
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// ── FR 배치 패리티(SPEC-056, R23) ──
+// @covers SPEC-006/FR-001
+// @covers SPEC-056/FR-008
+test("py frplacement: 섹션 밖 FR·exempt(FR 섹션 없음)·통과·off·enum 밖·--fix 바이트 동일", skip, () => {
+  const MISPLACED = "## Functional Requirements\n- **FR-001** a.\n## Ownership\n- **Files**: x/**\n- **FR-058** b.\n";
+  const CLEAN = "## Functional Requirements\n- **FR-001** a.\n";
+  const EXEMPT = "## Ownership\n- **FR-099** x.\n";
+  const scen = [
+    { cfg: { frPlacementPolicy: "hard" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "advisory" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "hard" }, spec: CLEAN },
+    { cfg: { frPlacementPolicy: "hard" }, spec: EXEMPT },
+    { cfg: { frPlacementPolicy: "off" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "deny" }, spec: MISPLACED },
+  ];
+  for (const [i, { cfg, spec }] of scen.entries()) {
+    const root = fixture({ "sdd/specs/SPEC-001.md": spec }, cfg);
+    try {
+      const n = runNode(root, "check-fr-placement.mjs");
+      const py = runPy(root, ["frplacement"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  // --fix도 같은 결과 텍스트를 낸다.
+  const rootN = fixture({ "sdd/specs/SPEC-001.md": MISPLACED }, { frPlacementPolicy: "hard" });
+  const rootP = fixture({ "sdd/specs/SPEC-001.md": MISPLACED }, { frPlacementPolicy: "hard" });
+  try {
+    const n = runNode(rootN, "check-fr-placement.mjs", ["--fix"]);
+    const py = runPy(rootP, ["frplacement", "--fix"]);
+    assert.equal(py.out, n.out, "--fix 출력 불일치");
+    assert.equal(
+      readFileSync(join(rootN, "sdd/specs/SPEC-001.md"), "utf8"),
+      readFileSync(join(rootP, "sdd/specs/SPEC-001.md"), "utf8"),
+      "--fix 결과 파일 내용 불일치",
+    );
+  } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+});
+
+// ── 게이트 실패 에스컬레이션 패리티(SPEC-057, R24) ──
+// gate 식별자는 런타임마다 다르므로(Node: 파일명, Python: 파일명:서브커맨드) 원장을 **직접
+// 주입**해 그 차이를 우회하고 판정 로직 자체(임계치·가드 유효성)만 대조한다.
+// @covers SPEC-006/FR-001
+// @covers SPEC-057/FR-007
+test("py gateescalation: 임계치 초과·가드 있음·가드 오류(3종)·원장 없음·off·enum 밖 바이트 동일", skip, () => {
+  const rec = (over = {}) => ({ gate: "check-fr-placement.mjs", class: "fr-outside-section", target: "sdd/specs/SPEC-001.md", ...over });
+  const ledgerOf = (n) => Array.from({ length: n }, () => rec()).map((r) => JSON.stringify(r)).join("\n") + "\n";
+  const withLedger = (root, lines) => { mkdirSync(join(root, ".sdd"), { recursive: true }); writeFileSync(join(root, ".sdd/gate-failures.jsonl"), lines); };
+  const scen = [
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "advisory" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: ledgerOf(2) },      // 임계치 미만
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "check-fr-placement.mjs", class: "fr-outside-section", guard: "sdd.config.json", note: "사유" }] }, ledger: ledgerOf(5) },
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c" }] }, ledger: ledgerOf(3) },                    // incomplete
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c", guard: "x.mjs" }] }, ledger: ledgerOf(3) },     // no-reason
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c", guard: "no-such.mjs", note: "사유" }] }, ledger: ledgerOf(3) },  // stale
+    { cfg: { gateFailureEscalationPolicy: "off" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "deny" }, ledger: null },
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: null },            // 원장 없음
+  ];
+  // **별도 루트를 쓴다** — 이 게이트 자신도 armVerdict를 거치므로 hard에서 차단하면 자기
+  // 실행이 방금 읽은 원장에 새 줄을 append한다(자기참조 오염). 한 루트를 공유하면 Node가 먼저
+  // 실행되며 원장을 4줄로 늘려놓고 Python이 그 늘어난 원장을 읽어 "3건"과 "4건"이 갈린다 —
+  // 런타임 차이가 아니라 공유 루트가 만든 시험 방법의 결함이다.
+  for (const [i, { cfg, ledger }] of scen.entries()) {
+    const rootN = fixture({}, cfg);
+    const rootP = fixture({}, cfg);
+    if (ledger) { withLedger(rootN, ledger); withLedger(rootP, ledger); }
+    try {
+      const n = runNode(rootN, "check-gate-escalation.mjs");
+      const py = runPy(rootP, ["gateescalation"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+  }
+});
