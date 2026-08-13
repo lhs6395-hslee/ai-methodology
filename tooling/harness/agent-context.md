@@ -10,8 +10,11 @@
 2. spec 위치 = `sdd/specs/` · 설계 문서(승인 전) = `docs/design/`
 3. PREFIX 표준 = SPEC / INFRA / TEST / CICD (FEAT 등 임의 생성 금지 — 필요하면 사용자 승인 후 `specIdPrefixes` 등록)
 4. FR은 EARS(SHALL 필수), 테스트는 `@covers <PREFIX>-NNN/FR-NNN`
-5. 코드 전에 spec부터 — 작성=LLM, 승인=사람. 1 spec = 1 aggregate
-6. 소유 코드 변경엔 같은 changeset에 소유 spec 변경 동반(순수 hotfix만 `Spec-Impact: none <사유>` 트레일러)
+5. **진입 순서는 작업 유형에 따라 갈린다** — "spec부터"는 신규 기능에만 문자 그대로 적용된다:
+   - **신규 기능(없던 capability·FR)**: spec에 FR(EARS)·근거·Surface를 먼저 확정 → 그 계약대로 코드 → 테스트. 작성=LLM, 승인=사람. 1 spec = 1 aggregate.
+   - **버그 수정(기존 동작이 명세와 다르게 도는 결함)**: 재현 실패 테스트로 RED를 먼저 확인(추측 금지 — 재현하지 못한 채 스펙 문구부터 쓰지 않는다) → 최소 수정으로 GREEN → 그 다음 스펙 갱신(FR 개정 또는 `Edge Cases`+`Change Log`). 정공법 = `/speckit.fix`.
+   - 신규 기능에 "재현 테스트부터"를 강요하지 않는다(아직 없는 동작은 재현 불가) — 반대로 버그 수정에 "spec부터"를 강요하지 않는다(재현 전 스펙 문구는 찔러보기가 된다).
+6. **공통(양쪽 다)**: 소유 코드 변경엔 **같은 changeset**에 소유 spec 변경 동반(순수 hotfix만 `Spec-Impact: none <사유>` 트레일러). commit-msg 게이트가 요구하는 것은 "같은 커밋에 스펙 변경이 있는가"이지 "디스크에 스펙을 먼저 저장했는가"가 아니다 — ①은 spec 확정이, ②는 재현 확인이 먼저지만 최종 커밋에는 둘 다 함께 들어간다.
 
 **강제는 실행기 무관:** git 훅(commit-msg·pre-commit)과 게이트(`check-fr-coverage`·`check-ownership`·`check-spec-sync`·`check-synonym` 등 R1~R10)가 **누가 커밋하든** 발화한다. 게이트 직접 실행 = `node scripts/<gate>.mjs` (또는 `python3 scripts/sdd_gates.py <gate>`).
 
