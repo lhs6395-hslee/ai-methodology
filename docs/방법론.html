@@ -1295,6 +1295,14 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
   </div>
   <p class="note">행위 불변 변경(리팩터링·포맷팅)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러로 통과(사유 필수 — 없으면 차단). 단 면제 범위는 <strong>동반 요구·상태 차단뿐</strong> — Files 글롭 문법 위반과 unowned closed-world는 트레일러로 우회할 수 없다(감사 T3). 공유 파일을 타 스펙 기능 때문에 고칠 땐 <code>Change-Driver: SPEC-X [@glob] &lt;사유&gt;</code> — <code>@glob</code> 경로 스코프를 달면 매치 파일만 완화된다(감사 T4).</p>
 
+  <h3>"spec-first"는 진입 순서까지 하나로 뭉개지 않는다 — 신규 기능과 버그 수정은 반대 방향에서 출발한다</h3>
+  <p>이 절의 이름은 <strong>spec-first</strong>지만, 그건 <em>커밋에 무엇이 함께 있어야 하는가</em>의 계약이지 <em>손으로 무엇부터 타이핑하는가</em>의 절차가 아니다. 두 가지가 섞이면 실측 사고가 난다: 버그를 아직 재현하지 못한 채 "spec부터"를 문자 그대로 따라 스펙 문구부터 쓰고 나서, 실제 원인은 그 문구가 가리킨 곳이 아니라 다른 곳이었던 경우다 — 이 방법론이 금지하는 <strong>찔러보기</strong> 그 자체다. 그래서 진입 순서는 작업 유형에 따라 갈린다:</p>
+  <div class="grid g4">
+    <div class="card"><h4>① 신규 기능 — spec부터</h4><p>없던 capability·FR을 만들 때는 재현할 기존 동작 자체가 없다. 그러니 <strong>스펙에 FR(EARS)·근거·Surface를 먼저 확정</strong>하고 → 그 계약에 맞춰 코드를 쓰고 → 테스트한다. "코드 전에 spec부터"가 문자 그대로 적용되는 유일한 경우다.</p></div>
+    <div class="card"><h4>② 버그 수정 — 재현부터</h4><p>기존 동작이 명세와 다르게 돈다는 <em>결함</em>을 다룬다. 아직 재현하지 못한 원인을 스펙 문구로 먼저 확정하면 그 문구는 추측이다. 그래서 <strong>재현 실패 테스트로 RED를 먼저 확인</strong>하고 → 최소 수정으로 GREEN을 만들고 → 그 다음 스펙을 갱신한다(FR 개정 또는 Edge Cases+Change Log). 정공법 = <code>/speckit.fix</code>.</p></div>
+  </div>
+  <p class="note gate">그런데 <strong>공통 규칙은 여전히 하나다</strong> — 위 "changeset = 브랜치" 규칙 그대로, <code>check-spec-sync</code>가 실제로 대조하는 것은 <em>같은 커밋(브랜치)에 스펙 변경이 있는가</em>이지 <em>디스크에 스펙 파일을 먼저 저장했는가</em>가 아니다. ①은 설계 관점에서 스펙이 먼저 <em>확정</em>돼야 하고 ②는 재현이 먼저 <em>확정</em>돼야 하지만, 최종 커밋에는 스펙·코드가 함께 들어간다 — "신규 기능에 재현 테스트부터"(아직 없는 동작은 재현 불가)도, "버그 수정에 spec부터"(재현 전 스펙 문구는 찔러보기)도 강요하지 않는다.</p>
+
   <h3>스펙 수명주기 — 리뷰 안 된 스펙은 코드를 이끌 수 없다</h3>
   <p>스펙 헤더 <code>Status:</code>는 enum이다 — <code>Planned → Draft → Reviewed → Approved → Active → Deprecated → Removed</code>. 차단은 화이트리스트(Reviewed 이상만 코드 주도 가능)라 Draft만이 아니라 Planned·enum 밖 값도 걸린다(감사 T2). 강제하는 것은 <strong>시간 순서가 아니라 상태 순서</strong>다:</p>
   <div class="pipe">
