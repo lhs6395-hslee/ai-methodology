@@ -230,11 +230,30 @@ export const DEFAULTS = {
   diagnosisGuardPolicy: "advisory",
   completionSignalPolicy: "advisory",
   diagnosisSpecMap: [],
+  // FR 배치(SPEC-056) — FR 정의는 `## Functional Requirements` 섹션 안에 있어야 한다.
+  // 실측: 에이전트가 하루에 같은 실수를 세 번 했다(FR을 Dedup-Review·Ownership 섹션에 썼다).
+  frPlacementPolicy: "advisory",
+  // 게이트 실패 에스컬레이션(SPEC-057) — 원장(.sdd/gate-failures.jsonl)에서 같은 (게이트,클래스)가
+  // 임계치를 넘겼는데 전용 가드가 없으면 말한다. 목적은 벌이 아니라 **기억**이다.
+  gateFailureEscalationPolicy: "advisory",
+  gateFailureEscalationThreshold: 3,
+  gateFailureLedger: null,          // null = 킷 기본(.sdd/gate-failures.jsonl)
+  // 전용 가드가 이미 있다고 등록된 (gate,class) — [{ gate, class, guard, note }]. guard 파일의
+  // 실재는 게이트가 확인한다(선언만으로 믿지 않는다). note는 필수(왜 이 클래스가 해소됐는가).
+  gateFailureGuards: [],
   // 명세를 **읽는** 명령으로 인정할 패턴. null이면 킷 기본 —
   // 명세 읽기를 막으면 "읽어라"면서 읽기를 막는 자기모순이 되고 그 순간 사람이 훅을 끈다.
   diagnosisSpecReadPatterns: null,
   diagnosisGuideSections: null,
   sweepInvocationMarkers: null,
+  // 위험 행동 승인(SPEC-058) — 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이
+  // 독립 서브에이전트의 검증 없이 지나가지 않게 한다. 실측: QA 실측·댓글까지 마친 티켓을 배포도
+  // 안 된 채 종결 상태로 넘기려 했다 — 커밋 이전, 대화 안에서 끝나 기존 게이트가 못 보는 층.
+  //   riskyActionPatterns: [{ match: <명령 정규식>, class, verifyAgainst: <무엇과 대조할지>, why }]
+  riskyActionPolicy: "advisory",
+  riskyActionPatterns: [],
+  riskyActionApprovalTtlSeconds: 900,   // 승인 마커 유효기간(초) — 신선도 판정에 쓴다
+  riskyActionLedger: null,              // null = 킷 기본(.sdd/action-approvals.jsonl)
   // ── 하드코딩 지양(오너 규범) — 어휘·확장자·경로는 게이트에 박지 않고 config로 교체 가능하게 둔다.
   // 전부 null 기본(= 킷 기본값)이고, 게이트는 자기가 무엇을 썼는지 출력에 밝힌다.
   // 스윕 규칙표 파일 — 킷은 `tooling/`, sdd-init.sh 배포 사이트는 `scripts/`. 고정하면 소비

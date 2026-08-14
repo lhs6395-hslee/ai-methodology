@@ -21,6 +21,7 @@ const PY = new URL("../sdd_gates.py", import.meta.url).pathname;
 const TOOLING = new URL("..", import.meta.url).pathname;
 // 배선 무결성 패리티가 픽스처 복사 목록을 폐포에서 계산하는 데 쓴다(손 목록은 다음 드리프트다).
 import { localImports } from "../import-wiring-lib.mjs";
+import { hashAction } from "../action-approval-lib.mjs";
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 let hasPython = true;
@@ -1757,4 +1758,163 @@ test("py preedit: 미수정 경고·차단(exit 2)·미소유 침묵·git 없음
       assert.equal(py.out, n.out, `질의 모드 ${rel} 출력 불일치`);
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── FR 배치 패리티(SPEC-056, R23) ──
+// @covers SPEC-006/FR-001
+// @covers SPEC-056/FR-008
+test("py frplacement: 섹션 밖 FR·exempt(FR 섹션 없음)·통과·off·enum 밖·--fix 바이트 동일", skip, () => {
+  const MISPLACED = "## Functional Requirements\n- **FR-001** a.\n## Ownership\n- **Files**: x/**\n- **FR-058** b.\n";
+  const CLEAN = "## Functional Requirements\n- **FR-001** a.\n";
+  const EXEMPT = "## Ownership\n- **FR-099** x.\n";
+  const scen = [
+    { cfg: { frPlacementPolicy: "hard" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "advisory" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "hard" }, spec: CLEAN },
+    { cfg: { frPlacementPolicy: "hard" }, spec: EXEMPT },
+    { cfg: { frPlacementPolicy: "off" }, spec: MISPLACED },
+    { cfg: { frPlacementPolicy: "deny" }, spec: MISPLACED },
+  ];
+  for (const [i, { cfg, spec }] of scen.entries()) {
+    const root = fixture({ "sdd/specs/SPEC-001.md": spec }, cfg);
+    try {
+      const n = runNode(root, "check-fr-placement.mjs");
+      const py = runPy(root, ["frplacement"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+  // --fix도 같은 결과 텍스트를 낸다.
+  const rootN = fixture({ "sdd/specs/SPEC-001.md": MISPLACED }, { frPlacementPolicy: "hard" });
+  const rootP = fixture({ "sdd/specs/SPEC-001.md": MISPLACED }, { frPlacementPolicy: "hard" });
+  try {
+    const n = runNode(rootN, "check-fr-placement.mjs", ["--fix"]);
+    const py = runPy(rootP, ["frplacement", "--fix"]);
+    assert.equal(py.out, n.out, "--fix 출력 불일치");
+    assert.equal(
+      readFileSync(join(rootN, "sdd/specs/SPEC-001.md"), "utf8"),
+      readFileSync(join(rootP, "sdd/specs/SPEC-001.md"), "utf8"),
+      "--fix 결과 파일 내용 불일치",
+    );
+  } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+});
+
+// ── 게이트 실패 에스컬레이션 패리티(SPEC-057, R24) ──
+// gate 식별자는 런타임마다 다르므로(Node: 파일명, Python: 파일명:서브커맨드) 원장을 **직접
+// 주입**해 그 차이를 우회하고 판정 로직 자체(임계치·가드 유효성)만 대조한다.
+// @covers SPEC-006/FR-001
+// @covers SPEC-057/FR-007
+test("py gateescalation: 임계치 초과·가드 있음·가드 오류(3종)·원장 없음·off·enum 밖 바이트 동일", skip, () => {
+  const rec = (over = {}) => ({ gate: "check-fr-placement.mjs", class: "fr-outside-section", target: "sdd/specs/SPEC-001.md", ...over });
+  const ledgerOf = (n) => Array.from({ length: n }, () => rec()).map((r) => JSON.stringify(r)).join("\n") + "\n";
+  const withLedger = (root, lines) => { mkdirSync(join(root, ".sdd"), { recursive: true }); writeFileSync(join(root, ".sdd/gate-failures.jsonl"), lines); };
+  const scen = [
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "advisory" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: ledgerOf(2) },      // 임계치 미만
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "check-fr-placement.mjs", class: "fr-outside-section", guard: "sdd.config.json", note: "사유" }] }, ledger: ledgerOf(5) },
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c" }] }, ledger: ledgerOf(3) },                    // incomplete
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c", guard: "x.mjs" }] }, ledger: ledgerOf(3) },     // no-reason
+    { cfg: { gateFailureEscalationPolicy: "hard", gateFailureGuards: [{ gate: "g", class: "c", guard: "no-such.mjs", note: "사유" }] }, ledger: ledgerOf(3) },  // stale
+    { cfg: { gateFailureEscalationPolicy: "off" }, ledger: ledgerOf(3) },
+    { cfg: { gateFailureEscalationPolicy: "deny" }, ledger: null },
+    { cfg: { gateFailureEscalationPolicy: "hard" }, ledger: null },            // 원장 없음
+  ];
+  // **별도 루트를 쓴다** — 이 게이트 자신도 armVerdict를 거치므로 hard에서 차단하면 자기
+  // 실행이 방금 읽은 원장에 새 줄을 append한다(자기참조 오염). 한 루트를 공유하면 Node가 먼저
+  // 실행되며 원장을 4줄로 늘려놓고 Python이 그 늘어난 원장을 읽어 "3건"과 "4건"이 갈린다 —
+  // 런타임 차이가 아니라 공유 루트가 만든 시험 방법의 결함이다.
+  for (const [i, { cfg, ledger }] of scen.entries()) {
+    const rootN = fixture({}, cfg);
+    const rootP = fixture({}, cfg);
+    if (ledger) { withLedger(rootN, ledger); withLedger(rootP, ledger); }
+    try {
+      const n = runNode(rootN, "check-gate-escalation.mjs");
+      const py = runPy(rootP, ["gateescalation"]);
+      assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+  }
+});
+
+// ── 위험 행동 승인 패리티(SPEC-058, R25) ──
+// @covers SPEC-006/FR-001
+// @covers SPEC-058/FR-008
+test("py riskyaction: 위험 행동 차단·승인 통과·만료·스윕(가드 오류)·off·enum 밖 바이트 동일", skip, () => {
+  const PATTERNS = [{ match: "tracker.*dev-done", class: "tracker-transition", verifyAgainst: "CLOSEOUT_FLOW 순서 대조", why: "배포 전 종결 전이 방지" }];
+  const RISKY_CMD = "tracker transition ticket=123 to=dev-done";
+  const withLedger = (root, lines) => { mkdirSync(join(root, ".sdd"), { recursive: true }); writeFileSync(join(root, ".sdd/action-approvals.jsonl"), lines); };
+
+  // ① hook 모드: hard 차단 / advisory 경고 / 미매치 침묵 / off 침묵
+  const hookScen = [
+    { cfg: { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+    { cfg: { riskyActionPolicy: "advisory", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+    { cfg: { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS }, cmd: "ls -la" },
+    { cfg: { riskyActionPolicy: "off", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+  ];
+  for (const [i, { cfg, cmd }] of hookScen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-risky-action.mjs", ["--hook", "--command", cmd]);
+      const py = runPy(root, ["riskyaction", "--hook", "--command", cmd]);
+      assert.equal(py.out, n.out, `훅 시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `훅 시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+
+  // ② 유효한 승인이 있으면 침묵 통과, 만료됐으면 다시 막는다(직접 원장 주입 — 별도 루트로 대조).
+  const RISKY_HASH = hashAction(RISKY_CMD);
+  const rec = (ageMs) => ({ hash: RISKY_HASH, class: "tracker-transition", note: "확인함", ts: new Date(Date.now() - ageMs).toISOString(), sessionId: "s1" });
+  // 해시는 Node·Python 각각 자기 런타임의 hash_action으로 낸 값과 대조해야 하므로, --record로
+  // 먼저 각 런타임 자신의 원장에 승인을 남기고(해시는 각 런타임이 스스로 계산) 그 다음 훅을 켠다.
+  const approvedRootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+  const approvedRootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+  try {
+    runNode(approvedRootN, "check-risky-action.mjs", ["--record", "--command", RISKY_CMD, "--class", "tracker-transition", "--note", "확인함"]);
+    runPy(approvedRootP, ["riskyaction", "--record", "--command", RISKY_CMD, "--class", "tracker-transition", "--note", "확인함"]);
+    const n = runNode(approvedRootN, "check-risky-action.mjs", ["--hook", "--command", RISKY_CMD]);
+    const py = runPy(approvedRootP, ["riskyaction", "--hook", "--command", RISKY_CMD]);
+    assert.equal(n.code, 0, n.out); assert.equal(py.code, 0, py.out); // 둘 다 승인 통과
+    assert.equal(py.out, n.out, "승인 통과 후 출력 불일치(둘 다 침묵이어야 한다)");
+  } finally { rmSync(approvedRootN, { recursive: true, force: true }); rmSync(approvedRootP, { recursive: true, force: true }); }
+
+  const expiredRootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS, riskyActionApprovalTtlSeconds: 1 });
+  const expiredRootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS, riskyActionApprovalTtlSeconds: 1 });
+  try {
+    withLedger(expiredRootN, JSON.stringify(rec(5000)) + "\n");
+    withLedger(expiredRootP, JSON.stringify(rec(5000)) + "\n");
+    const n = runNode(expiredRootN, "check-risky-action.mjs", ["--hook", "--command", RISKY_CMD]);
+    const py = runPy(expiredRootP, ["riskyaction", "--hook", "--command", RISKY_CMD]);
+    assert.equal(n.code, 2, n.out); assert.equal(py.code, 2, py.out); // 둘 다 만료 — 다시 막는다
+    assert.equal(py.out, n.out, "만료 시나리오 출력 불일치");
+  } finally { rmSync(expiredRootN, { recursive: true, force: true }); rmSync(expiredRootP, { recursive: true, force: true }); }
+
+  // ③ --record 필수 인자 결여 exit 1(값은 동일해야 한다)
+  {
+    const root = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+    try {
+      const n = runNode(root, "check-risky-action.mjs", ["--record", "--command", RISKY_CMD]);
+      const py = runPy(root, ["riskyaction", "--record", "--command", RISKY_CMD]);
+      assert.equal(n.code, 1); assert.equal(py.code, 1);
+      assert.equal(py.out, n.out, "--record 인자 결여 출력 불일치");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+
+  // ④ 스윕 모드: 선언 정상 / 가드 오류(class 없음) / 미선언(INERT) / off / enum 밖
+  const sweepScen = [
+    { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS },
+    { riskyActionPolicy: "hard", riskyActionPatterns: [{ match: "x" }] },
+    { riskyActionPolicy: "hard", riskyActionPatterns: [] },
+    { riskyActionPolicy: "off", riskyActionPatterns: PATTERNS },
+    { riskyActionPolicy: "deny", riskyActionPatterns: PATTERNS },
+  ];
+  for (const [i, cfg] of sweepScen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-risky-action.mjs");
+      const py = runPy(root, ["riskyaction"]);
+      assert.equal(py.out, n.out, `스윕 시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `스윕 시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });

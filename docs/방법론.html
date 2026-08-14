@@ -790,6 +790,45 @@ CI 상태          초록               → <span class="g">완료로 읽었다<
   <p class="note">명령을 정적 분석해 "이게 정말 대상을 조회하나"를 판정하지 않는다 — <code>kubectl</code>·<code>psql</code> 같은 어휘 목록으로 판정하면 목록 밖에서 오탐·미탐이 살아나고, 그 목록은 킷이 그 프로젝트의 인프라를 안다고 전제한다. <strong>선언을 요구하고 선언을 판정한다.</strong> 그리고 미선언에 기본값을 주지 않는다: <em>추정한 기본값은 조용히 정답이 되고, 그 순간 이 축은 아무것도 요구하지 않는 축이 된다.</em></p>
   <p class="note">해소 안내를 <strong>"선언을 고쳐 적어라"가 아니라 "대상을 조회하는 검사를 더해라"</strong>로 쓴 이유: 명령을 그대로 두고 선언만 <code>target-state</code>로 바꾸면 <em>그 선언이 거짓이 된다.</em> 게이트가 값싼 해소를 안내하면 사람은 그것을 택한다.</p>
 
+  <h4>FR 정의가 섹션 안에 있는가 <span class="note">(규칙 R23)</span></h4>
+  <p>다른 프로젝트에서 온 실측이다. 에이전트가 <strong>하루에 같은 실수를 세 번</strong> 했다 — FR 정의(<code>- **FR-NNN**</code>)를 <code>## Functional Requirements</code> 섹션이 아니라 Dedup-Review·Ownership 섹션에 썼다. 세 번 다 이렇게 흘러갔다:</p>
+  <pre>파일 저장        <span class="g">문법상 멀쩡한 마크다운</span> — 다른 게이트 전부 통과
+그 FR을 커버하려는 시점  <span class="r">"정의를 못 찾았다"(dangling @covers)</span> — 원인이 아니라 결과 자리에서, 그것도 늦게</pre>
+  <p><strong>사람이 그 자리에서 알아차릴 수 없는 부류다.</strong> 이 게이트는 FR 정의 줄이 섹션 밖에 있으면 그 자리에서 FR 번호·있던 섹션명·줄 번호를 함께 말한다. Change Log 표 행이나 산문 속 참조는 <em>정의가 아니라 이력·인용</em>이라 제외하고, FR 섹션이 아예 없는 스펙(순수 인프라 문서 등)은 판정 대상이 아니다(exempt).</p>
+  <p class="note"><strong>훅은 자동 교정하지 않는다.</strong> 파일을 말없이 바꾸면 사람이 커밋한 내용과 저장소 내용이 갈린다 — 잡아서 <code>--fix</code>를 알려주는 데까지가 훅의 몫이고, 실제 이동은 사람이 명시적으로 실행한다. <code>--fix</code>의 흡수 범위도 실측으로 좁혔다: FR 줄에 <strong>바로 이어지는</strong> <code>&gt;</code> 인용 줄까지만 함께 옮긴다 — 처음 구현은 빈 줄 뒤에 있는 <em>다른 문단의 인용</em>까지 쓸어가는 회귀가 있었다.</p>
+
+  <h4>반복이 기억되는가 <span class="note">(규칙 R24)</span></h4>
+  <p>같은 실측의 나머지 절반이다. 게이트는 R23의 실수를 <strong>세 번 다 정확히 잡았고 매번 사유를 정확히 말했다</strong> — 그런데 "이게 오늘 세 번째"라는 정보는 어디에도 없었다. 지금 없던 것은 감시자가 아니라 <strong>기억</strong>이다.</p>
+  <p>원장을 게이트마다 손으로 적게 하면 반드시 빠뜨리는 게이트가 생기고, 그 게이트가 다음 결함의 자리가 된다 — 이 킷의 손목록·손 파싱이 반복적으로 죽어온 형태 그대로다. 그래서 append는 모든 판정 게이트가 이미 거치는 <strong>판정의 공통 종료 지점</strong>(<code>armVerdict</code>, R8 옆 SPEC-040)에 얹었다:</p>
+  <pre>게이트 어디서든 차단(exit≠0)  →  armVerdict 종료 훅  →  .sdd/gate-failures.jsonl에 한 줄 append
+                                          ↑
+                              (개별 게이트는 코드 변경 0줄 — 자동 참여)</pre>
+  <div class="tablewrap"><table>
+    <tr><th>필드</th><th>채워지는 조건</th></tr>
+    <tr><td><code>gate · kind · detail · exitCode · ts · sessionId</code></td><td>모든 차단에 항상 — 가시성</td></tr>
+    <tr><td><code>class · target</code></td><td>게이트가 <code>verdict(kind, detail, &#123;class, target&#125;)</code>로 <strong>스스로 선언</strong>할 때만 — 에스컬레이션 집계 대상</td></tr>
+  </table></div>
+  <p class="note"><strong>클래스는 선언이지 추측이 아니다.</strong> 실패 문장을 정규식·키워드로 분류하면 그 분류는 추측이고, 이 방법론은 추측을 금지한다 — 분류가 틀리면 오탐 에스컬레이션이 쌓이고, 오탐이 잦은 축은 꺼진다. 선언 없는 게이트의 실패는 원장에는 남되(가시성) 집계에는 들어가지 않는다.</p>
+  <p>같은 (게이트,클래스)가 임계치(기본 3 — 실측 사고와 같은 문턱) 이상인데 전용 가드가 없으면 커밋을 막고 "가드를 만들어라"를 명시한다. <strong>목적은 벌이 아니라 가시성이다:</strong> 세 번째에 이 게이트가 뜨면 그날의 반복은 애초에 없었다. 가드 선언 자체의 결함(4필드 누락·사유 없음·가드 파일 부재)은 정책 강도와 무관하게 항상 막는다 — 무언의 면제를 만들지 않기 위해서다.</p>
+  <p class="note">완전 자율 감사 에이전트는 범위 밖이다. 어떤 실수가 전용 가드로 굳어져야 하는지는 <em>판단</em>이고, 틀리면 오탐 게이트가 생긴다. 이 축이 결정적으로 만드는 것은 <strong>회계</strong>(원장 적재·임계치 대조)뿐이고, 가드를 실제로 설계·구현하는 판단은 사람의 몫으로 남긴다.</p>
+
+  <h4>독립 검증 없이 위험 행동이 지나가는가 <span class="note">(규칙 R25)</span></h4>
+  <p>다른 프로젝트에서 온 실측이다. 같은 세션에서 두 사고가 났다 — QA 실측·트래커 댓글까지 마친 티켓 3건을 <strong>아직 배포도 안 된 채</strong> 종결 상태로 넘기려 했고(그 프로젝트의 순서 규칙이 명문화돼 있었는데도), 그 실수를 고치라고 하자 규칙을 <strong>개인 memory 파일</strong>에 적으려 했다(정작 그 프로젝트 명세가 "규칙을 사적 메모리에만 박으려 함"을 이미 실패 사례로 지목해뒀는데도 확인하지 않았다). 둘 다 <strong>커밋 이전</strong>, 대화 안에서 끝났다:</p>
+  <pre>QA 실측 완료      <span class="g">✓</span>
+트래커 댓글 작성  <span class="g">✓</span>
+배포             <span class="r">아직 안 함</span>
+그런데 다음 행동  <span class="r">티켓을 종결 상태로 전이하려 했다</span></pre>
+  <p>R1~R24는 전부 <strong>커밋 시점 이후</strong>를 본다. 이 사고는 커밋 자체가 없었으므로 그 어떤 규칙도 관여할 지점이 없었다 — R21(진단가드)·R8(배포가드)이 이미 서 있는 같은 층(도구 호출 직전)에 이 축이 합류하는 이유다. 그런데 구제 방식은 다르다: 저 둘은 <strong>정적</strong>이다("이미 답이 있는 명세를 읽어라", "커밋되지 않은 트리다") — 이 축은 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작)에 <strong>동적 증거</strong>, 즉 독립 서브에이전트가 실제로 명세·실제 상태를 대조 확인했다는 승인 마커를 요구한다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>층</th><th>본다</th><th>구제</th></tr>
+    <tr><td>R21 진단가드</td><td>조사 명령이 이미 답 있는 명세를 매칭하는가</td><td>정적 — 그 명세를 읽는다</td></tr>
+    <tr><td>R8 배포가드</td><td>배포 명령이 재현 가능한 리비전에서 나오는가</td><td>정적 — 커밋(또는 pull) 후 배포</td></tr>
+    <tr><td><strong>R25 위험 행동 승인</strong></td><td>되돌리기 어려운 행동에 <strong>독립 검증 증거</strong>가 있는가</td><td>동적 — 서브에이전트 확인 + <code>--record</code></td></tr>
+  </table></div>
+  <p class="note"><strong>승인 마커는 세션도 패턴도 아니라 정확한 행동 해시(sha256)에 결속된다.</strong> "한 번 확인했으니 이 종류는 당분간 통과"로 완화하면 티켓 A의 종결 승인이 티켓 B의 종결까지 덮는 사고가 그대로 재현된다 — 마커가 막으려는 문제를 마커 자신이 재도입하는 꼴이다. 오너가 세 옵션(해시 결속·패턴별 짧은 신선도 창·위험도별 혼합) 중 <strong>최대 엄격도</strong>를 명시적으로 선택했다: 안전성이 반복 마찰보다 우선한다.</p>
+  <p class="note"><strong>게이트는 서브에이전트를 스스로 부르지 않는다.</strong> 판정 게이트가 결정론적이어야 Node·Python 양판(R6 옆 SPEC-006)이 성립하는데, 게이트 프로세스 안에서 LLM을 불러 검증을 수행하면 그 판정은 더 이상 결정론적이지 않다. 그래서 차단 메시지는 "별도 컨텍스트의 서브에이전트로 확인하고 <code>--record</code>로 마커를 남겨라"는 <strong>지시</strong>로 끝나고, 실제 호출은 차단당한 실행기 자신이 자기 도구로 한다 — 완전 자율 감사 에이전트(바로 위 R24가 이미 그은 경계와 같다)를 만들지 않으면서도 검증의 <em>존재</em>는 결정론적으로 강제한다. 검증이 실제로 옳았는지는 이 축의 판정 대상이 아니다.</p>
+  <p>범위에서 명시적으로 제외한 것도 있다 — "로컬에 특정 앱·서비스가 없다"는 <strong>확인 없는 자연어 주장</strong>은 이 축이 잡지 않는다. 도구 호출을 막는 것과 자연어 주장을 판정하는 것은 다른 문제이고, 후자를 패턴 매칭으로 시도하면 이 방법론이 금지하는 <strong>추측 기반 판정</strong>이 된다.</p>
+
   <h4>감시자가 자기 이름에 속았다 — 그리고 감시 층 대부분이 아무 강제 층에도 없었다 <span class="note">(규칙 R17 실측)</span></h4>
   <p>오너가 반복해 지적한 것이 있다 — <em>"감시게이트 및 감시에이전트가 필요한데, 즉 SDD에 의해 수행하는지 혼자 날뛰지 않는지, 그게 동작을 하지 않아."</em> 그 실체를 측정으로 찾았고, 결과는 규칙이 부족한 게 아니라 <strong>규칙들이 강제되는 자리에 없었다</strong>는 것이었다.</p>
   <p>세 층은 각자 다른 것을 보고, 각자 다른 방식으로 우회된다:</p>
@@ -869,7 +908,7 @@ R13 구현 중복        Node 전용 — Python 프로젝트에선 <span class="
     <tr><td><strong>인용 수치 검산</strong></td><td>문서가 <code>data-sdd-count</code>로 <em>자원해서</em> 올린 숫자가 실제와 같은가 — <strong>숫자는 가장 먼저 낡고 가장 늦게 들킨다</strong></td></tr>
     <tr><td><strong>동반 갱신</strong></td><td>규칙표를 고친 커밋에 소개 문서가 <strong>함께</strong> 있는가 — 코드 변경이 스펙을 동반하는 것과 같은 규율</td></tr>
   </table></div>
-  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">21</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">27</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">56</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
+  <p>현재 상태는 이 문서가 스스로 인용하고, 게이트가 매 실행 검산한다 — 규칙 <strong><span data-sdd-count="rules">24</span></strong>종 · 게이트 <strong><span data-sdd-count="gates">30</span></strong>종 · 스펙 <strong><span data-sdd-count="specs">59</span></strong>종. 이 숫자가 실제와 어긋나면 커밋이 막힌다.</p>
   <p class="note">인용 표시는 문서가 <strong>자원해서</strong> 단다. 강제로 모든 숫자를 긁으면 버전·연도·비율까지 잡아 오탐이 폭주한다(용어집 자동 추출을 거부한 것과 같은 함정). 표시하지 않은 숫자는 이 축의 판정 대상이 아니다 — 그리고 <strong>오타난 인용 키는 "확인됨"으로 읽히지 않는다</strong>: 지원하지 않는 키를 쓰면 그것 자체가 위반으로 뜬다. 조용히 통과하는 자리를 남기지 않는 것이 이 축의 요점이다.</p>
   <p class="note">해소 경로는 <strong>문서 편집 하나뿐</strong>이다. 면제 목록을 두지 않았다 — 문서 갱신을 면제로 넘길 수 있으면 그 면제가 곧 정상 경로가 되고, 그러면 이 규칙은 없는 것과 같다.</p>
 
@@ -1272,6 +1311,14 @@ spec-sync 게이트 — mode:staged(hard) changed:2 specs:1
     <div class="step"><span class="n">4</span><b>git add + 재커밋</b><span>스펙 파일도 스테이징해야 통과</span></div>
   </div>
   <p class="note">행위 불변 변경(리팩터링·포맷팅)은 커밋 메시지에 <code>Spec-Impact: none &lt;사유&gt;</code> 트레일러로 통과(사유 필수 — 없으면 차단). 단 면제 범위는 <strong>동반 요구·상태 차단뿐</strong> — Files 글롭 문법 위반과 unowned closed-world는 트레일러로 우회할 수 없다(감사 T3). 공유 파일을 타 스펙 기능 때문에 고칠 땐 <code>Change-Driver: SPEC-X [@glob] &lt;사유&gt;</code> — <code>@glob</code> 경로 스코프를 달면 매치 파일만 완화된다(감사 T4).</p>
+
+  <h3>"spec-first"는 진입 순서까지 하나로 뭉개지 않는다 — 신규 기능과 버그 수정은 반대 방향에서 출발한다</h3>
+  <p>이 절의 이름은 <strong>spec-first</strong>지만, 그건 <em>커밋에 무엇이 함께 있어야 하는가</em>의 계약이지 <em>손으로 무엇부터 타이핑하는가</em>의 절차가 아니다. 두 가지가 섞이면 실측 사고가 난다: 버그를 아직 재현하지 못한 채 "spec부터"를 문자 그대로 따라 스펙 문구부터 쓰고 나서, 실제 원인은 그 문구가 가리킨 곳이 아니라 다른 곳이었던 경우다 — 이 방법론이 금지하는 <strong>찔러보기</strong> 그 자체다. 그래서 진입 순서는 작업 유형에 따라 갈린다:</p>
+  <div class="grid g4">
+    <div class="card"><h4>① 신규 기능 — spec부터</h4><p>없던 capability·FR을 만들 때는 재현할 기존 동작 자체가 없다. 그러니 <strong>스펙에 FR(EARS)·근거·Surface를 먼저 확정</strong>하고 → 그 계약에 맞춰 코드를 쓰고 → 테스트한다. "코드 전에 spec부터"가 문자 그대로 적용되는 유일한 경우다.</p></div>
+    <div class="card"><h4>② 버그 수정 — 재현부터</h4><p>기존 동작이 명세와 다르게 돈다는 <em>결함</em>을 다룬다. 아직 재현하지 못한 원인을 스펙 문구로 먼저 확정하면 그 문구는 추측이다. 그래서 <strong>재현 실패 테스트로 RED를 먼저 확인</strong>하고 → 최소 수정으로 GREEN을 만들고 → 그 다음 스펙을 갱신한다(FR 개정 또는 Edge Cases+Change Log). 정공법 = <code>/speckit.fix</code>.</p></div>
+  </div>
+  <p class="note gate">그런데 <strong>공통 규칙은 여전히 하나다</strong> — 위 "changeset = 브랜치" 규칙 그대로, <code>check-spec-sync</code>가 실제로 대조하는 것은 <em>같은 커밋(브랜치)에 스펙 변경이 있는가</em>이지 <em>디스크에 스펙 파일을 먼저 저장했는가</em>가 아니다. ①은 설계 관점에서 스펙이 먼저 <em>확정</em>돼야 하고 ②는 재현이 먼저 <em>확정</em>돼야 하지만, 최종 커밋에는 스펙·코드가 함께 들어간다 — "신규 기능에 재현 테스트부터"(아직 없는 동작은 재현 불가)도, "버그 수정에 spec부터"(재현 전 스펙 문구는 찔러보기)도 강요하지 않는다.</p>
 
   <h3>스펙 수명주기 — 리뷰 안 된 스펙은 코드를 이끌 수 없다</h3>
   <p>스펙 헤더 <code>Status:</code>는 enum이다 — <code>Planned → Draft → Reviewed → Approved → Active → Deprecated → Removed</code>. 차단은 화이트리스트(Reviewed 이상만 코드 주도 가능)라 Draft만이 아니라 Planned·enum 밖 값도 걸린다(감사 T2). 강제하는 것은 <strong>시간 순서가 아니라 상태 순서</strong>다:</p>

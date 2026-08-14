@@ -33,6 +33,8 @@ import re
 import unicodedata
 import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 
 # ── 판정 3분류 반환 계약(check-outcome-lib.mjs 패리티, SPEC-054) ───────────────
 # SPEC-040은 **게이트**가 스윕에 내는 판정 종류이고, 이것은 **코어**가 게이트에 돌려주는 형태다.
@@ -92,6 +94,94 @@ def outcome_summary(outcome, subject="판정"):
     return f"{subject}: 위반 0건 · 확인 못 함 0건"
 
 
+# ── 게이트 실패 원장(gate-failure-lib.mjs 패리티, SPEC-057) ───────────────────
+# 실측 제보: 에이전트가 하루에 같은 실수를 세 번 했다. 게이트는 매번 잡았지만 "이게 오늘
+# 세 번째"라는 정보가 어디에도 없었다 — 감시자가 아니라 **기억**이 없다.
+DEFAULT_GATE_FAILURE_LEDGER = ".sdd/gate-failures.jsonl"
+DEFAULT_ESCALATION_THRESHOLD = 3
+
+
+def parse_ledger(raw):
+    """반환 {"records", "unreadable"} — 깨진 줄은 조용히 버리지 않는다."""
+    records, unreadable = [], 0
+    for line in str(raw or "").split("\n"):
+        t = line.strip()
+        if not t:
+            continue
+        try:
+            r = json.loads(t)
+            if isinstance(r, dict):
+                records.append(r)
+            else:
+                unreadable += 1
+        except Exception:
+            unreadable += 1
+    return {"records": records, "unreadable": unreadable}
+
+
+def make_failure_record(fields):
+    meta = fields.get("meta") or {}
+    return {
+        "gate": str(fields.get("gate") or "unknown"),
+        "kind": str(fields.get("kind") or ""),
+        "detail": str(fields.get("detail") or ""),
+        "exitCode": fields.get("exitCode") if isinstance(fields.get("exitCode"), int) else None,
+        "class": str(meta["class"]) if meta.get("class") else None,
+        "target": str(meta["target"]) if meta.get("target") else None,
+        "ts": fields.get("ts"),
+        "sessionId": fields.get("sessionId") or "unknown",
+    }
+
+
+def class_counts(records):
+    """class 없는 레코드는 집계하지 않는다 — 선언 없는 실패는 가시성이지 강제가 아니다."""
+    groups = {}
+    for r in (records or []):
+        if not r or not r.get("class"):
+            continue
+        key = (str(r.get("gate") or ""), str(r["class"]))
+        if key not in groups:
+            groups[key] = {"gate": key[0], "class": key[1], "count": 0, "targets": [], "lastTs": None}
+        g = groups[key]
+        g["count"] += 1
+        if r.get("target") and r["target"] not in g["targets"]:
+            g["targets"].append(r["target"])
+        if r.get("ts") and (not g["lastTs"] or r["ts"] > g["lastTs"]):
+            g["lastTs"] = r["ts"]
+    return sorted(groups.values(), key=lambda g: (-g["count"], g["gate"], g["class"]))
+
+
+GATE_FAILURE_GUARD_FINDING_TEXT = {
+    "incomplete": "gate·class·guard 3필드가 모두 있어야 한다",
+    "no-reason": "사유(note)가 없다 — 왜 이 클래스가 해소됐다고 보는지 없으면 무언의 면제다",
+    "stale": "가드로 지목한 파일이 실재하지 않는다 — 선언만으로 믿지 않는다",
+}
+
+
+def guard_findings(guards, exists=None):
+    out = []
+    for i, g in enumerate(guards or []):
+        at = f'{g.get("gate")}/{g.get("class")}' if g and g.get("gate") and g.get("class") else f"#{i + 1}"
+        if not g or not g.get("gate") or not g.get("class") or not g.get("guard"):
+            out.append({"kind": "incomplete", "at": at})
+            continue
+        if not str(g.get("note") or "").strip():
+            out.append({"kind": "no-reason", "at": at})
+            continue
+        if callable(exists) and not exists(g["guard"]):
+            out.append({"kind": "stale", "at": at, "guard": g["guard"]})
+    return out
+
+
+def _guard_key(g):
+    return (g["gate"], g["class"])
+
+
+def escalation_findings(counts, guards, threshold=DEFAULT_ESCALATION_THRESHOLD):
+    guarded = {_guard_key(g) for g in (guards or []) if g and g.get("gate") and g.get("class")}
+    return [c for c in (counts or []) if c["count"] >= threshold and (c["gate"], c["class"]) not in guarded]
+
+
 # ── 판정 타입(verdict-lib.mjs 패리티, SPEC-040) ────────────────────────────────
 # 게이트는 "무엇을 했는지"를 산문이 아니라 **타입**으로 말한다. 이 미러가 없으면 Python 런타임
 # 프로젝트의 스윕은 여전히 문자열로 추측하고, "off (판정 안 함)"을 초록으로 읽는다.
@@ -108,19 +198,73 @@ def format_verdict(kind, detail=""):
     return f"{VERDICT_PREFIX} {k} — {d}" if d else f"{VERDICT_PREFIX} {k}"
 
 
-def verdict(kind, detail=""):
+def verdict(kind, detail="", meta=None):
+    """meta — {"class", "target"} 선택적 구조화 메타(SPEC-057). **선언이지 추측이 아니다**:
+    게이트가 스스로 넘기지 않으면 실패는 원장에 남아도(gate·kind·detail) 에스컬레이션 집계에는
+    들어가지 않는다. 문자열을 정규식·키워드로 분류하는 것은 이 방법론이 금지하는 추측이다."""
     global _VERDICT
-    _VERDICT = (kind, detail)
+    _VERDICT = (kind, detail, meta)
 
 
 def judged(violations=0):
     verdict("JUDGED", f"위반 {violations}건" if violations > 0 else "위반 0건")
 
 
+_EXIT_CODE = None
+_CURRENT_SUB = None
+
+
+def _capture_exit_code(code):
+    global _EXIT_CODE
+    _EXIT_CODE = code if isinstance(code, int) else (0 if code is None else 1)
+
+
+def _gate_name():
+    """Python은 단일 파일이라 서브커맨드 없이는 모든 판정이 파일명 하나로 뭉개진다 — 서브커맨드를
+    붙여 Node판의 게이트별 파일명(check-fr-placement.mjs 등)과 같은 층위로 맞춘다."""
+    base = "sdd_gates.py"
+    try:
+        base = os.path.basename(sys.argv[0] or base) or base
+    except Exception:
+        pass
+    return f"{base}:{_CURRENT_SUB}" if _CURRENT_SUB else base
+
+
+def _resolve_ledger_path():
+    """verdict-lib.mjs와 같은 이유로 config를 다시 빌드하지 않는다 — 원장 경로 오버라이드
+    키만 가볍게 본다(전체 load_config()는 각 게이트가 자기 main에서 이미 한 번 했다)."""
+    cfg_path = find_config(os.getcwd())
+    root = os.path.dirname(cfg_path) if cfg_path else os.getcwd()
+    rel = DEFAULT_GATE_FAILURE_LEDGER
+    if cfg_path:
+        try:
+            with open(cfg_path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            if isinstance(raw, dict) and isinstance(raw.get("gateFailureLedger"), str) and raw["gateFailureLedger"].strip():
+                rel = raw["gateFailureLedger"].strip()
+        except Exception:
+            pass
+    return os.path.join(root, *rel.split("/"))
+
+
+def _append_gate_failure(kind, detail, meta, code):
+    path = _resolve_ledger_path()
+    record = make_failure_record({
+        "gate": _gate_name(), "kind": kind, "detail": detail, "exitCode": code, "meta": meta,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "sessionId": os.environ.get("SDD_SESSION_ID") or "unknown",
+    })
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def arm_verdict(quiet_when_silent=False):
     """모든 종료 경로에서 판정 줄 하나. sys.exit도 atexit를 탄다.
 
-    os.write(1, …)를 쓰는 이유는 Node판과 같다 — print는 버퍼를 타서 종료 훅에서 유실될 수 있다."""
+    os.write(1, …)를 쓰는 이유는 Node판과 같다 — print는 버퍼를 타서 종료 훅에서 유실될 수 있다.
+    실패 원장(SPEC-057) append도 여기 한 곳에서 한다 — atexit는 exit code를 받지 못하므로
+    `_capture_exit_code`(파일 하단의 진입점 래퍼)가 먼저 `_EXIT_CODE`를 채워 둔다."""
     global _VERDICT_QUIET
     _VERDICT_QUIET = bool(quiet_when_silent)
     import atexit
@@ -128,13 +272,18 @@ def arm_verdict(quiet_when_silent=False):
     def _emit():
         if _VERDICT is None and _VERDICT_QUIET:
             return
-        kind, detail = _VERDICT if _VERDICT else (
-            "UNTYPED", "게이트가 판정 종류를 선언하지 않았다(배선 누락 — verdict() 호출 없음)")
+        kind, detail, meta = _VERDICT if _VERDICT else (
+            "UNTYPED", "게이트가 판정 종류를 선언하지 않았다(배선 누락 — verdict() 호출 없음)", None)
         try:
             sys.stdout.flush()
             os.write(1, (format_verdict(kind, detail) + "\n").encode("utf-8"))
         except Exception:
             pass
+        if _EXIT_CODE not in (None, 0):
+            try:
+                _append_gate_failure(kind, detail, meta, _EXIT_CODE)
+            except Exception:
+                pass
 
     atexit.register(_emit)
 
@@ -213,6 +362,20 @@ DEFAULTS = {
     # 진단 진입점 명세 강제 열람(SPEC-053) — 조회는 커밋을 남기지 않으므로 도구 호출 직전에 발동.
     "diagnosisGuardPolicy": "advisory",
     "completionSignalPolicy": "advisory",
+    # FR 배치(SPEC-056) — FR 정의는 `## Functional Requirements` 섹션 안에 있어야 한다.
+    "frPlacementPolicy": "advisory",
+    # 게이트 실패 에스컬레이션(SPEC-057) — 원장에서 같은 (게이트,클래스)가 임계치를 넘겼는데
+    # 전용 가드가 없으면 말한다. 목적은 벌이 아니라 기억이다.
+    "gateFailureEscalationPolicy": "advisory",
+    "gateFailureEscalationThreshold": 3,
+    "gateFailureLedger": None,
+    "gateFailureGuards": [],
+    # 위험 행동 승인(SPEC-058) — 되돌리기 어려운 행동은 독립 서브에이전트 검증 마커 없이
+    # 지나가지 않는다. 마커는 행동 페이로드 해시에 결속된다.
+    "riskyActionPolicy": "advisory",
+    "riskyActionPatterns": [],
+    "riskyActionApprovalTtlSeconds": 900,
+    "riskyActionLedger": None,
     "diagnosisSpecMap": [],
     "diagnosisSpecReadPatterns": None,
     "diagnosisGuideSections": None,
@@ -375,6 +538,10 @@ RATCHETED_POLICIES = [
     "diagnosisGuardPolicy",
     "completionSignalPolicy",
     "liveRealityCoveragePolicy",
+    "preEditSpecFirstPolicy",
+    "frPlacementPolicy",
+    "gateFailureEscalationPolicy",
+    "riskyActionPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -7068,6 +7235,456 @@ def cmd_preedit(cfg, positional, args):
         sys.exit(2)
 
 
+# ── FR 배치 (SPEC-056, R23) — Node판 fr-placement-lib.mjs + check-fr-placement.mjs 미러 ──────
+# 실측 제보: 에이전트가 하루에 같은 실수를 세 번 했다 — FR 정의를 FR 섹션 밖에 썼다. grammar-lib의
+# fr_declarations는 FR 섹션 **안**만 스캔하므로 밖에 있는 FR은 "정의 없음"으로 사라지고, 그 사라짐이
+# dangling @covers라는 다른 축의 결함으로 재등장한다. 이 축은 사라짐의 원인 자리를 직접 잡는다.
+FR_PLACEMENT_FAILURE_CLASS = "fr-outside-section"
+FR_SECTION_HEADING = "Functional Requirements"
+_H2 = re.compile(r"^##\s+(.+?)\s*$")
+
+
+def section_spans(text):
+    """문서의 모든 H2 섹션을 라인 범위로 나눈다 — 전수 열거(section_block과 다른 능력)."""
+    lines = str(text or "").split("\n")
+    heads = []
+    for i, ln in enumerate(lines):
+        m = _H2.match(ln)
+        if m:
+            heads.append((i, m.group(1).strip()))
+    if not heads:
+        return [{"name": None, "startLine": 0, "endLine": len(lines)}]
+    spans = []
+    if heads[0][0] > 0:
+        spans.append({"name": None, "startLine": 0, "endLine": heads[0][0]})
+    for i, (line, name) in enumerate(heads):
+        start = line + 1
+        end = heads[i + 1][0] if i + 1 < len(heads) else len(lines)
+        spans.append({"name": name, "startLine": start, "endLine": end})
+    return spans
+
+
+def _is_fr_section_name(name, heading):
+    return name is not None and re.match(rf"^{heading}\b", name) is not None
+
+
+def fr_placement_findings(text, fr_decl_re, req_alt="FR", heading=FR_SECTION_HEADING):
+    """반환 findings[]: {frId, section, line(1-based)}. FR 섹션이 없는 문서는 exempt(빈 리스트)."""
+    spans = section_spans(text)
+    if not any(_is_fr_section_name(s["name"], heading) for s in spans):
+        return []
+    lines = str(text or "").split("\n")
+    src = fr_decl_re.pattern if hasattr(fr_decl_re, "pattern") else str(fr_decl_re)
+    rex = re.compile(src)
+    out = []
+    for span in spans:
+        if _is_fr_section_name(span["name"], heading):
+            continue
+        for i in range(span["startLine"], span["endLine"]):
+            line = lines[i]
+            if not _is_fr_decl_line(line, req_alt):
+                continue
+            m = rex.search(line)
+            if not m:
+                continue
+            out.append({"frId": m.group(1), "section": span["name"] or "(첫 헤딩 이전)", "line": i + 1})
+    return out
+
+
+def fix_fr_placement(text, fr_decl_re, req_alt="FR", heading=FR_SECTION_HEADING):
+    """--fix — FR 정의 블록을 FR 섹션 끝으로 옮긴다. 흡수 범위는 인접한 `>` 줄까지만
+    (실측: 더 넓게 흡수하자 빈 줄 건너뛴 남의 `>` 줄이 함께 딸려갔다)."""
+    original = str(text or "")
+    findings = fr_placement_findings(original, fr_decl_re, req_alt, heading)
+    if not findings:
+        return {"text": original, "moved": []}
+    lines = original.split("\n")
+    spans = section_spans(original)
+    fr_span = next((s for s in spans if _is_fr_section_name(s["name"], heading)), None)
+    if not fr_span:
+        return {"text": original, "moved": []}
+
+    blocks = []
+    for f in findings:
+        start = f["line"] - 1
+        end = start + 1
+        while end < len(lines) and re.match(r"^\s*>", lines[end]):
+            end += 1
+        blocks.append({"start": start, "end": end, "frId": f["frId"], "from": f["section"]})
+    blocks.sort(key=lambda b: b["start"])
+
+    kept = []
+    cursor = 0
+    for b in blocks:
+        kept.extend(lines[cursor:b["start"]])
+        cursor = b["end"]
+    kept.extend(lines[cursor:])
+
+    removed_before = sum((b["end"] - b["start"]) for b in blocks if b["start"] < fr_span["endLine"])
+    insert_at = fr_span["endLine"] - removed_before
+    insertion = [ln for b in blocks for ln in lines[b["start"]:b["end"]]]
+    final_lines = kept[:insert_at] + insertion + kept[insert_at:]
+
+    return {
+        "text": "\n".join(final_lines),
+        "moved": [{"frId": b["frId"], "from": b["from"], "toSection": heading} for b in blocks],
+    }
+
+
+def cmd_gateescalation(cfg):
+    policy = str(cfg.get("gateFailureEscalationPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ gateFailureEscalationPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "gateFailureEscalationPolicy")
+        print("게이트 실패 에스컬레이션 — gateFailureEscalationPolicy:off (판정 안 함)")
+        return
+    hard = policy == "hard"
+    root = cfg["__root"]
+    rel = str(cfg.get("gateFailureLedger") or DEFAULT_GATE_FAILURE_LEDGER)
+    abs_path = os.path.join(root, *rel.split("/"))
+
+    raw = None
+    try:
+        with open(abs_path, encoding="utf-8") as fh:
+            raw = fh.read()
+    except OSError:
+        pass
+    if raw is None:
+        verdict("INERT", f"원장이 없다 — {rel}. 게이트가 아직 차단한 적이 없거나 이 작업본이 새로 만들어졌다")
+        print(f"게이트 실패 에스컬레이션 — 원장 없음({rel}, 판정 안 함).")
+        return
+
+    guards = cfg.get("gateFailureGuards")
+    guards = guards if isinstance(guards, list) else []
+    g_errors = guard_findings(guards, lambda g: os.path.exists(os.path.join(root, *str(g).split("/"))))
+    if g_errors:
+        verdict("JUDGED", f"가드 선언 오류 {len(g_errors)}건")
+        print("✗ gateFailureGuards 선언 오류:", file=sys.stderr)
+        for e in g_errors:
+            extra = f': {e["guard"]}' if e.get("guard") else ""
+            print(f'  ✗ [{e["at"]}] {GATE_FAILURE_GUARD_FINDING_TEXT[e["kind"]]}{extra}', file=sys.stderr)
+        sys.exit(1)
+
+    parsed = parse_ledger(raw)
+    records, unreadable = parsed["records"], parsed["unreadable"]
+    threshold = int(cfg.get("gateFailureEscalationThreshold") or 0) or DEFAULT_ESCALATION_THRESHOLD
+    counts = class_counts(records)
+    findings = escalation_findings(counts, guards, threshold)
+
+    judged(len(findings))
+    classed = sum(c["count"] for c in counts)
+    unreadable_tail = f" · 확인 못 함(파싱 실패) {unreadable}건" if unreadable else ""
+    print(f"게이트 실패 에스컬레이션(gateFailureEscalationPolicy={policy}): 원장 {len(records)}건(클래스 선언 {classed}건)"
+          f" — 임계치 {threshold} 초과 미가드 {len(findings)}건{unreadable_tail}")
+    tag = "✗" if hard else "⚠"
+    for f in findings:
+        targets = ", ".join(f["targets"][:3]) + (" …" if len(f["targets"]) > 3 else "")
+        print(f'  {tag} [{f["gate"]}] "{f["class"]}" 클래스가 {f["count"]}회 반복됐다(대상: {targets or "—"}) — 전용 가드가 없다.')
+        print(f'     → gateFailureGuards에 {{ gate: "{f["gate"]}", class: "{f["class"]}", guard: "<새 게이트 파일>", note: "<왜 해소되는가>" }}를'
+              " 추가하거나, 그 전에 전용 가드를 실제로 만들어라(선언만으로는 다음 실행에서 다시 잡힌다 — 가드 파일 실재를 대조한다).")
+    if findings and hard:
+        print("\n✗ gateFailureEscalationPolicy=hard: 반복된 실패 클래스가 있는데 전용 가드가 없다 — 같은 실수를 다시 겪었다.",
+              file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print("게이트 실패 에스컬레이션: OK — 임계치를 넘긴 미가드 클래스가 없다.")
+
+
+def cmd_frplacement(cfg, args):
+    policy = str(cfg.get("frPlacementPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ frPlacementPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "frPlacementPolicy")
+        print("FR 배치 게이트 — frPlacementPolicy:off (판정 안 함)")
+        return
+    hard = policy == "hard"
+    fix = "--fix" in args
+    spec_dir = resolve(cfg, cfg.get("specDir"))
+    try:
+        names = sorted(n for n in os.listdir(spec_dir) if n.endswith(".md"))
+    except OSError:
+        names = []
+    if not names:
+        verdict("INERT", "스펙 파일 0개 — 판정 대상이 없다")
+        print("FR 배치 게이트 — 스펙 파일 0개(판정 안 함)")
+        return
+
+    if fix:
+        fixed_count = 0
+        for n in names:
+            abs_path = os.path.join(spec_dir, n)
+            try:
+                with open(abs_path, encoding="utf-8") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            res = fix_fr_placement(text, cfg["__frDecl"], cfg["__reqAlt"])
+            if not res["moved"]:
+                continue
+            with open(abs_path, "w", encoding="utf-8") as fh:
+                fh.write(res["text"])
+            m = cfg["__specId"].search(text)
+            spec_id = m.group(0) if m else n
+            for mv in res["moved"]:
+                print(f'  ↻ [{spec_id}] {mv["frId"]}: {mv["from"]} → {mv["toSection"]} 섹션 끝으로 이동')
+            fixed_count += len(res["moved"])
+        verdict("SKIPPED", "--fix 모드(판정이 아니라 교정)")
+        print(f"FR 배치 게이트: --fix 완료 — {fixed_count}건 이동.")
+        return
+
+    report = []
+    for n in names:
+        abs_path = os.path.join(spec_dir, n)
+        try:
+            with open(abs_path, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        findings = fr_placement_findings(text, cfg["__frDecl"], cfg["__reqAlt"])
+        if not findings:
+            continue
+        m = cfg["__specId"].search(text)
+        spec_id = m.group(0) if m else n
+        for f in findings:
+            report.append({"specId": spec_id, "file": f'{cfg.get("specDir")}/{n}', **f})
+
+    meta = {"class": FR_PLACEMENT_FAILURE_CLASS, "target": report[0]["file"]} if report else None
+    verdict("JUDGED", f"위반 {len(report)}건" if report else "위반 0건", meta)
+    print(f"FR 배치 게이트(frPlacementPolicy={policy}): 스펙 {len(names)}개 검사 — {FR_SECTION_HEADING} 섹션 밖 FR {len(report)}건")
+    tag = "✗" if hard else "⚠"
+    for r in report:
+        print(f'  {tag} [{r["specId"]}] {r["frId"]}가 "{r["section"]}" 섹션에 있다({r["file"]}:{r["line"]}) — {FR_SECTION_HEADING} 섹션 안에 있어야 한다')
+    if report:
+        print("  → node scripts/check-fr-placement.mjs --fix 로 옮긴다(훅은 자동 교정하지 않는다 — 사람이 명시적으로 실행한다).")
+    if report and hard:
+        print('\n✗ frPlacementPolicy=hard: FR 정의가 섹션 밖에 있으면 다른 게이트가 "정의 없음(dangling @covers)"으로'
+              " 뒤늦게 본다 — 원인 자리에서 막는다.", file=sys.stderr)
+        sys.exit(1)
+    if not report:
+        print(f"FR 배치 게이트: OK — 모든 FR 정의가 {FR_SECTION_HEADING} 섹션 안에 있다.")
+
+
+# ── 위험 행동 승인 (SPEC-058, R25) — Node판 action-approval-lib.mjs 미러 ──────────
+# 실측 제보(2026-08-14): 커밋 이전, 대화 안에서 위험 행동(트래커 종결 전이 등)이 독립 검증 없이
+# 진행됐다. 승인 마커는 행동 페이로드 해시에 결속되고, 게이트는 마커의 존재·해시 일치·신선도만
+# 결정론적으로 본다 — 서브에이전트 호출은 차단당한 실행기 자신이 한다(게이트는 스스로 안 부른다).
+DEFAULT_ACTION_APPROVAL_LEDGER = ".sdd/action-approvals.jsonl"
+DEFAULT_APPROVAL_TTL_SECONDS = 900
+
+ACTION_APPROVAL_GUARD_FINDING_TEXT = {
+    "no-match": "명령 패턴이 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
+    "bad-regex": "명령 패턴이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+    "no-class": "class가 없다 — 에스컬레이션 집계(SPEC-057)가 이 선언을 인식할 키가 없다",
+    "no-verify-against": "verifyAgainst가 없다 — 서브에이전트가 무엇과 대조해야 하는지 모른다",
+    "no-why": "사유가 없다 — 왜 이 행동에 승인이 필요한지 모르면 사람은 규칙을 우회한다",
+}
+
+
+def hash_action(command):
+    return hashlib.sha256(str(command or "").strip().encode("utf-8")).hexdigest()
+
+
+def parse_risky_action_patterns(value):
+    out = []
+    for raw in (value if isinstance(value, list) else []):
+        if not isinstance(raw, dict):
+            continue
+        out.append({
+            "match": str(raw.get("match") or ""),
+            "class": str(raw.get("class") or ""),
+            "verifyAgainst": str(raw.get("verifyAgainst") or ""),
+            "why": str(raw.get("why") or ""),
+        })
+    return out
+
+
+def validate_risky_action_patterns(entries):
+    findings = []
+    for i, e in enumerate(entries or []):
+        at = e["class"] or e["match"] or f"#{i + 1}"
+        if not e["match"]:
+            findings.append({"kind": "no-match", "at": at})
+            continue
+        try:
+            re.compile(e["match"])
+        except re.error:
+            findings.append({"kind": "bad-regex", "at": at})
+            continue
+        if not e["class"].strip():
+            findings.append({"kind": "no-class", "at": at})
+        if not e["verifyAgainst"].strip():
+            findings.append({"kind": "no-verify-against", "at": at})
+        if not e["why"].strip():
+            findings.append({"kind": "no-why", "at": at})
+    return findings
+
+
+def match_risky_action(command, entries):
+    cmd = str(command or "")
+    if not cmd.strip():
+        return None
+    for e in entries or []:
+        if not e["match"]:
+            continue
+        try:
+            if re.search(e["match"], cmd, re.IGNORECASE):
+                return e
+        except re.error:
+            continue
+    return None
+
+
+def make_approval_record(fields):
+    return {
+        "hash": str(fields.get("hash") or ""),
+        "class": str(fields.get("class") or ""),
+        "note": str(fields.get("note") or ""),
+        "ts": fields.get("ts"),
+        "sessionId": fields.get("sessionId") or "unknown",
+    }
+
+
+def find_approval(hash_, records, ttl_seconds=DEFAULT_APPROVAL_TTL_SECONDS, now_ms=None):
+    if now_ms is None:
+        return None
+    best = None
+    for r in records or []:
+        if not r or r.get("hash") != hash_ or not r.get("ts"):
+            continue
+        try:
+            ts_ms = datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp() * 1000
+        except Exception:
+            continue
+        age_ms = now_ms - ts_ms
+        if age_ms < 0 or age_ms > ttl_seconds * 1000:
+            continue
+        if not best or r["ts"] > best["ts"]:
+            best = r
+    return best
+
+
+def cmd_riskyaction(cfg, argv):
+    policy = str(cfg.get("riskyActionPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ riskyActionPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    hook = "--hook" in argv
+    record = "--record" in argv
+    entries = parse_risky_action_patterns(cfg.get("riskyActionPatterns"))
+
+    if policy == "off":
+        if hook:
+            sys.exit(0)
+        verdict("OFF", "riskyActionPolicy")
+        print("위험 행동 승인 게이트 — riskyActionPolicy:off (판정 안 함)")
+        return
+
+    def get_flag(flag):
+        if flag in argv:
+            i = argv.index(flag)
+            if i + 1 < len(argv):
+                return argv[i + 1]
+        return None
+
+    root = cfg["__root"]
+    ledger_rel = str(cfg.get("riskyActionLedger") or DEFAULT_ACTION_APPROVAL_LEDGER)
+    ledger_path = os.path.join(root, *ledger_rel.split("/"))
+
+    if record:
+        command = get_flag("--command")
+        cls = get_flag("--class")
+        note = get_flag("--note")
+        if not command or not cls or not note:
+            print("✗ --record는 --command·--class·--note가 모두 필요하다(승인 근거를 지어내지 않는다).",
+                  file=sys.stderr)
+            sys.exit(1)
+        h = hash_action(command)
+        rec = make_approval_record({
+            "hash": h, "class": cls, "note": note,
+            "ts": datetime.now(timezone.utc).isoformat(), "sessionId": os.environ.get("SDD_SESSION_ID") or "unknown",
+        })
+        os.makedirs(os.path.dirname(ledger_path) or ".", exist_ok=True)
+        with open(ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+        verdict("SKIPPED", "--record 모드(판정이 아니라 승인 기록)")
+        print(f'위험 행동 승인 게이트: 승인 기록됨 — class="{cls}" hash={h[:12]}… (유효기간은 riskyActionApprovalTtlSeconds)')
+        return
+
+    if hook:
+        if not entries:
+            sys.exit(0)
+        # 정본은 Node판 commandFromHookInput(deploy-guard-lib) — `--command <값>` 아니면 stdin.
+        command = get_flag("--command") or ""
+        if not command:
+            try:
+                raw = sys.stdin.read()
+            except Exception:
+                raw = ""
+            if raw.strip():
+                try:
+                    o = json.loads(raw)
+                    command = str((o.get("tool_input") or {}).get("command") or o.get("command") or "")
+                except Exception:
+                    command = raw.strip()
+        entry = match_risky_action(command, entries)
+        if not entry:
+            sys.exit(0)
+
+        h = hash_action(command)
+        ttl = int(cfg.get("riskyActionApprovalTtlSeconds") or 0) or DEFAULT_APPROVAL_TTL_SECONDS
+        raw = None
+        try:
+            with open(ledger_path, encoding="utf-8") as fh:
+                raw = fh.read()
+        except OSError:
+            pass
+        records = parse_ledger(raw)["records"] if raw is not None else []
+        approval = find_approval(h, records, ttl, time.time() * 1000)
+        if approval:
+            sys.exit(0)
+
+        verdict("JUDGED", "위반 1건", {"class": entry["class"], "target": h})
+        print(f'[SDD 위험 행동] 클래스 "{entry["class"]}" — 독립 검증 없이는 진행할 수 없다(riskyActionPolicy={policy}).')
+        print(f'  왜: {entry["why"]}')
+        print(f'  확인 방법: {entry["verifyAgainst"]}')
+        print("  → 별도 컨텍스트의 서브에이전트를 만들어 위 내용을 실제로 대조 확인시켜라(이 게이트는 그 호출을 스스로 하지 않는다).")
+        print(f'  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "{entry["class"]}" --note "<확인 근거>"')
+        print(f"  → 그 다음 이 행동을 재시도하라(승인 유효기간 {ttl}초, 행동 문자열이 정확히 같아야 한다).")
+        if policy == "hard":
+            print("\n✗ riskyActionPolicy=hard: 승인 마커 없이 위험 행동을 차단한다.", file=sys.stderr)
+            sys.exit(2)
+        print("  · advisory — 차단하지 않는다. hard로 승격하면 이 행동은 여기서 멈춘다.")
+        return
+
+    if not entries:
+        verdict("INERT", "riskyActionPatterns 미선언 — 무엇에 발화할지 모른다")
+        print("위험 행동 승인 게이트 — `riskyActionPatterns` 미선언: **판정하지 않는다**."
+              " 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이 있으면"
+              " `{ match: <명령 정규식>, class, verifyAgainst, why }`로 선언하라.")
+        return
+    findings = validate_risky_action_patterns(entries)
+    judged(len(findings))
+    print(f"위험 행동 승인 게이트(riskyActionPolicy={policy}): 패턴 {len(entries)}종 선언 — 선언 위반 {len(findings)}")
+    tag = "✗" if policy == "hard" else "⚠"
+    for f in findings:
+        stream = sys.stderr if policy == "hard" else sys.stdout
+        print(f'  {tag} [{f["at"]}] {ACTION_APPROVAL_GUARD_FINDING_TEXT[f["kind"]]}', file=stream)
+    if findings and policy == "hard":
+        print("\n✗ 위험 행동 패턴 선언이 깨졌다 — 이 축의 자기결함은 **조용한 무발화**다.", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print(f"  ✓ 패턴 {len(entries)}종이 모두 class·verifyAgainst·사유를 갖는다.")
+        print("  · 이 층은 **도구 호출 직전**에 발동한다 — 실시간 대화는 커밋도 파일 변경도 남기지 않으므로"
+              " 커밋 게이트로는 원리상 볼 수 없다. 배선 실재는 R19(에이전트 배선)가 판정한다.")
+
+
 # ── 완료 판정 신호 강도 (SPEC-055, R22) — Node판 completion-signal-lib.mjs 미러 ──────
 # 실측 제보: 배포 완료를 **파생 신호로 판정했다.** 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서
 # 완료로 보고했는데 migrate Job이 실패해 배포 스테이지가 스킵된 상태였다.
@@ -7728,13 +8345,17 @@ def main():
         sys.exit(2)
     sub = args[0]
     strict = "--strict" in args
+    # 실패 원장의 gate 식별자에 쓴다 — Python은 단일 파일이라 서브커맨드 없이는 모든 판정이
+    # "sdd_gates.py"로 뭉개져 (gate,class) 에스컬레이션이 Node판만큼 구체적이지 못하다.
+    global _CURRENT_SUB
+    _CURRENT_SUB = sub
     # 판정 타입 방출(SPEC-040) — 어떤 종료 경로로 끝나든 한 줄. 선언 안 하면 UNTYPED로 자백된다.
     # Node판 게이트는 파일마다 armVerdict()를 부르지만 Python판은 단일 엔트리라 여기서 한 번이다.
     # ⚠ **훅 편의 계층은 예외가 아니라 좁힌 계약이다**(SPEC-040): PreToolUse처럼 매 명령에 붙어
     # 도는 계층은 발동 조건이 아니면 아무것도 출력하지 않는 것이 계약이고, 여기에 판정 줄을
     # 강제하면 모든 Bash 명령마다 한 줄이 붙어 소음이 된다 — 소음이 되는 순간 사람이 훅을 끈다.
     # 그래서 Node판의 `armVerdict({quietWhenSilent:true})`와 같은 조건으로만 침묵을 허용한다.
-    HOOK_LAYER_SUBS = ("diagnosisguard", "preedit")
+    HOOK_LAYER_SUBS = ("diagnosisguard", "preedit", "riskyaction")
     # preedit은 발동 조건이 아니면 **침묵이 계약**이다(Node판 armVerdict({quietWhenSilent:true}) 미러).
     arm_verdict(quiet_when_silent=(sub == "preedit" or (sub in HOOK_LAYER_SUBS and "--hook" in args)))
     cfg = load_config()
@@ -7818,6 +8439,12 @@ def main():
         cmd_watchdog(cfg)
     elif sub == "preedit":
         cmd_preedit(cfg, positional, args)
+    elif sub == "frplacement":
+        cmd_frplacement(cfg, positional + args)
+    elif sub == "gateescalation":
+        cmd_gateescalation(cfg)
+    elif sub == "riskyaction":
+        cmd_riskyaction(cfg, args)
     elif sub == "completionsignal":
         cmd_completionsignal(cfg)
     elif sub == "duplicatelogic":
@@ -7838,4 +8465,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # 실패 원장(SPEC-057) — atexit 콜백은 종료 코드를 받지 못하므로, 이 래퍼가 SystemExit을
+    # 가로채 `_EXIT_CODE`를 채운 뒤 그대로 다시 던진다. Node판 `process.on("exit", code => …)`와
+    # 구조가 다르지만 효과는 같다: 어떤 cmd_*도 건드리지 않고 모든 게이트가 자동으로 참여한다.
+    try:
+        main()
+    except SystemExit as e:
+        _capture_exit_code(e.code)
+        raise
+    _capture_exit_code(0)

@@ -24,10 +24,11 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 56건
+## Entity 키 (aggregate root) — 59건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval` | SPEC-058 | ✓ | ✓ | ✓ |
 | `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | ✓ |
 | `agent-wiring` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -49,6 +50,8 @@
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
 | `external-target` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
+| `fr-placement` | SPEC-056 | ✓ | ✓ | ✓ |
+| `gate-failure` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
 | `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install` | SPEC-004 | ✓ | ✓ | ✓ |
 | `hook-wiring` | SPEC-036 | ✓ | ✓ | ✓ |
@@ -85,10 +88,11 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 104건
+## Surface 키 — 110건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval-lib.mjs` | SPEC-058 | ✓ | ✓ | ✓ |
 | `agent-hooks.list` | SPEC-051 | ✓ | ✗ 미앵커 | ✓ |
 | `agent-wiring-lib.mjs` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation-lib.mjs` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -106,6 +110,8 @@
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
+| `check-fr-placement.mjs` | SPEC-056 | ✓ | ✓ | ✓ |
+| `check-gate-escalation.mjs` | SPEC-057 | ✓ | ✓ | ✓ |
 | `check-hooks-installed.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
 | `check-import-wiring.mjs` | SPEC-050 | ✓ | ✓ | ✓ |
 | `check-intro-doc.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
@@ -116,6 +122,7 @@
 | `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
 | `check-pre-edit.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-process-ssot.mjs` | SPEC-047 | ✓ | ✓ | ✓ |
+| `check-risky-action.mjs` | SPEC-058 | ✓ | ✓ | ✓ |
 | `check-sc-coverage.mjs` | SPEC-034 | ✓ | ✓ | ✓ |
 | `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
 | `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -140,6 +147,8 @@
 | `evidence-lib.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `evidence-scope-lib.mjs` | SPEC-043 | ✓ | ✓ | ✓ |
 | `external-target-lib.mjs` | SPEC-044 | ✓ | ✓ | ✓ |
+| `fr-placement-lib.mjs` | SPEC-056 | ✓ | ✓ | ✓ |
+| `gate-failure-lib.mjs` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
 | `go-gate` | SPEC-006 | ✓ | ✓ | ✓ |
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
@@ -194,10 +203,11 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 58건
+## Capability 키 — 61건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval.enforce` | SPEC-058 | ✓ | ✓ | ✓ |
 | `adoption-lifecycle.adopt` | SPEC-005 | ✓ | ✓ | ✓ |
 | `agent-wiring.attest` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation.account` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -219,6 +229,8 @@
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `external-target.disclose` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
+| `fr-placement.classify` | SPEC-056 | ✓ | ✓ | ✓ |
+| `gate-failure.record` | SPEC-057 | ✓ | ✓ | ✓ |
 | `gate-verdict.account` | SPEC-040 | ✓ | ✓ | ✓ |
 | `gate-verdict.emit` | SPEC-040 | ✓ | ✓ | ✓ |
 | `harness-install.install` | SPEC-004 | ✓ | ✓ | ✓ |
@@ -282,8 +294,8 @@
 
 ## 집계
 
-- 소유 키 총 **236건** (entity 56 · surface 104 · capability 58 · 역할없음 18)
+- 소유 키 총 **248건** (entity 59 · surface 110 · capability 61 · 역할없음 18)
 - 유일성 위반 **0건**
-- FR 앵커 미충족 **2건** / 미판정 0건
+- FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건
 

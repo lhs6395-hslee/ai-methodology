@@ -100,12 +100,18 @@ export function inertReasons(policy, checks) {
 // ⚠ `console.log`를 쓰지 않는 이유: stdout이 파이프일 때 Node의 쓰기는 비동기라
 // `process.on("exit")` 안에서는 유실될 수 있다. 스윕은 게이트를 파이프로 잡으므로
 // 그 유실이 곧 "판정 줄 없음"= UNTYPED 오분류가 된다. `fs.writeSync(1, …)`은 동기다.
-import { writeSync, realpathSync } from "node:fs";
+import { writeSync, readFileSync, mkdirSync, appendFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname, join, basename } from "node:path";
+import { findConfig } from "./sdd-config.mjs";
+import { makeFailureRecord, DEFAULT_GATE_FAILURE_LEDGER } from "./gate-failure-lib.mjs";
 
 let PENDING = null;
 
-export function verdict(kind, detail) { PENDING = { kind, detail }; }
+// meta — { class, target } 선택적 구조화 메타(SPEC-057). **선언이지 추측이 아니다**: 게이트가
+// 스스로 넘기지 않으면 실패는 원장에 남아도(gate·kind·detail) 에스컬레이션 집계에는 들어가지
+// 않는다. 문자열을 정규식·키워드로 분류하는 것은 이 방법론이 금지하는 추측이다.
+export function verdict(kind, detail, meta) { PENDING = { kind, detail, meta: meta || null }; }
 
 // 게이트 상단에서 한 번 호출한다. 이후 어떤 경로로 끝나든(정상·process.exit·예외) 한 줄이 나온다.
 //
@@ -118,11 +124,47 @@ export function verdict(kind, detail) { PENDING = { kind, detail }; }
 // 그 사실을 `verdict-contract.test.mjs`가 규칙표와 대조해 강제한다(선언만으로 빠져나갈 수 없음).
 export function armVerdict(opts = {}) {
   const quiet = Boolean(opts.quietWhenSilent);
-  process.on("exit", () => {
+  process.on("exit", (code) => {
     if (!PENDING && quiet) return;   // 훅 계층 + 발동 안 함 = 침묵이 정답
-    const v = PENDING || { kind: VERDICT_KINDS.UNTYPED, detail: "게이트가 판정 종류를 선언하지 않았다(배선 누락 — verdict() 호출 없음)" };
+    const v = PENDING || { kind: VERDICT_KINDS.UNTYPED, detail: "게이트가 판정 종류를 선언하지 않았다(배선 누락 — verdict() 호출 없음)", meta: null };
     try { writeSync(1, formatVerdict(v.kind, v.detail) + "\n"); } catch { /* stdout 닫힘 — 방출 불가 */ }
+    // 실패 원장(SPEC-057) — **게이트마다 따로 적지 않는다.** 방출기가 유일한 진입점이므로 여기
+    // 한 곳에서 append하면 모든 판정 게이트가 자동으로 참여한다(새 게이트를 추가해도 잊을 수
+    // 없다 — 빠뜨린 게이트가 정확히 이 축이 고치는 실측 결함의 형태였다). code!==0만 "차단"으로
+    // 본다 — advisory 경고(exit 0)는 원장 대상이 아니다.
+    if (code !== 0) {
+      try { appendGateFailure(v, code); } catch { /* 원장 쓰기 실패가 판정을 막으면 안 된다 — 판정 줄은 이미 나갔다 */ }
+    }
   });
+}
+
+// 원장 경로 — **config를 다시 빌드하지 않는다.** 필요한 건 프로젝트 루트와 `gateFailureLedger`
+// 오버라이드 키뿐이고, 전체 loadConfig()(역할 파생·정규식 컴파일 등)는 각 게이트가 자기 main()에서
+// 이미 한 번 했다. 여기서 또 하면 매 프로세스 종료마다 그 비용이 두 배가 된다.
+function resolveLedgerPath() {
+  const cfgPath = findConfig();
+  const root = cfgPath ? dirname(cfgPath) : process.cwd();
+  let rel = DEFAULT_GATE_FAILURE_LEDGER;
+  if (cfgPath) {
+    try {
+      const raw = JSON.parse(readFileSync(cfgPath, "utf8"));
+      if (raw && typeof raw.gateFailureLedger === "string" && raw.gateFailureLedger.trim()) {
+        rel = raw.gateFailureLedger.trim();
+      }
+    } catch { /* config 파싱 실패 — 기본 경로로 진행(원장 쓰기가 판정을 막으면 안 된다) */ }
+  }
+  return join(root, ...rel.split("/"));
+}
+
+function appendGateFailure(v, code) {
+  const path = resolveLedgerPath();
+  const record = makeFailureRecord({
+    gate: basename(process.argv[1] || "unknown"),
+    kind: v.kind, detail: v.detail, exitCode: code, meta: v.meta,
+    ts: new Date().toISOString(), sessionId: process.env.SDD_SESSION_ID || "unknown",
+  });
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, JSON.stringify(record) + "\n");
 }
 
 // 흔한 판정을 한 줄로 — 위반 건수만 주면 JUDGED의 사유 문구가 통일된다(어휘 표류 방지).
