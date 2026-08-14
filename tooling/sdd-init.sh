@@ -347,3 +347,31 @@ if [ "$GITWARN" -eq 1 ]; then
   warn "⚠ 중요 — git 훅이 배선되지 않았다(대상에 .git 없음). 강제 궤도(pre-commit·commit-msg)가 꺼진 상태다."
   warn "   해결: \`git init\` → \`sh $KIT/tooling/sdd-init.sh --gate=$GATE --force\` 재실행."
 fi
+
+# 미선언 축 안내 — 훅 배선은 이 스크립트가 자동으로 하지만, 무엇을 위험/진단/표면으로 볼지는
+# 프로젝트가 직접 선언해야 하는 축이 있다. 미선언이면 해당 게이트는 **훅에서 조용히 침묵**하고,
+# 스윕을 사람이 직접 돌렸을 때만 "미선언 — 판정 안 함" 한 줄로 드러난다 — 설치 직후엔 아무도
+# 이걸 모른다. 실측(2026-08-14): 그래서 "게이트가 깔렸는데 왜 아무것도 안 잡냐"는 질문이 나왔다.
+CFG="$T/sdd.config.json"
+if [ -f "$CFG" ] && command -v node >/dev/null 2>&1; then
+  # 미선언 = 키가 아예 없거나(기본 템플릿엔 없다 — 코드 기본값 []에 맡긴다) 빈 배열임.
+  # 셸 정규식으로는 여러 줄에 걸친 배열(pretty-printed JSON)을 못 봐서 실제 JSON 파싱을 쓴다.
+  UNDECLARED=$(node -e '
+    const cfg = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const axes = [
+      ["riskyActionPatterns", "R25", "되돌리기 어려운 행동(트래커 전이·배포·DB조작)의 실시간 승인 게이트"],
+      ["diagnosisSpecMap", "R21", "조사 전 명세 열람을 강제하는 진단가드"],
+      ["surfaceGlobs", "R2 orphan-surfaces", "고아 표면 탐지"],
+    ];
+    for (const [key, rule, desc] of axes) {
+      const v = cfg[key];
+      if (!Array.isArray(v) || v.length === 0) console.log("  · " + key + "(" + rule + ") — " + desc + "가 미선언 상태로 침묵한다");
+    }
+  ' "$CFG" 2>/dev/null)
+  if [ -n "$UNDECLARED" ]; then
+    say ""
+    say "ℹ 다음 축은 훅은 배선됐지만 선언이 비어 있어 **판정하지 않는다**(통과가 아니라 침묵):"
+    say "$UNDECLARED"
+    say "  해당되는 위험·진단 대상이 있으면 sdd.config.json에 선언하라(없으면 무시해도 된다 — 강제 아님)."
+  fi
+fi

@@ -62,7 +62,11 @@ function runSnippet(body) {
   const f = join(root, "g.mjs");
   writeFileSync(f, `import { armVerdict, verdict, judged } from ${JSON.stringify(LIB)};\n${body}\n`);
   try {
-    const out = execFileSync("node", [f], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    // cwd를 격리된 tmp 루트로 고정한다 — 안 그러면 verdict-lib의 resolveLedgerPath()가
+    // process.cwd()(=이 테스트를 실행한 실제 저장소)부터 위로 sdd.config.json을 찾아,
+    // 이 스니펫의 가짜 판정이 **킷 자신의 진짜 원장**(.sdd/gate-failures.jsonl)에 새어든다
+    // (실측: "gate":"g.mjs" 오염 37건, 2026-08-11~08-14).
+    const out = execFileSync("node", [f], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], cwd: root });
     return { code: 0, out };
   } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
   finally { rmSync(root, { recursive: true, force: true }); }
