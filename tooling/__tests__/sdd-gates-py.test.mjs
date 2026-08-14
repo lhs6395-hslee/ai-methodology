@@ -21,6 +21,7 @@ const PY = new URL("../sdd_gates.py", import.meta.url).pathname;
 const TOOLING = new URL("..", import.meta.url).pathname;
 // 배선 무결성 패리티가 픽스처 복사 목록을 폐포에서 계산하는 데 쓴다(손 목록은 다음 드리프트다).
 import { localImports } from "../import-wiring-lib.mjs";
+import { hashAction } from "../action-approval-lib.mjs";
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 let hasPython = true;
@@ -1833,5 +1834,87 @@ test("py gateescalation: 임계치 초과·가드 있음·가드 오류(3종)·�
       assert.equal(py.out, n.out, `시나리오 ${i + 1} 출력 불일치`);
       assert.equal(py.code, n.code, `시나리오 ${i + 1} exit 불일치`);
     } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+  }
+});
+
+// ── 위험 행동 승인 패리티(SPEC-058, R25) ──
+// @covers SPEC-006/FR-001
+// @covers SPEC-058/FR-008
+test("py riskyaction: 위험 행동 차단·승인 통과·만료·스윕(가드 오류)·off·enum 밖 바이트 동일", skip, () => {
+  const PATTERNS = [{ match: "tracker.*dev-done", class: "tracker-transition", verifyAgainst: "CLOSEOUT_FLOW 순서 대조", why: "배포 전 종결 전이 방지" }];
+  const RISKY_CMD = "tracker transition ticket=123 to=dev-done";
+  const withLedger = (root, lines) => { mkdirSync(join(root, ".sdd"), { recursive: true }); writeFileSync(join(root, ".sdd/action-approvals.jsonl"), lines); };
+
+  // ① hook 모드: hard 차단 / advisory 경고 / 미매치 침묵 / off 침묵
+  const hookScen = [
+    { cfg: { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+    { cfg: { riskyActionPolicy: "advisory", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+    { cfg: { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS }, cmd: "ls -la" },
+    { cfg: { riskyActionPolicy: "off", riskyActionPatterns: PATTERNS }, cmd: RISKY_CMD },
+  ];
+  for (const [i, { cfg, cmd }] of hookScen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-risky-action.mjs", ["--hook", "--command", cmd]);
+      const py = runPy(root, ["riskyaction", "--hook", "--command", cmd]);
+      assert.equal(py.out, n.out, `훅 시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `훅 시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+
+  // ② 유효한 승인이 있으면 침묵 통과, 만료됐으면 다시 막는다(직접 원장 주입 — 별도 루트로 대조).
+  const RISKY_HASH = hashAction(RISKY_CMD);
+  const rec = (ageMs) => ({ hash: RISKY_HASH, class: "tracker-transition", note: "확인함", ts: new Date(Date.now() - ageMs).toISOString(), sessionId: "s1" });
+  // 해시는 Node·Python 각각 자기 런타임의 hash_action으로 낸 값과 대조해야 하므로, --record로
+  // 먼저 각 런타임 자신의 원장에 승인을 남기고(해시는 각 런타임이 스스로 계산) 그 다음 훅을 켠다.
+  const approvedRootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+  const approvedRootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+  try {
+    runNode(approvedRootN, "check-risky-action.mjs", ["--record", "--command", RISKY_CMD, "--class", "tracker-transition", "--note", "확인함"]);
+    runPy(approvedRootP, ["riskyaction", "--record", "--command", RISKY_CMD, "--class", "tracker-transition", "--note", "확인함"]);
+    const n = runNode(approvedRootN, "check-risky-action.mjs", ["--hook", "--command", RISKY_CMD]);
+    const py = runPy(approvedRootP, ["riskyaction", "--hook", "--command", RISKY_CMD]);
+    assert.equal(n.code, 0, n.out); assert.equal(py.code, 0, py.out); // 둘 다 승인 통과
+    assert.equal(py.out, n.out, "승인 통과 후 출력 불일치(둘 다 침묵이어야 한다)");
+  } finally { rmSync(approvedRootN, { recursive: true, force: true }); rmSync(approvedRootP, { recursive: true, force: true }); }
+
+  const expiredRootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS, riskyActionApprovalTtlSeconds: 1 });
+  const expiredRootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS, riskyActionApprovalTtlSeconds: 1 });
+  try {
+    withLedger(expiredRootN, JSON.stringify(rec(5000)) + "\n");
+    withLedger(expiredRootP, JSON.stringify(rec(5000)) + "\n");
+    const n = runNode(expiredRootN, "check-risky-action.mjs", ["--hook", "--command", RISKY_CMD]);
+    const py = runPy(expiredRootP, ["riskyaction", "--hook", "--command", RISKY_CMD]);
+    assert.equal(n.code, 2, n.out); assert.equal(py.code, 2, py.out); // 둘 다 만료 — 다시 막는다
+    assert.equal(py.out, n.out, "만료 시나리오 출력 불일치");
+  } finally { rmSync(expiredRootN, { recursive: true, force: true }); rmSync(expiredRootP, { recursive: true, force: true }); }
+
+  // ③ --record 필수 인자 결여 exit 1(값은 동일해야 한다)
+  {
+    const root = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS });
+    try {
+      const n = runNode(root, "check-risky-action.mjs", ["--record", "--command", RISKY_CMD]);
+      const py = runPy(root, ["riskyaction", "--record", "--command", RISKY_CMD]);
+      assert.equal(n.code, 1); assert.equal(py.code, 1);
+      assert.equal(py.out, n.out, "--record 인자 결여 출력 불일치");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+
+  // ④ 스윕 모드: 선언 정상 / 가드 오류(class 없음) / 미선언(INERT) / off / enum 밖
+  const sweepScen = [
+    { riskyActionPolicy: "hard", riskyActionPatterns: PATTERNS },
+    { riskyActionPolicy: "hard", riskyActionPatterns: [{ match: "x" }] },
+    { riskyActionPolicy: "hard", riskyActionPatterns: [] },
+    { riskyActionPolicy: "off", riskyActionPatterns: PATTERNS },
+    { riskyActionPolicy: "deny", riskyActionPatterns: PATTERNS },
+  ];
+  for (const [i, cfg] of sweepScen.entries()) {
+    const root = fixture({}, cfg);
+    try {
+      const n = runNode(root, "check-risky-action.mjs");
+      const py = runPy(root, ["riskyaction"]);
+      assert.equal(py.out, n.out, `스윕 시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `스윕 시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

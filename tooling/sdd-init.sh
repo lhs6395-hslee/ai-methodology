@@ -111,7 +111,7 @@ case "$GATE" in
                  verification-accounting.mjs lifecycle-lib.mjs \
                  derivation-lib.mjs check-derivation.mjs sdd-smoke-scan.mjs sdd-retag.mjs \
                  prefix-class-lib.mjs grammar-lib.mjs numbering-lib.mjs changelog-fr-lib.mjs covers-backlink-lib.mjs duplicate-logic-lib.mjs check-duplicate-logic.mjs key-anchor-lib.mjs capability-ownership-lib.mjs schema-backing-lib.mjs object-storage-lib.mjs term-coverage-lib.mjs external-target-lib.mjs evidence-scope-lib.mjs test-domain-lib.mjs relation-lib.mjs drift-lib.mjs cross-spec-lib.mjs check-test-run.mjs check-schema-drift.mjs schema-drift-lib.mjs sdd-retire.mjs retire-lib.mjs policy-ratchet-lib.mjs check-policy-ratchet.mjs \
-                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs spec-conflict-lib.mjs check-spec-conflict.mjs diagnosis-guard-lib.mjs check-diagnosis-guard.mjs check-outcome-lib.mjs completion-signal-lib.mjs check-completion-signal.mjs fr-placement-lib.mjs check-fr-placement.mjs gate-failure-lib.mjs check-gate-escalation.mjs; do
+                 verdict-lib.mjs verification-run-lib.mjs check-verification-executed.mjs gen-ownership-map.mjs ownership-reality-lib.mjs engine-event-lib.mjs check-engine-event.mjs evidence-lib.mjs check-evidence.mjs live-reality-lib.mjs check-live-reality.mjs check-pre-edit.mjs synonym-lib.mjs check-synonym.mjs sc-coverage-lib.mjs check-sc-coverage.mjs deploy-guard-lib.mjs check-deploy-guard.mjs check-deploy-debt.mjs check-deploy-precheck.mjs hooks-install-lib.mjs check-hooks-installed.mjs intro-doc-lib.mjs check-intro-doc.mjs impl-reference-lib.mjs process-ssot-lib.mjs check-process-ssot.mjs watchdog-lib.mjs check-watchdog.mjs branch-observation-lib.mjs import-wiring-lib.mjs check-import-wiring.mjs agent-wiring-lib.mjs check-agent-wiring.mjs spec-conflict-lib.mjs check-spec-conflict.mjs diagnosis-guard-lib.mjs check-diagnosis-guard.mjs check-outcome-lib.mjs completion-signal-lib.mjs check-completion-signal.mjs fr-placement-lib.mjs check-fr-placement.mjs gate-failure-lib.mjs check-gate-escalation.mjs action-approval-lib.mjs check-risky-action.mjs; do
           sync_copy "$KIT/tooling/$f" "$T/scripts/$f"; done ;;
   *) echo "✗ --gate 는 go|sh|py|node" >&2; exit 2 ;;
 esac
@@ -144,6 +144,7 @@ if [ "$GATE" = "node" ]; then
   sync_copy "$KIT/tooling/harness/sdd-deploy-check.sh"     "$T/scripts/sdd-deploy-check.sh"
   sync_copy "$KIT/tooling/harness/sdd-deploy-precheck.sh"  "$T/scripts/sdd-deploy-precheck.sh"
   sync_copy "$KIT/tooling/harness/sdd-diagnosis-check.sh"  "$T/scripts/sdd-diagnosis-check.sh"
+  sync_copy "$KIT/tooling/harness/sdd-risky-action-check.sh" "$T/scripts/sdd-risky-action-check.sh"
   sync_copy "$KIT/tooling/harness/hooks.list"              "$T/scripts/hooks.list"
   sync_copy "$KIT/tooling/harness/pre-commit"              "$T/scripts/sdd-pre-commit.sh"
   # 배포 부채 파일은 **로컬 세션 기억 장치**다(SPEC-035) — 커밋 대상이 아니다.
@@ -152,7 +153,7 @@ if [ "$GATE" = "node" ]; then
     printf '\n# SDD 로컬 세션 상태(배포 부채 등) — 커밋 대상 아님\n.sdd/\n' >> "$T/.gitignore"
     say "  → .gitignore에 .sdd/ 추가(배포 부채 파일)"
   fi
-  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-deploy-precheck.sh" "$T/scripts/sdd-diagnosis-check.sh" "$T/scripts/sdd-pre-commit.sh"
+  chmod +x "$T/scripts/sdd-session-context.sh" "$T/scripts/sdd-edit-check.sh" "$T/scripts/sdd-deploy-check.sh" "$T/scripts/sdd-deploy-precheck.sh" "$T/scripts/sdd-diagnosis-check.sh" "$T/scripts/sdd-risky-action-check.sh" "$T/scripts/sdd-pre-commit.sh"
 
   # git pre-commit + pre-merge-commit 훅 연결 (.git 있을 때만).
   # pre-merge-commit(M5): 무충돌 git merge는 pre-commit을 타지 않는다 — 두 브랜치가 각자 같은

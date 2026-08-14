@@ -33,6 +33,7 @@ import re
 import unicodedata
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 
 # ── 판정 3분류 반환 계약(check-outcome-lib.mjs 패리티, SPEC-054) ───────────────
@@ -369,6 +370,12 @@ DEFAULTS = {
     "gateFailureEscalationThreshold": 3,
     "gateFailureLedger": None,
     "gateFailureGuards": [],
+    # 위험 행동 승인(SPEC-058) — 되돌리기 어려운 행동은 독립 서브에이전트 검증 마커 없이
+    # 지나가지 않는다. 마커는 행동 페이로드 해시에 결속된다.
+    "riskyActionPolicy": "advisory",
+    "riskyActionPatterns": [],
+    "riskyActionApprovalTtlSeconds": 900,
+    "riskyActionLedger": None,
     "diagnosisSpecMap": [],
     "diagnosisSpecReadPatterns": None,
     "diagnosisGuideSections": None,
@@ -534,6 +541,7 @@ RATCHETED_POLICIES = [
     "preEditSpecFirstPolicy",
     "frPlacementPolicy",
     "gateFailureEscalationPolicy",
+    "riskyActionPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -7462,6 +7470,221 @@ def cmd_frplacement(cfg, args):
         print(f"FR 배치 게이트: OK — 모든 FR 정의가 {FR_SECTION_HEADING} 섹션 안에 있다.")
 
 
+# ── 위험 행동 승인 (SPEC-058, R25) — Node판 action-approval-lib.mjs 미러 ──────────
+# 실측 제보(2026-08-14): 커밋 이전, 대화 안에서 위험 행동(트래커 종결 전이 등)이 독립 검증 없이
+# 진행됐다. 승인 마커는 행동 페이로드 해시에 결속되고, 게이트는 마커의 존재·해시 일치·신선도만
+# 결정론적으로 본다 — 서브에이전트 호출은 차단당한 실행기 자신이 한다(게이트는 스스로 안 부른다).
+DEFAULT_ACTION_APPROVAL_LEDGER = ".sdd/action-approvals.jsonl"
+DEFAULT_APPROVAL_TTL_SECONDS = 900
+
+ACTION_APPROVAL_GUARD_FINDING_TEXT = {
+    "no-match": "명령 패턴이 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
+    "bad-regex": "명령 패턴이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+    "no-class": "class가 없다 — 에스컬레이션 집계(SPEC-057)가 이 선언을 인식할 키가 없다",
+    "no-verify-against": "verifyAgainst가 없다 — 서브에이전트가 무엇과 대조해야 하는지 모른다",
+    "no-why": "사유가 없다 — 왜 이 행동에 승인이 필요한지 모르면 사람은 규칙을 우회한다",
+}
+
+
+def hash_action(command):
+    return hashlib.sha256(str(command or "").strip().encode("utf-8")).hexdigest()
+
+
+def parse_risky_action_patterns(value):
+    out = []
+    for raw in (value if isinstance(value, list) else []):
+        if not isinstance(raw, dict):
+            continue
+        out.append({
+            "match": str(raw.get("match") or ""),
+            "class": str(raw.get("class") or ""),
+            "verifyAgainst": str(raw.get("verifyAgainst") or ""),
+            "why": str(raw.get("why") or ""),
+        })
+    return out
+
+
+def validate_risky_action_patterns(entries):
+    findings = []
+    for i, e in enumerate(entries or []):
+        at = e["class"] or e["match"] or f"#{i + 1}"
+        if not e["match"]:
+            findings.append({"kind": "no-match", "at": at})
+            continue
+        try:
+            re.compile(e["match"])
+        except re.error:
+            findings.append({"kind": "bad-regex", "at": at})
+            continue
+        if not e["class"].strip():
+            findings.append({"kind": "no-class", "at": at})
+        if not e["verifyAgainst"].strip():
+            findings.append({"kind": "no-verify-against", "at": at})
+        if not e["why"].strip():
+            findings.append({"kind": "no-why", "at": at})
+    return findings
+
+
+def match_risky_action(command, entries):
+    cmd = str(command or "")
+    if not cmd.strip():
+        return None
+    for e in entries or []:
+        if not e["match"]:
+            continue
+        try:
+            if re.search(e["match"], cmd, re.IGNORECASE):
+                return e
+        except re.error:
+            continue
+    return None
+
+
+def make_approval_record(fields):
+    return {
+        "hash": str(fields.get("hash") or ""),
+        "class": str(fields.get("class") or ""),
+        "note": str(fields.get("note") or ""),
+        "ts": fields.get("ts"),
+        "sessionId": fields.get("sessionId") or "unknown",
+    }
+
+
+def find_approval(hash_, records, ttl_seconds=DEFAULT_APPROVAL_TTL_SECONDS, now_ms=None):
+    if now_ms is None:
+        return None
+    best = None
+    for r in records or []:
+        if not r or r.get("hash") != hash_ or not r.get("ts"):
+            continue
+        try:
+            ts_ms = datetime.fromisoformat(r["ts"].replace("Z", "+00:00")).timestamp() * 1000
+        except Exception:
+            continue
+        age_ms = now_ms - ts_ms
+        if age_ms < 0 or age_ms > ttl_seconds * 1000:
+            continue
+        if not best or r["ts"] > best["ts"]:
+            best = r
+    return best
+
+
+def cmd_riskyaction(cfg, argv):
+    policy = str(cfg.get("riskyActionPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ riskyActionPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    hook = "--hook" in argv
+    record = "--record" in argv
+    entries = parse_risky_action_patterns(cfg.get("riskyActionPatterns"))
+
+    if policy == "off":
+        if hook:
+            sys.exit(0)
+        verdict("OFF", "riskyActionPolicy")
+        print("위험 행동 승인 게이트 — riskyActionPolicy:off (판정 안 함)")
+        return
+
+    def get_flag(flag):
+        if flag in argv:
+            i = argv.index(flag)
+            if i + 1 < len(argv):
+                return argv[i + 1]
+        return None
+
+    root = cfg["__root"]
+    ledger_rel = str(cfg.get("riskyActionLedger") or DEFAULT_ACTION_APPROVAL_LEDGER)
+    ledger_path = os.path.join(root, *ledger_rel.split("/"))
+
+    if record:
+        command = get_flag("--command")
+        cls = get_flag("--class")
+        note = get_flag("--note")
+        if not command or not cls or not note:
+            print("✗ --record는 --command·--class·--note가 모두 필요하다(승인 근거를 지어내지 않는다).",
+                  file=sys.stderr)
+            sys.exit(1)
+        h = hash_action(command)
+        rec = make_approval_record({
+            "hash": h, "class": cls, "note": note,
+            "ts": datetime.now(timezone.utc).isoformat(), "sessionId": os.environ.get("SDD_SESSION_ID") or "unknown",
+        })
+        os.makedirs(os.path.dirname(ledger_path) or ".", exist_ok=True)
+        with open(ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+        verdict("SKIPPED", "--record 모드(판정이 아니라 승인 기록)")
+        print(f'위험 행동 승인 게이트: 승인 기록됨 — class="{cls}" hash={h[:12]}… (유효기간은 riskyActionApprovalTtlSeconds)')
+        return
+
+    if hook:
+        if not entries:
+            sys.exit(0)
+        # 정본은 Node판 commandFromHookInput(deploy-guard-lib) — `--command <값>` 아니면 stdin.
+        command = get_flag("--command") or ""
+        if not command:
+            try:
+                raw = sys.stdin.read()
+            except Exception:
+                raw = ""
+            if raw.strip():
+                try:
+                    o = json.loads(raw)
+                    command = str((o.get("tool_input") or {}).get("command") or o.get("command") or "")
+                except Exception:
+                    command = raw.strip()
+        entry = match_risky_action(command, entries)
+        if not entry:
+            sys.exit(0)
+
+        h = hash_action(command)
+        ttl = int(cfg.get("riskyActionApprovalTtlSeconds") or 0) or DEFAULT_APPROVAL_TTL_SECONDS
+        raw = None
+        try:
+            with open(ledger_path, encoding="utf-8") as fh:
+                raw = fh.read()
+        except OSError:
+            pass
+        records = parse_ledger(raw)["records"] if raw is not None else []
+        approval = find_approval(h, records, ttl, time.time() * 1000)
+        if approval:
+            sys.exit(0)
+
+        verdict("JUDGED", "위반 1건", {"class": entry["class"], "target": h})
+        print(f'[SDD 위험 행동] 클래스 "{entry["class"]}" — 독립 검증 없이는 진행할 수 없다(riskyActionPolicy={policy}).')
+        print(f'  왜: {entry["why"]}')
+        print(f'  확인 방법: {entry["verifyAgainst"]}')
+        print("  → 별도 컨텍스트의 서브에이전트를 만들어 위 내용을 실제로 대조 확인시켜라(이 게이트는 그 호출을 스스로 하지 않는다).")
+        print(f'  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "{entry["class"]}" --note "<확인 근거>"')
+        print(f"  → 그 다음 이 행동을 재시도하라(승인 유효기간 {ttl}초, 행동 문자열이 정확히 같아야 한다).")
+        if policy == "hard":
+            print("\n✗ riskyActionPolicy=hard: 승인 마커 없이 위험 행동을 차단한다.", file=sys.stderr)
+            sys.exit(2)
+        print("  · advisory — 차단하지 않는다. hard로 승격하면 이 행동은 여기서 멈춘다.")
+        return
+
+    if not entries:
+        verdict("INERT", "riskyActionPatterns 미선언 — 무엇에 발화할지 모른다")
+        print("위험 행동 승인 게이트 — `riskyActionPatterns` 미선언: **판정하지 않는다**."
+              " 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이 있으면"
+              " `{ match: <명령 정규식>, class, verifyAgainst, why }`로 선언하라.")
+        return
+    findings = validate_risky_action_patterns(entries)
+    judged(len(findings))
+    print(f"위험 행동 승인 게이트(riskyActionPolicy={policy}): 패턴 {len(entries)}종 선언 — 선언 위반 {len(findings)}")
+    tag = "✗" if policy == "hard" else "⚠"
+    for f in findings:
+        stream = sys.stderr if policy == "hard" else sys.stdout
+        print(f'  {tag} [{f["at"]}] {ACTION_APPROVAL_GUARD_FINDING_TEXT[f["kind"]]}', file=stream)
+    if findings and policy == "hard":
+        print("\n✗ 위험 행동 패턴 선언이 깨졌다 — 이 축의 자기결함은 **조용한 무발화**다.", file=sys.stderr)
+        sys.exit(1)
+    if not findings:
+        print(f"  ✓ 패턴 {len(entries)}종이 모두 class·verifyAgainst·사유를 갖는다.")
+        print("  · 이 층은 **도구 호출 직전**에 발동한다 — 실시간 대화는 커밋도 파일 변경도 남기지 않으므로"
+              " 커밋 게이트로는 원리상 볼 수 없다. 배선 실재는 R19(에이전트 배선)가 판정한다.")
+
+
 # ── 완료 판정 신호 강도 (SPEC-055, R22) — Node판 completion-signal-lib.mjs 미러 ──────
 # 실측 제보: 배포 완료를 **파생 신호로 판정했다.** 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서
 # 완료로 보고했는데 migrate Job이 실패해 배포 스테이지가 스킵된 상태였다.
@@ -8132,7 +8355,7 @@ def main():
     # 도는 계층은 발동 조건이 아니면 아무것도 출력하지 않는 것이 계약이고, 여기에 판정 줄을
     # 강제하면 모든 Bash 명령마다 한 줄이 붙어 소음이 된다 — 소음이 되는 순간 사람이 훅을 끈다.
     # 그래서 Node판의 `armVerdict({quietWhenSilent:true})`와 같은 조건으로만 침묵을 허용한다.
-    HOOK_LAYER_SUBS = ("diagnosisguard", "preedit")
+    HOOK_LAYER_SUBS = ("diagnosisguard", "preedit", "riskyaction")
     # preedit은 발동 조건이 아니면 **침묵이 계약**이다(Node판 armVerdict({quietWhenSilent:true}) 미러).
     arm_verdict(quiet_when_silent=(sub == "preedit" or (sub in HOOK_LAYER_SUBS and "--hook" in args)))
     cfg = load_config()
@@ -8220,6 +8443,8 @@ def main():
         cmd_frplacement(cfg, positional + args)
     elif sub == "gateescalation":
         cmd_gateescalation(cfg)
+    elif sub == "riskyaction":
+        cmd_riskyaction(cfg, args)
     elif sub == "completionsignal":
         cmd_completionsignal(cfg)
     elif sub == "duplicatelogic":

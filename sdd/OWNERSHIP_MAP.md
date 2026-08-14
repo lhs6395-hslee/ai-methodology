@@ -24,10 +24,11 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 58건
+## Entity 키 (aggregate root) — 59건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval` | SPEC-058 | ✓ | ✓ | ✓ |
 | `adoption-lifecycle` | SPEC-005 | ✓ | ✓ | ✓ |
 | `agent-wiring` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -87,10 +88,11 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 108건
+## Surface 키 — 110건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval-lib.mjs` | SPEC-058 | ✓ | ✓ | ✓ |
 | `agent-hooks.list` | SPEC-051 | ✓ | ✗ 미앵커 | ✓ |
 | `agent-wiring-lib.mjs` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation-lib.mjs` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -120,6 +122,7 @@
 | `check-policy-ratchet.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
 | `check-pre-edit.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `check-process-ssot.mjs` | SPEC-047 | ✓ | ✓ | ✓ |
+| `check-risky-action.mjs` | SPEC-058 | ✓ | ✓ | ✓ |
 | `check-sc-coverage.mjs` | SPEC-034 | ✓ | ✓ | ✓ |
 | `check-schema-drift.mjs` | SPEC-022 | ✓ | ✓ | ✓ |
 | `check-spec-cohesion.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -200,10 +203,11 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 60건
+## Capability 키 — 61건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
+| `action-approval.enforce` | SPEC-058 | ✓ | ✓ | ✓ |
 | `adoption-lifecycle.adopt` | SPEC-005 | ✓ | ✓ | ✓ |
 | `agent-wiring.attest` | SPEC-051 | ✓ | ✓ | ✓ |
 | `branch-observation.account` | SPEC-049 | ✓ | ✓ | ✓ |
@@ -290,7 +294,7 @@
 
 ## 집계
 
-- 소유 키 총 **244건** (entity 58 · surface 108 · capability 60 · 역할없음 18)
+- 소유 키 총 **248건** (entity 59 · surface 110 · capability 61 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

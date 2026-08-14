@@ -29,6 +29,10 @@
           {
             "type": "command",
             "command": "sh tooling/harness/sdd-diagnosis-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "sh tooling/harness/sdd-risky-action-check.sh"
           }
         ],
         "matcher": "Bash"

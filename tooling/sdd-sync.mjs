@@ -95,6 +95,11 @@ const RULES = [
   // 없었다. 판정 방출기(armVerdict)가 모든 게이트의 차단을 원장에 자동으로 적고, 이 게이트가
   // 같은 (게이트,클래스)가 임계치를 넘겼는데 전용 가드가 없으면 가드를 만들라고 말한다.
   { rule: "R24 게이트 실패 에스컬레이션(반복이 기억되는가)", gates: ["check-gate-escalation.mjs"] },
+  // R25(SPEC-058): SPEC-053·035와 같은 층(도구 호출 직전)이지만 구제 방식이 다르다 — 되돌리기
+  // 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작)에는 독립 서브에이전트가 명세·실제 상태를
+  // 대조 확인했다는 승인 마커(행동 해시 결속)를 요구한다. 실측: QA 실측·댓글까지 마친 티켓을
+  // 배포도 안 된 채 종결 상태로 넘기려 했다 — 커밋 이전, 대화 안에서 끝나 기존 게이트가 못 본다.
+  { rule: "R25 위험 행동 승인(독립 검증 없이 지나가지 않는가)", gates: ["check-risky-action.mjs"] },
 ];
 
 // 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
@@ -134,6 +139,7 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-completion-signal.mjs": "completionsignal",
   "check-fr-placement.mjs": "frplacement",
   "check-gate-escalation.mjs": "gateescalation",
+  "check-risky-action.mjs": "riskyaction",
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 
