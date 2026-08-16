@@ -1918,3 +1918,67 @@ test("py riskyaction: 위험 행동 차단·승인 통과·만료·스윕(가드
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
+
+// @covers SPEC-006/FR-001
+// @covers SPEC-058/FR-002
+// @covers SPEC-058/FR-009
+test("py riskyaction: MCP 도구(tool 필드) 매칭·해시·차단·no-matcher/ambiguous/bad-tool 스윕이 바이트 동일", skip, () => {
+  const runNodeStdin = (root, gate, args, stdinJson) => {
+    const GATE = new URL(`../${gate}`, import.meta.url).pathname;
+    try {
+      const out = execFileSync("node", [GATE, ...args],
+        { cwd: root, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: JSON.stringify(stdinJson), env: { ...process.env, CI: "", GITHUB_ACTIONS: "" } });
+      return { code: 0, out };
+    } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+  };
+  const runPyStdin = (root, args, stdinJson) => {
+    try {
+      const out = execFileSync("python3", [PY, ...args],
+        { cwd: root, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], input: JSON.stringify(stdinJson), env: { ...process.env, CI: "", GITHUB_ACTIONS: "" } });
+      return { code: 0, out };
+    } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+  };
+
+  const TOOL_PATTERNS = [{ tool: "mcp__github__merge_pull_request", class: "pr-merge", verifyAgainst: "CI 상태·리뷰 승인 확인", why: "머지는 되돌리기 어렵다" }];
+  const TOOL_CALL = { tool_name: "mcp__github__merge_pull_request", tool_input: { owner: "o", repo: "r", pullNumber: 26 } };
+
+  // ① 도구 호출 hard 차단 — 안내에 정준 페이로드가 그대로 찍히고, Node·Python이 같은 해시를 낸다.
+  {
+    const rootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: TOOL_PATTERNS });
+    const rootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: TOOL_PATTERNS });
+    try {
+      const n = runNodeStdin(rootN, "check-risky-action.mjs", ["--hook"], TOOL_CALL);
+      const py = runPyStdin(rootP, ["riskyaction", "--hook"], TOOL_CALL);
+      assert.equal(n.code, 2, n.out); assert.equal(py.code, 2, py.out);
+      assert.equal(py.out, n.out, "도구 호출 차단 출력 불일치(정준 페이로드·해시 포함)");
+    } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+  }
+
+  // ② 무관 도구는 침묵, Bash 전용 항목은 도구 호출에 안 걸린다.
+  {
+    const rootN = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: TOOL_PATTERNS });
+    const rootP = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: TOOL_PATTERNS });
+    try {
+      const n = runNodeStdin(rootN, "check-risky-action.mjs", ["--hook"], { tool_name: "mcp__github__get_me", tool_input: {} });
+      const py = runPyStdin(rootP, ["riskyaction", "--hook"], { tool_name: "mcp__github__get_me", tool_input: {} });
+      assert.equal(n.code, 0); assert.equal(py.code, 0);
+      assert.equal(py.out, n.out);
+    } finally { rmSync(rootN, { recursive: true, force: true }); rmSync(rootP, { recursive: true, force: true }); }
+  }
+
+  // ③ 스윕 — no-matcher·ambiguous-matcher·bad-tool 3종 결함이 바이트 동일.
+  const sweepScen = [
+    [{ class: "c", verifyAgainst: "v", why: "w" }],
+    [{ match: "m", tool: "t", class: "c", verifyAgainst: "v", why: "w" }],
+    [{ tool: "[", class: "c", verifyAgainst: "v", why: "w" }],
+  ];
+  for (const [i, patterns] of sweepScen.entries()) {
+    const root = fixture({}, { riskyActionPolicy: "hard", riskyActionPatterns: patterns });
+    try {
+      const n = runNode(root, "check-risky-action.mjs");
+      const py = runPy(root, ["riskyaction"]);
+      assert.equal(py.out, n.out, `tool 스윕 시나리오 ${i + 1} 출력 불일치`);
+      assert.equal(py.code, n.code, `tool 스윕 시나리오 ${i + 1} exit 불일치`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});

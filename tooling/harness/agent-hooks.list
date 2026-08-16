@@ -18,4 +18,8 @@ PreToolUse    Write|Edit  sdd-edit-check.sh
 PreToolUse    Bash        sdd-deploy-precheck.sh
 PreToolUse    Bash        sdd-diagnosis-check.sh
 PreToolUse    Bash        sdd-risky-action-check.sh
+# 실측(2026-08-14): 이 축의 매처가 Bash뿐이라 MCP 도구 호출(PR 머지 등)은 R25가 완전히 못 봤다
+# (riskyActionPatterns의 tool 필드로 매칭 — SPEC-058). 명시적으로 위험해 보이는 도구만 나열한다
+# (오너의 명시적 선택 — 모든 MCP 도구 호출을 광범위 매처로 덮지 않는다, 노이즈·마찰 방지).
+PreToolUse    mcp__github__merge_pull_request|mcp__github__push_files|mcp__github__create_pull_request|mcp__github__update_pull_request_branch|mcp__github__delete_file  sdd-risky-action-check.sh
 PostToolUse   Bash        sdd-deploy-check.sh

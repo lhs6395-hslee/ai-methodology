@@ -7478,8 +7478,10 @@ DEFAULT_ACTION_APPROVAL_LEDGER = ".sdd/action-approvals.jsonl"
 DEFAULT_APPROVAL_TTL_SECONDS = 900
 
 ACTION_APPROVAL_GUARD_FINDING_TEXT = {
-    "no-match": "명령 패턴이 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
-    "bad-regex": "명령 패턴이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+    "no-matcher": "match·tool이 둘 다 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
+    "ambiguous-matcher": "match·tool이 둘 다 있다 — 한 항목은 Bash 명령용(match)이거나 도구명용(tool) 중 하나만 갖는다",
+    "bad-regex": "명령 패턴(match)이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+    "bad-tool": "도구명 패턴(tool)이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
     "no-class": "class가 없다 — 에스컬레이션 집계(SPEC-057)가 이 선언을 인식할 키가 없다",
     "no-verify-against": "verifyAgainst가 없다 — 서브에이전트가 무엇과 대조해야 하는지 모른다",
     "no-why": "사유가 없다 — 왜 이 행동에 승인이 필요한지 모르면 사람은 규칙을 우회한다",
@@ -7490,6 +7492,46 @@ def hash_action(command):
     return hashlib.sha256(str(command or "").strip().encode("utf-8")).hexdigest()
 
 
+def _sort_keys_deep(v):
+    if isinstance(v, list):
+        return [_sort_keys_deep(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _sort_keys_deep(v[k]) for k in sorted(v.keys())}
+    return v
+
+
+# Node판 JSON.stringify({tool, input: sortKeysDeep(toolInput)})와 바이트 동일해야 한다(해시 대상).
+# ensure_ascii=False·구분자 무공백이 그 동일성의 핵심 — 기본값은 둘 다 Node 출력과 갈린다.
+def canonical_tool_payload(tool_name, tool_input):
+    payload = {"tool": str(tool_name or ""), "input": _sort_keys_deep(tool_input or {})}
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def tool_call_from_hook_input(argv, read_stdin):
+    def get_flag(flag):
+        if flag in argv:
+            i = argv.index(flag)
+            if i + 1 < len(argv):
+                return argv[i + 1]
+        return None
+    flag_command = get_flag("--command")
+    if flag_command is not None:
+        return {"toolName": "Bash", "command": flag_command, "toolInput": {"command": flag_command}}
+    try:
+        raw = read_stdin()
+    except Exception:
+        return {"toolName": "", "command": "", "toolInput": None}
+    if not raw.strip():
+        return {"toolName": "", "command": "", "toolInput": None}
+    try:
+        j = json.loads(raw)
+        tool_name = str(j.get("tool_name") or "")
+        tool_input = j.get("tool_input") or {}
+        return {"toolName": tool_name, "command": str(tool_input.get("command") or ""), "toolInput": tool_input}
+    except Exception:
+        return {"toolName": "", "command": "", "toolInput": None}
+
+
 def parse_risky_action_patterns(value):
     out = []
     for raw in (value if isinstance(value, list) else []):
@@ -7497,6 +7539,7 @@ def parse_risky_action_patterns(value):
             continue
         out.append({
             "match": str(raw.get("match") or ""),
+            "tool": str(raw.get("tool") or ""),
             "class": str(raw.get("class") or ""),
             "verifyAgainst": str(raw.get("verifyAgainst") or ""),
             "why": str(raw.get("why") or ""),
@@ -7507,15 +7550,27 @@ def parse_risky_action_patterns(value):
 def validate_risky_action_patterns(entries):
     findings = []
     for i, e in enumerate(entries or []):
-        at = e["class"] or e["match"] or f"#{i + 1}"
-        if not e["match"]:
-            findings.append({"kind": "no-match", "at": at})
+        at = e["class"] or e["match"] or e.get("tool") or f"#{i + 1}"
+        has_match = bool(e["match"])
+        has_tool = bool(e.get("tool"))
+        if not has_match and not has_tool:
+            findings.append({"kind": "no-matcher", "at": at})
             continue
-        try:
-            re.compile(e["match"])
-        except re.error:
-            findings.append({"kind": "bad-regex", "at": at})
+        if has_match and has_tool:
+            findings.append({"kind": "ambiguous-matcher", "at": at})
             continue
+        if has_match:
+            try:
+                re.compile(e["match"])
+            except re.error:
+                findings.append({"kind": "bad-regex", "at": at})
+                continue
+        if has_tool:
+            try:
+                re.compile(e["tool"])
+            except re.error:
+                findings.append({"kind": "bad-tool", "at": at})
+                continue
         if not e["class"].strip():
             findings.append({"kind": "no-class", "at": at})
         if not e["verifyAgainst"].strip():
@@ -7525,18 +7580,27 @@ def validate_risky_action_patterns(entries):
     return findings
 
 
-def match_risky_action(command, entries):
-    cmd = str(command or "")
-    if not cmd.strip():
-        return None
+def match_risky_action(call, entries):
+    tool_name = str((call or {}).get("toolName") or "")
+    command = str((call or {}).get("command") or "")
     for e in entries or []:
-        if not e["match"]:
+        if e.get("tool"):
+            if not tool_name:
+                continue
+            try:
+                if re.search(e["tool"], tool_name, re.IGNORECASE):
+                    return e
+            except re.error:
+                continue
             continue
-        try:
-            if re.search(e["match"], cmd, re.IGNORECASE):
-                return e
-        except re.error:
-            continue
+        if e.get("match"):
+            if not command.strip():
+                continue
+            try:
+                if re.search(e["match"], command, re.IGNORECASE):
+                    return e
+            except re.error:
+                continue
     return None
 
 
@@ -7620,24 +7684,17 @@ def cmd_riskyaction(cfg, argv):
     if hook:
         if not entries:
             sys.exit(0)
-        # 정본은 Node판 commandFromHookInput(deploy-guard-lib) — `--command <값>` 아니면 stdin.
-        command = get_flag("--command") or ""
-        if not command:
-            try:
-                raw = sys.stdin.read()
-            except Exception:
-                raw = ""
-            if raw.strip():
-                try:
-                    o = json.loads(raw)
-                    command = str((o.get("tool_input") or {}).get("command") or o.get("command") or "")
-                except Exception:
-                    command = raw.strip()
-        entry = match_risky_action(command, entries)
+        # 정본은 Node판 toolCallFromHookInput(action-approval-lib) — `--command <값>` 아니면 stdin.
+        call = tool_call_from_hook_input(argv, lambda: sys.stdin.read())
+        tool_name, command, tool_input = call["toolName"], call["command"], call["toolInput"]
+        entry = match_risky_action({"toolName": tool_name, "command": command}, entries)
         if not entry:
             sys.exit(0)
 
-        h = hash_action(command)
+        # Bash(match)는 명령 문자열을 그대로 해시한다(하위호환). 그 외 도구(tool)는 명령 문자열이
+        # 없으므로 {tool, input}의 정준 페이로드를 해시한다 — --record --command에 그대로 넘길 문자열.
+        payload = canonical_tool_payload(tool_name, tool_input) if entry.get("tool") else command
+        h = hash_action(payload)
         ttl = int(cfg.get("riskyActionApprovalTtlSeconds") or 0) or DEFAULT_APPROVAL_TTL_SECONDS
         raw = None
         try:
@@ -7655,7 +7712,10 @@ def cmd_riskyaction(cfg, argv):
         print(f'  왜: {entry["why"]}')
         print(f'  확인 방법: {entry["verifyAgainst"]}')
         print("  → 별도 컨텍스트의 서브에이전트를 만들어 위 내용을 실제로 대조 확인시켜라(이 게이트는 그 호출을 스스로 하지 않는다).")
-        print(f'  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "{entry["class"]}" --note "<확인 근거>"')
+        if entry.get("tool"):
+            print(f"  → 확인되면(도구 호출 — 아래 행동 페이로드를 정확히 그대로 붙여넣는다): node scripts/check-risky-action.mjs --record --command '{payload}' --class \"{entry['class']}\" --note \"<확인 근거>\"")
+        else:
+            print(f'  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "{entry["class"]}" --note "<확인 근거>"')
         print(f"  → 그 다음 이 행동을 재시도하라(승인 유효기간 {ttl}초, 행동 문자열이 정확히 같아야 한다).")
         if policy == "hard":
             print("\n✗ riskyActionPolicy=hard: 승인 마커 없이 위험 행동을 차단한다.", file=sys.stderr)
@@ -7667,7 +7727,8 @@ def cmd_riskyaction(cfg, argv):
         verdict("INERT", "riskyActionPatterns 미선언 — 무엇에 발화할지 모른다")
         print("위험 행동 승인 게이트 — `riskyActionPatterns` 미선언: **판정하지 않는다**."
               " 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이 있으면"
-              " `{ match: <명령 정규식>, class, verifyAgainst, why }`로 선언하라.")
+              " Bash는 `{ match: <명령 정규식>, class, verifyAgainst, why }`, 그 외 도구 호출은"
+              " `{ tool: <도구명 정규식>, class, verifyAgainst, why }`로 선언하라(둘 중 하나만).")
         return
     findings = validate_risky_action_patterns(entries)
     judged(len(findings))

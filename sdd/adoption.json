@@ -1,7 +1,7 @@
 {
   "_": "SDD 채택 영수증(SPEC-048) — 킷 자기적용판. 소비 프로젝트에서는 sdd-init.sh가 이 파일을 쓴다. **커밋한다**: 세션 상태가 아니라 채택 선언이다. 갱신: sh tooling/harness/self-adoption-install.sh",
-  "kitCommit": "dfba158f0951c808c3f413835ea2f5ab0e87a753",
-  "installedAt": "2026-08-14T08:35:01Z",
+  "kitCommit": "3ae576a25e18eda0b4721aca947931894f97b820",
+  "installedAt": "2026-08-16T06:16:19Z",
   "gate": "node",
   "gates": [
     "tooling/check-agent-wiring.mjs",
@@ -56,6 +56,7 @@
     "PreToolUse Bash sdd-deploy-precheck.sh",
     "PreToolUse Bash sdd-diagnosis-check.sh",
     "PreToolUse Bash sdd-risky-action-check.sh",
+    "PreToolUse mcp__github__merge_pull_request|mcp__github__push_files|mcp__github__create_pull_request|mcp__github__update_pull_request_branch|mcp__github__delete_file sdd-risky-action-check.sh",
     "PostToolUse Bash sdd-deploy-check.sh"
   ],
   "agentSettings": ".claude/settings.json"

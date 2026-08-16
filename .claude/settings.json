@@ -36,6 +36,15 @@
           }
         ],
         "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh tooling/harness/sdd-risky-action-check.sh"
+          }
+        ],
+        "matcher": "mcp__github__merge_pull_request|mcp__github__push_files|mcp__github__create_pull_request|mcp__github__update_pull_request_branch|mcp__github__delete_file"
       }
     ],
     "PostToolUse": [

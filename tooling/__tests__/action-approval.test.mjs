@@ -9,6 +9,7 @@ import {
   hashAction, parseRiskyActionPatterns, validateRiskyActionPatterns, matchRiskyAction,
   parseApprovalLedger, makeApprovalRecord, findApproval, ACTION_APPROVAL_GUARD_FINDING_TEXT,
   DEFAULT_ACTION_APPROVAL_LEDGER, DEFAULT_APPROVAL_TTL_SECONDS,
+  canonicalToolPayload, toolCallFromHookInput,
 } from "../action-approval-lib.mjs";
 
 test("DEFAULT_ACTION_APPROVAL_LEDGER는 .sdd/ 아래다 — 커밋 대상이 아니다", () => {
@@ -32,21 +33,25 @@ test("hashAction: 앞뒤 공백만 trim한다 — 그 외 정규화는 하지 �
 
 test("parseRiskyActionPatterns: 필드 정규화 — 없으면 빈 문자열", () => {
   const [e] = parseRiskyActionPatterns([{ match: "deploy" }]);
-  assert.deepEqual(e, { match: "deploy", class: "", verifyAgainst: "", why: "" });
+  assert.deepEqual(e, { match: "deploy", tool: "", class: "", verifyAgainst: "", why: "" });
 });
 
 // @covers SPEC-058/FR-005
-test("validateRiskyActionPatterns: match·class·verifyAgainst·why 4종 결함을 각각 잡는다", () => {
+test("validateRiskyActionPatterns: no-matcher·ambiguous-matcher·bad-regex·bad-tool·class·verifyAgainst·why를 각각 잡는다", () => {
   const entries = parseRiskyActionPatterns([
-    { match: "", class: "c", verifyAgainst: "v", why: "w" },           // no-match
-    { match: "[", class: "c", verifyAgainst: "v", why: "w" },          // bad-regex
-    { match: "m", class: "", verifyAgainst: "v", why: "w" },           // no-class
-    { match: "m", class: "c", verifyAgainst: "", why: "w" },           // no-verify-against
-    { match: "m", class: "c", verifyAgainst: "v", why: "" },           // no-why
-    { match: "m", class: "c", verifyAgainst: "v", why: "w" },          // clean
+    { match: "", tool: "", class: "c", verifyAgainst: "v", why: "w" },      // no-matcher
+    { match: "m", tool: "t", class: "c", verifyAgainst: "v", why: "w" },    // ambiguous-matcher
+    { match: "[", class: "c", verifyAgainst: "v", why: "w" },               // bad-regex
+    { tool: "[", class: "c", verifyAgainst: "v", why: "w" },                // bad-tool
+    { match: "m", class: "", verifyAgainst: "v", why: "w" },                // no-class
+    { match: "m", class: "c", verifyAgainst: "", why: "w" },                // no-verify-against
+    { match: "m", class: "c", verifyAgainst: "v", why: "" },                // no-why
+    { match: "m", class: "c", verifyAgainst: "v", why: "w" },               // clean(match)
+    { tool: "t", class: "c", verifyAgainst: "v", why: "w" },                // clean(tool)
   ]);
   const findings = validateRiskyActionPatterns(entries);
-  assert.deepEqual(findings.map((f) => f.kind), ["no-match", "bad-regex", "no-class", "no-verify-against", "no-why"]);
+  assert.deepEqual(findings.map((f) => f.kind),
+    ["no-matcher", "ambiguous-matcher", "bad-regex", "bad-tool", "no-class", "no-verify-against", "no-why"]);
 });
 
 // @covers SPEC-058/FR-001
@@ -55,10 +60,43 @@ test("matchRiskyAction: 첫 매치를 낸다(선언 순서), 미매치·빈 명�
     { match: "tracker.*dev-done", class: "tracker-transition", verifyAgainst: "CLOSEOUT_FLOW", why: "순서 위반 방지" },
     { match: "terraform apply", class: "deploy", verifyAgainst: "재현 가능 리비전", why: "" },
   ]);
-  assert.equal(matchRiskyAction("", entries), null);
-  assert.equal(matchRiskyAction("ls -la", entries), null);
-  assert.equal(matchRiskyAction("tracker transition ticket=1 to=dev-done", entries).class, "tracker-transition");
-  assert.equal(matchRiskyAction("terraform apply -auto-approve", entries).class, "deploy");
+  assert.equal(matchRiskyAction({ toolName: "Bash", command: "" }, entries), null);
+  assert.equal(matchRiskyAction({ toolName: "Bash", command: "ls -la" }, entries), null);
+  assert.equal(matchRiskyAction({ toolName: "Bash", command: "tracker transition ticket=1 to=dev-done" }, entries).class, "tracker-transition");
+  assert.equal(matchRiskyAction({ toolName: "Bash", command: "terraform apply -auto-approve" }, entries).class, "deploy");
+});
+
+// @covers SPEC-058/FR-001
+// @covers SPEC-058/FR-009
+test("matchRiskyAction: tool 항목은 도구명으로 매칭한다 — command 유무와 무관", () => {
+  const entries = parseRiskyActionPatterns([
+    { tool: "mcp__github__merge_pull_request", class: "pr-merge", verifyAgainst: "CI 상태·리뷰 승인", why: "머지는 되돌리기 어렵다" },
+    { match: "terraform apply", class: "deploy", verifyAgainst: "v", why: "w" },
+  ]);
+  assert.equal(matchRiskyAction({ toolName: "mcp__github__merge_pull_request", command: "" }, entries).class, "pr-merge");
+  assert.equal(matchRiskyAction({ toolName: "mcp__github__get_me", command: "" }, entries), null);
+  // Bash 명령은 tool 항목에 안 걸리고 match 항목에 걸린다.
+  assert.equal(matchRiskyAction({ toolName: "Bash", command: "terraform apply -auto-approve" }, entries).class, "deploy");
+});
+
+// @covers SPEC-058/FR-009
+test("canonicalToolPayload: 키 순서와 무관하게 같은 내용은 같은 문자열", () => {
+  const a = canonicalToolPayload("mcp__github__merge_pull_request", { owner: "o", repo: "r", pullNumber: 1 });
+  const b = canonicalToolPayload("mcp__github__merge_pull_request", { pullNumber: 1, repo: "r", owner: "o" });
+  assert.equal(a, b);
+  const c = canonicalToolPayload("mcp__github__merge_pull_request", { owner: "o", repo: "r", pullNumber: 2 });
+  assert.notEqual(a, c);
+});
+
+// @covers SPEC-058/FR-009
+test("toolCallFromHookInput: Bash는 command로, 그 외 도구는 toolInput 전체로 낸다", () => {
+  const bash = toolCallFromHookInput([], () => JSON.stringify({ tool_name: "Bash", tool_input: { command: "ls -la" } }));
+  assert.deepEqual(bash, { toolName: "Bash", command: "ls -la", toolInput: { command: "ls -la" } });
+  const tool = toolCallFromHookInput([], () => JSON.stringify({ tool_name: "mcp__github__merge_pull_request", tool_input: { owner: "o", repo: "r", pullNumber: 1 } }));
+  assert.deepEqual(tool, { toolName: "mcp__github__merge_pull_request", command: "", toolInput: { owner: "o", repo: "r", pullNumber: 1 } });
+  const viaFlag = toolCallFromHookInput(["--command", "ls -la"], () => "");
+  assert.equal(viaFlag.toolName, "Bash");
+  assert.equal(viaFlag.command, "ls -la");
 });
 
 test("parseApprovalLedger: 정상 줄·빈 줄·깨진 줄을 가른다 — 깨진 줄은 조용히 버리지 않는다", () => {
@@ -111,7 +149,7 @@ test("findApproval: 여러 유효 승인 중 가장 최근을 낸다(결정적)"
 });
 
 test("모든 가드 위반 종류에 사람이 읽는 문장이 있다", () => {
-  for (const k of ["no-match", "bad-regex", "no-class", "no-verify-against", "no-why"]) {
+  for (const k of ["no-matcher", "ambiguous-matcher", "bad-regex", "bad-tool", "no-class", "no-verify-against", "no-why"]) {
     assert.ok(String(ACTION_APPROVAL_GUARD_FINDING_TEXT[k] || "").trim(), k);
   }
 });
@@ -144,7 +182,13 @@ function fixture(config = {}, ledgerLines = null) {
 function runHook(root, command) {
   const gate = join(root, "scripts", "check-risky-action.mjs");
   try {
-    return { code: 0, out: execFileSync("node", [gate, "--hook"], { cwd: root, encoding: "utf8", input: JSON.stringify({ tool_input: { command } }), stdio: ["pipe", "pipe", "pipe"] }) };
+    return { code: 0, out: execFileSync("node", [gate, "--hook"], { cwd: root, encoding: "utf8", input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }), stdio: ["pipe", "pipe", "pipe"] }) };
+  } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+}
+function runHookTool(root, toolName, toolInput) {
+  const gate = join(root, "scripts", "check-risky-action.mjs");
+  try {
+    return { code: 0, out: execFileSync("node", [gate, "--hook"], { cwd: root, encoding: "utf8", input: JSON.stringify({ tool_name: toolName, tool_input: toolInput }), stdio: ["pipe", "pipe", "pipe"] }) };
   } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }
 function runSweep(root) {
@@ -280,4 +324,61 @@ test("게이트: 스윕 모드 — 선언 미검·미선언(INERT)·off·enum �
     assert.equal(r.code, 1);
     assert.match(r.out, /riskyActionPolicy 값 위반/);
   } finally { rmSync(bad, { recursive: true, force: true }); }
+});
+
+const TOOL_PATTERNS = [{ tool: "mcp__github__merge_pull_request", class: "pr-merge", verifyAgainst: "CI 상태·리뷰 승인 확인", why: "머지는 되돌리기 어렵다" }];
+const TOOL_NAME = "mcp__github__merge_pull_request";
+const TOOL_INPUT = { owner: "o", repo: "r", pullNumber: 26 };
+
+// @covers SPEC-058/FR-002
+// @covers SPEC-058/FR-003
+// @covers SPEC-058/FR-009
+test("게이트: MCP 도구 호출(tool 항목)도 Bash와 동일하게 막고, 승인 후 통과하며, 다른 페이로드는 재차단한다", () => {
+  const root = fixture({ riskyActionPolicy: "hard", riskyActionPatterns: TOOL_PATTERNS });
+  try {
+    const blocked = runHookTool(root, TOOL_NAME, TOOL_INPUT);
+    assert.equal(blocked.code, 2, blocked.out);
+    assert.match(blocked.out, /pr-merge/);
+    assert.match(blocked.out, /--record/);
+    // 안내에 찍힌 정준 페이로드를 그대로 --record --command에 넣는다(사람이 지어내지 않는다).
+    const payload = canonicalToolPayload(TOOL_NAME, TOOL_INPUT);
+    assert.ok(blocked.out.includes(payload), blocked.out);
+
+    const rec = runRecord(root, payload, "pr-merge", "CI 성공·리뷰 승인 확인함");
+    assert.equal(rec.code, 0, rec.out);
+
+    const after = runHookTool(root, TOOL_NAME, TOOL_INPUT);
+    assert.equal(after.code, 0, after.out); // 같은 호출 — 통과
+
+    const otherPr = runHookTool(root, TOOL_NAME, { owner: "o", repo: "r", pullNumber: 27 });
+    assert.equal(otherPr.code, 2, otherPr.out); // 다른 PR — 승인이 안 걸린다(해시 불일치)
+
+    const irrelevant = runHookTool(root, "mcp__github__get_me", {});
+    assert.equal(irrelevant.code, 0);
+    assert.equal(irrelevant.out.trim(), ""); // 무관 도구 — 침묵 통과
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-058/FR-005
+test("게이트: 스윕 모드 — no-matcher·ambiguous-matcher·bad-tool도 hard에서 막는다", () => {
+  const noMatcher = fixture({ riskyActionPolicy: "hard", riskyActionPatterns: [{ class: "c", verifyAgainst: "v", why: "w" }] });
+  try {
+    const r = runSweep(noMatcher);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /match·tool이 둘 다 없다/);
+  } finally { rmSync(noMatcher, { recursive: true, force: true }); }
+
+  const ambiguous = fixture({ riskyActionPolicy: "hard", riskyActionPatterns: [{ match: "m", tool: "t", class: "c", verifyAgainst: "v", why: "w" }] });
+  try {
+    const r = runSweep(ambiguous);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /match·tool이 둘 다 있다/);
+  } finally { rmSync(ambiguous, { recursive: true, force: true }); }
+
+  const badTool = fixture({ riskyActionPolicy: "hard", riskyActionPatterns: [{ tool: "[", class: "c", verifyAgainst: "v", why: "w" }] });
+  try {
+    const r = runSweep(badTool);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /도구명 패턴\(tool\)이 정규식으로 컴파일되지 않는다/);
+  } finally { rmSync(badTool, { recursive: true, force: true }); }
 });

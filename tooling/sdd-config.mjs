@@ -249,7 +249,10 @@ export const DEFAULTS = {
   // 위험 행동 승인(SPEC-058) — 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이
   // 독립 서브에이전트의 검증 없이 지나가지 않게 한다. 실측: QA 실측·댓글까지 마친 티켓을 배포도
   // 안 된 채 종결 상태로 넘기려 했다 — 커밋 이전, 대화 안에서 끝나 기존 게이트가 못 보는 층.
-  //   riskyActionPatterns: [{ match: <명령 정규식>, class, verifyAgainst: <무엇과 대조할지>, why }]
+  //   riskyActionPatterns: [{ match: <Bash 명령 정규식>|tool: <도구명 정규식>(둘 중 하나만),
+  //     class, verifyAgainst: <무엇과 대조할지>, why }]
+  //   tool은 MCP 도구 호출(mcp__github__merge_pull_request 등) 매칭용 — 명령 문자열이 없는
+  //   도구는 match로 원천적으로 못 잡는다(실측 2026-08-14).
   riskyActionPolicy: "advisory",
   riskyActionPatterns: [],
   riskyActionApprovalTtlSeconds: 900,   // 승인 마커 유효기간(초) — 신선도 판정에 쓴다

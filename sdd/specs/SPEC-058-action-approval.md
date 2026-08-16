@@ -23,9 +23,14 @@
 - **Acceptance (GWT)**: 1. **Given** a blocked risky action, **When** the guidance is printed, **Then** it names what to verify and the exact `--record` command to run afterward, without the gate process itself performing any verification.
 
 ### User Story 4 — 가드 선언 자체의 결함은 조용히 넘기지 않는다 (P1)
-`riskyActionPatterns` 선언이 불완전하면(match·class·verifyAgainst·why 중 하나라도 없음) 그 규칙은 아무것도 막지 못하는데, 침묵하면 사람은 "선언이 있어서 안전하다"로 오해한다.
-- **Independent Test**: 4종 결함을 각각 독립 finding으로 보고하고 hard에서 차단함을 확인. [검증: tooling/__tests__/action-approval.test.mjs]
+`riskyActionPatterns` 선언이 불완전하면(match·tool 중 하나도 없음·둘 다 있음·class·verifyAgainst·why 중 하나라도 없음) 그 규칙은 아무것도 막지 못하는데, 침묵하면 사람은 "선언이 있어서 안전하다"로 오해한다.
+- **Independent Test**: 결함 종류를 각각 독립 finding으로 보고하고 hard에서 차단함을 확인. [검증: tooling/__tests__/action-approval.test.mjs]
 - **Acceptance (GWT)**: 1. **Given** a `riskyActionPatterns` entry missing `class`, **When** the sweep mode runs, **Then** it reports the defect and exits non-zero under hard, regardless of whether any risky command has run yet.
+
+### User Story 5 — MCP 도구 호출도 명령 문자열 없이 매칭·해시된다 (P1)
+실측(2026-08-16): `agent-hooks.list`의 PreToolUse 매처가 `Bash`뿐이던 시절엔 `mcp__github__merge_pull_request` 같은 되돌리기 어려운 MCP 도구 호출이 이 축을 완전히 우회했다 — 명령 문자열이 없는 도구라 `match`(정규식 대 명령 문자열)로는 원천적으로 못 잡는다. `riskyActionPatterns` 항목에 `tool`(도구명 정규식) 필드를 추가해, 도구명으로 매칭하고 `{tool, input}`의 정준(키 정렬) JSON을 해시 대상으로 쓴다.
+- **Independent Test**: `tool` 항목이 도구명으로 매칭되고, `command` 유무와 무관하며, 정준 페이로드가 Node·Python 바이트 동일 해시를 냄을 확인. [검증: tooling/__tests__/action-approval.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs]
+- **Acceptance (GWT)**: 1. **Given** a `riskyActionPatterns` entry with `tool: "mcp__github__merge_pull_request"` and no valid approval, **When** that tool is about to be called, **Then** the call is blocked exactly as a matching Bash command would be, and the approval hash is computed from the canonical `{tool, input}` payload rather than any command string.
 
 ### Edge Cases
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
@@ -37,24 +42,27 @@
 - **`advisory`는 막지 않는다** — 강도 사다리를 지킨다. 채택 중 프로젝트를 벽으로 세우지 않는다.
 - **차단 시 실패 클래스를 선언한다(패턴이 선언한 `class`)** — SPEC-057의 에스컬레이션 집계가 "선언된 클래스만 센다"는 계약의 두 번째 소비자다(첫 소비자는 SPEC-056). 같은 위험 행동이 임계치 이상 반복되면 R24가 "이건 N번째다, 가드를 만들어라"를 말한다.
 - **`--record`는 게이트가 판정한 것이 아니라 사람/서브에이전트가 선언한 것이다** — 이 모드는 `SKIPPED` 판정 타입을 방출한다(교정 유틸리티 경로임을 명시, `--fix`와 같은 계약).
+- **모든 MCP 도구 호출을 광범위 매처로 덮지 않는다(오너의 명시적 선택)** — `mcp__.*` 같은 와일드카드는 도구가 늘 때마다 노이즈·마찰이 커지고, 읽기 전용 호출(`list_*`·`get_*`)까지 걸린다. 대신 `agent-hooks.list`의 PreToolUse 매처에 위험해 보이는 도구만 명시적으로 나열한다 — 새 위험 도구가 생기면 그때 매처를 넓힌다(자동 확장 아님).
+- **`match`·`tool`은 한 항목에 정확히 하나만** — 둘 다 있으면 "이 항목이 Bash용인지 도구용인지" 판정 규칙이 두 갈래로 갈라진다. 서브명령 세부 매칭(예: 특정 PR 번호만)은 이번 범위가 아니다 — 명시적으로 위험한 도구 자체를 승인 대상으로 삼는다(오너의 명시적 선택, 단순함 우선).
 
 ---
 
 ## Functional Requirements (EARS)
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
-- **FR-001** (ubiquitous): THE **action-approval** (E) core in **action-approval-lib.mjs** (S) SHALL match a pending command against declared `riskyActionPatterns` entries in declaration order and return the first matching entry, so that ordering itself is the precedence rule for overlapping patterns. — capability: **action-approval.enforce** (C).
-- **FR-002** (event): WHEN **check-risky-action.mjs** (S) running as a PreToolUse hook finds a command matching a declared risky-action pattern with no valid approval, it SHALL report the pattern's class, why, and verification target, instruct that an independent subagent perform the verification, and it SHALL exit non-zero only when `riskyActionPolicy` is `hard`.
-- **FR-003** (unwanted): IF an approval record's hash does not exactly equal the sha256 hash of the pending command's exact text, or its timestamp is older than `riskyActionApprovalTtlSeconds`, THEN the gate SHALL treat it as absent and SHALL NOT let the action through, because reusing an approval across a different action or after it has gone stale defeats the guarantee this axis exists to provide.
-- **FR-004** (event): WHEN a person or subagent runs **check-risky-action.mjs --record** (S) with `--command`, `--class`, and `--note`, THE SYSTEM SHALL compute the hash from the exact command text and append one record to the approval ledger, and it SHALL refuse the invocation when any of the three arguments is missing rather than inventing a placeholder.
-- **FR-005** (unwanted): IF a `riskyActionPatterns` entry is missing `match`, `class`, `verifyAgainst`, or `why`, THEN the sweep mode SHALL report each defect independently and SHALL exit non-zero under `hard`, because a malformed declaration matches nothing and blocks nothing while looking like a guard.
+- **FR-001** (ubiquitous): THE **action-approval** (E) core in **action-approval-lib.mjs** (S) SHALL match a pending action (a Bash command or a named tool call) against declared `riskyActionPatterns` entries in declaration order and return the first matching entry, so that ordering itself is the precedence rule for overlapping patterns. — capability: **action-approval.enforce** (C).
+- **FR-002** (event): WHEN **check-risky-action.mjs** (S) running as a PreToolUse hook finds an action matching a declared risky-action pattern with no valid approval, it SHALL report the pattern's class, why, and verification target, instruct that an independent subagent perform the verification, and it SHALL exit non-zero only when `riskyActionPolicy` is `hard`.
+- **FR-003** (unwanted): IF an approval record's hash does not exactly equal the sha256 hash of the pending action's exact payload (the command text for `match` entries, or the canonical `{tool, input}` JSON for `tool` entries), or its timestamp is older than `riskyActionApprovalTtlSeconds`, THEN the gate SHALL treat it as absent and SHALL NOT let the action through, because reusing an approval across a different action or after it has gone stale defeats the guarantee this axis exists to provide.
+- **FR-004** (event): WHEN a person or subagent runs **check-risky-action.mjs --record** (S) with `--command`, `--class`, and `--note`, THE SYSTEM SHALL compute the hash from the exact payload text given (a command string or a canonical tool-call payload) and append one record to the approval ledger, and it SHALL refuse the invocation when any of the three arguments is missing rather than inventing a placeholder.
+- **FR-005** (unwanted): IF a `riskyActionPatterns` entry declares neither `match` nor `tool`, declares both, or declares a `match`/`tool`/`class`/`verifyAgainst`/`why` value that is empty or (for `match`/`tool`) fails to compile as a regular expression, THEN the sweep mode SHALL report each defect independently and SHALL exit non-zero under `hard`, because a malformed declaration matches nothing and blocks nothing while looking like a guard.
 - **FR-006** (event): WHEN the gate blocks under `hard`, it SHALL declare the matched pattern's `class` and the action's hash as the verdict's escalation metadata, so a gate-failure ledger consumer (SPEC-057) can count repeats of the same risky action without inferring the class from free text.
 - **FR-007** (ubiquitous): THE gate SHALL NOT itself invoke any subagent, model call, or network request — its own judgment is limited to the approval marker's existence, hash match, and freshness, and the instruction to perform independent verification is text directed at the blocked executor, not an action the gate takes.
 - **FR-008** (ubiquitous): THE gate's report and exit code SHALL be identical between the canonical runtime and the Python runtime, as required for judging gates.
+- **FR-009** (event): WHEN a `riskyActionPatterns` entry declares `tool` (a tool-name regular expression) rather than `match`, THE core SHALL match it against the PreToolUse hook's `tool_name` regardless of whether a command string is present, and WHEN that entry blocks an action, THE gate SHALL compute the approval hash from a canonical JSON serialization of `{tool: tool_name, input: tool_input}` with object keys sorted recursively, so that the same tool call always hashes identically regardless of the hook payload's key order.
 
 ### Key Entities
-- **risky action** — a pending tool-call command matching a project-declared pattern for behavior that is hard to reverse (tracker state transition, deploy, destructive DB operation), as distinct from an investigation-shaped command (SPEC-053) or a deploy precondition (SPEC-035) — the remedy differs: this axis requires dynamic proof of independent verification, not a static spec pointer or precondition check.
-- **approval marker** — a ledger record asserting that a specific action (identified by the sha256 hash of its exact command text) was independently verified; valid only while within its configured freshness window and only for that exact action, never inferred to cover a different action of the same class.
+- **risky action** — a pending tool-call action (a Bash command matched via `match`, or a named tool call matched via `tool`) matching a project-declared pattern for behavior that is hard to reverse (tracker state transition, deploy, destructive DB operation, an explicitly-declared risky non-Bash tool call such as a pull-request merge), as distinct from an investigation-shaped command (SPEC-053) or a deploy precondition (SPEC-035) — the remedy differs: this axis requires dynamic proof of independent verification, not a static spec pointer or precondition check.
+- **approval marker** — a ledger record asserting that a specific action (identified by the sha256 hash of its exact payload — command text or canonical tool-call JSON) was independently verified; valid only while within its configured freshness window and only for that exact action, never inferred to cover a different action of the same class.
 
 ---
 
@@ -74,8 +82,8 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `action-approval.test.mjs` 전 케이스 green — 코어(해시 결정성·선언 파싱·검증 4종 결함·매칭·승인 신선도 4종) + 게이트 카나리아(hard 차단·advisory 비차단·무관 침묵·record 통과·해시 불일치 재차단·만료 재차단·record 인자 결여·스윕 4종). [검증: tooling/__tests__/action-approval.test.mjs]
-- **SC-002**: 판정 출력이 Node↔Python 바이트 동일하다(훅 4·승인 통과/만료·record 인자 결여·스윕 5, 총 11+ 시나리오). [검증: tooling/__tests__/sdd-gates-py.test.mjs]
+- **SC-001**: `action-approval.test.mjs` 전 케이스 green — 코어(해시 결정성·선언 파싱·검증 결함 종류·Bash/tool 매칭·정준 페이로드·승인 신선도) + 게이트 카나리아(Bash hard 차단·advisory 비차단·무관 침묵·record 통과·해시 불일치 재차단·만료 재차단·record 인자 결여·MCP 도구 차단/통과/무관 침묵·스윕 결함 종류). [검증: tooling/__tests__/action-approval.test.mjs]
+- **SC-002**: 판정 출력이 Node↔Python 바이트 동일하다(Bash 훅 4·승인 통과/만료·record 인자 결여·스윕 5·MCP 도구 훅 2·tool 스윕 3, 총 15+ 시나리오). [검증: tooling/__tests__/sdd-gates-py.test.mjs]
 - **SC-003**: 게이트가 hard에서 승인 없는 위험 행동을 **실제로 차단**한다 — 통과 경로만 관측된 게이트는 미검증이다(SPEC-048 카나리아 계약). [검증: tooling/__tests__/action-approval.test.mjs]
 
 ## Non-Functional Requirements
@@ -91,12 +99,16 @@
 - **기각한 대안:** 게이트가 직접 서브에이전트(LLM)를 호출해 검증을 수행하는 방식. 판정 게이트는 결정론적이어야 Node·Python 양판이 가능하다(SPEC-006의 불변) — LLM 호출은 그 자체로 비결정적이고, 이 게이트가 아니라 차단당한 실행기가 자기 도구로 수행해야 그 경계가 유지된다. 재검토 조건: 판정 게이트의 양판 요구가 결정론 외의 형태를 허용하게 되면.
 - **기각한 대안:** 미확인 단정(사례 ①)까지 이 축의 위험 패턴으로 포함하는 방식. 도구 호출을 막는 것이 아니라 자연어 주장을 판정해야 하는데, 텍스트 분류는 이 방법론이 금지하는 추측이다. 재검토 조건: 도구 호출 로그에서 "검증 없이 진행"을 결정적으로 판별할 수 있는 별도 신호가 발견되면(그때는 별도 축).
 - **기각한 대안:** 진단가드(SPEC-053)를 확장해 이 기능을 흡수하는 방식. 구제 방식이 근본적으로 다르다(정적 지목 vs 동적 승인 마커) — 한 축에 묶으면 두 계약이 뒤섞인다. 재검토 조건: 없음.
+- 실측(2026-08-16, 킷 자기 세션): 이 킷 자신이 `mcp__github__merge_pull_request`로 PR을 머지하는 도중 이 축 어디도 관여하지 않았다 — `agent-hooks.list`의 PreToolUse 매처가 `Bash`뿐이었기 때문이다. `riskyActionPatterns`에 `tool` 필드(도구명 정규식)를 추가해 닫았다.
+- 오너의 명시적 결정(MCP 커버리지 범위): "위험해 보이는 도구만 명시적으로 추가" 안을 "모든 MCP 도구 호출을 광범위 매처로 덮는" 안 대신 골랐다 — 후자는 도구가 늘 때마다 노이즈·마찰이 커지고 읽기 전용 호출까지 걸린다. 1차 목록: `mcp__github__merge_pull_request`·`push_files`·`create_pull_request`·`update_pull_request_branch`·`delete_file`.
+- **기각한 대안:** `riskyActionPatterns` 항목에 `match`(Bash)와 `tool`(도구명)을 함께 선언해 도구+명령 조합으로 세밀하게 매칭하는 방식. 서브명령 세부 매칭(예: 특정 PR 번호만 승인)까지 범위에 넣으면 이 축의 계약이 "위험 도구 자체를 승인 대상으로 삼는다"에서 벗어난다 — 오너는 단순함을 우선했다(위험 도구를 명시적으로 나열하는 것으로 충분). 재검토 조건: 도구별 세부 매칭이 실제로 필요한 실측 사고가 나오면.
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
 | 일시 | 수행자 | 판정 |
 |---|---|---|
 | 2026-08-14 | 셀프리뷰(코어 TDD 다수 + 게이트 카나리아 다수 + 양판 패리티 11+ 시나리오) + 오너 설계 논의(게이트 1+에이전트 1로 수렴, 해시 결속 채택, 사례① 명시적 제외) → Active | FR-001~008 unit 커버. 킷 자기적용: 킷 자신에 위험 행동 패턴이 없어 INERT이고 게이트가 그 사실을 매 실행 밝힌다 |
+| 2026-08-16 | 셀프리뷰(tool 매칭·정준 페이로드 코어 TDD + 게이트 카나리아 + 양판 패리티 신규 시나리오) + 오너 설계 논의(명시적 위험 도구 목록 채택) → Active 유지 | FR-009 신규 unit 커버. FR-001~005 문구를 Bash·도구 호출 공통으로 일반화 |
 
 ## Dedup-Review
 <!-- 이웃 스펙과의 의미적 중복 검토 기록 — 게이트는 존재·형식만 검사(판정은 사람/LLM) -->
@@ -110,3 +122,4 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-08-14 | 초안 — `action-approval-lib`(sha256 행동 해시·패턴 선언 파싱/검증·매칭·`parseLedger` 재사용·승인 신선도 판정) + `check-risky-action`(hook/record/sweep 3모드, hard/advisory/off, 차단 시 class·hash를 SPEC-057 메타로 선언) + `sdd-risky-action-check.sh`(PreToolUse 래퍼) + `riskyActionPolicy`·`riskyActionPatterns`·`riskyActionApprovalTtlSeconds`·`riskyActionLedger` knob + 스윕 R25 등재 + `agent-hooks.list`·배포 목록·양판 대응·래칫 편입, 양판 | 실측 제보: 커밋 이전, 대화 안에서 위험 행동(트래커 종결 전이 등)이 독립 검증 없이 진행됐다. 오너와 설계를 논의해 "감시·감사 게이트·에이전트 각 2개=4개" 안을 기각하고 게이트 1+에이전트 1로 수렴했다(시점은 무엇을 만드는가가 아니라 언제 호출하는가의 문제). 마커를 세션·패턴이 아니라 **행동 해시**에 결속한 이유: 한 번의 승인이 다른 대상의 같은 종류 행동까지 덮는 것을 막는다(오너 명시적 선택 — 안전성이 마찰보다 우선). 게이트가 서브에이전트를 스스로 부르지 않는 이유: 판정 게이트는 결정론적이어야 Node·Python 양판이 가능하다(SPEC-006) — LLM 호출은 차단당한 실행기 자신의 몫이다. 사례①(미확인 단정)을 명시적으로 제외한 이유: 도구 호출 차단과 자연어 주장 판정은 다른 문제이고 후자는 추측이 된다. SPEC-053을 확장하지 않고 새 SPEC으로 만든 이유: 구제 방식이 근본적으로 다르다(정적 지목 vs 동적 승인) [검증: tooling/__tests__/action-approval.test.mjs] |
+| 2026-08-16 | 확장 — `riskyActionPatterns`에 `tool`(도구명 정규식) 필드 추가(`match`와 상호 배타) + `canonicalToolPayload`(키 정렬 JSON, 해시 대상)·`toolCallFromHookInput`(PreToolUse 훅 입력 일반화, `commandFromHookInput` 대체) 신설 + 검증 결함 종류를 no-matcher/ambiguous-matcher/bad-regex/bad-tool로 재정의 + `agent-hooks.list`에 명시적 위험 MCP 도구 5종(`merge_pull_request`·`push_files`·`create_pull_request`·`update_pull_request_branch`·`delete_file`) PreToolUse 매처 추가, 양판 | 실측: 이 킷 자신이 `mcp__github__merge_pull_request`로 PR을 머지하는 동안 이 축이 완전히 우회됐다 — 명령 문자열이 없는 도구라 `match`로는 원천적으로 못 잡는다. 오너와 논의해 "모든 MCP 도구를 광범위 매처로 덮는" 안을 기각하고 "위험해 보이는 도구를 명시적으로 나열"하는 안을 택했다(노이즈·마찰 방지). 해시 대상을 명령 문자열에서 일반화해 `{tool, input}`의 정준 JSON을 쓰되, Bash는 기존 계약을 그대로 유지한다(하위호환) [검증: tooling/__tests__/action-approval.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |

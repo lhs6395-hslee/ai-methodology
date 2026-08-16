@@ -16,11 +16,11 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { loadConfig } from "./sdd-config.mjs";
-import { commandFromHookInput } from "./deploy-guard-lib.mjs";
 import {
   parseRiskyActionPatterns, validateRiskyActionPatterns, matchRiskyAction, hashAction,
   parseApprovalLedger, makeApprovalRecord, findApproval, ACTION_APPROVAL_GUARD_FINDING_TEXT,
   DEFAULT_ACTION_APPROVAL_LEDGER, DEFAULT_APPROVAL_TTL_SECONDS,
+  canonicalToolPayload, toolCallFromHookInput,
 } from "./action-approval-lib.mjs";
 import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
 
@@ -79,11 +79,14 @@ function main() {
   // ── 훅 모드 ────────────────────────────────────────────────────────────────
   if (HOOK) {
     if (!entries.length) process.exit(0);   // 선언 없음 — 훅에서는 침묵
-    const command = commandFromHookInput(process.argv, () => readFileSync(0, "utf8"));
-    const entry = matchRiskyAction(command, entries);
+    const { toolName, command, toolInput } = toolCallFromHookInput(process.argv, () => readFileSync(0, "utf8"));
+    const entry = matchRiskyAction({ toolName, command }, entries);
     if (!entry) process.exit(0);            // 위험 패턴 미매치 — 침묵이 정답
 
-    const hash = hashAction(command);
+    // Bash(match)는 명령 문자열을 그대로 해시한다(하위호환). 그 외 도구(tool)는 명령 문자열이
+    // 없으므로 {tool, input}의 정준 페이로드를 해시한다 — --record --command에 그대로 넘길 문자열.
+    const payload = entry.tool ? canonicalToolPayload(toolName, toolInput) : command;
+    const hash = hashAction(payload);
     const ttl = Number(cfg.riskyActionApprovalTtlSeconds) || DEFAULT_APPROVAL_TTL_SECONDS;
     const raw = readLedger(ledgerPath(cfg));
     const { records } = raw == null ? { records: [] } : parseApprovalLedger(raw);
@@ -98,7 +101,11 @@ function main() {
     console.log(`  왜: ${entry.why}`);
     console.log(`  확인 방법: ${entry.verifyAgainst}`);
     console.log("  → 별도 컨텍스트의 서브에이전트를 만들어 위 내용을 실제로 대조 확인시켜라(이 게이트는 그 호출을 스스로 하지 않는다).");
-    console.log(`  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "${entry.class}" --note "<확인 근거>"`);
+    if (entry.tool) {
+      console.log(`  → 확인되면(도구 호출 — 아래 행동 페이로드를 정확히 그대로 붙여넣는다): node scripts/check-risky-action.mjs --record --command '${payload}' --class "${entry.class}" --note "<확인 근거>"`);
+    } else {
+      console.log(`  → 확인되면: node scripts/check-risky-action.mjs --record --command "<이 행동의 원문 명령 그대로>" --class "${entry.class}" --note "<확인 근거>"`);
+    }
     console.log(`  → 그 다음 이 행동을 재시도하라(승인 유효기간 ${ttl}초, 행동 문자열이 정확히 같아야 한다).`);
     if (POLICY === "hard") {
       console.error("\n✗ riskyActionPolicy=hard: 승인 마커 없이 위험 행동을 차단한다.");
@@ -113,7 +120,8 @@ function main() {
     verdict(VERDICT_KINDS.INERT, "riskyActionPatterns 미선언 — 무엇에 발화할지 모른다");
     console.log("위험 행동 승인 게이트 — `riskyActionPatterns` 미선언: **판정하지 않는다**."
       + " 되돌리기 어려운 행동(트래커 상태 전이·배포·파괴적 DB 조작 등)이 있으면"
-      + " `{ match: <명령 정규식>, class, verifyAgainst, why }`로 선언하라.");
+      + " Bash는 `{ match: <명령 정규식>, class, verifyAgainst, why }`, 그 외 도구 호출은"
+      + " `{ tool: <도구명 정규식>, class, verifyAgainst, why }`로 선언하라(둘 중 하나만).");
     return;
   }
   const findings = validateRiskyActionPatterns(entries);

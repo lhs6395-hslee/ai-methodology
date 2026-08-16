@@ -48,15 +48,20 @@ export function hashAction(command) {
 export const DEFAULT_ACTION_APPROVAL_LEDGER = ".sdd/action-approvals.jsonl";
 export const DEFAULT_APPROVAL_TTL_SECONDS = 900; // 15분 — 실측 사고 규모에 맞춘 초기값, 프로젝트가 조정
 
-// 선언 파싱 — riskyActionPatterns: [{ match, class, verifyAgainst, why }]
-// match: 위험 행동을 매칭할 명령 정규식 / class: 에스컬레이션 집계 키(SPEC-057 소비)
-// verifyAgainst: 서브에이전트가 무엇과 대조해야 하는가(명세 포인터 + 실제 상태 조회 방법)
+// 선언 파싱 — riskyActionPatterns: [{ match, tool, class, verifyAgainst, why }]
+// match: Bash 명령을 매칭할 정규식(도구명 "Bash") / tool: 그 외 도구 호출을 매칭할 도구명 정규식
+// (mcp__github__merge_pull_request 등 — 실측: 2026-08-14, MCP 도구 호출은 명령 문자열이 없어
+// match로는 원천적으로 못 잡는다). 한 항목은 둘 중 정확히 하나만 갖는다 — 섞으면 "이 항목이
+// Bash용인지 도구용인지" 판정 규칙이 두 갈래로 갈라진다(단순함을 유지한다, 오너의 명시적 선택:
+// 서브명령 세부 매칭이 아니라 위험해 보이는 도구를 명시적으로 나열).
+// class: 에스컬레이션 집계 키(SPEC-057 소비) / verifyAgainst: 서브에이전트가 무엇과 대조해야 하는가
 export function parseRiskyActionPatterns(value) {
   const out = [];
   for (const raw of Array.isArray(value) ? value : []) {
     if (!raw || typeof raw !== "object") continue;
     out.push({
       match: String(raw.match ?? ""),
+      tool: String(raw.tool ?? ""),
       class: String(raw.class ?? ""),
       verifyAgainst: String(raw.verifyAgainst ?? ""),
       why: String(raw.why ?? ""),
@@ -67,13 +72,17 @@ export function parseRiskyActionPatterns(value) {
 
 // 선언 검증 — 이 축의 자기결함은 **조용한 무발화**다: 잘못된 선언은 아무것도 막지 않고
 // 아무것도 알리지 않는다.
-// 반환 findings[] — kind: no-match | bad-regex | no-class | no-verify-against | no-why
+// 반환 findings[] — kind: no-matcher | ambiguous-matcher | bad-regex | bad-tool | no-class | no-verify-against | no-why
 export function validateRiskyActionPatterns(entries) {
   const findings = [];
   for (const [i, e] of (entries || []).entries()) {
-    const at = e.class || e.match || `#${i + 1}`;
-    if (!e.match) { findings.push({ kind: "no-match", at }); continue; }
-    try { new RegExp(e.match); } catch { findings.push({ kind: "bad-regex", at }); continue; }
+    const at = e.class || e.match || e.tool || `#${i + 1}`;
+    const hasMatch = !!e.match;
+    const hasTool = !!e.tool;
+    if (!hasMatch && !hasTool) { findings.push({ kind: "no-matcher", at }); continue; }
+    if (hasMatch && hasTool) { findings.push({ kind: "ambiguous-matcher", at }); continue; }
+    if (hasMatch) { try { new RegExp(e.match); } catch { findings.push({ kind: "bad-regex", at }); continue; } }
+    if (hasTool) { try { new RegExp(e.tool); } catch { findings.push({ kind: "bad-tool", at }); continue; } }
     if (!e.class.trim()) findings.push({ kind: "no-class", at });
     if (!e.verifyAgainst.trim()) findings.push({ kind: "no-verify-against", at });
     if (!e.why.trim()) findings.push({ kind: "no-why", at });
@@ -82,16 +91,58 @@ export function validateRiskyActionPatterns(entries) {
 }
 
 // 위험 행동 매칭 — 첫 매치를 낸다(순서가 선언이다. 여러 패턴이 걸리면 먼저 선언된 것을 본다).
-export function matchRiskyAction(command, entries) {
-  const cmd = String(command || "");
-  if (!cmd.trim()) return null;
+// call: { toolName, command } — Bash는 command로, 그 외 도구는 toolName으로 매칭한다.
+export function matchRiskyAction(call, entries) {
+  const toolName = String((call && call.toolName) || "");
+  const command = String((call && call.command) || "");
   for (const e of entries || []) {
-    if (!e.match) continue;
-    let re;
-    try { re = new RegExp(e.match, "i"); } catch { continue; }
-    if (re.test(cmd)) return e;
+    if (e.tool) {
+      if (!toolName) continue;
+      let re;
+      try { re = new RegExp(e.tool, "i"); } catch { continue; }
+      if (re.test(toolName)) return e;
+      continue;
+    }
+    if (e.match) {
+      if (!command.trim()) continue;
+      let re;
+      try { re = new RegExp(e.match, "i"); } catch { continue; }
+      if (re.test(command)) return e;
+    }
   }
   return null;
+}
+
+// 도구 호출(비-Bash)의 정준 페이로드 — 해시 대상 문자열을 만든다. 키 순서를 정렬해 같은 내용이
+// 항상 같은 문자열이 되게 한다(hostToolInput의 키 삽입 순서에 결속되면 같은 호출도 다른 해시가
+// 나올 수 있다). hashAction()에 그대로 넘기면 되므로 별도 해시 함수를 새로 만들지 않는다.
+export function canonicalToolPayload(toolName, toolInput) {
+  return JSON.stringify({ tool: String(toolName || ""), input: sortKeysDeep(toolInput || {}) });
+}
+function sortKeysDeep(v) {
+  if (Array.isArray(v)) return v.map(sortKeysDeep);
+  if (v && typeof v === "object") {
+    return Object.keys(v).sort().reduce((o, k) => { o[k] = sortKeysDeep(v[k]); return o; }, {});
+  }
+  return v;
+}
+
+// PreToolUse 훅 입력에서 도구 호출을 읽는다 — commandFromHookInput(SPEC-035)의 일반화판.
+// Bash는 tool_input.command를 그대로 command로 낸다(하위호환). 그 외 도구는 command가 비고
+// toolInput 전체가 남는다(canonicalToolPayload가 그것으로 해시 페이로드를 만든다).
+export function toolCallFromHookInput(argv, readStdin) {
+  const get = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined; };
+  const flagCommand = get("--command");
+  if (flagCommand !== undefined) return { toolName: "Bash", command: flagCommand, toolInput: { command: flagCommand } };
+  let raw = "";
+  try { raw = readStdin(); } catch { return { toolName: "", command: "", toolInput: null }; }
+  if (!raw.trim()) return { toolName: "", command: "", toolInput: null };
+  try {
+    const j = JSON.parse(raw);
+    const toolName = String(j.tool_name || "");
+    const toolInput = j.tool_input || {};
+    return { toolName, command: String(toolInput.command || ""), toolInput };
+  } catch { return { toolName: "", command: "", toolInput: null }; }
 }
 
 // 원장에 남길 승인 레코드 하나.
@@ -121,8 +172,10 @@ export function findApproval(hash, records, ttlSeconds = DEFAULT_APPROVAL_TTL_SE
 }
 
 export const ACTION_APPROVAL_GUARD_FINDING_TEXT = Object.freeze({
-  "no-match": "명령 패턴이 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
-  "bad-regex": "명령 패턴이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+  "no-matcher": "match·tool이 둘 다 없다 — 무엇에 발화할지 모르는 선언은 아무것도 막지 않는다",
+  "ambiguous-matcher": "match·tool이 둘 다 있다 — 한 항목은 Bash 명령용(match)이거나 도구명용(tool) 중 하나만 갖는다",
+  "bad-regex": "명령 패턴(match)이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
+  "bad-tool": "도구명 패턴(tool)이 정규식으로 컴파일되지 않는다 — 이 규칙은 **조용히 무발화**다",
   "no-class": "class가 없다 — 에스컬레이션 집계(SPEC-057)가 이 선언을 인식할 키가 없다",
   "no-verify-against": "verifyAgainst가 없다 — 서브에이전트가 무엇과 대조해야 하는지 모른다",
   "no-why": "사유가 없다 — 왜 이 행동에 승인이 필요한지 모르면 사람은 규칙을 우회한다",
