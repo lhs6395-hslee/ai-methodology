@@ -19,6 +19,7 @@ import {
   invariantsOf, validateInvariants, ssotMissingInvariants,
   unenforcedInvariantFindings, staleEnforcementMentionFindings,
 } from "./process-ssot-lib.mjs";
+import { triGuard } from "./check-outcome-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
 
@@ -143,9 +144,13 @@ function main() {
         block(`프로세스 "${name}": SSOT(${ssotPath})가 선언된 불변식을 담지 않는다 — 빠진 불변식 ${missInv.length}건: ${missInv.join(" · ")}.`
           + ` 불변식 이름도 단계처럼 문서에 문자 그대로 있어야 한다`);
       }
-      for (const u of unenforcedInvariantFindings(invariants, (p) => existsSync(join(ROOT, p)))) {
+      const enf = unenforcedInvariantFindings(invariants, triGuard((p) => existsSync(join(ROOT, p))));
+      for (const u of enf.violations) {
         block(`프로세스 "${name}": 불변식 "${u.name}"이 "${u.enforcement}"로 강제된다고 선언했는데 그 파일이 저장소에 없다`
           + ` — 강제한다는 주장이 거짓이다. 파일을 만들거나 enforcement를 null로 바꿔 "명시적으로 미강제"라고 선언하라`);
+      }
+      for (const u of enf.unchecked) {
+        console.log(`  · 불변식 "${u.name}"(${u.enforcement}): 실재 여부 확인 못 함 — 위반으로 단정하지 않는다`);
       }
       for (const s of staleEnforcementMentionFindings(ssotText, invariants)) {
         block(`프로세스 "${name}": 불변식 "${s.name}"은 config에 "${s.enforcement}"로 강제된다고 돼 있는데 SSOT(${ssotPath}) 본문은`

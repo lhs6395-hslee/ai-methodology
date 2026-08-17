@@ -88,6 +88,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-17 | SPEC-059(게이트 무결성 감사) 배선 — `sdd-init.sh` node 복사 목록에 `duplicate-source-lib.mjs`·`check-duplicate-source-drift.mjs`·`invariant-guard-lib.mjs`·`check-invariant-guard.mjs` 추가, `sdd-sync.mjs` RULES에 R26 등재 + PY_SUBCOMMAND에 두 게이트 대응 선언. `tooling/__tests__/sdd-sync.test.mjs`·`ship-closure.test.mjs`의 `new URL(...).pathname` → `fileURLToPath(new URL(...))` 교정(동작 변화 없음, 테스트 하네스만 — Windows에서 드라이브 문자 앞 슬래시가 남아 e2e 테스트가 ENOENT로 실패하고 있었다) | 소비 프로젝트 실측(2026-08-17) — 훅/게이트 사본 드리프트와 가드 함수 우회를 잡는 신규 게이트가 배포·스윕 목록에서 빠지면 소비 프로젝트는 그 게이트를 아예 받지 못한다(이전에도 세 번 재발한 결함과 같은 유형 — 배포 목록 전이 폐포 참조) |
 | 2026-08-10 | 스윕 규칙표에 R21(진단 가드 선언) 등재 + 복사 목록에 `diagnosis-guard-lib`·`check-diagnosis-guard`·`sdd-diagnosis-check.sh` 추가 + `--json` 규칙 ID 목록에 R21 반영 | SPEC-053 동반. 스윕에 실은 것은 **선언 판정**이다(훅 판정은 도구 호출 직전에 따로 발동한다) — 잘못된 선언은 아무것도 막지 않고 아무것도 알리지 않으므로 그 조용한 무발화를 스윕이 본다 |
 | 2026-08-10 | 스윕 규칙표에 R20(명세 모순 감사) 등재 + 복사 목록에 `spec-conflict-lib`·`check-spec-conflict` 추가 + `--json` 리포트 규칙 ID 목록에 R20 반영 | SPEC-052 동반. 이 축은 **감사** 층이라 앞의 19종과 성격이 다르다 — 나머지는 "에이전트가 명세대로 하는가"를 보고 R20은 명세 자체를 본다. 스윕에 실은 이유: 감사는 우회 불가한 채널(CI)에서 돌아야 하고, 감사자가 감시 대상의 협조를 요구하면 강제가 아니다 |
 | 2026-08-10 | `docs/change_log.html` 재생성(면제 래칫 라운드의 Change Log 반영) | 생성기(`gen-changelog.mjs`)가 git 이력에서 재생성하는 산출물이고, pre-commit 훅이 자동 갱신·스테이징한다. 이번 라운드에 그 생성기가 **소유 없이 면제돼 있던 부채**로 등록됐다(SPEC-027 FR-009 — 해소: 이 스펙 Files에 등재하고 면제는 산출물에만 남긴다, 기한 2026-09-30) |

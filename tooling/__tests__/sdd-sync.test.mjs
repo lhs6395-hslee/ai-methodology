@@ -5,9 +5,10 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { gateOutcome, crashSummary } from "../sdd-sync.mjs";
 
-const SYNC = new URL("../sdd-sync.mjs", import.meta.url).pathname;
+const SYNC = fileURLToPath(new URL("../sdd-sync.mjs", import.meta.url));
 
 function fixture(files) {
   const dir = mkdtempSync(join(tmpdir(), "sdd-sync-"));
@@ -117,7 +118,7 @@ test("--json → 기계 판독 리포트(스키마 v1·rule id·게이트·내�
   assert.equal(rep.schemaVersion, 2);   // SPEC-040: tally·kind 추가
   assert.equal(typeof rep.clean, "boolean");
   assert.ok(Array.isArray(rep.flaggedRules));
-  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R25"]);
+  assert.deepEqual(rep.rules.map((x) => x.id), ["R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23", "R24", "R25", "R26"]);
   for (const rule of rep.rules) {
     assert.equal(typeof rule.title, "string");
     assert.equal(typeof rule.flagged, "boolean");

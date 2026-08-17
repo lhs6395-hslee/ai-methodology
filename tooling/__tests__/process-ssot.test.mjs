@@ -110,14 +110,21 @@ test("실측 재현 — 불변식 이름도 단계처럼 SSOT 문서에 문자 �
 
 test("강제한다고 선언했는데 그 파일이 저장소에 없으면 위반 — 강제 주장이 거짓이다", () => {
   const invs = invariantsOf({ invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] });
-  assert.deepEqual(unenforcedInvariantFindings(invs, () => false),
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => false).violations,
     [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }]);
-  assert.deepEqual(unenforcedInvariantFindings(invs, () => true), []);
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => true).violations, []);
+});
+
+test("실재 여부를 확인 못 하면(TRI.UNKNOWN) 위반도 통과도 아니라 확인 못 함으로 낸다", () => {
+  const invs = invariantsOf({ invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] });
+  const r = unenforcedInvariantFindings(invs, () => undefined);
+  assert.deepEqual(r.violations, []);
+  assert.deepEqual(r.unchecked, [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }]);
 });
 
 test("enforcement:null(명시적 미강제)은 파일 실재 검사 대상이 아니다 — 허용된 선언이다", () => {
   const invs = invariantsOf({ invariants: [{ name: "불변식 E", enforcement: null }] });
-  assert.deepEqual(unenforcedInvariantFindings(invs, () => false), [], "강제한다는 주장 자체가 없으니 파일 부재는 위반이 아니다");
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => false).violations, [], "강제한다는 주장 자체가 없으니 파일 부재는 위반이 아니다");
 });
 
 test("실측 재현 — 코드는 강제하는데 SSOT 문서 본문이 그 사실을 말하지 않으면 드리프트로 지목", () => {

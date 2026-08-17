@@ -25,6 +25,7 @@
 // 없는 프로젝트에 사슬을 요구하면 그건 거짓 요구다.
 //
 // 순수 함수(IO 없음) — 파일 읽기·소유 해석은 소비 게이트. Python 미러(SPEC-006).
+import { TRI, tri } from "./check-outcome-lib.mjs";
 
 // 사슬의 조각을 담을 수 있는 문서 종류 — 게이트에 박지 않고 여기서 선언한다(프로젝트는
 // `processDocRegex`로 교체). `.rst`·`.adoc`으로 문서를 쓰는 프로젝트에서 사슬이 통째로 안 보이는
@@ -148,12 +149,19 @@ export function ssotMissingInvariants(ssotText, invariants) {
 }
 
 // enforcement가 선언됐는데 그 파일이 저장소에 실재하지 않으면 위반 — "강제한다"는 주장이
-// 거짓이다. fileExists(path) → boolean (게이트 주입, 코어는 I/O 없음).
+// 거짓이다. fileExists(path)는 boolean 또는 TRI(SPEC-054)를 낼 수 있다 — 읽기 실패 등으로
+// **실재 여부를 확인 못 했다**는 사실을 "없다"(거짓 위반)나 "있다"(거짓 통과)로 붕괴시키지
+// 않고 `unchecked`로 따로 낸다(존재 판정기를 받는 코어의 공통 계약, SPEC-054 FR-004).
 export function unenforcedInvariantFindings(invariants, fileExists) {
-  const exists = typeof fileExists === "function" ? fileExists : () => true;
-  return (invariants || [])
-    .filter((iv) => iv.enforcement && !exists(iv.enforcement))
-    .map((iv) => ({ name: iv.name, enforcement: iv.enforcement }));
+  const check = typeof fileExists === "function" ? fileExists : () => true;
+  const violations = [], unchecked = [];
+  for (const iv of invariants || []) {
+    if (!iv.enforcement) continue;
+    const st = tri(check(iv.enforcement));
+    if (st === TRI.NO) violations.push({ name: iv.name, enforcement: iv.enforcement });
+    else if (st === TRI.UNKNOWN) unchecked.push({ name: iv.name, enforcement: iv.enforcement });
+  }
+  return { violations, unchecked };
 }
 
 // enforcement가 선언됐는데 그 경로 문자열이 SSOT 문서 본문 어디에도 없으면 위반 — config는

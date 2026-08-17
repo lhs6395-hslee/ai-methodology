@@ -100,6 +100,12 @@ const RULES = [
   // 대조 확인했다는 승인 마커(행동 해시 결속)를 요구한다. 실측: QA 실측·댓글까지 마친 티켓을
   // 배포도 안 된 채 종결 상태로 넘기려 했다 — 커밋 이전, 대화 안에서 끝나 기존 게이트가 못 본다.
   { rule: "R25 위험 행동 승인(독립 검증 없이 지나가지 않는가)", gates: ["check-risky-action.mjs"] },
+  // R26(SPEC-059): "배선됐는가"(R17·SPEC-036)가 아니라 "배선된 게이트/가드가 실제로 전체를
+  // 커버하는가"를 본다. 실측(소비 프로젝트, 2026-08-17): ① 같은 논리적 훅을 표현한다고 주장하는
+  // 두 파일(scripts/hooks/commit-msg·scripts/sdd-commit-msg.sh)이 이미 갈라져 있었는데 어떤
+  // 게이트도 못 잡았다 ② dev-done 전이의 필수 가드(canTransition)를 실제 쓰기 경로가 전혀
+  // 호출하지 않았는데 소유권 게이트는 "누가 소유하는가"만 보고 "호출하는가"는 안 봤다.
+  { rule: "R26 게이트 무결성 감사(배선이 실제로 전체를 덮는가)", gates: ["check-duplicate-source-drift.mjs", "check-invariant-guard.mjs"] },
 ];
 
 // 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
@@ -140,6 +146,8 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-fr-placement.mjs": "frplacement",
   "check-gate-escalation.mjs": "gateescalation",
   "check-risky-action.mjs": "riskyaction",
+  "check-duplicate-source-drift.mjs": "duplicatesourcedrift",
+  "check-invariant-guard.mjs": "invariantguard",
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 

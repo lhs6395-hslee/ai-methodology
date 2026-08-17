@@ -5,4 +5,6 @@ cd "$DIR"
 git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && { echo "self commit-msg: merge skip" >&2; exit 0; }
 node tooling/check-spec-sync.mjs --staged --message-file "$1" || exit $?
 node tooling/check-fr-placement.mjs || exit $?
-node tooling/check-gate-escalation.mjs
+node tooling/check-gate-escalation.mjs || exit $?
+node tooling/check-duplicate-source-drift.mjs || exit $?
+node tooling/check-invariant-guard.mjs

@@ -542,6 +542,8 @@ RATCHETED_POLICIES = [
     "frPlacementPolicy",
     "gateFailureEscalationPolicy",
     "riskyActionPolicy",
+    "duplicateSourceDriftPolicy",
+    "invariantGuardPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -6189,9 +6191,17 @@ def ssot_missing_invariants(ssot_text, invariants):
 
 
 def unenforced_invariant_findings(invariants, file_exists=None):
-    exists = file_exists if callable(file_exists) else (lambda p: True)
-    return [{"name": iv["name"], "enforcement": iv["enforcement"]}
-            for iv in (invariants or []) if iv["enforcement"] and not exists(iv["enforcement"])]
+    check = file_exists if callable(file_exists) else (lambda p: True)
+    violations, unchecked = [], []
+    for iv in invariants or []:
+        if not iv["enforcement"]:
+            continue
+        st = tri(check(iv["enforcement"]))
+        if st == TRI_NO:
+            violations.append({"name": iv["name"], "enforcement": iv["enforcement"]})
+        elif st == TRI_UNKNOWN:
+            unchecked.append({"name": iv["name"], "enforcement": iv["enforcement"]})
+    return {"violations": violations, "unchecked": unchecked}
 
 
 def stale_enforcement_mention_findings(ssot_text, invariants):
@@ -6309,9 +6319,12 @@ def cmd_processssot(cfg):
             if miss_inv:
                 block(f'프로세스 "{name}": SSOT({ssot_path})가 선언된 불변식을 담지 않는다 — 빠진 불변식 {len(miss_inv)}건: {" · ".join(miss_inv)}.'
                       " 불변식 이름도 단계처럼 문서에 문자 그대로 있어야 한다")
-            for u in unenforced_invariant_findings(invariants, lambda p: os.path.exists(os.path.join(root, p))):
+            enf = unenforced_invariant_findings(invariants, lambda p: os.path.exists(os.path.join(root, p)))
+            for u in enf["violations"]:
                 block(f'프로세스 "{name}": 불변식 "{u["name"]}"이 "{u["enforcement"]}"로 강제된다고 선언했는데 그 파일이 저장소에 없다'
                       ' — 강제한다는 주장이 거짓이다. 파일을 만들거나 enforcement를 null로 바꿔 "명시적으로 미강제"라고 선언하라')
+            for u in enf["unchecked"]:
+                print(f'  · 불변식 "{u["name"]}"({u["enforcement"]}): 실재 여부 확인 못 함 — 위반으로 단정하지 않는다')
             for s in stale_enforcement_mention_findings(ssot_text, invariants):
                 block(f'프로세스 "{name}": 불변식 "{s["name"]}"은 config에 "{s["enforcement"]}"로 강제된다고 돼 있는데 SSOT({ssot_path}) 본문은'
                       ' 그 사실을 말하지 않는다 — 문서가 여전히 "임시 규칙"이라고만 말하는 동안 코드는 이미 강제하고 있었던 드리프트와 같은 모양이다.'
@@ -7751,6 +7764,226 @@ def cmd_riskyaction(cfg, argv):
               " 커밋 게이트로는 원리상 볼 수 없다. 배선 실재는 R19(에이전트 배선)가 판정한다.")
 
 
+# ── 훅/게이트 사본 드리프트 (SPEC-059, R26) — Node판 duplicate-source-lib.mjs 미러 ──────
+GATE_CALL_RE = re.compile(r"\bcheck-[a-z0-9][a-z0-9-]*\.mjs\b")
+
+
+def gate_calls_in(text):
+    return sorted(set(GATE_CALL_RE.findall(str(text or ""))))
+
+
+def validate_duplicate_source_pairs(pairs):
+    errors = []
+    for i, raw in enumerate(pairs or []):
+        p = raw if isinstance(raw, dict) else {}
+        a = str(p.get("a") or "").strip()
+        b = str(p.get("b") or "").strip()
+        reason = str(p.get("reason") or "").strip()
+        if not a or not b:
+            errors.append(f"duplicateSourcePairs[{i}] — a·b 둘 다 파일 경로 필수")
+        elif a == b:
+            errors.append(f"duplicateSourcePairs[{i}] — a와 b가 같다(자기 자신은 사본이 아니다)")
+        if not reason:
+            errors.append(f"duplicateSourcePairs[{i}] — reason 필수(사유 없는 등록은 등록이 아니다)")
+    return errors
+
+
+def drift_findings(text_a, text_b):
+    a = set(gate_calls_in(text_a))
+    b = set(gate_calls_in(text_b))
+    return {"onlyInA": sorted(a - b), "onlyInB": sorted(b - a)}
+
+
+def cmd_duplicatesourcedrift(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("duplicateSourceDriftPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ duplicateSourceDriftPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "duplicateSourceDriftPolicy")
+        print("훅/게이트 사본 드리프트 게이트 — duplicateSourceDriftPolicy:off (판정 안 함)")
+        return
+
+    raw = cfg.get("duplicateSourcePairs")
+    pairs = raw if isinstance(raw, list) else []
+    if not pairs:
+        verdict("INERT", "duplicateSourcePairs 미등록 — 검사할 사본 쌍이 없다")
+        print("[안 봄(판정 입력 없음)] 훅/게이트 사본 드리프트 게이트 — duplicateSourcePairs가 비어 있다."
+              " 같은 논리적 훅·게이트를 표현한다고 주장하는 파일 쌍이 있으면"
+              " `{ a: <경로>, b: <경로>, reason: <왜 둘인가> }`로 등록하라.")
+        return
+
+    cfg_errors = validate_duplicate_source_pairs(pairs)
+    if cfg_errors:
+        judged(len(cfg_errors))
+        print(f"훅/게이트 사본 드리프트 게이트(duplicateSourceDriftPolicy={policy}): 등록 {len(pairs)}쌍")
+        for e in cfg_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    errors, warnings, unchecked = [], [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    for p in pairs:
+        a, b, reason = p.get("a"), p.get("b"), p.get("reason")
+        abs_a, abs_b = os.path.join(root, a), os.path.join(root, b)
+        if not os.path.exists(abs_a) or not os.path.exists(abs_b):
+            missing = a if not os.path.exists(abs_a) else b
+            unchecked.append(f"{a} ↔ {b} — 한쪽 이상 파일 부재({missing} 없음), 대조 못 함")
+            continue
+        d = drift_findings(read_text(abs_a), read_text(abs_b))
+        if d["onlyInA"] or d["onlyInB"]:
+            parts = []
+            if d["onlyInA"]:
+                parts.append(f'{a}에만 있음: {", ".join(d["onlyInA"])}')
+            if d["onlyInB"]:
+                parts.append(f'{b}에만 있음: {", ".join(d["onlyInB"])}')
+            block(f'{a} ↔ {b}({reason}): 부르는 게이트 목록이 갈렸다 — {" / ".join(parts)}.'
+                  " 어느 쪽이 최신인지는 이 게이트가 정하지 않는다 — 둘을 맞추거나, 한쪽이 다른 쪽을 생성하도록 리팩터하라")
+
+    judged(len(errors))
+    print(f"훅/게이트 사본 드리프트 게이트(duplicateSourceDriftPolicy={policy}): 등록 {len(pairs)}쌍 대조"
+          + (f" · 확인 못 함 {len(unchecked)}건(통과 아님)" if unchecked else ""))
+    for u in unchecked:
+        print(f"  · {u}")
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 훅/게이트 사본이 갈라져 있다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if not warnings and not unchecked:
+        print("  ✓ 등록된 모든 사본 쌍이 같은 게이트 목록을 부른다.")
+
+
+# ── 가드 함수 우회 (SPEC-059, R26) — Node판 invariant-guard-lib.mjs 미러 ────────────
+def validate_invariant_guards(guards):
+    errors = []
+    for i, raw in enumerate(guards or []):
+        g = raw if isinstance(raw, dict) else {}
+        guard = str(g.get("guard") or "").strip()
+        guard_file = str(g.get("guardFile") or "").strip()
+        raw_surfaces = g.get("guardedWriteSurfaces")
+        surfaces = [s for s in raw_surfaces if str(s or "").strip()] if isinstance(raw_surfaces, list) else []
+        if not guard:
+            errors.append(f"invariantGuards[{i}] — guard(가드 함수 이름) 필수")
+        if not guard_file:
+            errors.append(f"invariantGuards[{i}] — guardFile(가드가 정의된 파일) 필수")
+        if not surfaces:
+            errors.append(f"invariantGuards[{i}] — guardedWriteSurfaces 1개 이상 필수(빈 배열은 검사 대상 없음과 같다)")
+        gfp = g.get("guardedFieldPattern")
+        if gfp is not None and not isinstance(gfp, str):
+            errors.append(f"invariantGuards[{i}].guardedFieldPattern — 문자열(정규식 소스)이어야 한다")
+    return errors
+
+
+def guard_missing_findings(guards, guard_file_text):
+    out = []
+    for g in guards or []:
+        text = guard_file_text(g.get("guardFile"))
+        if text is None:
+            out.append({"guard": g.get("guard"), "guardFile": g.get("guardFile"), "reason": "guardFile 부재"})
+            continue
+        if reference_count(text, g.get("guard")) < 1:
+            out.append({"guard": g.get("guard"), "guardFile": g.get("guardFile"), "reason": "guardFile에 정의가 없다"})
+    return out
+
+
+def guard_bypass_findings(guards, surface_text):
+    findings, unchecked = [], []
+    for g in guards or []:
+        field_pattern = g.get("guardedFieldPattern")
+        field_re = re.compile(field_pattern) if field_pattern else None
+        for surface in g.get("guardedWriteSurfaces") or []:
+            text = surface_text(surface)
+            if text is None:
+                unchecked.append({"guard": g.get("guard"), "surface": surface, "reason": "표면 파일 부재"})
+                continue
+            if field_re and not field_re.search(text):
+                continue
+            count = reference_count(text, g.get("guard"))
+            if count < REFERENCE_BAR["fn"]:
+                findings.append({
+                    "guard": g.get("guard"), "surface": surface, "count": count,
+                    "reason": "가드 참조 0건" if count == 0 else "가드가 import만 되고 호출 흔적이 없다(참조 1건)",
+                })
+    return {"findings": findings, "unchecked": unchecked}
+
+
+def cmd_invariantguard(cfg):
+    root = cfg["__root"]
+    policy = str(cfg.get("invariantGuardPolicy") or "advisory")
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ invariantGuardPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "invariantGuardPolicy")
+        print("가드 함수 우회 게이트 — invariantGuardPolicy:off (판정 안 함)")
+        return
+
+    raw = cfg.get("invariantGuards")
+    guards = raw if isinstance(raw, list) else []
+    if not guards:
+        verdict("INERT", "invariantGuards 미등록 — 검사할 가드가 없다")
+        print("[안 봄(판정 입력 없음)] 가드 함수 우회 게이트 — invariantGuards가 비어 있다."
+              " '이 상태 전이는 반드시 이 함수를 거쳐야 한다'는 불변식이 있으면"
+              " `{ guard, guardFile, guardedWriteSurfaces: [...], guardedFieldPattern? }`로 등록하라.")
+        return
+
+    cfg_errors = validate_invariant_guards(guards)
+    if cfg_errors:
+        judged(len(cfg_errors))
+        print(f"가드 함수 우회 게이트(invariantGuardPolicy={policy}): 등록 {len(guards)}건")
+        for e in cfg_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+
+    def read_or_none(rel):
+        abs_path = os.path.join(root, rel)
+        if not os.path.exists(abs_path):
+            return None
+        try:
+            return read_text(abs_path)
+        except OSError:
+            return None
+
+    errors, warnings = [], []
+
+    def block(msg):
+        (errors if policy == "hard" else warnings).append(msg)
+
+    missing = guard_missing_findings(guards, read_or_none)
+    for m in missing:
+        block(f'가드 "{m["guard"]}"({m["guardFile"]}): {m["reason"]} — 존재하지 않는 함수를 가드로 등록했다')
+
+    bypass = guard_bypass_findings(guards, read_or_none)
+    for f in bypass["findings"]:
+        block(f'가드 "{f["guard"]}"가 {f["surface"]}에서 우회된다 — {f["reason"]}(참조 {f["count"]}건).'
+              " 이 표면은 이 상태를 직접 쓰면서 가드를 거치지 않는다는 뜻이다. 가드를 호출하도록 고치거나,"
+              " 실제로 가드가 필요 없으면 guardedWriteSurfaces에서 이 표면을 빼라(침묵으로 남기지 않는다)")
+
+    judged(len(errors))
+    print(f"가드 함수 우회 게이트(invariantGuardPolicy={policy}): 가드 {len(guards)}건"
+          + (f" · 확인 못 함 {len(bypass['unchecked'])}건(통과 아님)" if bypass["unchecked"] else ""))
+    for u in bypass["unchecked"]:
+        print(f'  · {u["guard"]} ↔ {u["surface"]} — {u["reason"]}')
+    for w in warnings:
+        print(f"  ⚠ {w}")
+    if errors:
+        print(f"\n✗ 가드가 우회되는 표면이 있다 {len(errors)}건:", file=sys.stderr)
+        for e in errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if not warnings and not bypass["unchecked"]:
+        print("  ✓ 등록된 모든 가드가 지목된 표면 전부에서 실제로 참조된다.")
+
+
 # ── 완료 판정 신호 강도 (SPEC-055, R22) — Node판 completion-signal-lib.mjs 미러 ──────
 # 실측 제보: 배포 완료를 **파생 신호로 판정했다.** 파이프라인 로그에 성공 줄이 있고 CI가 초록이어서
 # 완료로 보고했는데 migrate Job이 실패해 배포 스테이지가 스킵된 상태였다.
@@ -8511,6 +8744,10 @@ def main():
         cmd_gateescalation(cfg)
     elif sub == "riskyaction":
         cmd_riskyaction(cfg, args)
+    elif sub == "duplicatesourcedrift":
+        cmd_duplicatesourcedrift(cfg)
+    elif sub == "invariantguard":
+        cmd_invariantguard(cfg)
     elif sub == "completionsignal":
         cmd_completionsignal(cfg)
     elif sub == "duplicatelogic":

@@ -16,4 +16,10 @@ node scripts/check-spec-sync.mjs --staged --message-file "$1" || exit $?
 node scripts/check-fr-placement.mjs || exit $?
 # 게이트 실패 에스컬레이션(SPEC-057) — 원장을 읽어 반복된 미가드 실패 클래스를 말한다.
 [ -f scripts/check-gate-escalation.mjs ] || { echo "sdd commit-msg: check-gate-escalation 없음 — sdd-init 재실행 필요" >&2; exit 1; }
-node scripts/check-gate-escalation.mjs
+node scripts/check-gate-escalation.mjs || exit $?
+# 게이트 무결성 감사(SPEC-059, R26) — "배선됐는가"가 아니라 "배선된 게이트/가드가 실제로
+# 전체를 커버하는가"를 본다. 등록(duplicateSourcePairs/invariantGuards)이 없으면 INERT.
+[ -f scripts/check-duplicate-source-drift.mjs ] || { echo "sdd commit-msg: check-duplicate-source-drift 없음 — sdd-init 재실행 필요" >&2; exit 1; }
+node scripts/check-duplicate-source-drift.mjs || exit $?
+[ -f scripts/check-invariant-guard.mjs ] || { echo "sdd commit-msg: check-invariant-guard 없음 — sdd-init 재실행 필요" >&2; exit 1; }
+node scripts/check-invariant-guard.mjs
