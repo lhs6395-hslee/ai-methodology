@@ -6155,6 +6155,51 @@ def unowned_state_findings(stages, is_owned=None):
             for st in (stages or []) if st["state"] and not own(st["state"])]
 
 
+# ── 불변식 강제 여부(4번째 축, Node process-ssot-lib.mjs 미러) ──────────────
+def invariant_of(entry):
+    if isinstance(entry, str):
+        return {"name": entry, "enforcement": None}
+    e = entry or {}
+    raw = e.get("enforcement")
+    return {"name": str(e.get("name") or ""), "enforcement": None if raw is None else str(raw)}
+
+
+def invariants_of(proc):
+    return [i for i in (invariant_of(x) for x in ((proc or {}).get("invariants") or [])) if i["name"]]
+
+
+def validate_invariants(invariants):
+    errors = []
+    for raw in invariants or []:
+        is_obj = isinstance(raw, dict)
+        name = raw if isinstance(raw, str) else (str(raw.get("name") or "") if is_obj else "")
+        if not name.strip():
+            errors.append('invariants[] — name 필수(빈 값은 규칙 없음과 같다)')
+            continue
+        if is_obj and "enforcement" in raw:
+            enf = raw.get("enforcement")
+            if enf is not None and not isinstance(enf, str):
+                errors.append(f'invariants["{name}"].enforcement — 문자열(강제 스크립트 경로) 또는 null이어야 한다')
+    return errors
+
+
+def ssot_missing_invariants(ssot_text, invariants):
+    s = str(ssot_text or "")
+    return [iv["name"] for iv in (invariants or []) if iv["name"] not in s]
+
+
+def unenforced_invariant_findings(invariants, file_exists=None):
+    exists = file_exists if callable(file_exists) else (lambda p: True)
+    return [{"name": iv["name"], "enforcement": iv["enforcement"]}
+            for iv in (invariants or []) if iv["enforcement"] and not exists(iv["enforcement"])]
+
+
+def stale_enforcement_mention_findings(ssot_text, invariants):
+    s = str(ssot_text or "")
+    return [{"name": iv["name"], "enforcement": iv["enforcement"]}
+            for iv in (invariants or []) if iv["enforcement"] and iv["enforcement"] not in s]
+
+
 def cmd_processssot(cfg):
     root = cfg["__root"]
     policy = str(cfg.get("processSsotPolicy") or "advisory")
@@ -6178,6 +6223,9 @@ def cmd_processssot(cfg):
               " 그 저장소가 소유되는지를 본다.")
         return
     cfg_errors = validate_processes(processes)
+    for name in names:
+        for e in validate_invariants((processes[name] or {}).get("invariants") or []):
+            cfg_errors.append(f'processes["{name}"].{e}')
     if cfg_errors:
         judged(len(cfg_errors))
         print(f"순차 프로세스 게이트(processSsotPolicy={policy}): 프로세스 {len(names)}종 선언")
@@ -6220,7 +6268,7 @@ def cmd_processssot(cfg):
 
     cap = int(cfg.get("processSsotListCap") or 12)
     min_stages = int(cfg.get("processFragmentMinStages") or 2)
-    stage_total = state_total = 0
+    stage_total = state_total = invariant_total = invariant_enforced_total = 0
     for name in names:
         proc = processes[name]
         stages = stages_of(proc)
@@ -6252,9 +6300,27 @@ def cmd_processssot(cfg):
                   " — 인프라 산출물인데 스펙 밖에 있으면 그쪽 리뷰에서도 빠진다(실측: 저장소 요구가 어느 FR에도 없고 코드 주석에만 있었다)."
                   " 어느 스펙의 Ownership Files에 편입하라")
 
+        # ④ 불변식 강제 여부 — 사슬(stages)과 별개로 SSOT가 선언하는 규칙. 미선언이면 건너뛴다.
+        invariants = invariants_of(proc)
+        if invariants:
+            invariant_total += len(invariants)
+            invariant_enforced_total += len([iv for iv in invariants if iv["enforcement"]])
+            miss_inv = ssot_missing_invariants(ssot_text, invariants)
+            if miss_inv:
+                block(f'프로세스 "{name}": SSOT({ssot_path})가 선언된 불변식을 담지 않는다 — 빠진 불변식 {len(miss_inv)}건: {" · ".join(miss_inv)}.'
+                      " 불변식 이름도 단계처럼 문서에 문자 그대로 있어야 한다")
+            for u in unenforced_invariant_findings(invariants, lambda p: os.path.exists(os.path.join(root, p))):
+                block(f'프로세스 "{name}": 불변식 "{u["name"]}"이 "{u["enforcement"]}"로 강제된다고 선언했는데 그 파일이 저장소에 없다'
+                      ' — 강제한다는 주장이 거짓이다. 파일을 만들거나 enforcement를 null로 바꿔 "명시적으로 미강제"라고 선언하라')
+            for s in stale_enforcement_mention_findings(ssot_text, invariants):
+                block(f'프로세스 "{name}": 불변식 "{s["name"]}"은 config에 "{s["enforcement"]}"로 강제된다고 돼 있는데 SSOT({ssot_path}) 본문은'
+                      ' 그 사실을 말하지 않는다 — 문서가 여전히 "임시 규칙"이라고만 말하는 동안 코드는 이미 강제하고 있었던 드리프트와 같은 모양이다.'
+                      " 문서에 강제 스크립트 경로를 언급하도록 갱신하라")
+
     judged(len(errors))
     print(f"순차 프로세스 게이트(processSsotPolicy={policy}): 프로세스 {len(names)}종 · 단계 {stage_total}건"
-          f" · 저장소 선언 {state_total}건 · 문서 {len(docs)}건 대조({prose.pattern})")
+          f" · 저장소 선언 {state_total}건 · 문서 {len(docs)}건 대조({prose.pattern})"
+          f" · 불변식 {invariant_total}건(강제 {invariant_enforced_total}건 · 명시적 미강제 {invariant_total - invariant_enforced_total}건)")
     for w in warnings:
         print(f"  ⚠ {w}")
     if errors:
@@ -6263,7 +6329,7 @@ def cmd_processssot(cfg):
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
     if not warnings:
-        print("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐다.")
+        print("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐고, 불변식은 강제되거나 명시적으로 미강제다.")
 
 
 # ── 감시자 실재 코어 (SPEC-048, watchdog-lib.mjs 미러) ─────────────────────

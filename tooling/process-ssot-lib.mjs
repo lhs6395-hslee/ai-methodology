@@ -99,3 +99,69 @@ export function unownedStateFindings(stages, isOwned) {
   const own = typeof isOwned === "function" ? isOwned : () => true;
   return (stages || []).filter((st) => st.state && !own(st.state)).map((st) => ({ stage: st.name, state: st.state }));
 }
+
+// ─── 불변식 강제 여부 (4번째 축) ────────────────────────────────────────────
+// 사슬(stages)과 별개로, SSOT 문서는 흔히 그 사슬을 지키는 "불변식"도 함께 선언한다
+// (예: CLOSEOUT_FLOW.md의 "사슬을 지키는 불변식" 절). 불변식은 stage가 아니다 — 순서상의
+// 한 단계가 아니라 사슬 전체에 걸리는 규칙이다. 이 규칙이 실제로 코드로 강제되는지, 강제
+// 안 된다면 그 사실이 최소한 명시적으로 선언됐는지를 본다. "강제한다고 적혀 있는데 그
+// 파일이 없다"·"강제됐는데 문서는 여전히 임시 규칙이라고 말한다" 둘 다 놓치면 안 되는
+// 드리프트다 — 소비 프로젝트 실측: CLOSEOUT_FLOW.md의 불변식 F가 "qa-agent가 실측을 완전히
+// 대체하기 전까지 유효한 임시 규칙"이라는 문구로 몇 주간 머물렀고, 그 사이 강제 코드가
+// 생겼는지 여부를 문서만 봐서는 알 수 없었다.
+
+// 불변식 선언 정규화 — 문자열이면 이름만(강제 없음), 객체면 {name, enforcement}.
+// enforcement는 문자열(강제 스크립트 경로) 또는 null/생략(명시적 미강제) 이어야 한다.
+export function invariantOf(entry) {
+  if (typeof entry === "string") return { name: entry, enforcement: null };
+  const e = entry || {};
+  const raw = e.enforcement;
+  return { name: String(e.name ?? ""), enforcement: raw === undefined || raw === null ? null : String(raw) };
+}
+
+export function invariantsOf(proc) {
+  return ((proc || {}).invariants || []).map(invariantOf).filter((i) => i.name);
+}
+
+// config 형식 검증 — enforcement에 문자열·null·undefined 외의 타입을 조용히 통과시키지 않는다.
+export function validateInvariants(invariants) {
+  const errors = [];
+  for (const raw of invariants || []) {
+    const isObj = raw && typeof raw === "object" && !Array.isArray(raw);
+    const name = typeof raw === "string" ? raw : isObj ? String(raw.name ?? "") : "";
+    if (!name.trim()) { errors.push(`invariants[] — name 필수(빈 값은 규칙 없음과 같다)`); continue; }
+    if (isObj && "enforcement" in raw) {
+      const enf = raw.enforcement;
+      if (enf !== null && typeof enf !== "string") {
+        errors.push(`invariants["${name}"].enforcement — 문자열(강제 스크립트 경로) 또는 null이어야 한다`);
+      }
+    }
+  }
+  return errors;
+}
+
+// 불변식 이름도 단계 이름과 같은 원칙 — SSOT 문서에 문자 그대로 없으면 그 문서는 이 불변식을
+// 담지 않은 것이다(동의어 추정 없음, 표기 불일치의 해소는 선언을 문서에 맞추는 것).
+export function ssotMissingInvariants(ssotText, invariants) {
+  const s = String(ssotText || "");
+  return (invariants || []).filter((iv) => !s.includes(iv.name)).map((iv) => iv.name);
+}
+
+// enforcement가 선언됐는데 그 파일이 저장소에 실재하지 않으면 위반 — "강제한다"는 주장이
+// 거짓이다. fileExists(path) → boolean (게이트 주입, 코어는 I/O 없음).
+export function unenforcedInvariantFindings(invariants, fileExists) {
+  const exists = typeof fileExists === "function" ? fileExists : () => true;
+  return (invariants || [])
+    .filter((iv) => iv.enforcement && !exists(iv.enforcement))
+    .map((iv) => ({ name: iv.name, enforcement: iv.enforcement }));
+}
+
+// enforcement가 선언됐는데 그 경로 문자열이 SSOT 문서 본문 어디에도 없으면 위반 — config는
+// "코드로 강제된다"고 아는데 사람이 읽는 문서는 그 사실을 말하지 않는 드리프트(문서가
+// "임시 규칙"이라고 계속 말하는 동안 코드는 이미 강제하고 있었던 실측 사례가 근거).
+export function staleEnforcementMentionFindings(ssotText, invariants) {
+  const s = String(ssotText || "");
+  return (invariants || [])
+    .filter((iv) => iv.enforcement && !s.includes(iv.enforcement))
+    .map((iv) => ({ name: iv.name, enforcement: iv.enforcement }));
+}

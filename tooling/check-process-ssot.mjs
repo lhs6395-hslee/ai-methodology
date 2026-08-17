@@ -16,6 +16,8 @@ import { parseSection } from "./ownership-keys.mjs";
 import {
   validateProcesses, stagesOf, ssotMissingStages, fragmentFindings,
   statelessStageFindings, unownedStateFindings, DEFAULT_PROCESS_DOC_REGEX,
+  invariantsOf, validateInvariants, ssotMissingInvariants,
+  unenforcedInvariantFindings, staleEnforcementMentionFindings,
 } from "./process-ssot-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS, isMainEntry } from "./verdict-lib.mjs";
@@ -45,6 +47,12 @@ function main() {
     return;
   }
   const cfgErrors = validateProcesses(processes);
+  // 불변식 config 문법도 같은 자리에서 함께 문법화한다(정의되지 않은 형태를 조용히 통과시키지
+  // 않는다) — 원본(raw) 배열로 검사한다: invariantsOf()는 이름 빈 항목을 조용히 걸러내므로
+  // 그 필터를 통과한 값으로 검사하면 "이름 없음" 오류를 영영 못 잡는다.
+  for (const name of names) {
+    cfgErrors.push(...validateInvariants((processes[name] || {}).invariants || []).map((e) => `processes["${name}"].${e}`));
+  }
   if (cfgErrors.length) {
     judged(cfgErrors.length);
     console.log(`순차 프로세스 게이트(processSsotPolicy=${POLICY}): 프로세스 ${names.length}종 선언`);
@@ -79,7 +87,7 @@ function main() {
 
   const errors = [], warnings = [];
   const block = (msg) => (POLICY === "hard" ? errors : warnings).push(msg);
-  let stageTotal = 0, stateTotal = 0;
+  let stageTotal = 0, stateTotal = 0, invariantTotal = 0, invariantEnforcedTotal = 0;
 
   for (const name of names) {
     const proc = processes[name];
@@ -123,18 +131,41 @@ function main() {
         + ` — 인프라 산출물인데 스펙 밖에 있으면 그쪽 리뷰에서도 빠진다(실측: 저장소 요구가 어느 FR에도 없고 코드 주석에만 있었다).`
         + ` 어느 스펙의 Ownership Files에 편입하라`);
     }
+
+    // ④ 불변식 강제 여부 — 사슬(stages)과 별개로 SSOT가 선언하는 규칙. 미선언(invariants
+    // 생략)이면 완전히 건너뛴다(하위호환 — 모든 프로세스가 불변식을 나눠 가질 필요는 없다).
+    const invariants = invariantsOf(proc);
+    if (invariants.length) {
+      invariantTotal += invariants.length;
+      invariantEnforcedTotal += invariants.filter((iv) => iv.enforcement).length;
+      const missInv = ssotMissingInvariants(ssotText, invariants);
+      if (missInv.length) {
+        block(`프로세스 "${name}": SSOT(${ssotPath})가 선언된 불변식을 담지 않는다 — 빠진 불변식 ${missInv.length}건: ${missInv.join(" · ")}.`
+          + ` 불변식 이름도 단계처럼 문서에 문자 그대로 있어야 한다`);
+      }
+      for (const u of unenforcedInvariantFindings(invariants, (p) => existsSync(join(ROOT, p)))) {
+        block(`프로세스 "${name}": 불변식 "${u.name}"이 "${u.enforcement}"로 강제된다고 선언했는데 그 파일이 저장소에 없다`
+          + ` — 강제한다는 주장이 거짓이다. 파일을 만들거나 enforcement를 null로 바꿔 "명시적으로 미강제"라고 선언하라`);
+      }
+      for (const s of staleEnforcementMentionFindings(ssotText, invariants)) {
+        block(`프로세스 "${name}": 불변식 "${s.name}"은 config에 "${s.enforcement}"로 강제된다고 돼 있는데 SSOT(${ssotPath}) 본문은`
+          + ` 그 사실을 말하지 않는다 — 문서가 여전히 "임시 규칙"이라고만 말하는 동안 코드는 이미 강제하고 있었던 드리프트와 같은 모양이다.`
+          + ` 문서에 강제 스크립트 경로를 언급하도록 갱신하라`);
+      }
+    }
   }
 
   judged(errors.length);
   console.log(`순차 프로세스 게이트(processSsotPolicy=${POLICY}): 프로세스 ${names.length}종 · 단계 ${stageTotal}건`
-    + ` · 저장소 선언 ${stateTotal}건 · 문서 ${docs.length}건 대조(${PROSE.source})`);
+    + ` · 저장소 선언 ${stateTotal}건 · 문서 ${docs.length}건 대조(${PROSE.source})`
+    + ` · 불변식 ${invariantTotal}건(강제 ${invariantEnforcedTotal}건 · 명시적 미강제 ${invariantTotal - invariantEnforcedTotal}건)`);
   for (const w of warnings) console.log(`  ⚠ ${w}`);
   if (errors.length) {
     console.error(`\n✗ 순차 사슬이 흩어져 있다 ${errors.length}건:`);
     for (const e of errors) console.error(`  ✗ ${e}`);
     process.exit(1);
   }
-  if (!warnings.length) console.log("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐다.");
+  if (!warnings.length) console.log("  ✓ 전 구간이 SSOT에 있고 조각 보유 문서가 그것을 가리키며, 비교 단계의 저장소는 선언·소유됐고, 불변식은 강제되거나 명시적으로 미강제다.");
 }
 
 if (isMainEntry(import.meta.url)) { armVerdict(); main(); }

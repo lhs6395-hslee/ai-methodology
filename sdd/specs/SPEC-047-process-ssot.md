@@ -22,6 +22,11 @@
 - **Independent Test**: 같은 테스트가 미소유 저장소를 표면화하고 소유 시 통과함을 검증. [검증: tooling/__tests__/process-ssot.test.mjs]
 - **Acceptance (GWT)**: 1. **Given** a declared store that no spec's Files glob matches, **When** the gate runs, **Then** it reports the store as unowned.
 
+### User Story 4 — 선언된 불변식은 강제되거나, 명시적으로 미강제라고 말한다 (P1)
+사슬(stages)과 별개로 SSOT 문서는 흔히 그 사슬을 지키는 "불변식"도 선언한다. 이 규칙이 실제로 코드로 강제되는지, 강제 안 된다면 그 사실이 최소한 명시적으로 선언됐는지를 모르면 "텍스트로만 있는 규칙"이 조용히 몇 주씩 방치된다 — 소비 프로젝트 실측: 불변식이 "임시 규칙"이라는 문구로 남아 있는 사이 강제 코드가 이미 생겼는데, 문서만 봐서는 그 사실을 알 수 없었다.
+- **Independent Test**: 순수 코어(불변식 정규화·config 문법·SSOT 누락·미실재 강제·문서 미언급 드리프트)와 게이트(강제 파일 부재 차단·드리프트 차단·이름 누락 차단·통과·명시적 미강제 허용·하위호환)를 단독 검증. [검증: tooling/__tests__/process-ssot.test.mjs]
+- **Acceptance (GWT)**: 1. **Given** an invariant declared with a non-null `enforcement` path, **When** that path does not exist in the repository, **Then** the gate reports it as a false enforcement claim. 2. **Given** the same invariant once its enforcement path exists, **When** the SSOT document's body never mentions that path, **Then** the gate reports the document as stale (config says enforced, prose does not).
+
 ### Edge Cases
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 - **`processes` 미선언은 `INERT`다** — 순차 사슬이 없는 프로젝트에 사슬을 요구하면 거짓 요구다. 선언이 판정의 입구다.
@@ -34,6 +39,9 @@
 - **사슬의 순서가 옳은지는 판정하지 않는다** — 존재는 기계, 질은 리뷰.
 - 비교 마커는 프로젝트가 갈아끼운다(`statefulStageMarkers`) — 어휘 교체이지 면제가 아니다.
 - 기본 `advisory`. `hard`는 SSOT가 정착한 뒤가 종착지다.
+- **불변식의 `enforcement: null`(또는 생략)은 허용된다** — 모든 불변식이 코드로 강제될 필요는 없다(예: 조직적 2인 책임분리 규칙). 단, 반드시 명시적이어야 한다 — `invariants` 배열 자체를 생략하는 것과 항목을 두되 `enforcement: null`로 두는 것은 다르다(전자는 이 축 전체가 미검사, 후자는 "검사했고 의도적으로 미강제"다).
+- **불변식 이름도 단계처럼 SSOT 문서에 문자 그대로 있어야 한다** — 동의어 추정 없음(같은 원칙, User Story 1과 동형).
+- **`invariants` 미선언은 이 축 전체를 건너뛴다** — 완전히 하위호환. 모든 프로세스가 불변식을 나눠 가질 필요는 없다.
 
 ---
 
@@ -44,6 +52,7 @@
 - **FR-002** (unwanted): IF a prose document holds at least the fragment threshold of declared stage names without containing the SSOT path, THEN **check-process-ssot.mjs** (S) SHALL report it as a fragment holder, warning under advisory and exiting non-zero under hard.
 - **FR-003** (unwanted): IF a stage name claims cross-run comparison by marker while declaring no store, THEN the gate SHALL report it as a comparison without a meeting place; IF a declared store matches no spec's ownership globs, THEN the gate SHALL report it as unowned infrastructure.
 - **FR-004** (state): WHILE no process is declared, THE SYSTEM SHALL declare itself inert rather than reporting zero violations; WHERE a declared SSOT document is absent, THE SYSTEM SHALL fail rather than skipping it.
+- **FR-005** (unwanted): IF a process declares an invariant whose `enforcement` is a non-null path, THEN the gate SHALL report it as a false enforcement claim WHEN that path does not exist in the repository, AND SHALL report the SSOT document as stale WHEN its body never mentions that path; IF an invariant's name is absent from the SSOT document, THEN the gate SHALL report it the same way a missing stage is reported. WHERE a process declares no `invariants`, THE SYSTEM SHALL skip this axis entirely (backward-compatible). — capability: **process-ssot.consolidate** (C).
 
 ### Key Entities
 - **process-ssot** — the single document that owns a sequential chain end to end, as distinct from the specs that hold its fragments, so that no reader has to reconstruct the flow from pieces.
@@ -69,6 +78,7 @@
 - **SC-001**: `process-ssot.test.mjs` 전 케이스 green — 단계 정규화·config 문법 3종·빠진 단계·조각 보유(자기 제외·참조 통과·1단계 제외)·비교 마커 저장소·마커 교체·미소유 저장소·게이트 5갈래. [검증: tooling/__tests__/process-ssot.test.mjs]
 - **SC-002**: 판정 출력이 Node↔Python 바이트 동일하다. [검증: tooling/__tests__/sdd-gates-py.test.mjs]
 - **SC-003**: 제보의 8단계 사슬이 합성 재현으로 표면화된다 — 빠진 단계 5건·조각 보유 1건·저장소 미선언 1건이 각각 지목된다. [검증: tooling/__tests__/process-ssot.test.mjs]
+- **SC-004**: 불변식 강제 파일 부재·SSOT 미언급 드리프트·이름 누락·명시적 미강제 허용·하위호환(invariants 미선언)이 각각 합성 재현으로 표면화·통과된다. [검증: tooling/__tests__/process-ssot.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 판정 코어는 문자열 대조만의 순수 함수이고 파일 읽기·글롭 컴파일·소유 해석은 소비 게이트가 주입하므로, 저장소 없이 코어를 단독 테스트할 수 있다. [검증: tooling/__tests__/process-ssot.test.mjs]
@@ -79,6 +89,7 @@
 - **기각한 대안:** 단계 이름의 동의어·유사 표기를 추정하는 방식. 오탐이 폭주하고 판정이 확률적이 된다 — SPEC-033·042가 이미 거부한 길이다. 재검토 조건: 없음. 표기 불일치의 해소는 선언을 문서에 맞추는 것이다.
 - **기각한 대안:** 모든 단계에 저장소를 요구하는 방식. 대부분의 단계는 상태가 필요 없고(커밋·머지), 전부 요구하면 사람이 빈 값을 채운다. 비교·합의 마커와의 곱으로 좁힌다 — SPEC-043이 방아쇠 폭을 곱으로 좁힌 것과 같은 판단이다. 재검토 조건: 마커 없는 단계가 상태 부재로 실패한 실측이 나오면 마커를 넓힌다.
 - **기각한 대안:** 저장소가 **실제로 쓰였는지** 확인하는 방식. 그건 SPEC-041(실행 원장)의 축이다 — 이 spec은 저장소가 **선언·소유됐는지**까지 본다. 존재는 실행이 아니다.
+- **기각한 대안:** `enforcement` 파일이 **정말 그 불변식을 검사하는지** 의미까지 확인하는 방식(예: 그 파일이 관련 문자열을 담고 있는지 정적 분석). 의미론적 확인은 판정 범위 밖이다 — 존재는 기계, 의미는 리뷰. 파일이 실재하고 문서가 그 사실을 언급한다는 것까지가 기계가 셀 수 있는 사실이고, 그 파일이 실제로 옳은 검사를 하는지는 코드 리뷰의 몫이다. 재검토 조건: 없음.
 
 ## Review Log
 <!-- Reviewed 승격 조건: /analyze·/checklist 수준 검토 결과 기록(일시·수행자·판정) — completeness 게이트가 존재를 검사 -->
@@ -98,6 +109,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-17 | **FR-005 신설 — 불변식 강제 여부(4번째 축)**: `processes[name].invariants: [{name, enforcement}]` 선언 신설. `invariantOf`/`invariantsOf`/`validateInvariants`/`ssotMissingInvariants`/`unenforcedInvariantFindings`/`staleEnforcementMentionFindings`(process-ssot-lib.mjs) + `cmd_processssot` Python 미러 확장 + `check-process-ssot.mjs` 배선(같은 `processSsotPolicy` 재사용, 새 정책 키 없음). `enforcement: null`(명시적 미강제)은 허용 — 모든 불변식이 코드일 필요는 없다. 단위 12건 신규 + Python 패리티 시나리오 5건 추가 | 소비 프로젝트(gsn-ai-pm-management-tool) 실측(2026-08-17): CLOSEOUT_FLOW.md의 "사슬을 지키는 불변식" 6개 중 여러 개가 텍스트로만 있었고, 그중 하나(불변식 F)는 "qa-agent가 실측을 완전히 대체하기 전까지 유효한 임시 규칙"이라는 문구로 몇 주간 남아 있었다 — 그 사이 강제 코드가 생겼는지 여부를 SPEC-047의 기존 3축(단계 완비·조각 참조·저장소 소유)만으로는 알 수 없었다. 사슬(stages)과 불변식은 같은 SSOT 문서의 서로 다른 절이므로 별도 spec을 만들지 않고 이 spec의 4번째 축으로 확장했다(SPEC-041과는 축이 다름 — 그쪽은 "실행됐는가", 이쪽은 "강제하는 코드가 실재하는가") |
 | 2026-08-10 | 엔트리 가드를 공용 `isMainEntry`(realpath 비교)로 교체 | 이 게이트가 `import.meta.url === \`file://${argv[1]}\`` 문자열 비교를 쓰고 있었다. 그 형태는 경로에 비-ASCII가 있거나 심볼릭 링크가 끼면 갈리고, 갈리면 main 블록이 **실행되지 않은 채 exit 0** — 통과가 아니라 무음 미실행이다. 킷은 이 결함을 이미 한 번 고쳤는데(SPEC-021 실측) 정의가 세 파일에 복사돼 있었고 이 게이트가 그 규범을 모른 채 깨진 형태로 태어났다. 정의를 `verdict-lib` 한 곳으로 모으고 재유입을 계약 테스트가 금지한다(SPEC-040 FR-005) [검증: tooling/__tests__/import-wiring.test.mjs] |
 | 2026-08-10 | 초안 — `processes`·`processSsotPolicy`(off\|advisory\|hard, 기본 advisory)·`processSsotListCap`·`processFragmentMinStages`·`statefulStageMarkers` + `process-ssot-lib`(단계 정규화·config 문법·빠진 단계·조각 보유·비교 마커·미소유 저장소) + `check-process-ssot` + 스윕 R16 등재 | 제보 사례 5: 8단계 close-out 사슬의 조각이 6개 문서에 흩어져 전 구간 문서가 없었고, 어느 문서를 읽어도 일부만 보여 세션마다 flow를 재구성하며 매번 다른 곳이 빠졌다. 그 흩어짐이 코드의 무행동으로 나타났다 — 교차검증이 상대 기록 없으면 통과했고 두 기록이 만날 저장소가 아예 없어 **비교가 한 번도 수행된 적이 없다**. 사슬을 자동 재구성하는 길은 기각했다(게이트가 사슬의 저자가 되고, 재구성이 의도와 다를 때 아무도 모른다). 모든 단계에 저장소를 요구하는 길도 기각했다(대부분의 단계는 상태가 필요 없고, 전부 요구하면 사람이 빈 값을 채운다) — 비교·합의 마커와의 곱으로 좁혔다 [검증: tooling/__tests__/process-ssot.test.mjs] |
 | 2026-08-10 | 순차 프로세스 픽스처의 복사 목록을 폐포 계산으로 교체 | 같은 드리프트 결함(삽입 위치가 다중행 import 안으로 들어가 `SyntaxError`가 났고 그 자리에서 잡혔다) |

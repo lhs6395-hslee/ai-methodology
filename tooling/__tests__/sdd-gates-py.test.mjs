@@ -16,9 +16,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const PY = new URL("../sdd_gates.py", import.meta.url).pathname;
-const TOOLING = new URL("..", import.meta.url).pathname;
+const PY = fileURLToPath(new URL("../sdd_gates.py", import.meta.url));
+const TOOLING = fileURLToPath(new URL("..", import.meta.url));
 // 배선 무결성 패리티가 픽스처 복사 목록을 폐포에서 계산하는 데 쓴다(손 목록은 다음 드리프트다).
 import { localImports } from "../import-wiring-lib.mjs";
 import { hashAction } from "../action-approval-lib.mjs";
@@ -41,15 +42,21 @@ function fixture(files, config = {}) {
 }
 
 function runPy(root, args, env = {}) {
+  // Windows에서 Python의 텍스트 모드 stdout은 print()의 "\n"을 os.linesep("\r\n")으로 바꾼다 —
+  // Node판은 이 변환이 없으므로 그대로 비교하면 항상 갈린다. 테스트 하네스에서만 정규화한다
+  // (sdd_gates.py 자체의 실제 동작은 건드리지 않는다 — 다른 플랫폼엔 이 변환이 없다).
+  const norm = (s) => s.replace(/\r\n/g, "\n");
   try {
+    // PYTHONIOENCODING: Windows 콘솔 기본 코드페이지(cp949 등)는 em-dash 같은 non-ASCII를
+    // UnicodeEncodeError로 죽인다 — Python은 stdout 인코딩을 로케일에서 가져오므로 명시해야 한다.
     const out = execFileSync("python3", [PY, ...args],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: "", GITHUB_ACTIONS: "", ...env } });
-    return { code: 0, out };
-  } catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: "", GITHUB_ACTIONS: "", PYTHONIOENCODING: "utf-8", ...env } });
+    return { code: 0, out: norm(out) };
+  } catch (e) { return { code: e.status ?? 1, out: norm((e.stdout || "") + (e.stderr || "")) }; }
 }
 
 function runNode(root, gate, args = [], env = {}) {
-  const GATE = new URL(`../${gate}`, import.meta.url).pathname;
+  const GATE = fileURLToPath(new URL(`../${gate}`, import.meta.url));
   try {
     const out = execFileSync("node", [GATE, ...args],
       { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: "", GITHUB_ACTIONS: "", ...env } });
@@ -1343,9 +1350,11 @@ test("py fr: 지목 구현체 참조 — 고아·전무·통과·커버 미언�
 });
 
 // ── 순차 프로세스 SSOT 패리티(SPEC-047) ──
-test("py processssot: 미선언 inert·SSOT 부재·빠진 단계·조각 보유·저장소 미선언/미소유 바이트 동일", skip, () => {
+test("py processssot: 미선언 inert·SSOT 부재·빠진 단계·조각 보유·저장소 미선언/미소유·불변식 4종 바이트 동일", skip, () => {
   const CHAIN = ["로컬 실측", "커밋·푸시", "배포", "개발 실측", "교차검증 일치", "dev-done"];
   const OWN = (files) => `# S\n**Spec**: \`SPEC-001\`\n로컬 실측을 다룬다.\n## Ownership\n- **Entities**: run\n- **Files**: ${files}\n`;
+  const VALID_STAGES = [...CHAIN.slice(0, 4), { name: "교차검증 일치", state: ".sdd/runs.jsonl" }, "dev-done"];
+  const OWN_SPEC = { "sdd/specs/SPEC-001.md": OWN(".sdd/**, docs/C.md") };
   const scen = [
     { cfg: {}, files: {} },                                                            // 미선언 → INERT
     { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } }, processSsotPolicy: "hard" }, files: {} },  // SSOT 부재
@@ -1359,6 +1368,18 @@ test("py processssot: 미선언 inert·SSOT 부재·빠진 단계·조각 보유
       files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n", "sdd/specs/SPEC-001.md": OWN(".sdd/**, docs/C.md") } },  // 통과
     { cfg: { processes: { c: { ssot: "docs/C.md", stages: ["a"] } } }, files: {} },      // config 문법(1단계)
     { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN } }, processSsotPolicy: "off" }, files: {} },
+    // ── 불변식 4번째 축(FR-005) ──
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: VALID_STAGES, invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n저장소: .sdd/runs.jsonl\n불변식 F는 scripts/check-x.mjs로 강제된다.\n", ...OWN_SPEC } },  // 강제 파일 부재
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: VALID_STAGES, invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n저장소: .sdd/runs.jsonl\n불변식 F는 임시 규칙이다.\n", "scripts/check-x.mjs": "// x\n", ...OWN_SPEC } },  // 강제됐는데 문서 미언급(드리프트)
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: VALID_STAGES, invariants: [{ name: "불변식 F", enforcement: null }] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n저장소: .sdd/runs.jsonl\n", ...OWN_SPEC } },  // 불변식 이름 자체가 문서에 없음
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: VALID_STAGES, invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n저장소: .sdd/runs.jsonl\n불변식 F는 scripts/check-x.mjs로 강제된다.\n", "scripts/check-x.mjs": "// x\n", ...OWN_SPEC } },  // 통과(강제)
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: VALID_STAGES, invariants: [{ name: "불변식 E", enforcement: null }] } } },
+      files: { "docs/C.md": "# c\n" + CHAIN.join(" → ") + "\n저장소: .sdd/runs.jsonl\n불변식 E는 리포터 전용이다.\n", ...OWN_SPEC } },  // 통과(명시적 미강제)
+    { cfg: { processes: { c: { ssot: "docs/C.md", stages: CHAIN, invariants: [{ name: "", enforcement: null }] } }, processSsotPolicy: "hard" }, files: {} },  // 불변식 config 문법(빈 이름)
   ];
   for (const [i, { cfg, files }] of scen.entries()) {
     const root = fixture(files, cfg);

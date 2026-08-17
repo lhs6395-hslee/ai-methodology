@@ -6,15 +6,19 @@
 // @covers SPEC-047/FR-002
 // @covers SPEC-047/FR-003
 // @covers SPEC-047/FR-004
+// @covers SPEC-047/FR-005
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   validateProcesses, stagesOf, ssotMissingStages, fragmentFindings,
   statelessStageFindings, unownedStateFindings, DEFAULT_STATEFUL_STAGE_MARKERS,
+  invariantOf, invariantsOf, validateInvariants, ssotMissingInvariants,
+  unenforcedInvariantFindings, staleEnforcementMentionFindings,
 } from "../process-ssot-lib.mjs";
 
 import { importClosure } from "../import-wiring-lib.mjs";
@@ -80,6 +84,49 @@ test("선언된 저장소는 소유돼야 한다 — 인프라 산출물이 스�
   assert.deepEqual(unownedStateFindings(stages, () => true), []);
 });
 
+// ── 불변식 강제 여부(4번째 축, FR-005) ──────────────────────────────────────
+// 실측 근거: CLOSEOUT_FLOW.md의 불변식 F가 "qa-agent가 실측을 완전히 대체하기 전까지 유효한
+// 임시 규칙"이라는 문구로 몇 주간 남아 있었다 — 강제 코드가 생긴 뒤에도 문서가 갱신되지
+// 않으면 아무도 모른다.
+test("불변식 선언은 문자열(강제 없음)과 {name, enforcement} 둘 다 받는다", () => {
+  assert.deepEqual(invariantOf("불변식 E"), { name: "불변식 E", enforcement: null });
+  assert.deepEqual(invariantOf({ name: "불변식 F", enforcement: "scripts/check-x.mjs" }),
+    { name: "불변식 F", enforcement: "scripts/check-x.mjs" });
+  assert.deepEqual(invariantOf({ name: "불변식 F", enforcement: null }), { name: "불변식 F", enforcement: null });
+  assert.deepEqual(invariantsOf({}), [], "invariants 생략은 완전히 하위호환(검사 대상 0건)");
+});
+
+test("불변식 config 문법 — name은 필수, enforcement는 문자열|null만 허용", () => {
+  assert.deepEqual(validateInvariants([{ name: "", enforcement: null }]).length, 1, "빈 이름은 규칙 없음과 같다");
+  assert.deepEqual(validateInvariants([{ name: "F", enforcement: 42 }]).length, 1, "enforcement는 문자열|null만");
+  assert.deepEqual(validateInvariants([{ name: "F", enforcement: "s.mjs" }, "G"]), []);
+});
+
+test("실측 재현 — 불변식 이름도 단계처럼 SSOT 문서에 문자 그대로 없으면 지목한다", () => {
+  const invs = invariantsOf({ invariants: ["불변식 A", "불변식 F"] });
+  assert.deepEqual(ssotMissingInvariants("불변식 A만 적혀 있다", invs), ["불변식 F"]);
+  assert.deepEqual(ssotMissingInvariants("불변식 A와 불변식 F 둘 다 있다", invs), []);
+});
+
+test("강제한다고 선언했는데 그 파일이 저장소에 없으면 위반 — 강제 주장이 거짓이다", () => {
+  const invs = invariantsOf({ invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] });
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => false),
+    [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }]);
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => true), []);
+});
+
+test("enforcement:null(명시적 미강제)은 파일 실재 검사 대상이 아니다 — 허용된 선언이다", () => {
+  const invs = invariantsOf({ invariants: [{ name: "불변식 E", enforcement: null }] });
+  assert.deepEqual(unenforcedInvariantFindings(invs, () => false), [], "강제한다는 주장 자체가 없으니 파일 부재는 위반이 아니다");
+});
+
+test("실측 재현 — 코드는 강제하는데 SSOT 문서 본문이 그 사실을 말하지 않으면 드리프트로 지목", () => {
+  const invs = invariantsOf({ invariants: [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }] });
+  assert.deepEqual(staleEnforcementMentionFindings("불변식 F는 임시 규칙이다(강제 코드 언급 없음)", invs),
+    [{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }]);
+  assert.deepEqual(staleEnforcementMentionFindings("불변식 F는 scripts/check-x.mjs로 코드로 강제됨", invs), []);
+});
+
 // ── 게이트 e2e ────────────────────────────────────────────────────────────
 // 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
 const LIBS = importClosure(["check-process-ssot.mjs"], KIT_SRC);
@@ -87,7 +134,7 @@ function repo(files, config) {
   const root = mkdtempSync(join(tmpdir(), "sdd-proc-"));
   mkdirSync(join(root, "sdd", "specs"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
-  for (const f of LIBS) cpSync(new URL(`../${f}`, import.meta.url).pathname, join(root, "scripts", f));
+  for (const f of LIBS) cpSync(fileURLToPath(new URL(`../${f}`, import.meta.url)), join(root, "scripts", f));
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], ...config }));
   for (const [rel, body] of Object.entries(files)) {
     mkdirSync(join(root, rel, ".."), { recursive: true });
@@ -151,5 +198,92 @@ test("off는 판정하지 않는다고 선언한다 — clean이 아니다(SPEC-
     const r = run(root);
     assert.equal(r.code, 0);
     assert.match(r.out, /판정: OFF/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ── 게이트 e2e — 불변식 강제 여부(4번째 축, FR-005) ─────────────────────────
+const INVARIANT_STAGES = [...CHAIN.slice(0, 5), { name: "교차검증 일치", state: ".sdd/measure-runs.jsonl" }, ...CHAIN.slice(6)];
+const INVARIANT_OWNER = "sdd/specs/SPEC-001.md";
+function invariantRepo(invariants, ssotBody, extra = {}) {
+  return repo({
+    "docs/CLOSEOUT.md": ssotBody,
+    [INVARIANT_OWNER]: "# S\n**Spec**: `SPEC-001`\n로컬 실측과 교차검증 일치는 docs/CLOSEOUT.md를 따른다.\n"
+      + "## Ownership\n- **Entities**: run\n- **Files**: .sdd/**\n",
+  }, { processes: { closeout: { ssot: "docs/CLOSEOUT.md", stages: INVARIANT_STAGES, invariants } }, processSsotPolicy: "hard", ...extra });
+}
+
+test("불변식이 강제된다고 선언했는데 그 파일이 저장소에 없으면 hard에서 차단", () => {
+  const root = invariantRepo([{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }],
+    "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n불변식 F는 scripts/check-x.mjs로 강제된다.\n");
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /불변식 "불변식 F".*그 파일이 저장소에 없다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("코드는 강제하는데 SSOT 문서가 그 사실을 말하지 않으면(드리프트) hard에서 차단", () => {
+  const root = invariantRepo([{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }],
+    "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n불변식 F는 임시 규칙이다.\n");
+  writeFileSync(join(root, "scripts", "check-x.mjs"), "// 존재 확인용\n");
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /SSOT.*본문은.*그 사실을 말하지 않는다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("불변식 이름이 SSOT 문서에 없으면 hard에서 차단(단계와 동일 원칙)", () => {
+  const root = invariantRepo([{ name: "불변식 F", enforcement: null }],
+    "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n");
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /선언된 불변식을 담지 않는다.*불변식 F/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("강제 파일 실재 + 문서 자기언급 + 이름 등장이면 통과 — 불변식이 있어도 사슬은 green", () => {
+  const root = invariantRepo([{ name: "불변식 F", enforcement: "scripts/check-x.mjs" }],
+    "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n"
+    + "불변식 F는 scripts/check-x.mjs로 코드로 강제된다.\n");
+  writeFileSync(join(root, "scripts", "check-x.mjs"), "// 존재 확인용\n");
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /불변식 1건\(강제 1건 · 명시적 미강제 0건\)/);
+    assert.match(r.out, /✓ 전 구간이 SSOT에 있고.*불변식은 강제되거나 명시적으로 미강제다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("enforcement:null(명시적 미강제)은 강제 파일 부재로 걸리지 않는다 — 모든 불변식이 코드일 필요는 없다", () => {
+  const root = invariantRepo([{ name: "불변식 E", enforcement: null }],
+    "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n불변식 E는 리포터 전용이다(수동 절차).\n");
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /불변식 1건\(강제 0건 · 명시적 미강제 1건\)/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("invariants 생략은 완전히 하위호환 — 기존 3축 판정에 영향 없다", () => {
+  const root = repo({
+    "docs/CLOSEOUT.md": "# close-out\n" + CHAIN.join(" → ") + "\n저장소: .sdd/measure-runs.jsonl\n",
+    [INVARIANT_OWNER]: "# S\n**Spec**: `SPEC-001`\n로컬 실측과 교차검증 일치는 docs/CLOSEOUT.md를 따른다.\n"
+      + "## Ownership\n- **Entities**: run\n- **Files**: .sdd/**\n",
+  }, { processes: { closeout: { ssot: "docs/CLOSEOUT.md", stages: INVARIANT_STAGES } }, processSsotPolicy: "hard" });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /불변식 0건\(강제 0건 · 명시적 미강제 0건\)/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("불변식 config 문법 위반(빈 이름)은 문법 오류로 즉시 차단", () => {
+  const root = repo({}, { processes: { closeout: { ssot: "docs/CLOSEOUT.md", stages: CHAIN, invariants: [{ name: "", enforcement: null }] } }, processSsotPolicy: "hard" });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /name 필수/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
