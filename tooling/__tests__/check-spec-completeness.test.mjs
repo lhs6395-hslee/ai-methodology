@@ -6,8 +6,9 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../check-spec-completeness.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-spec-completeness.mjs", import.meta.url));
 
 function fixture(files) {
   const dir = mkdtempSync(join(tmpdir(), "sdd-cmpl-"));

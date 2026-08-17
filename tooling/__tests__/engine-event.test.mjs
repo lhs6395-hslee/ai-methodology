@@ -13,9 +13,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { roleActive, roleInertReasons, realityFindings, splitEventKey, eventAttributionFindings } from "../engine-event-lib.mjs";
 
-const GATE = new URL("../check-engine-event.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-engine-event.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

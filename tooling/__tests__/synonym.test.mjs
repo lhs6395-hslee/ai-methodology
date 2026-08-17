@@ -15,13 +15,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   singularize, canonicalForm, lexicalCollisions, validateSynonymRegistry,
   declaredSynonymFindings, parseCandidatePairs, classifyCandidates, validateLedger,
   entitySetFingerprint, parseCandidateHeader, candidateFreshness,
 } from "../synonym-lib.mjs";
 
-const GATE = new URL("../check-synonym.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-synonym.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

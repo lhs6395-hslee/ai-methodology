@@ -12,12 +12,13 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   extractLiterals, duplicateLiteralFindings, staleAllowEntries, parseDuplicateCandidates,
   DEFAULT_DUPLICATE_MIN_LENGTH,
 } from "../duplicate-logic-lib.mjs";
 
-const GATE = new URL("../check-duplicate-logic.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-duplicate-logic.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

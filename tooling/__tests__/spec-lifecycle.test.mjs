@@ -13,10 +13,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseLifecycle, LIFECYCLE_ENUM } from "../lifecycle-lib.mjs";
 
-const COMPLETENESS = new URL("../check-spec-completeness.mjs", import.meta.url).pathname;
-const SPECSYNC = new URL("../check-spec-sync.mjs", import.meta.url).pathname;
+const COMPLETENESS = fileURLToPath(new URL("../check-spec-completeness.mjs", import.meta.url));
+const SPECSYNC = fileURLToPath(new URL("../check-spec-sync.mjs", import.meta.url));
 
 function fixture(files) {
   const root = mkdtempSync(join(tmpdir(), "sdd-lc-"));

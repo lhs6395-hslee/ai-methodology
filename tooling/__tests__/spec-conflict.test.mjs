@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   lineDirectives, predicateTokens, collectDirectives, docFrequency, specConflicts, formatConflict,
   DEFAULT_MIN_TOKENS, DEFAULT_MAX_DOC_FREQ,
@@ -139,7 +140,7 @@ test("게이트는 어느 쪽이 정본인지 정하지 않는다 — 추정이 
 
 // ── 킷 자기적용 ──────────────────────────────────────────────────────────────
 test("킷 코퍼스에 상반된 지시가 없다(도그푸딩) — 도입 전 오탐 0을 측정한 그 코퍼스다", () => {
-  const dir = new URL("../../sdd/specs", import.meta.url).pathname;
+  const dir = fileURLToPath(new URL("../../sdd/specs", import.meta.url));
   const specs = readdirSync(dir).filter((n) => n.endsWith(".md")).map((n) => ({
     id: n.replace(/\.md$/, ""), file: n, text: readFileSync(join(dir, n), "utf8"),
   }));
@@ -156,7 +157,7 @@ function fixture(policy, specs) {
   mkdirSync(join(root, "scripts"), { recursive: true });
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specConflictPolicy: policy }));
   const seen = new Set(); const stack = ["check-spec-conflict.mjs"];
-  const TOOLING = new URL("..", import.meta.url).pathname;
+  const TOOLING = fileURLToPath(new URL("..", import.meta.url));
   while (stack.length) {
     const f = stack.pop();
     if (seen.has(f)) continue;

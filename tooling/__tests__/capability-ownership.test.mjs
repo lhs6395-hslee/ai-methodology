@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "../capability-ownership-lib.mjs";
 import { importClosure } from "../import-wiring-lib.mjs";
 
@@ -21,7 +22,7 @@ import { importClosure } from "../import-wiring-lib.mjs";
 const KIT_SRC = (f) => readFileSync(join(process.cwd(), "tooling", f), "utf8");
 
 
-const GATE = new URL("../check-ownership.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-ownership.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 
@@ -81,7 +82,7 @@ function fixture(policy, ownership) {
   writeFileSync(join(root, "sdd/specs/SPEC-001.md"), `# S\n**Spec**: \`SPEC-001\`\n\n## Ownership\n${ownership}\n`);
   // 복사 목록은 **손으로 적지 않는다** — import 폐포에서 계산한다(SPEC-050).
   for (const f of importClosure(["check-ownership.mjs"], KIT_SRC))
-    cpSync(new URL(`../${f}`, import.meta.url).pathname, join(root, "scripts", f));
+    cpSync(fileURLToPath(new URL(`../${f}`, import.meta.url)), join(root, "scripts", f));
   return root;
 }
 function run(root) {

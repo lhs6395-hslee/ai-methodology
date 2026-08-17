@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // 키트 자기 게이트가 이 파일도 스캔하므로 픽스처 태그는 이어붙여 중화한다.
 const TAG = "// @cov" + "ers ";
@@ -22,7 +23,7 @@ function run(gate, files, config = {}) {
   writeFileSync(join(root, "sdd.config.json"),
     JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], ...config }));
   for (const [rel, body] of Object.entries(files)) writeFileSync(join(root, rel), body);
-  const GATE = new URL(`../${gate}`, import.meta.url).pathname;
+  const GATE = fileURLToPath(new URL(`../${gate}`, import.meta.url));
   try {
     const out = execFileSync("node", [GATE], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     return { code: 0, out };

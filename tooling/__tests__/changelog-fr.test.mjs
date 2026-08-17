@@ -13,10 +13,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { changeLogFrRefs, changeLogFrFindings } from "../changelog-fr-lib.mjs";
 import { frNumberingIssues } from "../numbering-lib.mjs";
 
-const GATE = new URL("../check-fr-coverage.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-fr-coverage.mjs", import.meta.url));
 const refs = (t, verbs) => changeLogFrRefs(t, "FR", "SPEC|INFRA|TEST|CICD", verbs || {});
 const TAG = "// @cov" + "ers ";   // 자기 게이트 스캔 중화(픽스처 태그가 킷 회계에 섞이면 dangling이 된다)
 const cl = (...rows) => `## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n${rows.join("\n")}\n`;

@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, changeLogAdded, changeLogRowShape, deployGuardFindings,
   debtLine, parseDebt, settleDebt,
@@ -23,9 +24,9 @@ import {
   deployApprovalFindings, hasSavedPlanArg,
 } from "../deploy-guard-lib.mjs";
 
-const GATE = new URL("../check-deploy-guard.mjs", import.meta.url).pathname;
-const DEBT_GATE = new URL("../check-deploy-debt.mjs", import.meta.url).pathname;
-const PRE_GATE = new URL("../check-deploy-precheck.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-deploy-guard.mjs", import.meta.url));
+const DEBT_GATE = fileURLToPath(new URL("../check-deploy-debt.mjs", import.meta.url));
+const PRE_GATE = fileURLToPath(new URL("../check-deploy-precheck.mjs", import.meta.url));
 
 test("parseDeployCommand: 상태 변경 명령만 감지, dry-run·조회는 제외, 소스 경로 추출", () => {
   const a = parseDeployCommand("kubectl apply -f k8s/dashboard.yaml");

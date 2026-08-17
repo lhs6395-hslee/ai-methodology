@@ -6,8 +6,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../check-spec-cohesion.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-spec-cohesion.mjs", import.meta.url));
 
 function fixture(cfg, files) {
   const dir = mkdtempSync(join(tmpdir(), "sdd-coh-"));
@@ -102,7 +103,7 @@ test("Ownership Entities 2개+ = aggregate 다수 분할 신호(advisory)", () =
     "# SPEC-001\n## Ownership\n- **Entities**: recommendation, invoice\n");
   let out;
   try {
-    out = execFileSync("node", [new URL("../check-spec-cohesion.mjs", import.meta.url).pathname],
+    out = execFileSync("node", [fileURLToPath(new URL("../check-spec-cohesion.mjs", import.meta.url))],
       { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   } catch (e) {
     out = (e.stdout || "") + (e.stderr || "");

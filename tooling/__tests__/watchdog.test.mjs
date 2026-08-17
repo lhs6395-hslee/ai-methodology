@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseReceipt, missingGates, ciWiring, sweepInvocation, sweepBlocking, gatesOutsideCi,
   DEFAULT_WATCHDOG_RECEIPT } from "../watchdog-lib.mjs";
 import { importClosure } from "../import-wiring-lib.mjs";
@@ -103,7 +104,7 @@ function repo(files, config) {
   const root = mkdtempSync(join(tmpdir(), "sdd-wd-"));
   mkdirSync(join(root, "sdd", "specs"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
-  for (const f of LIBS) cpSync(new URL(`../${f}`, import.meta.url).pathname, join(root, "scripts", f));
+  for (const f of LIBS) cpSync(fileURLToPath(new URL(`../${f}`, import.meta.url)), join(root, "scripts", f));
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], ...config }));
   for (const [rel, body] of Object.entries(files)) {
     mkdirSync(join(root, rel, ".."), { recursive: true });

@@ -13,13 +13,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   validateChecks, classifyResult, summarize,
   isDeployArtifact, liveRealityCoverage, liveRealityCoverageVerdict, RECOMMENDED_DEPLOY_ARTIFACT_MARKERS,
 } from "../live-reality-lib.mjs";
 import { compileGlob } from "../spec-sync-lib.mjs";
 
-const GATE = new URL("../check-live-reality.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-live-reality.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

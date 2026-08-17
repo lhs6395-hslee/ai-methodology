@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SDD_HOOK_MARKER, parseHookList, hookFindings , parseHookEntries, HOOK_FINDING_TEXT } from "../hooks-install-lib.mjs";
 
-const GATE = new URL("../check-hooks-installed.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-hooks-installed.mjs", import.meta.url));
 
 test("parseHookList: 주석·빈 줄 제외, 순서 보존, 중복 제거", () => {
   assert.deepEqual(parseHookList("# 설명\npre-commit\n\ncommit-msg # 끝주석\npre-commit\n"),
@@ -98,9 +98,10 @@ import { mkdtempSync as _mkdtemp, existsSync as _exists, readdirSync as _readdir
 import { tmpdir as _tmpdir } from "node:os";
 import { join as _join } from "node:path";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { stripFullLineComments } from "../external-target-lib.mjs";
 
-const KIT = new URL("../..", import.meta.url).pathname;
+const KIT = fileURLToPath(new URL("../..", import.meta.url));
 const sh = (cmd, cwd) => _exec("sh", ["-c", cmd], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
 function worktree() {
@@ -242,7 +243,7 @@ test("킷 자신의 훅이 신선도 판정 대상이다 — 설치기 안 hered
   for (const e of entries) {
     assert.ok(e.source, `${e.name}: 킷 목록은 원본 경로를 선언해야 한다(미선언이면 신선도 미판정이다)`);
     // 원본이 실재해야 한다 — 없으면 게이트가 source-unreadable로 매 실행 고발한다.
-    const abs = new URL(`../../${e.source}`, import.meta.url).pathname;
+    const abs = fileURLToPath(new URL(`../../${e.source}`, import.meta.url));
     assert.ok(existsSync(abs), `${e.name}: 선언한 원본이 없다 — ${e.source}`);
     assert.match(readFileSync(abs, "utf8"), /sdd-managed-hook/, `${e.name}: 킷 마커가 원본에 있어야 한다`);
   }

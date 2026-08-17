@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   parseAgentHookDecl, wiredHooks, missingMatcherTokens, commandNamesScript,
   agentWiringFindings, buildHookSettings, mergeHookSettings,
@@ -21,7 +22,7 @@ import {
 } from "../agent-wiring-lib.mjs";
 import { localImports } from "../import-wiring-lib.mjs";
 
-const TOOLING = new URL("..", import.meta.url).pathname;
+const TOOLING = fileURLToPath(new URL("..", import.meta.url));
 const DECL = "SessionStart  -           sdd-session-context.sh\nPreToolUse    Write|Edit  sdd-edit-check.sh\n";
 
 // ── 선언 파싱 ────────────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ test("--emit-settings는 판정이 아니라 산출이다 — 쓰기는 설치�
 
 // ── 킷 자기적용 — 이 층만 도그푸딩이 0이었다 ─────────────────────────────────
 test("킷 자신이 에이전트 훅을 배선하고 있다 — 이 층만 도그푸딩 0이었던 것이 결함의 본체다", () => {
-  const settings = JSON.parse(readFileSync(new URL("../../.claude/settings.json", import.meta.url).pathname, "utf8"));
+  const settings = JSON.parse(readFileSync(fileURLToPath(new URL("../../.claude/settings.json", import.meta.url)), "utf8"));
   const decls = parseAgentHookDecl(readFileSync(join(TOOLING, "harness/agent-hooks.list"), "utf8"));
   const f = agentWiringFindings(decls, settings, () => true);
   assert.equal(f.settingsMissing, false);

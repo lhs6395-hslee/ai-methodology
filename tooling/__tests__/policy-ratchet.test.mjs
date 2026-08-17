@@ -18,9 +18,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { rankOf, numOf, classifyRatchet, effectiveRatchetPolicy, RATCHETED_POLICIES, RATCHETED_LIMITS } from "../policy-ratchet-lib.mjs";
 
-const GATE = new URL("../check-policy-ratchet.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-policy-ratchet.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 
@@ -363,7 +364,7 @@ test("다섯 판정 종류 전부가 사람이 읽는 문장을 갖는다", () =
 
 // ── 킷 자기적용 — 등록하는 순간 부채가 드러난다 ──────────────────────────────
 test("킷의 면제 전부가 분류·사유를 갖는다(도그푸딩) — 등록이 곧 리뷰다", () => {
-  const cfg = JSON.parse(readFileSync(new URL("../../sdd.config.json", import.meta.url).pathname, "utf8"));
+  const cfg = JSON.parse(readFileSync(fileURLToPath(new URL("../../sdd.config.json", import.meta.url)), "utf8"));
   const f = exemptionFindings(cfg, cfg.exemptionRegistry, cfg.exemptionKnobs)
     .filter((x) => x.kind !== "stale-record");
   assert.deepEqual(f, [], `킷 면제에 미등록·형식 위반이 남아 있다:\n${JSON.stringify(f, null, 2)}`);

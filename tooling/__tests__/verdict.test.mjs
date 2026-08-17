@@ -13,7 +13,10 @@ import {
   VERDICT_KINDS, formatVerdict, parseVerdict, stripVerdictLines, isJudged, KIND_LABEL,
 } from "../verdict-lib.mjs";
 
-const LIB = new URL("../verdict-lib.mjs", import.meta.url).pathname;
+// import 지정자로 쓰인다(64행) — 파일 경로가 아니라 file:// URL이어야 한다(Windows에서
+// 절대경로 문자열을 지정자로 쓰면 ERR_UNSUPPORTED_ESM_URL_SCHEME로 죽는다). new URL(...)이
+// 이미 file:// URL이므로 fileURLToPath로 fs 경로화하지 않고 .href를 그대로 쓴다.
+const LIB = new URL("../verdict-lib.mjs", import.meta.url).href;
 
 test("판정 종류는 다섯 개뿐 — 늘어나면 '이건 어디에 넣지'가 생기고 그 자리가 예외가 된다", () => {
   assert.deepEqual(Object.keys(VERDICT_KINDS).sort(),

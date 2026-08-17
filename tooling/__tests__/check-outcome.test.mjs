@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CHECK_KINDS, TRI, tri, triGuard, checkOutcome, mergeOutcomes, outcomeSummary,
 } from "../check-outcome-lib.mjs";
@@ -19,7 +20,7 @@ import { filesLineMissingPaths } from "../spec-sync-lib.mjs";
 import { agentWiringFindings, parseAgentHookDecl } from "../agent-wiring-lib.mjs";
 import { validateDiagnosisMap, parseDiagnosisMap } from "../diagnosis-guard-lib.mjs";
 
-const TOOLING = new URL("..", import.meta.url).pathname;
+const TOOLING = fileURLToPath(new URL("..", import.meta.url));
 
 // ── 3상태 정규화 ─────────────────────────────────────────────────────────────
 test("종류는 셋뿐이다 — 더 늘리면 '이건 어디에 넣지'가 생기고 그 순간 예외가 태어난다", () => {

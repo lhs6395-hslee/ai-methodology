@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   parseDiagnosisMap, validateDiagnosisMap, isSpecRead, judgeCommand, formatGuidance,
   GUARD_MODES, GUARD_FINDING_TEXT, DEFAULT_SPEC_READ_PATTERNS,
@@ -105,7 +106,7 @@ function fixture(policy, map) {
     JSON.stringify({ specDir: "sdd/specs", diagnosisGuardPolicy: policy, diagnosisSpecMap: map }));
   writeFileSync(join(root, "sdd", "specs", "INFRA-004.md"), "**Spec**: `INFRA-004`\n## Edge Cases\n- ArgoCD sync 실패\n");
   const seen = new Set(); const stack = ["check-diagnosis-guard.mjs"];
-  const TOOLING = new URL("..", import.meta.url).pathname;
+  const TOOLING = fileURLToPath(new URL("..", import.meta.url));
   while (stack.length) {
     const f = stack.pop();
     if (seen.has(f)) continue;
@@ -187,7 +188,7 @@ test("off는 판정하지 않는다고 선언한다", () => {
 
 // ── 킷 자기적용 + 층 합성 ────────────────────────────────────────────────────
 test("킷이 자기 진단 규칙을 선언하고 있다 — 이 층만 도그푸딩 0이면 다음 결함이 안 보인다", () => {
-  const cfg = JSON.parse(readFileSync(new URL("../../sdd.config.json", import.meta.url).pathname, "utf8"));
+  const cfg = JSON.parse(readFileSync(fileURLToPath(new URL("../../sdd.config.json", import.meta.url)), "utf8"));
   const e = parseDiagnosisMap(cfg.diagnosisSpecMap);
   assert.ok(e.length > 0, "킷이 진단 규칙을 선언하지 않았다");
   assert.deepEqual(validateDiagnosisMap(e, () => true).filter((f) => f.kind !== "missing-spec"), []);
@@ -195,12 +196,12 @@ test("킷이 자기 진단 규칙을 선언하고 있다 — 이 층만 도그�
 
 // 이 가드는 감시 에이전트 층에 살고, 그 배선의 실재는 R19가 판정한다 — 층이 합성된다.
 test("가드가 에이전트 훅 선언에 등재돼 있다 — 배선 실재는 R19가 본다", () => {
-  const decl = readFileSync(new URL("../harness/agent-hooks.list", import.meta.url).pathname, "utf8");
+  const decl = readFileSync(fileURLToPath(new URL("../harness/agent-hooks.list", import.meta.url)), "utf8");
   assert.match(decl, /sdd-diagnosis-check\.sh/);
 });
 
 test("가드 쉘은 검사 못 함을 통과로 출력하지 않는다", () => {
-  const sh = readFileSync(new URL("../harness/sdd-diagnosis-check.sh", import.meta.url).pathname, "utf8");
+  const sh = readFileSync(fileURLToPath(new URL("../harness/sdd-diagnosis-check.sh", import.meta.url)), "utf8");
   assert.match(sh, /검사 못 함/);
   assert.match(sh, /--hook/);
 });

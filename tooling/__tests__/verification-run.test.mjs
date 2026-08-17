@@ -13,10 +13,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseRunLine, parseRunLedger, classifyRuns, verificationRunVerdict, formatRunLine } from "../verification-run-lib.mjs";
 import { compileGlob } from "../spec-sync-lib.mjs";
 
-const GATE = new URL("../check-verification-executed.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-verification-executed.mjs", import.meta.url));
 
 // ── 순수 코어 ────────────────────────────────────────────────────────────────
 test("사유 없는 포기는 기록이 아니다 — 포기는 허용하되 침묵은 금지(제보 ①의 핵심)", () => {
@@ -291,7 +292,7 @@ test("직렬화 왕복 — 기록한 줄을 그대로 다시 읽는다", () => {
 test("차단 출구마다 계측이 붙어 있다 — 계측 자리를 흩으면 하나를 빠뜨린다", () => {
   // 실측: 처음엔 spec-first 출구 하나만 계측했더니 unowned 차단 경로가 기록 없이 지나갔다.
   // 그게 바로 제보가 지적한 결함 계열이므로, 계약으로 고정한다.
-  const src = readFileSync(new URL("../check-spec-sync.mjs", import.meta.url).pathname, "utf8");
+  const src = readFileSync(fileURLToPath(new URL("../check-spec-sync.mjs", import.meta.url)), "utf8");
   const lines = src.split("\n");
   const missing = [];
   for (let i = 0; i < lines.length; i++) {

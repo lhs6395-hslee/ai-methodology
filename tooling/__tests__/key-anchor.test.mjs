@@ -12,11 +12,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { bareKey, stripCodeSpans, extractCodeSpans, isFrDeclLine, extractAnchors, extractAnchorsWithMarkers, buildKeySet, anchorFindings, buildKeyKindMap, categoryMarkerFindings, backtickKeyFindings, unanchoredOwnedKeyFindings } from "../key-anchor-lib.mjs";
 
 const M = { entity: "E", surface: "S", capability: "C" };
 
-const GATE = new URL("../check-spec-consistency.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-spec-consistency.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

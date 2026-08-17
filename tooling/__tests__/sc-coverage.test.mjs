@@ -14,13 +14,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { compileGlob } from "../spec-sync-lib.mjs";
 import {
   parseScLine, kindOfPointer, validateEvidenceManifest, classifyScCoverage,
   scDeclDrift,
 } from "../sc-coverage-lib.mjs";
 
-const GATE = new URL("../check-sc-coverage.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-sc-coverage.mjs", import.meta.url));
 const matcher = (re, p) => re.test(String(p).replace(/^\.\//, ""));
 const compile = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v.map(compileGlob)]));
 

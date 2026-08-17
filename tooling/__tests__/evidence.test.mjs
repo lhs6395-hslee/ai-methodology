@@ -14,9 +14,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseEvidenceTag, hasExecutionVerb, isBrowserGradeEvidence, evidenceFindings , markerHits, isDeployGradeEvidence, DEFAULT_DEPLOY_EVIDENCE_PATTERNS } from "../evidence-lib.mjs";
 
-const GATE = new URL("../check-evidence.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-evidence.mjs", import.meta.url));
 
 // ── 순수 코어 ──
 

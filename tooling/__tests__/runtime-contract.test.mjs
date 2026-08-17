@@ -12,6 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { DEFAULTS } from "../sdd-config.mjs";
 
 const src = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
@@ -20,7 +21,7 @@ let hasPython = true;
 try { execFileSync("python3", ["--version"], { stdio: "ignore" }); } catch { hasPython = false; }
 
 test("① Python DEFAULTS = Node DEFAULTS (키·값 동일)", hasPython ? false : { skip: "python3 없음" }, () => {
-  const PY = new URL("../sdd_gates.py", import.meta.url).pathname;
+  const PY = fileURLToPath(new URL("../sdd_gates.py", import.meta.url));
   const raw = execFileSync("python3", ["-c",
     `import json, runpy; d = runpy.run_path(${JSON.stringify(PY)}); print(json.dumps(d["DEFAULTS"]))`,
   ], { encoding: "utf8" });
@@ -80,7 +81,7 @@ test("④ 경로 인용 계약: 모든 런타임의 git 프로세스 기동이 c
   const GIT_CMD = /(?:`|"|')git\s|"git"\s*,|\[\s*"git"/;
   const QUOTED_OFF = /core\.quotepath=off/i;
   const offenders = [];
-  for (const rel of readdirSync(new URL("..", import.meta.url).pathname)) {
+  for (const rel of readdirSync(fileURLToPath(new URL("..", import.meta.url)))) {
     if (!/^(?:check-|sdd-|gen-)[\w-]*\.mjs$/.test(rel) && rel !== "sdd_gates.py") continue;
     const lines = src(rel).split("\n");
     for (const [i, line] of lines.entries()) {

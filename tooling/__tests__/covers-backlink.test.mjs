@@ -12,10 +12,11 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { evidencePathsOf, coversBacklinkFindings, coversBacklinkVerdict } from "../covers-backlink-lib.mjs";
 import { compileGlob } from "../spec-sync-lib.mjs";
 
-const GATE = new URL("../check-fr-coverage.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-fr-coverage.mjs", import.meta.url));
 const TAG = "// @cov" + "ers ";   // 자기 게이트 스캔 중화
 const matcher = (p, path) => { try { return compileGlob(p).test(path); } catch { return false; } };
 

@@ -9,8 +9,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const TOOLING = new URL("..", import.meta.url).pathname;
+const TOOLING = fileURLToPath(new URL("..", import.meta.url));
 const INIT = readFileSync(join(TOOLING, "sdd-init.sh"), "utf8");
 
 // sdd-init.sh의 node 분기 복사 목록 — 소스에서 뽑는다(손으로 복제하면 그 복제가 다음 드리프트다).

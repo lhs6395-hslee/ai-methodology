@@ -13,8 +13,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../sdd-smoke-scan.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../sdd-smoke-scan.mjs", import.meta.url));
 const VTAG = "# @veri" + "fies "; // 자기 게이트(스캔) 중화 — 픽스처 파일에만 실태그 기록
 
 function fixture(files, config = {}) {

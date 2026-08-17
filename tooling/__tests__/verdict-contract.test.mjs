@@ -10,10 +10,11 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gateOutcome, tallyGates, tallyLine } from "../sdd-sync.mjs";
 import { VERDICT_KINDS, formatVerdict } from "../verdict-lib.mjs";
 
-const HERE = new URL("..", import.meta.url).pathname;
+const HERE = fileURLToPath(new URL("..", import.meta.url));
 const SYNC_SRC = readFileSync(join(HERE, "sdd-sync.mjs"), "utf8");
 
 // 규칙표에 등재된 게이트 파일 목록 — 소스에서 뽑는다(목록을 손으로 복제하면 그 복제가 다음 드리프트다).
@@ -129,7 +130,7 @@ function repo(files) {
 }
 function runDup(root, config) {
   writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], duplicateLogicPolicy: "advisory", ...config }));
-  const GATE = new URL("../check-duplicate-logic.mjs", import.meta.url).pathname;
+  const GATE = fileURLToPath(new URL("../check-duplicate-logic.mjs", import.meta.url));
   try { return { code: 0, out: execFileSync("node", [GATE], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
   catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }

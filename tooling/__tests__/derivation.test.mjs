@@ -14,9 +14,10 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../check-derivation.mjs", import.meta.url).pathname;
-const COMPLETENESS = new URL("../check-spec-completeness.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-derivation.mjs", import.meta.url));
+const COMPLETENESS = fileURLToPath(new URL("../check-spec-completeness.mjs", import.meta.url));
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 function fixture(files, config = {}) {

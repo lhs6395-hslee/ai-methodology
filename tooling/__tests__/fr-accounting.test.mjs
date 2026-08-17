@@ -13,8 +13,9 @@ import { execFileSync , spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync , readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../check-fr-coverage.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-fr-coverage.mjs", import.meta.url));
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 function fixture(files, config = {}) {

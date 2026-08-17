@@ -6,8 +6,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const GATE = new URL("../check-fr-coverage.mjs", import.meta.url).pathname;
+const GATE = fileURLToPath(new URL("../check-fr-coverage.mjs", import.meta.url));
 // 키트 자기 게이트가 이 파일도 스캔하므로 픽스처 태그는 이어붙여 중화한다.
 const TAG = "// @cov" + "ers ";
 

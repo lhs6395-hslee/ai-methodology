@@ -7,8 +7,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SCRIPT = new URL("../check-pre-edit.mjs", import.meta.url).pathname;
+const SCRIPT = fileURLToPath(new URL("../check-pre-edit.mjs", import.meta.url));
 
 // 소유 스펙(Files glob) + git 저장소를 갖춘 픽스처. base=main 대비 판정하므로 커밋을 하나 만든다.
 function repo({ specFiles = "src/**", touchSpec = false, cfg = {} } = {}) {

@@ -9,8 +9,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const SH = new URL("../sdd_gates.sh", import.meta.url).pathname;
+const SH = fileURLToPath(new URL("../sdd_gates.sh", import.meta.url));
 const TAG = "// @cov" + "ers "; // 자기 게이트 스캔 중화
 
 let hasJq = true;
