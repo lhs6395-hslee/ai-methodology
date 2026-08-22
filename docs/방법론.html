@@ -828,6 +828,22 @@ CI 상태          초록               → <span class="g">완료로 읽었다<
   <p class="note"><strong>승인 마커는 세션도 패턴도 아니라 정확한 행동 해시(sha256)에 결속된다.</strong> "한 번 확인했으니 이 종류는 당분간 통과"로 완화하면 티켓 A의 종결 승인이 티켓 B의 종결까지 덮는 사고가 그대로 재현된다 — 마커가 막으려는 문제를 마커 자신이 재도입하는 꼴이다. 오너가 세 옵션(해시 결속·패턴별 짧은 신선도 창·위험도별 혼합) 중 <strong>최대 엄격도</strong>를 명시적으로 선택했다: 안전성이 반복 마찰보다 우선한다.</p>
   <p class="note"><strong>게이트는 서브에이전트를 스스로 부르지 않는다.</strong> 판정 게이트가 결정론적이어야 Node·Python 양판(R6 옆 SPEC-006)이 성립하는데, 게이트 프로세스 안에서 LLM을 불러 검증을 수행하면 그 판정은 더 이상 결정론적이지 않다. 그래서 차단 메시지는 "별도 컨텍스트의 서브에이전트로 확인하고 <code>--record</code>로 마커를 남겨라"는 <strong>지시</strong>로 끝나고, 실제 호출은 차단당한 실행기 자신이 자기 도구로 한다 — 완전 자율 감사 에이전트(바로 위 R24가 이미 그은 경계와 같다)를 만들지 않으면서도 검증의 <em>존재</em>는 결정론적으로 강제한다. 검증이 실제로 옳았는지는 이 축의 판정 대상이 아니다.</p>
   <p>범위에서 명시적으로 제외한 것도 있다 — "로컬에 특정 앱·서비스가 없다"는 <strong>확인 없는 자연어 주장</strong>은 이 축이 잡지 않는다. 도구 호출을 막는 것과 자연어 주장을 판정하는 것은 다른 문제이고, 후자를 패턴 매칭으로 시도하면 이 방법론이 금지하는 <strong>추측 기반 판정</strong>이 된다.</p>
+
+  <h4>계획된 인프라 변경이 이 changeset 범위를 벗어나는가 <span class="note">(규칙 R8 확장)</span></h4>
+  <p>다른 프로젝트에서 온 실측이다(2026-08-22). SNS 알림 기능을 애플리케이션·Terraform 양쪽에서 걷어내는 작업을 마치고 <code>terraform plan</code>을 돌렸더니, 의도한 SNS 리소스 11건 삭제 외에 전혀 무관한 변경 6건이 같은 plan에 섞여 나왔다 — bastion 재생성(다운타임 위험)·CloudFront·EKS access entry·Lambda 4개·Secrets Manager 2건. 건드린 파일(<code>modules/sns/**</code>)과 아무 관계가 없었다:</p>
+  <pre>의도한 변경   SNS 리소스 11건 삭제           <span class="g">✓ modules/sns/**와 일치</span>
+plan 실제 출력 위 11건 + 무관한 변경 6건       <span class="r">✗ 커밋된 코드가 설명하지 못한다</span></pre>
+  <p><strong>이건 애플리케이션 층의 <code>check-spec-sync</code>가 잡는 것과 같은 계급의 결함이다</strong> — "코드가 스펙과 어긋나면 커밋을 막는다"의 인프라 버전이 "계획된 인프라 변경이 이 changeset 범위와 어긋나면 배포를 막는다"다. git에 커밋된 IaC 코드와 실제 라이브 인프라가 이미 어긋나 있었고, 무관한 작업을 apply하는 순간 그 드리프트가 함께 묻어 나올 뻔했다. 전례(2026-08-03, CloudFront 관련 프로덕션 전면 403 두 번)도 같은 유형이다.</p>
+  <div class="tablewrap"><table>
+    <tr><th>층</th><th>본다</th><th>구제</th></tr>
+    <tr><td>R21 진단가드</td><td>조사 명령이 이미 답 있는 명세를 매칭하는가</td><td>정적 — 그 명세를 읽는다</td></tr>
+    <tr><td>R8 배포가드</td><td>배포 명령이 재현 가능한 리비전에서 나오는가</td><td>정적 — 커밋(또는 pull) 후 배포</td></tr>
+    <tr><td><strong>R8 확장(범위 격리)</strong></td><td>계획된 변경이 <strong>이 changeset 범위</strong> 안에 있는가</td><td>정적 — <code>deployScopeCommand</code>가 범위 밖 항목을 신고, <code>SDD_ALLOW_DRIFT=1</code>로 동의</td></tr>
+    <tr><td>R25 위험 행동 승인</td><td>되돌리기 어려운 행동에 독립 검증 증거가 있는가</td><td>동적 — 서브에이전트 확인 + <code>--record</code></td></tr>
+  </table></div>
+  <p class="note"><strong>인프라 도구를 킷이 모른다</strong>(R9 라이브 대조와 같은 경계). <code>terraform plan</code>을 파싱하는 대신 <code>deployScopeCommand</code>라는 프로젝트 명령을 주입받는다 — stdout 한 줄이 범위 밖 리소스 하나(비면 clean), 명령이 비-0으로 죽으면 위반이 아니라 <strong>미판정</strong>이다(자격증명 없는 로컬에서 하드 실패 금지 — <code>liveRealityChecks</code>와 같은 계약). <code>deploySmokeCommand</code>와 달리 <strong>미선언을 부채로 잡지 않는다</strong> — 모듈 개념이 없는 <code>kubectl apply -f single.yaml</code> 같은 배포를 부당하게 벌주지 않기 위해서다.</p>
+  <p class="note">동의 변수는 파괴적 명령 동의(<code>SDD_DESTROY_OK</code>)와 <strong>다른 이름</strong>(<code>SDD_ALLOW_DRIFT</code>)을 쓴다. 하나로 합치면 "삭제를 승인했다"와 "무관한 드리프트를 감수했다"가 같은 흔적이 되어, 사후에 그 커밋이 무엇에 동의한 것이었는지 구분할 수 없다.</p>
+
   <p class="note"><strong>훅과 스윕은 같은 프로그램의 두 모드다.</strong> <code>check-risky-action.mjs</code>가 <code>--hook</code> 유무로 갈라 실행할 뿐, 파일도 로직도 하나다 — 훅 모드는 <em>지금 이 행동 1건</em>이 위험 패턴에 매칭되는지·승인 마커가 있는지를 보고, 스윕 모드는 <em>선언 자체</em>(match·tool·class·verifyAgainst·why를 다 채웠는가)가 멀쩡한지를 commit-msg 시점에 본다 — 대상이 다르다. 이 훅이 <code>.claude/settings.json</code>에 실제로 배선됐는가는 이 축이 아니라 R19(에이전트 배선)가 별도로 본다 — 세 층이 겹치는 게 아니라 각자 다른 실패 모드를 잡는다: 훅=행동 자체, 스윕=패턴 선언 품질, R19=훅이 실제 연결됐는지.</p>
   <p class="note"><strong>실측 추가(2026-08-14) — 매처가 Bash뿐이라 MCP 도구 호출은 이 축이 완전히 못 봤다.</strong> <code>agent-hooks.list</code>의 PreToolUse 매처가 <code>Write|Edit</code>·<code>Bash</code>뿐이었던 시절엔 <code>mcp__github__merge_pull_request</code> 같은 도구 호출(PR 머지처럼 되돌리기 어려운 행동)이 실시간 층 어디도 거치지 않고 그대로 실행됐다 — 명령 문자열이 없는 도구라 <code>match</code>로는 원천적으로 못 잡는 부류다. <code>riskyActionPatterns</code>에 <code>{ tool: &lt;도구명 정규식&gt;, class, verifyAgainst, why }</code>(한 항목은 <code>match</code>·<code>tool</code> 중 하나만) 형태를 추가해 닫았다 — 해시 대상은 명령 문자열 대신 <code>{tool, input}</code>의 정준 JSON이고, 오너의 명시적 선택대로 모든 MCP 도구를 광범위 매처로 덮지 않고 <strong>위험해 보이는 도구만 명시적으로 나열</strong>한다(노이즈·마찰 방지).</p>
 

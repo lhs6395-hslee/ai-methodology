@@ -20,7 +20,7 @@ import {
   DEFAULT_DEPLOY_PATTERNS, parseDeployCommand, changeLogAdded, changeLogRowShape, deployGuardFindings,
   debtLine, parseDebt, settleDebt,
   deployPreconditionFindings, deployPreconditionVerdict, deploySmokeVerdict,
-  deployApprovalFindings, hasSavedPlanArg,
+  deployApprovalFindings, hasSavedPlanArg, deployScopeVerdict, deployScopeFindings,
 } from "../deploy-guard-lib.mjs";
 
 const GATE = new URL("../check-deploy-guard.mjs", import.meta.url).pathname;
@@ -269,6 +269,43 @@ test("deploySmokeVerdict: 미선언은 부채 · 통과는 alive · 비-0은 ski
   assert.equal(deploySmokeVerdict("x", () => { throw new Error("spawn fail"); }).status, "dead");
 });
 
+// @covers SPEC-035/FR-009
+test("deployScopeVerdict: 미선언은 undeclared(부채 아님) · 빈 출력은 clean · 줄 있으면 drift · 비-0은 skipped", () => {
+  assert.equal(deployScopeVerdict("", null).status, "undeclared");
+  assert.equal(deployScopeVerdict("tf-scope-check", () => ({ exitCode: 0, stdout: "" })).status, "clean");
+  const drift = deployScopeVerdict("tf-scope-check", () => ({ exitCode: 0, stdout: "aws_instance.bastion\naws_lambda_function.x\n" }));
+  assert.equal(drift.status, "drift");
+  assert.deepEqual(drift.lines, ["aws_instance.bastion", "aws_lambda_function.x"]);
+  const skipped = deployScopeVerdict("tf-scope-check", () => ({ exitCode: 1, stderr: "no credentials" }));
+  assert.equal(skipped.status, "skipped");
+  assert.match(skipped.detail, /no credentials/);
+  assert.match(skipped.detail, /미판정이다/);
+  // 실행 자체가 던져도 skipped다(위반이 아니다) — dead와 반대 규약: 확인 못 한 인프라 실물을 위반으로 세지 않는다
+  assert.equal(deployScopeVerdict("x", () => { throw new Error("spawn fail"); }).status, "skipped");
+});
+
+// @covers SPEC-035/FR-009
+test("deployScopeFindings: drift는 위반, 동의하면 consented(정보), skipped·clean은 각각 정보/무발화", () => {
+  const drift = deployScopeVerdict("x", () => ({ exitCode: 0, stdout: "a\nb\nc\nd\n" }));
+  const blocked = deployScopeFindings(drift, {});
+  assert.deepEqual(blocked.map((f) => f.kind), ["scope-drift"]);
+  assert.match(blocked[0].detail, /SDD_ALLOW_DRIFT=1/);
+  assert.match(blocked[0].detail, /외 1건/); // 4건 중 3건만 표본으로 보이고 나머지는 개수로
+
+  const consented = deployScopeFindings(drift, { allowDrift: true });
+  assert.deepEqual(consented.map((f) => f.kind), ["scope-drift-consented"]);
+  assert.equal(deployPreconditionVerdict("hard", consented).blocking, false);
+  assert.equal(deployPreconditionVerdict("hard", consented).unknowns.length, 1);
+
+  const clean = deployScopeVerdict("x", () => ({ exitCode: 0, stdout: "" }));
+  assert.deepEqual(deployScopeFindings(clean, {}), []);
+
+  const skipped = deployScopeVerdict("x", () => ({ exitCode: 1 }));
+  const skippedFindings = deployScopeFindings(skipped, {});
+  assert.deepEqual(skippedFindings.map((f) => f.kind), ["scope-skipped"]);
+  assert.equal(deployPreconditionVerdict("hard", skippedFindings).blocking, false);
+});
+
 test("게이트 e2e(스모크): 미선언은 경로 없는 배포에서도 발화 · 죽으면 부채로 적재되고 살아나면 해소", () => {
   const h = debtFixture("hard");
   const cfgPath = join(h.root, "sdd.config.json");
@@ -361,4 +398,40 @@ test("게이트 e2e(승인): git이 없어도 승인·파괴 축은 판정된다
     // 저장된 plan + 동의 없는 일반 apply는 조용하다(오탐 금지)
     assert.equal(run("terraform apply tfplan").out.trim(), "");
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-035/FR-009
+test("게이트 e2e(범위 격리): deployScopeCommand 선언 시 drift를 hard에서 차단하고 SDD_ALLOW_DRIFT=1로 통과한다 · 미선언은 침묵", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-scope-"));
+  mkdirSync(join(root, "sdd/specs"), { recursive: true });
+  // stdout에 두 줄을 내는 가짜 스코프 체크 스크립트 — 실제 terraform 없이 계약만 검증한다.
+  const scopeScript = join(root, "scope-check.sh");
+  writeFileSync(scopeScript, "#!/bin/sh\necho aws_instance.bastion\necho aws_lambda_function.scheduler\n", { mode: 0o755 });
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({
+      specDir: "sdd/specs", deployPreconditionPolicy: "hard", deployScopeCommand: `sh ${scopeScript}`,
+    }));
+    const run = (cmd, env) => {
+      try { return { code: 0, out: execFileSync("node", [PRE_GATE, "--command", cmd], { cwd: root, encoding: "utf8", env: { ...process.env, ...env } }) }; }
+      catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
+    };
+    const drift = run("terraform apply tfplan");
+    assert.equal(drift.code, 2, drift.out);
+    assert.match(drift.out, /범위를 벗어난다/);
+    assert.match(drift.out, /aws_instance.bastion/);
+    assert.match(drift.out, /SDD_ALLOW_DRIFT=1/);
+
+    const consented = run("terraform apply tfplan", { SDD_ALLOW_DRIFT: "1" });
+    assert.equal(consented.code, 0, consented.out);
+    assert.match(consented.out, /명시 동의됨/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+
+  // 미선언 프로젝트는 이 축이 완전히 조용하다(부채 아님 — deploySmokeCommand와 다른 규약)
+  const plain = mkdtempSync(join(tmpdir(), "sdd-scope-plain-"));
+  mkdirSync(join(plain, "sdd/specs"), { recursive: true });
+  try {
+    writeFileSync(join(plain, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", deployPreconditionPolicy: "hard" }));
+    const out = execFileSync("node", [PRE_GATE, "--command", "terraform apply tfplan"], { cwd: plain, encoding: "utf8" });
+    assert.equal(out.trim(), "");
+  } finally { rmSync(plain, { recursive: true, force: true }); }
 });

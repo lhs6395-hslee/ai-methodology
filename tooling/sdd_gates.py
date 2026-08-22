@@ -415,6 +415,7 @@ DEFAULTS = {
     "deployPreconditionPolicy": "off",
     "deploySmokeCommand": None,
     "deploySmokeTimeoutMs": 60000,
+    "deployScopeCommand": None,
     "scCoveragePolicy": "off",
     "verificationKinds": {},
     "evidenceManifest": None,

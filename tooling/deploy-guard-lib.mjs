@@ -197,10 +197,60 @@ export function deployApprovalFindings(command, opts = {}) {
 export function deployPreconditionVerdict(policy, findings) {
   const pol = String(policy || "off");
   if (pol === "off") return { judged: false, blocking: false, violations: [], unknowns: [] };
-  const INFO = new Set(["no-upstream", "destructive-consented"]);
+  const INFO = new Set(["no-upstream", "destructive-consented", "scope-skipped", "scope-drift-consented"]);
   const violations = (findings || []).filter((f) => !INFO.has(f.kind));
   const unknowns = (findings || []).filter((f) => INFO.has(f.kind));
   return { judged: true, blocking: pol === "hard" && violations.length > 0, violations, unknowns };
+}
+
+// ── 계획 범위 격리 — "이 배포가 계산한 변경이 이 changeset이 설명하는 범위 안에 있는가" ──
+// 실측 제보(2026-08-22, gsn-ai-pm-management-tool): SNS 알림 기능을 걷어내는 작업에서
+// `terraform plan`을 실행했더니 의도한 SNS 리소스 11건 삭제 외에 무관한 변경 6건(bastion
+// 재생성·CloudFront·EKS access entry·Lambda 4개·Secrets Manager 2건)이 같은 plan에
+// 섞여 나왔다. 건드린 파일(modules/sns/**)과 무관했고, git에 커밋된 IaC 코드와 실제 라이브
+// 인프라가 이미 어긋나 있었다 — 무관한 작업을 apply하는 순간 그 드리프트가 함께 묻어 나올
+// 뻔했다. 전례(2026-08-03, CloudFront 관련 프로덕션 전면 403 두 번)도 같은 유형이다.
+//
+// 이 축은 인프라 도구를 모른다(SPEC-032와 같은 경계 — 이 코어는 terraform·pulumi·CDK를
+// 모른다). "계획된 변경이 이 changeset 범위 밖인가"를 계산하는 것은 전적으로 프로젝트가
+// 주입하는 `deployScopeCommand`의 몫이고, 이 코어는 그 stdout(한 줄 = 범위 밖 항목 하나,
+// SPEC-032의 liveRealityChecks와 같은 계약)을 읽어 승인 우회·파괴적 명령과 같은 강도로
+// 판정에 편입할 뿐이다. `deploySmokeCommand`와 달리 **미선언을 부채로 계상하지 않는다** —
+// 스모크는 모든 배포에 보편적으로 적용되지만 범위 격리는 plan 기반 IaC 도구(모듈 개념이
+// 있는 Terraform·Pulumi 등)에만 의미가 있어, 강제하면 kubectl 단일 매니페스트 배포 같은
+// 프로젝트를 부당하게 벌준다.
+//
+// 반환 {status, lines, detail} — status: undeclared | clean | drift | skipped
+export function deployScopeVerdict(command, run) {
+  const cmd = String(command || "").trim();
+  if (!cmd) return { status: "undeclared", lines: [], detail: "" };
+  let r;
+  try { r = run(cmd); } catch (e) { r = { exitCode: 1, stdout: "", stderr: String((e && e.message) || e) }; }
+  if (!r || r.exitCode !== 0) {
+    const why = String((r && r.stderr) || "").trim().split("\n").filter(Boolean).pop() || `exit ${r && r.exitCode}`;
+    return { status: "skipped", lines: [], detail: `범위 판정 못 함 — \`${cmd}\` 비정상 종료(${why}) — 자격증명·네트워크 등. 위반 없음이 아니라 미판정이다` };
+  }
+  const lines = String(r.stdout || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return { status: "clean", lines: [], detail: "" };
+  return { status: "drift", lines, detail: `계획된 변경이 이 changeset 범위를 벗어난다 — ${lines.length}건` };
+}
+
+// deployScopeVerdict 결과 → precondition findings. 동의는 파괴적 명령과 같은 방식(매 실행
+// 환경변수 선언, standing policy 아님)이지만 다른 대상이라 별도 변수(SDD_ALLOW_DRIFT)를 쓴다 —
+// 하나로 합치면 "삭제를 승인했다"와 "무관한 드리프트를 감수했다"가 같은 흔적이 되어 사후에
+// 어느 쪽이었는지 구분할 수 없다.
+export function deployScopeFindings(verdict, opts = {}) {
+  const v = verdict || {};
+  if (v.status === "skipped") return [{ kind: "scope-skipped", detail: v.detail }];
+  if (v.status !== "drift") return [];
+  const sample = v.lines.slice(0, 3).join("; ") + (v.lines.length > 3 ? ` 외 ${v.lines.length - 3}건` : "");
+  if (opts.allowDrift) {
+    return [{ kind: "scope-drift-consented", detail: `범위 밖 변경 ${v.lines.length}건이지만 SDD_ALLOW_DRIFT=1로 명시 동의됨 — ${sample}` }];
+  }
+  return [{
+    kind: "scope-drift",
+    detail: `${v.detail}: ${sample} — 의도한 것이면 SDD_ALLOW_DRIFT=1로 재실행하고, 아니면 먼저 드리프트를 흡수하라(라이브가 최신이면 저장소를 먼저 맞춘다 — SPEC-032 라이브 우선 대조)`,
+  }];
 }
 
 // ── 배포판 거짓 안전 — "명령이 성공했다"와 "서비스가 살아 있다"는 다른 사실 ──

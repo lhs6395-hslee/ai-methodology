@@ -340,6 +340,13 @@ export const DEFAULTS = {
   // 비-0은 skip이 아니라 **실패**다(테스트·e2ePrecheck와 같은 반전 규약).
   deploySmokeCommand: null,
   deploySmokeTimeoutMs: 60000,
+  // 계획 범위 격리(SPEC-035 확장) — 명령이 계산한 변경이 이 changeset 범위 밖이면(stdout
+  // 한 줄 = 범위 밖 항목 하나, liveRealityChecks와 같은 계약) deployPreconditionPolicy=hard에서
+  // 차단한다. 실측 제보(2026-08-22): terraform plan에 의도한 변경 외 무관한 리소스 6건이
+  // 섞여 나왔다 — git 코드와 라이브 인프라가 이미 어긋나 있었다. **미선언은 부채가 아니다**
+  // (deploySmokeCommand와 달리) — 모듈 개념이 있는 IaC 도구(Terraform 등)에만 의미가 있다.
+  // 인프라 도구를 모른다 — "범위 밖인지" 계산은 전적으로 이 명령의 몫(SPEC-032와 같은 경계).
+  deployScopeCommand: null,
   scCoveragePolicy: "off",
   // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
   // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).

@@ -23,7 +23,8 @@ import { execSync } from "node:child_process";
 import { loadConfig } from "./sdd-config.mjs";
 import {
   DEFAULT_DEPLOY_PATTERNS, parseDeployCommand,
-  deployPreconditionFindings, deployPreconditionVerdict, deployApprovalFindings, commandFromHookInput } from "./deploy-guard-lib.mjs";
+  deployPreconditionFindings, deployPreconditionVerdict, deployApprovalFindings, commandFromHookInput,
+  deployScopeVerdict, deployScopeFindings } from "./deploy-guard-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
 armVerdict({ quietWhenSilent: true });  // 훅 편의 계층 — 발동 조건이 아니면 침묵이 계약이다(SPEC-040)
@@ -51,7 +52,19 @@ if (!parsed.matched) process.exit(0);
 // 아니라 per-invocation 선언 — 그래야 흔적이 남고 습관이 되지 않는다).
 const approval = deployApprovalFindings(command, { destroyOk: String(process.env.SDD_DESTROY_OK || "") === "1" });
 
+// 계획 범위 격리(SPEC-035 확장) — 선언됐을 때만 판정한다(스모크와 달리 미선언을 부채로
+// 계상하지 않는다: 모듈 개념이 없는 배포 도구를 부당하게 벌주지 않는다).
 const ROOT = cfg.__root;
+const scopeCommand = String(cfg.deployScopeCommand || "").trim();
+const scopeRun = (c) => {
+  try { return { exitCode: 0, stdout: execSync(c, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; }
+  catch (e) { return { exitCode: e.status ?? 1, stdout: e.stdout || "", stderr: e.stderr || "" }; }
+};
+if (scopeCommand) {
+  const scopeVerdict = deployScopeVerdict(scopeCommand, scopeRun);
+  approval.push(...deployScopeFindings(scopeVerdict, { allowDrift: String(process.env.SDD_ALLOW_DRIFT || "") === "1" }));
+}
+
 const git = (args) => {
   // core.quotepath=off — 비ASCII 경로가 8진수로 인용되면 경로 대조가 조용히 어긋난다(전 게이트 공통 계약).
   try { return execSync(`git -c core.quotepath=off ${args}`, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); }
@@ -93,6 +106,9 @@ if (v.blocking) {
   console.error("  · 의도적 예외라면 `deployPreconditionPolicy`를 advisory로 내리지 말고(래칫 위반) 이 배포를 커밋 뒤로 미뤄라.");
   if (v.violations.some((f) => f.kind === "destructive")) {
     console.error("  · 삭제가 의도한 것이면 무엇이 지워지는지 확인한 뒤 `SDD_DESTROY_OK=1`을 붙여 재실행하라(매 실행 선언 — 습관이 되지 않게).");
+  }
+  if (v.violations.some((f) => f.kind === "scope-drift")) {
+    console.error("  · 범위 밖 변경이 의도한 것이면 `SDD_ALLOW_DRIFT=1`을 붙여 재실행하라(매 실행 선언). 의도한 게 아니면 먼저 드리프트를 흡수하라 — 이 changeset에 얹으면 무관한 인프라 변경이 함께 나간다.");
   }
   process.exit(2); // PreToolUse 규약 — 비-0이 도구 실행을 막는다
 }

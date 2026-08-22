@@ -201,8 +201,9 @@ JS/TS는 `commands.smoke`에 `SDD_SMOKE=1 vitest run --project smoke`, 테스트
 | `evidenceManifest` | CI에서 못 도는 검증(라이브 클러스터·WAF·관리형 DB)의 증거 회계 — `smokeManifest` 동형. 경로 문자열 또는 객체: `{ "<SPEC>/<SC-001>": {kind, evidence} }` 또는 `{kind:"deferred", reason}`. **사유 없는 유예는 판정 전 에러**(미검증을 문서 형태로 세탁 금지) | `null` |
 | `scCoverageListCap` | 미회계 목록 출력 상한 — 총량은 헤더가 말하고 초과분은 "외 N건"으로 명시(감춤 아님) | `12` |
 | `outOfBandDeployPolicy` · `outOfBandDeployCommands` · `outOfBandDeployDebtFile` | out-of-band 배포 가드(SPEC-035) — 배포가 커밋보다 먼저인 궤도에서 spec-first 발화 지점을 **배포 행위**까지 앞당긴다. `off`·`advisory`·`hard`. 배포 시점은 어느 강도에서도 비차단이다(PostToolUse는 이미 실행된 뒤에 돈다 — 되돌릴 수 없는 것을 막는 척하지 않는다). `hard`의 실체는 **부채 적재**: 미기록 배포가 `outOfBandDeployDebtFile`(JSONL, 로컬·gitignore)에 쌓이고 pre-commit의 `check-deploy-debt`가 **커밋을 막는다**. 갚는 방법은 하나 — 소유 스펙 Change Log에 행을 추가하면 자동 해소된다(파일을 지우는 것은 갚는 것이 아니다). **권장 종착지 = `hard`** | `"advisory"` · `null` · `".sdd/deploy-debt.jsonl"` |
-| `deployPreconditionPolicy` | 배포 **전제 조건**(SPEC-035 FR-006·FR-008) — 위와 **다른 질문**을 묻는다: 그쪽은 "이 배포가 스펙에 반영됐나"(사후), 이쪽은 **"이 배포가 재현 가능한 리비전에서 나오는가"**(사전). 미커밋 트리·upstream 뒤처짐은 순수 git 조회라 배포 **전에** 판정되고 오탐이 거의 없다 — 그래서 유일하게 **PreToolUse에서 실제로 차단**하는 배포 축이다(hard=exit 2). upstream 없음은 hard에서도 차단하지 않고 미판정으로 표기한다(모르는 것을 위반으로 세면 오탐이고, 오탐은 훅을 꺼지게 한다). 기본 off — 사전 차단이라 도입 즉시 켜면 미커밋 배포 궤도의 팀이 첫날 멈춘다. **권장 종착지 = `hard`**(advisory 경유) 판정 4종: 미커밋 트리·upstream 뒤처짐(재현 가능성) + **저장된 plan 없는 `-auto-approve`**(승인 우회 — 승인한 것 = 적용되는 것) + **동의 없는 파괴적 명령**(destroy·delete·uninstall → `SDD_DESTROY_OK=1` 매 실행 선언). 뒤 둘은 명령 문자열만 보므로 git 없이도 판정된다 | `"off"` |
+| `deployPreconditionPolicy` | 배포 **전제 조건**(SPEC-035 FR-006·FR-008·FR-009) — 위와 **다른 질문**을 묻는다: 그쪽은 "이 배포가 스펙에 반영됐나"(사후), 이쪽은 **"이 배포가 재현 가능한 리비전에서 나오는가"**(사전). 미커밋 트리·upstream 뒤처짐은 순수 git 조회라 배포 **전에** 판정되고 오탐이 거의 없다 — 그래서 유일하게 **PreToolUse에서 실제로 차단**하는 배포 축이다(hard=exit 2). upstream 없음은 hard에서도 차단하지 않고 미판정으로 표기한다(모르는 것을 위반으로 세면 오탐이고, 오탐은 훅을 꺼지게 한다). 기본 off — 사전 차단이라 도입 즉시 켜면 미커밋 배포 궤도의 팀이 첫날 멈춘다. **권장 종착지 = `hard`**(advisory 경유) 판정 5종: 미커밋 트리·upstream 뒤처짐(재현 가능성) + **저장된 plan 없는 `-auto-approve`**(승인 우회 — 승인한 것 = 적용되는 것) + **동의 없는 파괴적 명령**(destroy·delete·uninstall → `SDD_DESTROY_OK=1` 매 실행 선언) + **계획 범위 격리**(아래 `deployScopeCommand`). 뒤 셋은 명령 문자열/프로젝트 명령 출력만 보므로 git 없이도 판정된다 | `"off"` |
 | `deploySmokeCommand` · `deploySmokeTimeoutMs` | 배포 직후 **서비스 생존** 확인(SPEC-035 FR-007). 정본 §7 "판정 없이 exit 0"의 배포판 사촌 — **배포 명령이 성공해도 서비스는 죽을 수 있다**(실측: apply 성공 · CI 초록 · 전 요청 403). **미선언 자체가 부채로 계상된다**: 아무도 확인하지 않은 것과 확인해서 살아 있는 것이 같은 침묵으로 보이면 안 된다. 비-0은 skip이 아니라 **실패**다(테스트·`e2ePrecheck`와 같은 반전 규약). 스모크 부채는 스펙 편집으로 갚아지지 않고 — `smoke-undeclared`는 선언으로, `smoke-dead`는 스모크가 다시 통과해야 해소된다 | `null` · `60000` |
+| `deployScopeCommand` | **계획 범위 격리**(SPEC-035 FR-009) — 이 명령이 계산한 변경이 이 changeset 범위 밖이면(stdout 한 줄 = 범위 밖 항목 하나, `liveRealityChecks`와 같은 계약) hard에서 차단한다. 실측 제보: `terraform plan`에 의도한 SNS 리소스 11건 삭제 외 무관한 변경 6건이 섞여 나왔다 — 커밋된 IaC와 라이브 인프라가 이미 어긋나 있었다. **인프라 도구를 모른다** — "범위 밖인지" 계산(plan 파싱·git diff 대조·모듈 매핑)은 전적으로 이 명령의 몫이다(워크드 예시는 아래 §배포 전제조건 템플릿). **미선언은 부채가 아니다**(`deploySmokeCommand`와 다른 규약) — 모듈 개념이 없는 배포(`kubectl apply -f single.yaml`)를 부당하게 벌주지 않는다. 동의는 `SDD_ALLOW_DRIFT=1`(파괴 동의 `SDD_DESTROY_OK`와 별개 변수 — 흔적이 섞이면 사후에 어느 쪽이었는지 구분 못 한다) | `null` |
 | `e2eFileRegex` | e2e 테스트 파일 정규식(`testFileRegex`의 **부분집합**) — 선언하면 e2e로만 커버된 FR이 `unit`(=실행 검증됨)이 아니라 `e2e` 버킷으로 분리 집계된다. ⚠ 실측 결함: 회계가 e2e를 unit으로 세는 동안 실행 게이트는 e2e를 돌리지 않아 FR 58건이 거짓 green이었다 | `[]` |
 | `e2eTestsPolicy` · `commands.e2e` · `e2ePrecheck` | e2e 실행 축(SPEC-021 확장) — 선언하면 `commands.e2e`를 실제로 돌려 판정한다. `e2ePrecheck`(선택)는 **실행 전제 프로브**로, 실패하면 `skipped(사유)`이고 통과 후 비-0은 진짜 실패다(테스트에서 비-0은 skip이 아니라 실패이므로 live-reality와 달리 프로브로 가른다). **`hard` + skipped = 실패**(판정 못 했는데 통과는 거짓 안전). 앱 기동 전제라 pre-commit이 아니라 pre-push·CI에 배선한다 | `"off"` · — · `null` |
 | `synonymPolicy` | 의미적 중복 3층(SPEC-033, entity 역할 한정) — ①정규화 후 **형태 변이** 충돌(`order`/`orders`/`pjt_order`)·②`synonymRegistry`가 선언한 **별칭 사용**은 결정적이라 이 강도대로 차단하고, ③유사 후보는 **어떤 강도에서도 차단하지 않는다**(확률적 오탐이 빌드를 깨면 사람이 그 층을 떼어낸다). `off`·`advisory`·`hard`. **권장 종착지 = `hard`** | `"off"` |
@@ -296,3 +297,45 @@ ECR 리포 없음 · 경로 가드 · base==HEAD · 크로스계정 ECR API · b
 > ⚠ 이 검사는 **스테이지 자신이 먼저 하는 것이 더 낫다**(SPEC-041 ③). 스테이지가 자기 전제를
 > 검사해 `--record <asset> INERT "<사유>"`를 남기면, 안 뜬 사실이 초록에 묻히지 않는다.
 > 여기 R9 검사는 그 배선이 아직 없는 동안의 백스톱이다.
+
+## 배포 전제조건 템플릿 — 계획 범위 격리 (SPEC-035 FR-009 — 프로젝트마다 재발명 금지)
+
+실측 제보(2026-08-22): SNS 알림 기능을 애플리케이션·Terraform 양쪽에서 걷어내는 작업 중
+`terraform plan`을 실행했더니, 의도한 SNS 리소스 11건 삭제 외에 무관한 변경 6건(bastion
+재생성·CloudFront·EKS access entry·Lambda 4개·Secrets Manager 2건)이 같은 plan에 섞여
+나왔다. 건드린 파일(`modules/sns/**`)과 무관했다 — git에 커밋된 코드와 실제 라이브 인프라가
+이미 어긋나 있었고, 무관한 작업을 apply하는 순간 그 드리프트가 함께 묻어 나올 뻔했다.
+
+이건 애플리케이션 층에서 `check-spec-sync`가 강제하는 것과 **같은 원칙의 인프라 버전**이다 —
+동기화가 필요한 두 축은 ①코드↔스펙(commit-msg에서 강제) ②인프라↔IaC(배포 시점에서 강제)다.
+①은 이 킷이 도입 때부터 다뤘고, ②는 이 FR-009로 닫는다.
+
+**계약 복습:** stdout **한 줄 = 범위 밖 리소스 하나**(비면 clean), **exit ≠ 0 = 미판정**(위반
+아님 — 자격증명 없는 로컬에서 하드 실패 금지, `liveRealityChecks`와 같은 계약). 인프라 도구를
+킷이 모르므로 plan 파싱·git diff 대조·모듈 매핑은 전부 이 명령 안에서 프로젝트가 한다.
+
+### ⑤ terraform plan ↔ changeset 범위 대조
+```json
+{
+  "deployScopeCommand": "scripts/tf-scope-check.sh"
+}
+```
+`scripts/tf-scope-check.sh`(스켈레톤 — 프로젝트 도구에 맞춰 채운다):
+```sh
+#!/bin/sh
+# 1) 이 changeset이 건드린 모듈 집합 — 마지막 apply 지점 이후 diff(git tag·타임스탬프 등
+#    "마지막 적용 지점"을 어떻게 기록하는지는 이 스크립트의 몫이다. 킷은 관여하지 않는다).
+CHANGED_MODULES=$(git diff --name-only "$(git describe --tags --match 'tf-applied-*' --abbrev=0 2>/dev/null || echo HEAD~20)"..HEAD -- '*.tf' \
+  | sed -E 's#^(modules/[^/]+)/.*#\1#' | sort -u)
+# 2) plan이 실제로 건드리는 모듈 — terraform plan -json을 리소스 주소로 축약한다.
+PLANNED_MODULES=$(terraform plan -json 2>/dev/null \
+  | jq -r 'select(.type=="resource_drift" or .type=="planned_change") | .change.resource.addr // empty' \
+  | sed -E 's#^(module\.[^.]+)\..*#\1#' | sed 's#^module\.##' | sort -u)
+# 3) 범위 밖 = planned - changed. 한 줄 = 위반 하나.
+comm -23 <(printf '%s\n' "$PLANNED_MODULES") <(printf '%s\n' "$CHANGED_MODULES")
+```
+> `terraform plan -json`은 credentials·backend 접근이 필요하다 — 실패하면 비-0으로 죽어야
+> `deployScopeVerdict`가 **미판정**으로 분류한다(위반 0건으로 세면 거짓 안전). "마지막 적용
+> 지점"을 git tag로 남기는 관례(제보 프로젝트가 실측 검증한 방식)를 함께 쓰면 매 apply 성공
+> 시 `git tag tf-applied-$(date +%s) && git push --tags`로 갱신한다 — 이 지점의 계산 방법은
+> `deployScopeCommand`의 구현 디테일이라 킷이 규정하지 않는다.

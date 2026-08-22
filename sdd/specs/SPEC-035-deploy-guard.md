@@ -12,8 +12,17 @@
 - **Independent Test**: `deploy-guard.test.mjs`가 순수 코어(명령 파싱·dry-run 제외·Change Log 행 판정·형식 검사·findings 분기)와 게이트 배선(경고 후 exit 0, 커밋된 소스는 침묵)을 단독 검증. [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **Acceptance (GWT)**: 1. **Given** an uncommitted manifest owned by a spec whose Change Log has no new row, **When** `kubectl apply -f` runs, **Then** the hook names the spec and the missing record and exits zero.
 
+### User Story 2 — 계획된 변경이 이 changeset 범위를 벗어나면 막는다 (P1)
+실측 제보(2026-08-22, gsn-ai-pm-management-tool): SNS 알림 기능을 걷어내는 작업에서 `terraform plan`을 실행했더니, 의도한 SNS 리소스 11건 삭제 외에 무관한 변경 6건(bastion 재생성·CloudFront·EKS access entry·Lambda 4개·Secrets Manager 2건)이 같은 plan에 섞여 나왔다. 건드린 파일(`modules/sns/**`)과 아무 관계가 없었다 — git에 커밋된 IaC 코드와 실제 라이브 인프라가 이미 어긋나 있었고, 무관한 작업을 apply하는 순간 그 드리프트가 함께 묻어 나올 뻔했다. 전례(2026-08-03, CloudFront 관련 프로덕션 전면 403 두 번)도 같은 유형이다. 애플리케이션 계층에서 `check-spec-sync`가 강제하는 "코드↔스펙 동기화"의 인프라 사촌이 없다는 것이 이 두 사고의 공통 구조다.
+- **Independent Test**: `deploy-guard.test.mjs`가 순수 코어(`deployScopeVerdict`의 4분기·`deployScopeFindings`의 위반/동의/스킵 분기)와 게이트 e2e(hard 차단·`SDD_ALLOW_DRIFT=1` 통과·미선언 침묵)를 단독 검증. [검증: tooling/__tests__/deploy-guard.test.mjs]
+- **Acceptance (GWT)**: 1. **Given** `deployScopeCommand`가 선언되고 그 명령이 이 changeset이 건드리지 않은 리소스 이름을 stdout에 출력, **When** `deployPreconditionPolicy: hard`에서 배포 명령이 실행되려 할 때, **Then** 그 항목들을 나열하고 exit 2로 막으며, `SDD_ALLOW_DRIFT=1`이 선언되면 통과시키되 흔적을 남긴다.
+
 ### Edge Cases
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
+- **인프라 도구를 모른다(SPEC-032와 같은 경계).** "계획된 변경이 이 changeset 범위 밖인가"를 계산하는 것은 전적으로 프로젝트가 주입하는 `deployScopeCommand`의 몫이다 — Terraform 모듈이든 Pulumi 스택이든, 그 도구의 plan 포맷을 킷이 흉내내면 포맷이 바뀌는 순간 조용히 inert가 된다(FR-008 옆 "plan 내용은 파싱하지 않는다"와 같은 이유). 코어는 stdout(한 줄 = 범위 밖 항목 하나, `liveRealityChecks`와 같은 계약)만 읽는다.
+- **미선언은 부채가 아니다 — `deploySmokeCommand`와 다른 규약.** 스모크는 모든 배포에 보편적으로 적용되지만(모든 서비스는 죽을 수 있다), 범위 격리는 모듈·스택 개념이 있는 plan 기반 IaC 도구에만 의미가 있다. 강제하면 `kubectl apply -f single.yaml` 같은 단일 매니페스트 배포를 부당하게 벌준다.
+- **명령 실행 실패는 위반이 아니라 skipped다** — 자격증명·네트워크가 없어 판정 자체가 불가능한 경우, 위반 0건으로 세면 거짓 안전이다(SPEC-032 동형).
+- **동의는 삭제 동의와 다른 변수(`SDD_ALLOW_DRIFT`)로 선언한다.** `SDD_DESTROY_OK`와 합치면 "삭제를 승인했다"와 "무관한 드리프트를 감수했다"가 같은 흔적이 되어 사후에 어느 쪽이었는지 구분할 수 없다.
 - **항상 비차단이다** — PostToolUse는 명령이 **이미 실행된 뒤**에 돈다. 막을 것이 없고 배포를 되돌리는 것은 게이트의 일이 아니다. 진짜 차단은 커밋(commit-msg)·CI가 계속 담당하며, 이 훅은 그 차단이 오기 전에 적게 만든다.
 - **조회·계획·dry-run은 감지하지 않는다** — 상태를 바꾸지 않으므로 드리프트를 만들지 않는다(`kubectl get`·`terraform plan`·`--dry-run`). 오탐이 잦으면 사람이 훅을 통째로 꺼버리므로, 감지 범위를 상태 변경으로 좁히는 것이 강제력을 지키는 길이다.
 - **커밋된 소스 배포는 정상 궤도라 침묵한다** — 이미 spec-sync를 통과한 것이다. 경고 대상은 **미커밋 소스가 라이브에 반영된 경우**뿐이다.
@@ -35,6 +44,7 @@
 - **FR-007** (event): WHEN a deploy is detected, THE SYSTEM SHALL judge service survival separately from command success: WHERE `deploySmokeCommand` is declared, it SHALL be executed with a non-zero exit read as failure rather than as skip; WHERE it is undeclared, that absence SHALL itself be reported, and under hard both outcomes SHALL be recorded as debt settled only by a passing smoke or by declaring the command — never by editing a spec.
 - **FR-008** (unwanted): IF a deploy command bypasses review — an auto-approve flag without a saved plan argument — or performs a destructive operation without per-invocation consent in the environment, THEN the **deploy-guard** (E) core SHALL report it before the command runs, treating an applied saved plan as legitimately approved and a declared consent as a recorded trace rather than a violation.
 - **FR-005** (state): WHILE `outOfBandDeployPolicy` is hard, **check-deploy-guard.mjs** (S) SHALL append each unrecorded deploy to `outOfBandDeployDebtFile` as one JSON line while still exiting zero, and **check-deploy-debt.mjs** (S) SHALL — at pre-commit — settle every debt whose owning spec has a Change Log row added in the staged change, rewrite the file with only the unsettled lines (preserving unparseable lines), and exit non-zero while any debt remains; WHERE the policy is not hard or the file is absent, THE gate SHALL exit zero in silence.
+- **FR-009** (unwanted): IF `deployScopeCommand` is declared and, when run at deploy time, prints one or more non-empty lines to stdout, THEN **check-deploy-precheck.mjs** (S) SHALL treat each line as one resource change lying outside this changeset's scope and report it as a violation — blocking under `deployPreconditionPolicy: hard` unless `SDD_ALLOW_DRIFT=1` is declared for that invocation — and SHALL classify a non-zero exit from the command as unjudged rather than as a violation; WHERE `deployScopeCommand` is undeclared, THE SYSTEM SHALL perform no evaluation and SHALL NOT record any debt, unlike `deploySmokeCommand`'s undeclared state.
 
 ### Key Entities
 - **deploy-guard** — the check that fires at deploy time rather than commit time, so that a change already living in production has its rationale written down before the commit gate ever sees it.
@@ -62,6 +72,7 @@
 - **SC-004**: 미커밋 트리에서 `deployPreconditionPolicy: hard`가 배포를 exit 2로 막고, 커밋 후에는 위반이 사라지며, upstream 없음은 hard에서도 차단하지 않고 미판정으로 표기된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **SC-005**: `deploySmokeCommand` 미선언이 경로 인자 없는 배포에서도 표면화되고, 스모크 실패가 부채로 적재돼 커밋을 막으며, 스모크가 다시 통과하면 그 부채가 해소된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
 - **SC-003**: 같은 픽스처에서 advisory는 부채 파일을 만들지 않고, hard는 부채를 적재해 후속 커밋을 exit 1로 막으며, 소유 스펙 Change Log 행을 스테이징하면 해소돼 exit 0이 된다. [검증: tooling/__tests__/deploy-guard.test.mjs]
+- **SC-007**: `deployScopeCommand`가 범위 밖 항목을 출력하면 hard에서 exit 2로 막고 항목을 나열하며, `SDD_ALLOW_DRIFT=1`로 재실행하면 통과하되 흔적이 출력에 남는다. 명령이 비-0으로 실패하면 위반이 아니라 미판정으로 표기되고, 미선언 프로젝트는 이 축이 완전히 침묵한다(부채 없음). [검증: tooling/__tests__/deploy-guard.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 판정 코어는 정규식·집합 대조만의 순수 함수이고 git 조회는 소비 게이트가 수행하므로, 훅이 없는 환경에서도 코어를 단독 테스트할 수 있다. [검증: tooling/__tests__/deploy-guard.test.mjs]
@@ -83,6 +94,8 @@
 - advisory와 hard의 차이는 **부채 적재**다(실측 제보: 둘이 출력도 동작도 같아 승격이 장식이었다). 배포 시점은 여전히 비차단이다 — 되돌릴 수 없는 것을 막는 척하지 않는다. 대신 막을 수 있는 유일한 지점, 아직 오지 않은 커밋에서 막는다.
 - 부채는 **자동으로만** 해소된다 — 소유 스펙 Change Log에 행이 스테이징되는 순간이다. 사람이 파일을 지워 갚게 두면 "지우기"가 갚는 방법이 되고, 그러면 부채 파일은 기록 장치가 아니라 성가신 알림이 된다. 파싱 불가한 줄도 지우지 않는다(파싱 실패로 부채를 지우는 것이 곧 세탁이다).
 - 부채 파일은 **로컬 세션 상태**라 커밋 대상이 아니다(sdd-init가 `.gitignore`에 `.sdd/`를 넣는다) — 추적하면 "커밋해서 없앤다"가 또 하나의 갚는 방법이 된다.
+- **애플리케이션 층과 인프라 층은 같은 종류의 사고를 겪는다.** `check-spec-sync`가 강제하는 것은 "코드가 스펙과 어긋나면 커밋을 막는다"이고, `deployScopeCommand`가 강제하는 것은 "계획된 인프라 변경이 이 changeset이 설명하는 범위와 어긋나면 배포를 막는다" — 대상만 다를 뿐 같은 원칙(동기화가 깨질 수 있다는 사실을 사람의 기억에 맡기지 않는다)이다. 이 킷의 SSOT는 이제 "동기화가 필요한 두 축(코드↔스펙, 인프라↔IaC)"을 나란히 문서화한다(METHODOLOGY.md).
+- **"마지막 적용 지점"을 어떻게 계산하는지는 이 축의 관심사가 아니다.** 제보 프로젝트는 git tag로 마지막 apply 시점을 기록해 "이번에 무엇이 새로 바뀌었는가"를 계산했다 — 이건 `deployScopeCommand` 내부의 구현 디테일이다. 코어가 그 계산 방법까지 규정하면 도구마다 다른 북키핑 관례를 킷이 떠안게 된다.
 - 기각한 대안: hard에서 배포 명령 자체를 차단하기. PostToolUse는 명령이 **이미 실행된 뒤**에 돌아 차단할 대상이 없고, PreToolUse로 옮기면 배포 전 워킹트리만 보고 판정하게 돼 "배포 후 기록"이라는 이 spec의 궤도와 어긋난다. 재검토 조건: 훅 계약이 배포 명령의 사전 차단을 지원하게 되면.
 
 ## Review Log
@@ -90,11 +103,13 @@
 | 일시 | 수행자 | 판정 |
 |---|---|---|
 | 2026-08-02 | 셀프리뷰(순수 코어 TDD·게이트 e2e·5분기 실측) + 소유자 개선 요청(out-of-band 배포 사각지대) → Active | FR-001~004 unit 커버 |
+| 2026-08-22 | 셀프리뷰(범위 격리 코어·게이트 e2e 신규) + 소비 프로젝트 실측 제보(SNS 제거 작업 중 무관 리소스 6건 drift) → Active 유지 | FR-009 신규 unit 커버 |
 
 ## Dedup-Review
 <!-- 이웃 스펙과의 의미적 중복 검토 기록 — 게이트는 존재·형식만 검사(판정은 사람/LLM) -->
 - 2026-08-02 이웃 SPEC-003(spec-sync): 비중복 — 003은 **커밋** 시점에 소유 코드 변경의 스펙 동반을 차단하고, 이 spec은 그보다 앞선 **배포** 시점에 비차단으로 상기시킨다. 시점과 강도가 다르며 003이 차단을 계속 담당한다.
 - 2026-08-02 이웃 SPEC-032(live-reality): 비중복 — 032는 이미 벌어진 선언↔실물 **차이를 측정**하고, 이 spec은 차이가 **생기는 순간**을 잡는다. 사후 측정 vs 발생 시점이다.
+- 2026-08-22 재확인(FR-009, `deployScopeCommand`): 비중복 — 두 축의 어댑터 계약(stdout 한 줄=위반 하나, 비-0=skipped)은 의도적으로 같지만(같은 유형의 문제는 같은 모양의 해법을 쓴다), 032는 **주기·가오픈 점검 시점의 sweep 게이트**(commit-msg/CI)이고 이 FR은 **PreToolUse 실시간 차단**이다. 032의 어댑터로도 같은 로직을 등록할 수 있지만 그건 "나중에 발견"이고, 이 FR은 "지금 막는다"다 — 시점이 다르면 같은 판정도 다른 강제력을 갖는다.
 - 2026-08-02 이웃 SPEC-009(derivation-accounting): 비중복 — 009는 Change Log 근거의 선제 캡처 규범, 이 spec은 배포 시점에 그 캡처가 일어났는지 확인하는 트리거다. 규범 vs 트리거다.
 
 ## Change Log
@@ -110,3 +125,4 @@
 | 2026-08-09 | 훅 입력 파서 정본화 — `commandFromHookInput`(deploy-guard-lib) | `readCommand`가 check-deploy-guard와 check-deploy-precheck에 **본문 동일**로 있었다(R13 구조 중복). PreToolUse/PostToolUse의 stdin JSON 계약이 두 곳에 복제되면 훅 입력 형식이 바뀔 때 한쪽만 따라간다. `readStdin`을 주입받아 코어 순수성 유지 |
 | 2026-08-10 | 배포 게이트 3종(`deploy-guard`·`deploy-debt`·`deploy-precheck`)의 `git` 래퍼에 `core.quotepath=off` 적용 | 세 게이트 모두 스펙 파일 경로로 diff를 떠 Change Log 동반을 판정한다. 비ASCII 경로가 인용되면 그 대조가 조용히 어긋난다 — **거짓 통과와 거짓 위반이 같은 원인에서 나온다** |
 | 2026-08-10 | `check-pre-edit`을 "훅 편의 계층 선례"로 인용한 문장 교정 | 그 게이트가 차단 강도를 갖게 되면서(SPEC-003 FR-001) 이 문장이 **같은 대상에 반대 성격을 부여하는 진술**이 됐다 — R20이 잡는 모순의 형태다. 이 스펙 자신의 Node 전용 결정은 그대로 두고 인용만 걷어냈다(결정을 바꾼 것이 아니라 근거를 정정한 것이다) |
+| 2026-08-22 | FR-009 신설 — `deployScopeCommand`(SPEC-032 어댑터와 같은 계약) + `deployScopeVerdict`/`deployScopeFindings`(deploy-guard-lib) + `check-deploy-precheck` 배선 + `SDD_ALLOW_DRIFT=1` 동의 변수(파괴 동의와 별개) | 실측 제보(gsn-ai-pm-management-tool): SNS 알림 기능 제거 작업 중 `terraform plan`에 무관한 리소스 6건(bastion 재생성·CloudFront·EKS·Lambda 4개·Secrets Manager 2건)이 섞여 나왔다 — 건드린 파일과 무관했고, 커밋된 IaC와 라이브 인프라가 이미 어긋나 있었다. 전례(2026-08-03, CloudFront 403)와 같은 유형: 애플리케이션 층의 "코드↔스펙 동기화"에 해당하는 인프라 층 대응물이 이 킷에 없었다. `plan 내용은 파싱하지 않는다`는 기존 FR-008 원칙을 그대로 따라 도구별 파싱은 프로젝트의 `deployScopeCommand`에 맡기고, 이 코어는 그 stdout만 읽는다(SPEC-032의 `liveRealityChecks`와 같은 계약 재사용 — 같은 문제엔 같은 모양의 해법). `deploySmokeCommand`와 달리 미선언을 부채로 잡지 않은 이유: 스모크는 모든 배포에 보편적이지만 범위 격리는 모듈 개념이 있는 IaC 도구에만 의미가 있어, 강제하면 단일 매니페스트 배포 프로젝트를 부당하게 벌준다 [검증: tooling/__tests__/deploy-guard.test.mjs] |
