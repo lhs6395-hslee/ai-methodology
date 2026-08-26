@@ -347,6 +347,16 @@ export const DEFAULTS = {
   // (deploySmokeCommand와 달리) — 모듈 개념이 있는 IaC 도구(Terraform 등)에만 의미가 있다.
   // 인프라 도구를 모른다 — "범위 밖인지" 계산은 전적으로 이 명령의 몫(SPEC-032와 같은 경계).
   deployScopeCommand: null,
+  // CI/CD 파이프라인 셋업 마법사(SPEC-059)가 쓰는 리치 스키마 파일 경로 — evidenceManifest·
+  // smokeManifest와 같은 포인터 knob 계열이다. 스키마 자체(environments·promotions 등)를 이
+  // sdd.config.json에 중복 저장하지 않는다(같은 데이터를 두 곳에 적으면 한쪽이 뒤처진다는 이
+  // 킷 자신의 반복된 교훈). null이면 기본 파일명 "sdd.pipeline.config.json"을 쓴다.
+  pipelineConfigFile: null,
+  // 배포 시간창 강제(SPEC-060) — off|advisory|hard. pre-push 훅 계층(check-deploy-window.mjs,
+  // Node 전용 — deployPreconditionPolicy와 같은 이유로 sweep 판정 게이트가 아니다)이 읽는다.
+  // 마법사를 돌려 sdd.pipeline.config.json이 생겨도 이 값이 off면 완전히 침묵한다(선언-의존
+  // 축이 하나 더 있다는 뜻 — 파이프라인 설정 파일 존재와 강제 여부는 별개 승격 결정이다).
+  deployWindowPolicy: "off",
   scCoveragePolicy: "off",
   // `[검증: 경로]`의 경로 → 검증 종류 유도(글롭). 사람이 종류를 손으로 적으면 또 하나의
   // 자기신고가 되므로, 산출물이 어디 사는지로 기계가 분류한다. 비면 전부 "other"(회계는 됨).

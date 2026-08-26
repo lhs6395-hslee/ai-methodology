@@ -138,6 +138,18 @@ if [ "$GATE" = "node" ]; then
   say "  → pre-push는 아래 훅 배선 단계에서 설치된다(선택 아님 — 미설치면 R4 sync가 한 번도 안 돈다)"
   say "  → 계약: $KIT/HARNESS.md  · 스킬: /sdd-sync"
 
+  # ── CI/CD 파이프라인 셋업 마법사(선택, SPEC-059 인터뷰·렌더러 + SPEC-060 배포 시간창) ──
+  # 항상 배포한다 — pre-push 정본 템플릿(위)이 scripts/check-deploy-window.mjs 존재를 확인 후에만
+  # 부르므로, 마법사를 안 쓴 프로젝트에선 이 파일들이 있어도 훅 동작에 영향이 없다(선언-의존).
+  mkdir -p "$T/scripts/pipeline-renderers" "$T/.claude/skills/sdd-pipeline-setup"
+  sync_copy "$KIT/tooling/pipeline-setup-lib.mjs"                   "$T/scripts/pipeline-setup-lib.mjs"
+  sync_copy "$KIT/tooling/deploy-window-lib.mjs"                    "$T/scripts/deploy-window-lib.mjs"
+  sync_copy "$KIT/tooling/check-deploy-window.mjs"                  "$T/scripts/check-deploy-window.mjs"
+  sync_copy "$KIT/tooling/pipeline-renderers/jenkins-renderer.mjs"  "$T/scripts/pipeline-renderers/jenkins-renderer.mjs"
+  sync_copy "$KIT/tooling/pipeline-renderers/README.md"             "$T/scripts/pipeline-renderers/README.md"
+  sync_copy "$KIT/tooling/harness/sdd-pipeline-setup.SKILL.md"      "$T/.claude/skills/sdd-pipeline-setup/SKILL.md"
+  say "  → 파이프라인 셋업 마법사 설치: /sdd-pipeline-setup (배포 시간창 게이트는 deployWindowPolicy로 명시 승격해야 강제된다)"
+
   # ── hook 세트 배선: 채택 순간 = 상시 강제 궤도 ─────────────────
   sync_copy "$KIT/tooling/harness/sdd-session-context.sh" "$T/scripts/sdd-session-context.sh"
   sync_copy "$KIT/tooling/harness/sdd-edit-check.sh"       "$T/scripts/sdd-edit-check.sh"

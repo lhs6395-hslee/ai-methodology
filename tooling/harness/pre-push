@@ -5,8 +5,30 @@
 # --hook: config의 syncHookRules로 무거운 규칙을 선언적으로 위임(위임처 syncHookDelegatedTo 필수).
 # --budget: 안전망 — 초과분은 조용한 통과가 아니라 "미판정"으로 표면화된다.
 # 훅이 몇 초를 넘기면 사람이 --no-verify로 우회하고, 그 순간 훅 전체가 무의미해진다(실측 30초+).
-node scripts/sdd-sync.mjs --hook --strict --budget "${SDD_SYNC_BUDGET_MS:-15000}" && exit 0
-echo ""
-echo "↑ spec↔code drift 가능 — node scripts/sdd-sync.mjs로 검토(Claude Code: /sdd-sync). (push는 계속됨)"
-[ "${SDD_SYNC_BLOCK:-0}" = "1" ] && exit 1
+#
+# stdin(git pre-push 프로토콜: `<local ref> <local sha1> <remote ref> <remote sha1>`)을 캐시 파일에
+# 받아둔다 — 아래에서 두 프로그램이 각각 읽는다(파이프 stdin은 한 번 읽으면 소진돼 두 번째 소비자가
+# EOF만 본다).
+SDD_PP_STDIN="$(mktemp 2>/dev/null || echo "/tmp/sdd-prepush-refs-$$")"
+cat > "$SDD_PP_STDIN"
+
+node scripts/sdd-sync.mjs --hook --strict --budget "${SDD_SYNC_BUDGET_MS:-15000}" < "$SDD_PP_STDIN"
+SDD_SYNC_STATUS=$?
+if [ $SDD_SYNC_STATUS -ne 0 ]; then
+  echo ""
+  echo "↑ spec↔code drift 가능 — node scripts/sdd-sync.mjs로 검토(Claude Code: /sdd-sync). (push는 계속됨)"
+  if [ "${SDD_SYNC_BLOCK:-0}" = "1" ]; then rm -f "$SDD_PP_STDIN"; exit 1; fi
+fi
+
+# 배포 시간창 게이트(SPEC-060) — /sdd-pipeline-setup 마법사를 안 쓴 프로젝트엔 이 파일이 없어
+# 완전히 무해(no-op)하다. 쓴 프로젝트에서도 킷 정본 이 템플릿에 있어야 sync_copy로 매 업데이트에도
+# 살아남는다 — 소비 프로젝트에 직접 배선하면 다음 업데이트에서 조용히 사라진다(이 제안이 막으려는
+# 결함 클래스 그 자체를 재현하게 된다).
+if [ -f scripts/check-deploy-window.mjs ]; then
+  node scripts/check-deploy-window.mjs --hook < "$SDD_PP_STDIN"
+  SDD_WINDOW_STATUS=$?
+  if [ $SDD_WINDOW_STATUS -ne 0 ]; then rm -f "$SDD_PP_STDIN"; exit 1; fi
+fi
+
+rm -f "$SDD_PP_STDIN"
 exit 0

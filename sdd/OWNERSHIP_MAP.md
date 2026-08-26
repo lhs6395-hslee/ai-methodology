@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 59건
+## Entity 키 (aggregate root) — 61건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -39,6 +39,7 @@
 | `covers-backlink` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard` | SPEC-035 | ✓ | ✓ | ✓ |
+| `deploy-window` | SPEC-060 | ✓ | ✓ | ✓ |
 | `derivation-accounting` | SPEC-009 | ✓ | ✓ | ✓ |
 | `diagnosis-guard` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic` | SPEC-038 | ✓ | ✓ | ✓ |
@@ -64,6 +65,7 @@
 | `object-storage-decision` | SPEC-016 | ✓ | ✓ | ✓ |
 | `ownership-map` | SPEC-028 | ✓ | ✓ | ✓ |
 | `ownership-reality` | SPEC-029 | ✓ | ✓ | ✓ |
+| `pipeline-setup` | SPEC-059 | ✓ | ✓ | ✓ |
 | `policy-ratchet` | SPEC-027 | ✓ | ✓ | ✓ |
 | `prefix-class-consistency` | SPEC-012 | ✓ | ✓ | ✓ |
 | `process-ssot` | SPEC-047 | ✓ | ✓ | ✓ |
@@ -88,7 +90,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 110건
+## Surface 키 — 114건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -104,6 +106,7 @@
 | `check-deploy-debt.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-guard.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
 | `check-deploy-precheck.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
+| `check-deploy-window.mjs` | SPEC-060 | ✓ | ✓ | ✓ |
 | `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
 | `check-diagnosis-guard.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `check-duplicate-logic.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
@@ -139,6 +142,7 @@
 | `covers-backlink-lib.mjs` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-lib.mjs` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard-lib.mjs` | SPEC-035 | ✓ | ✓ | ✓ |
+| `deploy-window-lib.mjs` | SPEC-060 | ✓ | ✓ | ✓ |
 | `derivation-lib.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
 | `diagnosis-guard-lib.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `drift-lib.mjs` | SPEC-019 | ✓ | ✓ | ✓ |
@@ -157,6 +161,7 @@
 | `impl-reference-lib.mjs` | SPEC-046 | ✓ | ✓ | ✓ |
 | `import-wiring-lib.mjs` | SPEC-050 | ✓ | ✓ | ✓ |
 | `intro-doc-lib.mjs` | SPEC-045 | ✓ | ✓ | ✓ |
+| `jenkins-renderer.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
 | `key-anchor-lib.mjs` | SPEC-023 | ✓ | ✓ | ✓ |
 | `lifecycle-lib.mjs` | SPEC-008 | ✓ | ✓ | ✓ |
 | `live-reality-lib.mjs` | SPEC-032 | ✓ | ✓ | ✓ |
@@ -165,6 +170,7 @@
 | `object-storage-lib.mjs` | SPEC-016 | ✓ | ✓ | ✓ |
 | `ownership-keys.mjs` | SPEC-001 | ✓ | ✓ | ✓ |
 | `ownership-reality-lib.mjs` | SPEC-029 | ✓ | ✓ | ✓ |
+| `pipeline-setup-lib.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
 | `policy-ratchet-lib.mjs` | SPEC-027 | ✓ | ✓ | ✓ |
 | `pre-commit` | SPEC-004 | ✓ | ✓ | ✓ |
 | `pre-push` | SPEC-004 | ✓ | ✓ | ✓ |
@@ -203,7 +209,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 61건
+## Capability 키 — 63건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -218,6 +224,7 @@
 | `covers-backlink.judge` | SPEC-039 | ✓ | ✓ | ✓ |
 | `cross-spec-change.judge` | SPEC-020 | ✓ | ✓ | ✓ |
 | `deploy-guard.gate` | SPEC-035 | ✓ | ✓ | ✓ |
+| `deploy-window.enforce` | SPEC-060 | ✓ | ✓ | ✓ |
 | `derivation-accounting.account` | SPEC-009 | ✓ | ✓ | ✓ |
 | `diagnosis-guard.expose` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic.judge` | SPEC-038 | ✓ | ✓ | ✓ |
@@ -244,6 +251,7 @@
 | `object-storage-decision.judge` | SPEC-016 | ✓ | ✓ | ✓ |
 | `ownership-map.generate` | SPEC-028 | ✓ | ✓ | ✓ |
 | `ownership-reality.judge` | SPEC-029 | ✓ | ✓ | ✓ |
+| `pipeline-setup.render` | SPEC-059 | ✓ | ✓ | ✓ |
 | `policy-ratchet.judge` | SPEC-027 | ✓ | ✓ | ✓ |
 | `prefix-class-consistency.judge` | SPEC-012 | ✓ | ✓ | ✓ |
 | `process-ssot.consolidate` | SPEC-047 | ✓ | ✓ | ✓ |
@@ -294,7 +302,7 @@
 
 ## 집계
 
-- 소유 키 총 **248건** (entity 59 · surface 110 · capability 61 · 역할없음 18)
+- 소유 키 총 **256건** (entity 61 · surface 114 · capability 63 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

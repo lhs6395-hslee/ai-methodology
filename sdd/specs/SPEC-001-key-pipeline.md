@@ -90,6 +90,8 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-26 | config 표면에 `deployWindowPolicy`(off 기본) 추가, Node·Python DEFAULTS 동시 + `policy-ratchet-lib.mjs`/`sdd_gates.py`의 `RATCHETED_POLICIES`에 등재 | SPEC-060 동반 — 배포 시간창 pre-push 강제의 off/advisory/hard 정책. 래칫 감시 목록에서 빠지면 hard→advisory 한 줄로 위반을 회피할 수 있다(정책 강도 knob은 전수 등재가 불변) [검증: tooling/__tests__/runtime-contract.test.mjs, tooling/__tests__/policy-ratchet.test.mjs] |
+| 2026-08-26 | config 표면에 `pipelineConfigFile`(null 기본 — `sdd.pipeline.config.json`) 추가, Node·Python DEFAULTS 동시 | SPEC-059 동반 — `/sdd-pipeline-setup` 마법사의 리치 스키마(`environments`·`promotions` 등)는 `sdd.pipeline.config.json` 한 파일에만 두고, 이 config 표면엔 `evidenceManifest`/`smokeManifest`와 같은 포인터 knob(파일 경로)만 추가했다 — 같은 데이터를 두 곳에 적으면 한쪽이 뒤처진다는 반복된 교훈을 피하기 위함 [검증: tooling/__tests__/runtime-contract.test.mjs] |
 | 2026-08-22 | config 표면에 `deployScopeCommand`(null 기본) 추가 | SPEC-035 FR-009 동반 — 계획된 인프라 변경이 changeset 범위 밖이면 배포를 막는 축. `deploySmokeCommand`와 달리 미선언을 부채로 잡지 않는다(모듈 개념이 없는 배포를 부당하게 벌주지 않기 위해) |
 | 2026-08-16 | `riskyActionPatterns` 표면의 설명 주석을 `tool` 필드(도구명 정규식, `match`와 상호 배타) 포함으로 갱신(값 변경 없음, 문서 주석만) | SPEC-058 동반 — MCP 도구 호출(명령 문자열이 없는 도구)은 `match`로 원천적으로 못 잡아 `tool` 필드가 추가됐다 |
 | 2026-08-10 | config 표면에 `diagnosisGuardPolicy`(advisory 기본, 킷 hard)·`diagnosisSpecMap`·`diagnosisSpecReadPatterns`·`diagnosisGuideSections` 추가 + `entityRegistry`에 `diagnosis-guard` 등재 + 킷 진단 규칙 2종 선언, Node·Python DEFAULTS 동시 | SPEC-053 동반. 금지 목록을 게이트에 하드코딩하지 않은 이유: 프로젝트마다 금지 대상이 다르고, 하드코딩하면 킷이 **그 프로젝트의 결정**을 담게 된다(제보 프로젝트의 첫 사례가 그 형태였다). `diagnosisSpecReadPatterns`를 null 기본으로 뺀 이유: 명세를 읽는 명령은 모든 규칙을 이겨야 하는데 그 인정 범위가 프로젝트 레이아웃에 달려 있다 [검증: tooling/__tests__/diagnosis-guard.test.mjs] |

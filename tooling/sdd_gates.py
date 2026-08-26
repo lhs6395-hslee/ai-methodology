@@ -416,6 +416,8 @@ DEFAULTS = {
     "deploySmokeCommand": None,
     "deploySmokeTimeoutMs": 60000,
     "deployScopeCommand": None,
+    "pipelineConfigFile": None,
+    "deployWindowPolicy": "off",
     "scCoveragePolicy": "off",
     "verificationKinds": {},
     "evidenceManifest": None,
@@ -543,6 +545,7 @@ RATCHETED_POLICIES = [
     "frPlacementPolicy",
     "gateFailureEscalationPolicy",
     "riskyActionPolicy",
+    "deployWindowPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
