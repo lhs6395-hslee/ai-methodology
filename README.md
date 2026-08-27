@@ -103,6 +103,16 @@
 
 인자 없으면 현재 디렉토리·정본 저장소를 기본값으로 쓴다. 절차 원본은 `prompts/`(SSOT)에 한 곳, 스킬은 이를 참조·실행한다(중복 저장 안 함). 스킬 계약은 [`sdd/specs/SPEC-005-adoption-lifecycle.md`](sdd/specs/SPEC-005-adoption-lifecycle.md).
 
+### 그 외 설치형 스킬 (채택 후, 필요할 때)
+위 3종(채택 라이프사이클)과 별개로, `--gate=node`로 배선한 프로젝트에는 상황별 스킬이 더 설치된다. 정본 절차는 각 스킬이 가리키는 파일 하나(SSOT)이고, 아래는 진입점만 모은 것이다:
+
+| 명령 | 상황 | 정본 절차 |
+|---|---|---|
+| `/sdd-sync` | spec↔code drift 인터랙티브 점검(pre-push가 자동으로도 돌린다) | `tooling/sdd-sync.mjs`, 계약: [`HARNESS.md`](HARNESS.md) |
+| `/speckit-fix` | 버그픽스를 SDD 경로로 — RED 재현 → 스펙 착지 → GREEN → 게이트 | `tooling/harness/speckit-fix.SKILL.md` |
+| `/sdd-migrate` | `/sdd-update`가 표면화한 백로그(entity 입도·capability 귀속·FR 키 앵커)를 실제 스펙 재구성으로 실행 | [`prompts/migrate.md`](prompts/migrate.md) |
+| `/sdd-pipeline-setup` | 대화형 인터뷰로 CI/CD 배포 파이프라인 셋업 — `sdd.pipeline.config.json` + 선택한 제공자(Jenkins·GitHub Actions·GitLab CI)의 설정 파일 생성, 배포 시간창 pre-push 게이트 동반 | [`prompts/pipeline-setup.md`](prompts/pipeline-setup.md), 계약: [`sdd/specs/SPEC-059-pipeline-setup.md`](sdd/specs/SPEC-059-pipeline-setup.md)·[`SPEC-060-deploy-window.md`](sdd/specs/SPEC-060-deploy-window.md) |
+
 ### 경량 부트스트랩 (전체 clone 없이 URL로 시작)
 위 raw URL 한 줄이면 에이전트가 이 부트스트랩을 알아서 수행한다. 수동으로 실행 폐포만 받으려면(526KB 전체 clone 불필요) partial + sparse clone 1회:
 ```sh
