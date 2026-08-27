@@ -486,6 +486,76 @@ test("semantic drift: Spec-Impact로 면제되면 부채 줄로 사후 감사 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// 이슈 #21 D-2: 소유 포기를 커밋 2개로 쪼개면(①Files 삭제+정당한 Change Log, ②그 다음 커밋에서
+// 코드 변경) idx∪HEAD 합집합 방어가 무력했다 — 두 리비전 모두 이미 소유가 빠진 뒤라서. base ref
+// 대비 "예전엔 소유였는데 지금은 아무도 안 가진" 파일을 리네임과 같은 승격 대상으로 잡는다.
+test("semantic drift: 소유 포기 2커밋 분할(D-2 실측 시나리오) — base 대비 소유 상실이 승격 트리거", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base"); g("branch", "-M", "main"); g("checkout", "-qb", "feat");
+
+    // 커밋 1: Files 선언 제거(합당한 Change Log 동반) — 그 자체로는 정당한 spec-first 변경.
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("—", "| 2026-07-16 | pdf 모듈 소유 이관 | 다른 팀으로 이관 |\n"));
+    g("add", "-A"); g("commit", "-qm", "drop pdf ownership");
+
+    // 커밋 2: 스펙은 안 건드리고 코드만 바꾼다 — 예전 판은 여기서 완전 침묵(exit 0)했다.
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 2; // sneaky behavior change\n");
+    g("add", "-A"); g("commit", "-qm", "change pdf parsing behavior");
+
+    const r = runGate(root, ["main"]); // range 모드 — base:main 대비 두 커밋 전체 diff
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /✗ \[SPEC-001\] 소유 이동\(base 대비 Files 소유 상실\)/);
+    assert.match(r.out, /semantic drift/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("semantic drift: 소유 이동도 FR 라인 변경이면 통과 — Spec-Impact 없이도 정당한 해소", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base"); g("branch", "-M", "main"); g("checkout", "-qb", "feat");
+
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("—", "| 2026-07-16 | pdf 모듈 소유 이관 | 다른 팀으로 이관 |\n"));
+    g("add", "-A"); g("commit", "-qm", "drop pdf ownership");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 2;\n");
+    // 이 커밋에서 스펙의 FR 선언 라인 자체를 바꾼다 — 소유는 이미 넘어갔지만 본문 재검토가 이뤄졌다는 신호.
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("—", "| 2026-07-16 | pdf 모듈 소유 이관 | 다른 팀으로 이관 |\n").replace("SHALL x.", "SHALL y."));
+    g("add", "-A"); g("commit", "-qm", "change pdf + revisit spec");
+
+    const r = runGate(root, ["main"]);
+    assert.equal(r.code, 0, r.out);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("semantic drift: 지금도 다른 스펙이 그 파일을 소유하면 소유 이동 트리거가 아니다(정상 재배정)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "sdd/specs/SPEC-002.md"),
+      "# SPEC-002\n**Spec**: `SPEC-002`\n\n**FR-001** THE SYSTEM SHALL z.\n\n## Ownership\n- **Entities**: other\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base"); g("branch", "-M", "main"); g("checkout", "-qb", "feat");
+
+    // SPEC-001이 소유를 넘기고 SPEC-002가 같은 커밋에서 넘겨받는다 — 이건 정상 재배정.
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("—", "| 2026-07-16 | pdf 모듈 소유 이관 | SPEC-002로 이관 |\n"));
+    writeFileSync(join(root, "sdd/specs/SPEC-002.md"),
+      "# SPEC-002\n**Spec**: `SPEC-002`\n\n**FR-001** THE SYSTEM SHALL z.\n\n## Ownership\n- **Entities**: other\n- **Files**: src/lib/pdf/**\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n| 2026-07-16 | pdf 모듈 소유 이관 수신 | SPEC-001에서 이관 |\n");
+    g("add", "-A"); g("commit", "-qm", "reassign pdf ownership");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 2;\n");
+    g("add", "-A"); g("commit", "-qm", "change pdf parsing behavior");
+
+    const r = runGate(root, ["main"]);
+    assert.equal(r.code, 0, r.out); // SPEC-002가 지금 소유 중 — "소유 이동" 트리거 대상 아님
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-020/FR-002
 test("cross-spec: 공유 파일을 타 스펙 기능 때문에 변경 + Change-Driver → 참조 완화(PASS) / 없으면 위반 / 가짜 동인 비완화", () => {
   const { root, g } = repo();

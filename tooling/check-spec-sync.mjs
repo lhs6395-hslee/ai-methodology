@@ -271,10 +271,42 @@ const frLineChanged = (specPath) => {
   return ds.some((d) => d && re.test(d));
 };
 const triggered = new Set();
+const triggerReasons = new Map(); // specId -> Set("rename"|"ownership-move") — 리포트 문구용
+const addTrigger = (id, reason) => {
+  triggered.add(id);
+  if (!triggerReasons.has(id)) triggerReasons.set(id, new Set());
+  triggerReasons.get(id).add(reason);
+};
 for (const nf of renamed) {
   if (specSet.has(nf) || nf.startsWith(cfg.specDir + "/")) continue;
   if (exempt.some((rx) => rx.test(nf))) continue;
-  for (const s of specs) if (s.globs.some(({ re }) => re.test(nf))) triggered.add(s.id);
+  for (const s of specs) if (s.globs.some(({ re }) => re.test(nf))) addTrigger(s.id, "rename");
+}
+// 소유 이동(SPEC-019 FR-002, 이슈 #21 D-2) — 두-리비전 ownership diff. `specs[].globs`는 이미
+// idx∪HEAD(같은 changeset 안의 "Files 삭제 커밋 + 코드 변경 커밋" 합침)라 **한 changeset 안**의
+// 회피는 막혔지만, "커밋1=Files 삭제(정당한 Change Log 동반) → 커밋2=코드 변경"처럼 **소유 포기가
+// 이미 base 이전 커밋에 확정**돼 있으면 idx도 HEAD도 이미 소유가 빠진 뒤라 그 합집합 방어가
+// 무력하다 — 유일한 탐지 채널이 `unowned` 경고인데 만성 노이즈가 그 채널을 잠식한다(실측).
+// base ref(이 changeset이 갈라진 지점)의 스펙 Files 선언과 대조해, "base에서는 소유였는데 지금은
+// 어떤 스펙도 안 가진" 파일을 리네임과 같은 승격 대상으로 잡는다(FR 라인 변경 ∨ Spec-Impact 필요).
+if (branchDiffOk) {
+  const baseGlobsCache = new Map(); // spec.path -> [re...] | null(스펙이 base에 없었음)
+  const baseGlobsOf = (spec) => {
+    if (baseGlobsCache.has(spec.path)) return baseGlobsCache.get(spec.path);
+    const baseText = shOk(`git show ${BASE}:${spec.path}`);
+    const result = baseText ? parseSection(baseText, "Ownership", ["Files"]).Files.map(stripInlineComment).filter(Boolean).map(compileGlob) : null;
+    baseGlobsCache.set(spec.path, result);
+    return result;
+  };
+  for (const f of changed) {
+    if (specSet.has(f) || f.startsWith(cfg.specDir + "/")) continue;
+    if (exempt.some((rx) => rx.test(f))) continue;
+    if (specs.some((s) => s.globs.some(({ re }) => re.test(f)))) continue; // 지금도 누군가 소유 — 이동 아님
+    for (const s of specs) {
+      const baseGlobs = baseGlobsOf(s);
+      if (baseGlobs && baseGlobs.some((re) => re.test(f))) addTrigger(s.id, "ownership-move");
+    }
+  }
 }
 const satisfied = new Set([...triggered].filter((id) => {
   const s = specs.find((x) => x.id === id);
@@ -317,8 +349,15 @@ if (filesMissingHard && !violations.length) {
   console.error(`\n✗ Files 리터럴 경로 부재: 존재하지 않는 경로는 어떤 변경 파일과도 매치하지 않는다 — 스펙을 실물 경로에 맞추거나(리네임 반영) 그 항목을 지워라.`);
   process.exit(1);
 }
-// semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
-for (const id of drift.violations) console.log(`  ${driftHard ? "✗" : "⚠"} [${id}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy=${DRIFT_POLICY})`);
+// semantic drift 승격 리포트(SPEC-019) — 트리거 스펙(리네임 ∨ 소유 이동)에 FR라인/Spec-Impact 부재.
+const triggerLabel = (id) => {
+  const r = triggerReasons.get(id) || new Set();
+  const parts = [];
+  if (r.has("rename")) parts.push("소유 파일 리네임");
+  if (r.has("ownership-move")) parts.push("소유 이동(base 대비 Files 소유 상실)");
+  return parts.join(" + ") || "소유 파일 리네임";
+};
+for (const id of drift.violations) console.log(`  ${driftHard ? "✗" : "⚠"} [${id}] ${triggerLabel(id)} — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy=${DRIFT_POLICY})`);
 // 트레일러 사용 감사 흔적(이슈 #21 M-7) — Spec-Impact가 이 커밋의 semantic drift 승격 전체를
 // 면제하면 위반이 0건이 돼 조용히 지나간다. 판정(0건)은 옳지만 **왜 0건인지**가 남아야
 // 사후에 "그 사유가 타당했는가"를 감사할 수 있다 — 트레일러는 커밋 이력에 영속해도 이
@@ -349,7 +388,7 @@ if (violations.length && STAGED) {
   process.exit(1);
 }
 if (driftHard) {
-  console.error(`\n✗ semantic drift(SPEC-019): 리네임된 소유 파일의 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 \`Spec-Impact: <사유>\` 트레일러를 남겨라 — ${drift.violations.join(", ")}.`);
+  console.error(`\n✗ semantic drift(SPEC-019): 소유 파일 리네임 또는 소유 이동(base 대비 Files 소유 상실)이 있었던 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 \`Spec-Impact: <사유>\` 트레일러를 남겨라 — ${drift.violations.join(", ")}.`);
   noteBranchFiring("spec-sync#spec-first", `semantic drift ${drift.violations.length}건 차단`);
   process.exit(1);
 }

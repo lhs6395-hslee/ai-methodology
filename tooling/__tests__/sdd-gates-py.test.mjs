@@ -686,6 +686,31 @@ test("py specsync semantic drift(이슈 #21 M-6/M-7): 값 없는 Spec-Impact는 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-019/FR-002
+test("py specsync 소유 이동(이슈 #21 D-2): 2커밋 분할 소유 포기가 base 대비 승격 트리거 — Node와 바이트 동일", skip, () => {
+  const SPEC = (files, extra = "") => `# SPEC-001\n**Spec**: \`SPEC-001\`\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL x.\n\n## Ownership\n- **Entities**: thing\n- **Files**: ${files}\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n${extra}`;
+  const root = fixture(
+    { "sdd/specs/SPEC-001.md": SPEC("src/lib/pdf/**"), "src/lib/pdf/parse.ts": "export const v = 1;\n" },
+    { semanticDriftPolicy: "hard" });
+  const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+  try {
+    g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
+    g("add", "-A"); g("commit", "-qm", "base"); g("branch", "-M", "main"); g("checkout", "-qb", "feat");
+
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("—", "| 2026-07-16 | pdf 모듈 소유 이관 | 다른 팀으로 이관 |\n"));
+    g("add", "-A"); g("commit", "-qm", "drop pdf ownership");
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 2; // sneaky behavior change\n");
+    g("add", "-A"); g("commit", "-qm", "change pdf parsing behavior");
+
+    const py = runPy(root, ["specsync", "main"]);
+    const nd = runNode(root, "check-spec-sync.mjs", ["main"]);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.match(py.out, /✗ \[SPEC-001\] 소유 이동\(base 대비 Files 소유 상실\)/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── fr 검증 회계(SPEC-007 패리티): strictSpecs·requireAccounting·smokeManifest ──
 
 test("py fr 회계: strictSpecs 부분커버 exit 1 · R3 unaccounted exit 1 · manifest 검증 에러", skip, () => {

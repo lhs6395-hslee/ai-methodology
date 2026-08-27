@@ -32,7 +32,7 @@
 > 정본은 영어. 요구 ID 예시는 게이트가 팬텀 FR로 집계하므로 본문에 리터럴로 적지 않는다(SPEC-002 규칙).
 
 - **FR-001** (event): WHEN the changeset renames a file owned by a spec (git rename status), the **semantic-drift** (E) judgment in **drift-lib.mjs** (S) SHALL require that spec to have either a changed FR declaration line or a `Spec-Impact` trailer in the changeset, and SHALL report a drift-escalation violation for that spec otherwise. — capability: **semantic-drift.judge** (C).
-- **FR-002** (event): WHEN a changed file's owning spec set differs from its pre-change ownership (ownership move), THE SYSTEM SHALL apply the same escalation as a rename — deferred to a later increment pending two-revision ownership diffing.
+- **FR-002** (event): WHEN a changed file in the changeset is not owned by any spec's current `Files` globs (working-tree/index union) but was matched by some spec's `Files` globs as declared at the base ref, THE SYSTEM SHALL treat that as an ownership-move trigger for that spec and apply the same escalation as a rename (FR-001) — a changed file still owned by some spec at HEAD, even a different one than at base, is a normal reassignment and is NOT a trigger.
 - **FR-003** (ubiquitous): THE SYSTEM SHALL consider the escalation satisfied only by a changed FR declaration line in the owning spec or a `Spec-Impact` trailer, and SHALL NOT judge whether the FR body semantically matches the new code — that match is a review checkpoint, not a gate.
 - **FR-004** (state): WHILE no owned file in the changeset is renamed or ownership-moved, THE SYSTEM SHALL leave the existing spec-sync requirement unchanged, adding no escalation on ordinary edits.
 - **FR-005** (state): WHILE `semanticDriftPolicy` is `off`, THE SYSTEM SHALL perform no escalation; WHILE `advisory` (default), it SHALL surface violations as warnings without changing exit; WHILE `hard`, it SHALL exit non-zero on a violation; an out-of-enum value SHALL be reported.
@@ -61,6 +61,7 @@
 ## Success Criteria (측정형)
 - **SC-001**: `drift.test.mjs` 전 케이스 green + `escalations` 판정의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/drift.test.mjs]
 - **SC-002**: 이 레포 자신을 `semanticDriftPolicy: advisory`로 돌 때 무-리네임 커밋에 escalation 0(거짓양성 없음). [검증: .github/workflows/sdd-gates.yml]
+- **SC-003**: 소유 포기가 2커밋으로 분할된 실측 시나리오(①Files 삭제+Change Log ②코드 변경)에서 base 대비 소유 이동이 승격을 트리거하고, 지금도 다른 스펙이 소유하면(정상 재배정) 트리거하지 않는다(FR-002, Node↔Python 바이트 동일). [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: `drift-lib.mjs`는 git·파일시스템 부작용 없는 순수 함수(트리거 집합·충족 집합 → 위반 집합)라 결정적으로 단위 테스트된다; git diff 수집은 소비 게이트(check-spec-sync)가 수행. [검증: tooling/__tests__/drift.test.mjs]
@@ -86,5 +87,6 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-16 | 초안 — 리네임 트리거 → spec-sync 요구 승격(FR 라인 변경 ∨ Spec-Impact) + `semanticDriftPolicy` knob + 리뷰 경계 선언. `drift-lib.mjs`(순수 코어)·`drift.test.mjs`, Node·Python 패리티. FR-002(소유 이동)는 deferred | 도그푸딩(소비 프로젝트 B) 통증 2: 코드 리네임·목적변경인데 FR 본문이 옛 의미 유지해도 무통과 — "의미 방치"를 기계 트리거로 리뷰에 라우팅 |
+| 2026-08-27 | FR-002 deferred 해제 — 두-리비전 ownership diff(이슈 #21 D-2). `check-spec-sync.mjs`/`sdd_gates.py`가 base ref의 스펙 `Files` 선언과 현재(idx∪HEAD) 선언을 대조해, "base에서는 소유였는데 지금은 어떤 스펙도 안 가진" 변경 파일을 리네임과 같은 승격 대상(트리거 집합)으로 추가한다 — 판정 코어(`escalations`)는 무변경, 소비 게이트가 트리거 집합을 채우는 방식만 넓혔다. 지금도 다른 스펙이 소유하면(정상 재배정) 트리거하지 않는다 | 실측(이슈 #21 D-2): 소유 포기를 "①Files 삭제(합당한 Change Log 동반) → ②다음 커밋에서 코드 변경" 두 커밋으로 쪼개면, idx∪HEAD 합집합 방어(같은 changeset 안의 회피 차단)가 무력했다 — 두 리비전 모두 이미 소유가 빠진 뒤라서. 유일한 탐지 채널이 `unowned` 경고였는데, 소비 프로젝트에서 만성 unowned 노이즈(`scripts/*.mjs` 등)가 그 채널을 잠식해 "가장 위험한 결합"으로 지목됐다 — 이 fix는 `unowned`와 독립된 두 번째 탐지 채널이라 그 잠식에 영향받지 않는다 [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
 | 2026-08-27 | FR-006 신설 — ① `Spec-Impact:` 트레일러가 내용 없이(콜론 뒤 빈 문자열) 있어도 승격 요구를 면제하지 않도록 정정(이슈 #21 M-6), ② 트레일러가 승격을 면제하면 위반 0건이라 stdout에 흔적이 없던 것을 부채 줄로 표면화(이슈 #21 M-7 — 면제된 스펙 id를 명시). Node·Python 패리티 | 감사 이슈 #21 실측: `none <사유>` 분기는 빈 사유를 이미 exit 1로 막는데, 일반 `Spec-Impact:` 판정은 존재 여부만 보고 내용을 안 봐서 값 없는 한 줄이 사유 있는 트레일러보다 **더 관대한 역전**이었다. 그리고 트레일러가 승격 전체를 면제하면(hasSpecImpact=true) `escalations()`가 즉시 빈 위반 집합을 반환해 어떤 스펙이 왜 면제됐는지가 게이트 출력에서 사라졌다 — 트레일러는 커밋 이력에 영속해도 사후 감사(그 사유가 타당했는가)를 시작할 진입점이 없었다. M-8(면제 부채 줄에 글리프 없어 sdd-sync가 못 봄)은 이미 해소돼 있었다 — flagged 판정이 SPEC-040 `judged()`/`verdict()` 선언 기반으로 바뀌어 산문 글리프 스캔에 의존하지 않는다(`sdd-sync.mjs` 주석 참조) [검증: tooling/__tests__/check-spec-sync.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |

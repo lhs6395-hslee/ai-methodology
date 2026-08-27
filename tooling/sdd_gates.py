@@ -4623,6 +4623,12 @@ def cmd_specsync(cfg, staged, msg_file, base):
             ds.append(_git(cfg, ["diff", f"{base}...HEAD", "--", path]))
         return any(d and rx.search(d) for d in ds)
     triggered = set()
+    trigger_reasons = {}  # spec_id -> set("rename"|"ownership-move") — 리포트 문구용
+
+    def add_trigger(spec_id, reason):
+        triggered.add(spec_id)
+        trigger_reasons.setdefault(spec_id, set()).add(reason)
+
     for nf in renamed:
         if nf in spec_set or nf.startswith(cfg["specDir"] + "/"):
             continue
@@ -4630,7 +4636,36 @@ def cmd_specsync(cfg, staged, msg_file, base):
             continue
         for spec_id, path, globs, deleted, status in specs:
             if any(rx.match(nf) for _, rx in globs):
-                triggered.add(spec_id)
+                add_trigger(spec_id, "rename")
+    # 소유 이동(SPEC-019 FR-002, 이슈 #21 D-2, Node 미러) — 두-리비전 ownership diff. "커밋1=Files
+    # 삭제(정당한 Change Log 동반) → 커밋2=코드 변경"으로 쪼개면 idx∪HEAD 합집합 방어로는 못 잡는다
+    # (그 시점엔 idx도 HEAD도 이미 소유가 빠진 뒤라서). base ref의 스펙 Files 선언과 대조해
+    # "base에서는 소유였는데 지금은 어떤 스펙도 안 가진" 파일을 같은 승격 대상으로 잡는다.
+    if branch_diff_ok:
+        base_globs_cache = {}  # spec.path -> [regex...] | None(스펙이 base에 없었음)
+
+        def base_globs_of(path):
+            if path in base_globs_cache:
+                return base_globs_cache[path]
+            base_text = _git(cfg, ["show", f"{base}:{path}"])
+            if base_text:
+                raw = [strip_inline_comment(g) for g in parse_section(base_text, "Ownership", ["Files"])["Files"]]
+                result = [compile_glob(g) for g in raw if g]
+            else:
+                result = None
+            base_globs_cache[path] = result
+            return result
+        for f in sorted(changed):
+            if f in spec_set or f.startswith(cfg["specDir"] + "/"):
+                continue
+            if any(rx.match(f) for rx in exempt):
+                continue
+            if any(any(rx.match(f) for _, rx in globs) for _, _, globs, _, _ in specs):
+                continue  # 지금도 누군가 소유 — 이동 아님
+            for spec_id, path, globs, deleted, status in specs:
+                bg = base_globs_of(path)
+                if bg and any(rx.match(f) for rx in bg):
+                    add_trigger(spec_id, "ownership-move")
     spec_by_id = {s[0]: s for s in specs}
     satisfied = set(sid for sid in triggered
                     if spec_by_id.get(sid) and fr_line_changed(spec_by_id[sid][1]))
@@ -4669,9 +4704,17 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print("\n✗ Files 리터럴 경로 부재: 존재하지 않는 경로는 어떤 변경 파일과도 매치하지 않는다 — 스펙을 실물 경로에 맞추거나(리네임 반영) 그 항목을 지워라.",
               file=sys.stderr)
         sys.exit(1)
-    # semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
+    # semantic drift 승격 리포트(SPEC-019) — 트리거 스펙(리네임 ∨ 소유 이동)에 FR라인/Spec-Impact 부재.
+    def trigger_label(sid):
+        r = trigger_reasons.get(sid, set())
+        parts = []
+        if "rename" in r:
+            parts.append("소유 파일 리네임")
+        if "ownership-move" in r:
+            parts.append("소유 이동(base 대비 Files 소유 상실)")
+        return " + ".join(parts) if parts else "소유 파일 리네임"
     for sid in drift_violations:
-        print(f"  {'✗' if drift_hard else '⚠'} [{sid}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy={drift_policy})")
+        print(f"  {'✗' if drift_hard else '⚠'} [{sid}] {trigger_label(sid)} — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy={drift_policy})")
     # 트레일러 사용 감사 흔적(이슈 #21 M-7, Node 미러) — 판정(0건)은 옳되 왜 0건인지가 남아야
     # 사후 감사가 가능하다.
     if has_spec_impact and triggered and not drift_violations:
@@ -4703,7 +4746,7 @@ def cmd_specsync(cfg, staged, msg_file, base):
         print("  · 진짜 스펙 무관이면 커밋 메시지에 `Spec-Impact: none <사유>` 트레일러.", file=sys.stderr)
         sys.exit(1)
     if drift_hard:
-        print(f"\n✗ semantic drift(SPEC-019): 리네임된 소유 파일의 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 `Spec-Impact: <사유>` 트레일러를 남겨라 — {', '.join(drift_violations)}.",
+        print(f"\n✗ semantic drift(SPEC-019): 소유 파일 리네임 또는 소유 이동(base 대비 Files 소유 상실)이 있었던 스펙 본문을 재검토하고 FR 선언 라인 변경 또는 `Spec-Impact: <사유>` 트레일러를 남겨라 — {', '.join(drift_violations)}.",
               file=sys.stderr)
         sys.exit(1)
     if draft_hard:
