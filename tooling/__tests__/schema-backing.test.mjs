@@ -8,6 +8,9 @@
 // @covers SPEC-026/FR-005
 // @covers SPEC-026/FR-006
 // @covers SPEC-026/FR-007
+// @covers SPEC-026/FR-008
+// @covers SPEC-026/FR-009
+// @covers SPEC-026/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveCategoryRoles } from "../ownership-keys.mjs";
@@ -15,7 +18,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "../schema-backing-lib.mjs";
+import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, schemaSourceGlobFindings, extractSchemaEntities, schemaSourceSamples, schemaBackingFindings } from "../schema-backing-lib.mjs";
 
 const GATE = new URL("../check-ownership.mjs", import.meta.url).pathname;
 
@@ -110,6 +113,50 @@ test("validateSchemaPatterns: 잘못된 정규식 수집(엔진 메시지 미포
   // 잘못된 정규식이 섞여도 추출은 크래시하지 않고 유효 패턴만 반영
   const set = extractSchemaEntities([{ text: "table users;", patterns: ["bad(((", "table ([a-z]+)"] }]);
   assert.deepEqual([...set], ["users"]);
+});
+
+// 이슈 #21 C-1 우회로 4개 중 "스펙 자기참조 글롭" — 스펙 자신이 자기 소유 entity의 실재 근거가
+// 되는 완전 순환.
+test("schemaSourceGlobFindings: 스펙 디렉토리를 가리키는 글롭은 구조 오류 — 무관 글롭은 통과", () => {
+  const f1 = schemaSourceGlobFindings([{ globs: ["sdd/specs/**"], patterns: ["x"] }], "sdd/specs");
+  assert.equal(f1.length, 1);
+  assert.match(f1[0], /entitySchemaSources\[0\]\.globs "sdd\/specs\/\*\*" — 스펙 디렉토리/);
+  const f2 = schemaSourceGlobFindings([{ globs: ["sdd/specs/*.md"], patterns: ["x"] }], "sdd/specs");
+  assert.equal(f2.length, 1);
+  const f3 = schemaSourceGlobFindings([{ globs: ["src/db/*.ts"], patterns: ["x"] }], "sdd/specs");
+  assert.deepEqual(f3, []);
+  assert.deepEqual(schemaSourceGlobFindings([], "sdd/specs"), []);
+  assert.deepEqual(schemaSourceGlobFindings(undefined, "sdd/specs"), []);
+});
+
+// 이슈 #21 C-1 우회로 2·3 — import 문·주석 DDL이 구조 SSOT 선언으로 오인증되던 것을 줄 단위로 배제.
+test("extractSchemaEntities: import 문·주석 라인의 매치는 제외 — 정당한 선언은 그대로 잡는다", () => {
+  const set = extractSchemaEntities([{
+    text: [
+      `import { type Wizard } from "./types";`,
+      `// interface Ghost {}`,
+      `/* interface AlsoGhost {} */`,
+      ` * interface JsdocGhost {}`,
+      `# interface HashGhost {}`,
+      `-- TODO: CREATE TABLE wizard`,
+      `interface RealTable {}`,
+      `  interface IndentedReal {}`,
+    ].join("\n"),
+    patterns: ["interface\\s+([A-Za-z0-9_]+)"],
+  }]);
+  assert.deepEqual([...set].sort(), ["indentedreal", "realtable"]);
+});
+
+test("schemaSourceSamples: 파일별 추출 표본(중복 제거·file 오름차순) — file 없는 unit은 제외", () => {
+  const samples = schemaSourceSamples([
+    { text: `model User {}\nmodel Post {}\nmodel User {}\n`, patterns: ["^model (\\w+)"], file: "b.prisma" },
+    { text: `CREATE TABLE invoices (...);`, patterns: ["CREATE TABLE ([a-z_]+)"], file: "a.sql" },
+    { text: `model Ignored {}`, patterns: ["^model (\\w+)"] }, // file 없음 — 제외
+  ]);
+  assert.deepEqual(samples, [
+    { file: "a.sql", entities: ["invoices"] },
+    { file: "b.prisma", entities: ["user", "post"] },
+  ]);
 });
 
 // ── 게이트 e2e (entitySchemaBackingPolicy off|advisory|hard) ──
@@ -212,5 +259,31 @@ test("게이트: 잘못된 정규식은 크래시 대신 명확한 config 에러
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /entitySchemaSources\[0\]\.patterns "pgTable\(\(\(" — 잘못된 정규식/);
     assert.doesNotMatch(r.out, /SyntaxError|Invalid regular expression|Unterminated/); // 엔진 스택 노출 안 함
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트: 스펙 디렉토리 자기참조 글롭 — 구조 오류로 exit 1(이슈 #21 C-1)", () => {
+  const root = fixture("advisory", { extraConfig: {
+    entityRegistry: { pjt_projects: "실 aggregate", wizard: "x" },
+    entitySchemaSources: [
+      { globs: ["src/db/*.ts"], patterns: ['pgTable\\("([a-zA-Z0-9_]+)"'] },
+      { globs: ["sdd/specs/**"], patterns: ["\\*\\*Entities\\*\\*: (\\w+)"] },
+    ] } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /entitySchemaSources\[1\]\.globs "sdd\/specs\/\*\*" — 스펙 디렉토리\(sdd\/specs\)를 가리킴/);
+    assert.match(r.out, /Entity 스키마 백킹 설정 오류/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트: 어댑터 매치 표본이 파일별로 매 실행 표면화된다(이슈 #21 C-1 FR-010)", () => {
+  const root = fixture("hard", { entities: "pjt_project_staff", extraConfig: {
+    entityRegistry: { pjt_projects: "실 aggregate", pjt_project_staff: "실 인력 테이블" } } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /Entity 스키마 백킹 어댑터 표본/);
+    assert.match(r.out, /src\/db\/schema\.ts → pjt_projects, pjt_project_staff/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

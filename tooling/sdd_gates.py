@@ -1856,22 +1856,87 @@ def validate_schema_patterns(sources):
     return errors
 
 
+def schema_source_glob_findings(sources, spec_dir):
+    """entitySchemaSources 글롭이 스펙 디렉토리를 가리키는 완전 순환 차단(이슈 #21 C-1, Node
+    schemaSourceGlobFindings 미러) — 스펙 자신이 자기 소유 entity의 실재 근거가 되는 순환을
+    probe 경로 매치로 판정한다(실제 파일 열거 없이 순수)."""
+    findings = []
+    dir_ = str(spec_dir or "sdd/specs").rstrip("/")
+    probe = f"{dir_}/SPEC-000-probe.md"
+    for index, src in enumerate(sources or []):
+        for raw in (src or {}).get("globs") or []:
+            g = str(raw).strip()
+            if not g:
+                continue
+            try:
+                re_ = compile_glob(g)
+            except re.error:
+                continue
+            if re_.match(probe):
+                findings.append(
+                    f'entitySchemaSources[{index}].globs "{g}" — 스펙 디렉토리({dir_})를 가리킴: '
+                    f"스펙 자신이 스펙 소유 entity의 실재 근거가 되면 완전 순환이다(구조 SSOT는 "
+                    f"코드·스키마·IaC여야 한다, 이슈 #21 C-1)"
+                )
+    return findings
+
+
+_IMPORT_OR_COMMENT_RE = re.compile(r"^\s*(import\b|//|/\*|\*(?!/)|#|--)")
+
+
+def _line_at(text, idx):
+    start = text.rfind("\n", 0, idx) + 1
+    end = text.find("\n", idx)
+    if end == -1:
+        end = len(text)
+    return text[start:end]
+
+
+def _matched_identifiers(text, patterns):
+    """패턴별 매치를 순회하며 import·주석 라인을 걸러낸 식별자를 낸다(이슈 #21 C-1, Node
+    matchedIdentifiers 미러 — extract_schema_entities·schema_source_samples 공유 코어)."""
+    t = text or ""
+    for p in patterns or []:
+        try:
+            rx = _compile_schema_pattern(p)
+        except re.error:
+            continue
+        for m in rx.finditer(t):
+            if _IMPORT_OR_COMMENT_RE.match(_line_at(t, m.start())):
+                continue
+            ident = str(m.group(1) or "").strip().lower()
+            if ident:
+                yield ident
+
+
 def extract_schema_entities(units):
     """구조 SSOT 텍스트에서 실재 entity 식별자 추출 — units:[{text, patterns:[정규식]}], 캡처1=식별자.
-    잘못된 정규식은 건너뛴다(크래시 방지 — 유효성은 validate_schema_patterns가 별도 보고)."""
+    잘못된 정규식은 건너뛴다(크래시 방지 — 유효성은 validate_schema_patterns가 별도 보고).
+    import 문·주석 라인의 매치는 제외한다(이슈 #21 C-1)."""
     out = set()
     for unit in units or []:
         text = unit.get("text") or ""
-        for p in unit.get("patterns") or []:
-            try:
-                rx = _compile_schema_pattern(p)
-            except re.error:
-                continue
-            for m in rx.finditer(text):
-                ident = str(m.group(1) or "").strip().lower()
-                if ident:
-                    out.add(ident)
+        for ident in _matched_identifiers(text, unit.get("patterns") or []):
+            out.add(ident)
     return out
+
+
+def schema_source_samples(units):
+    """소스 파일별 추출 표본(이슈 #21 C-1, Node schemaSourceSamples 미러) — 어댑터 품질은 정규식
+    문법만으로 판정할 수 없어, 파일별로 무엇이 나왔는지 소비 게이트가 매 실행 표면화하도록 원자료를
+    낸다. units: [{text, patterns, file}] — file 없는 unit은 제외. 반환: [(file, [entities...])]
+    file 오름차순."""
+    by_file = {}
+    for unit in units or []:
+        file = unit.get("file")
+        if not file:
+            continue
+        text = unit.get("text") or ""
+        for ident in _matched_identifiers(text, unit.get("patterns") or []):
+            arr = by_file.setdefault(file, [])
+            if ident not in arr:
+                arr.append(ident)
+    return [(file, by_file[file]) for file in sorted(by_file)]
 
 
 def schema_backing_findings(owned_by_spec, schema_set, exempt_set, slug_by_spec=None):
@@ -2723,7 +2788,7 @@ def cmd_ownership(cfg, strict):
         sys.exit(1)
 
     # Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
-    sb_errors, sb_findings, sb_exempt_used = [], [], []
+    sb_errors, sb_findings, sb_exempt_used, sb_samples = [], [], [], []
     if sb_active:
         exempt = cfg.get("entitySchemaExemptEntities") or {}
         exempt_set = set()
@@ -2736,6 +2801,8 @@ def cmd_ownership(cfg, strict):
         # 잘못된 정규식은 크래시 대신 명확히 보고(엔진별 메시지 미포함 — 패리티).
         for idx, pat in validate_schema_patterns(sb_sources):
             sb_errors.append(f'entitySchemaSources[{idx}].patterns "{pat}" — 잘못된 정규식(문법 오류): 이 knob의 추출 패턴을 확인하라')
+        # 스펙 디렉토리 자기참조 글롭 차단(이슈 #21 C-1) — 완전 순환은 문법 오류가 아니라 구조 오류.
+        sb_errors.extend(schema_source_glob_findings(sb_sources, cfg.get("specDir")))
         # 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
         ignore = set(cfg["ignoreDirs"])
         all_files = []
@@ -2755,13 +2822,14 @@ def cmd_ownership(cfg, strict):
                     continue
                 try:
                     with open(os.path.join(cfg["__root"], rel), encoding="utf-8") as fh:
-                        units.append({"text": fh.read(), "patterns": patterns})
+                        units.append({"text": fh.read(), "patterns": patterns, "file": rel})
                 except OSError:
                     pass
         # 모듈 문법(SPEC-029 ①) — 스펙별 슬러그 맵(전역 집합 아님).
         slug_by_spec = ({sid: slug for sid, slug in sb_slugs} if spec_slug_source_declared(sb_sources) else None)
         sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set, slug_by_spec)
         sb_exempt_used = sorted(e for e in exempt_set if e in owners[ent_cat])
+        sb_samples = schema_source_samples(units)
     sb_hard = sb_policy == "hard" and len(sb_findings) > 0
     if sb_active and sb_findings:
         print(f"Entity 스키마 백킹(entitySchemaBackingPolicy={sb_policy}): 위반 {len(sb_findings)}건 — 소유 entity가 구조 SSOT에 없음(유령 entity 의심)")
@@ -2771,8 +2839,14 @@ def cmd_ownership(cfg, strict):
     # 면제는 조용히 '완료'가 되지 않게 항상 표면화(부채·리뷰 대상). 대량 면제는 개념 단위 분할 신호.
     if sb_active and sb_exempt_used:
         print(f'Entity 스키마 백킹: 스키마 대조 면제 {len(sb_exempt_used)}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): {", ".join(sb_exempt_used)}')
+    # 어댑터 표본 — 정규식 문법은 유효해도 "구조 SSOT를 가리키는가"는 기계로 완전히 판정할 수
+    # 없다(이슈 #21 C-1). 매 실행 파일별 추출 표본을 표면화해 사람 개입 지점이 승인 전에 훑어보게 한다.
+    if sb_active and sb_samples:
+        print("Entity 스키마 백킹 어댑터 표본(entitySchemaSources 신규·변경 시 사람이 정합성을 확인 — 이슈 #21 C-1):")
+        for file, entities in sb_samples:
+            print(f'  · {file} → {", ".join(entities)}')
     if sb_errors:
-        print(f"\n✗ entitySchemaExemptEntities 위반 {len(sb_errors)}건:", file=sys.stderr)
+        print(f"\n✗ Entity 스키마 백킹 설정 오류 {len(sb_errors)}건(entitySchemaExemptEntities·entitySchemaSources):", file=sys.stderr)
         for e in sb_errors:
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)

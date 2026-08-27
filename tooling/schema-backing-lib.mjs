@@ -26,6 +26,7 @@ export function schemaBackingActive(policy, sources, roles) {
 // 소비 게이트가 차단하고, 스키마 없는 프로젝트는 정책을 명시적 off(기본값)로 두어 조용히 통과한다.
 // 반환: 사유 문자열 배열(빈 배열 = 판정 성립 ∨ off). 순수 — 출력·exit은 소비 게이트.
 import { inertReasons } from "./verdict-lib.mjs";
+import { compileGlob } from "./spec-sync-lib.mjs";
 
 export function schemaBackingInertReasons(policy, sources, roles) {
   // 규칙 정본은 verdict-lib의 inertReasons — 축 셋에 같은 형태가 복제돼 있었다(R13 구조 중복).
@@ -63,6 +64,30 @@ export function compileSchemaPattern(pattern) {
   return new RegExp(body, flags);
 }
 
+// entitySchemaSources 글롭이 스펙 디렉토리를 가리키는 완전 순환을 차단한다(이슈 #21 C-1 실측
+// 우회로 4개 중 "스펙 자기참조 글롭" — `globs:["sdd/specs/**"]`로 스펙 자신이 자기 소유 entity의
+// 실재 근거가 됨: 유령 entity를 스펙에 적어 넣으면 그 스펙 자신이 그 entity의 "구조 SSOT"가
+// 되어 백킹이 항상 성립한다). config 무결성 게이트(A-4 grammar-lib.mjs exemptGlobFindings)와
+// 동형 — probe 경로 매치로 판정한다(실제 파일 열거 없이 순수하게). specDir은 호출부(config)가
+// 주입 — 서브디렉토리 채택을 지원한다. 순수 함수, 반환: 사유 문자열 배열.
+export function schemaSourceGlobFindings(sources, specDir) {
+  const findings = [];
+  const dir = String(specDir || "sdd/specs").replace(/\/+$/, "");
+  const probe = `${dir}/SPEC-000-probe.md`;
+  (sources || []).forEach((src, index) => {
+    for (const raw of (src && src.globs) || []) {
+      const g = String(raw).trim();
+      if (!g) continue;
+      let re;
+      try { re = compileGlob(g); } catch { continue; }
+      if (re.test(probe)) {
+        findings.push(`entitySchemaSources[${index}].globs "${g}" — 스펙 디렉토리(${dir})를 가리킴: 스펙 자신이 스펙 소유 entity의 실재 근거가 되면 완전 순환이다(구조 SSOT는 코드·스키마·IaC여야 한다, 이슈 #21 C-1)`);
+      }
+    }
+  });
+  return findings;
+}
+
 // 스키마 소스별 패턴 문자열의 정규식 유효성 검사 — 잘못된 정규식은 {index, pattern}로 수집한다
 // (게이트가 크래시하지 않고 명확히 보고하도록). 엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티).
 export function validateSchemaPatterns(sources) {
@@ -76,22 +101,64 @@ export function validateSchemaPatterns(sources) {
   return errors;
 }
 
+// import 문·주석 라인의 매치는 구조 SSOT 선언으로 인정하지 않는다(이슈 #21 C-1 실측 우회로 2·3:
+// `import { type Wizard } from …`의 Wizard를 정규식 어댑터가 실재 entity로 오인증했고,
+// `-- TODO: CREATE TABLE wizard` 같은 주석 DDL도 정석 어댑터에서 백킹을 성립시켰다). 매치가
+// 일어난 "줄" 시작이 import·라인 주석(//·#·--)·블록 주석 시작/계속(/*·*)이면 그 매치를 버린다 —
+// 판정은 줄 단위라 한 줄에 캡처가 여럿이어도 균일하게 적용된다. loose-adapter형 오탐(TODO 목록
+// 항목의 명사 등)은 기계로 완전히 닫히지 않는다 — 그 나머지는 표본 표면화(schemaSourceSamples)로
+// 사람 승인에 맡긴다(이슈 #21 C-1, 완전 자동화 불가 영역).
+const IMPORT_OR_COMMENT_RE = /^\s*(import\b|\/\/|\/\*|\*(?!\/)|#|--)/;
+
+function lineAt(text, idx) {
+  const start = text.lastIndexOf("\n", idx - 1) + 1;
+  let end = text.indexOf("\n", idx);
+  if (end === -1) end = text.length;
+  return text.slice(start, end);
+}
+
+// 패턴별 매치를 순회하며 import·주석 라인을 걸러낸 식별자를 낸다(extractSchemaEntities·
+// schemaSourceSamples 공유 코어 — 같은 필터링 로직의 리터럴 중복을 피한다, R13).
+function* matchedIdentifiers(text, patterns) {
+  const t = String(text || "");
+  for (const p of patterns || []) {
+    let rx;
+    try { rx = compileSchemaPattern(p); } catch { continue; }
+    for (const m of t.matchAll(rx)) {
+      if (IMPORT_OR_COMMENT_RE.test(lineAt(t, m.index))) continue;
+      const id = String(m[1] ?? "").trim().toLowerCase();
+      if (id) yield id;
+    }
+  }
+}
+
 // 스키마 소스 텍스트에서 실재 entity 식별자 추출 — units: [{text, patterns:["정규식문자열"]}].
 // 각 패턴의 캡처그룹 1이 식별자. 전역 매치. 정규화(트림·소문자) 집합 반환.
 // 잘못된 정규식은 건너뛴다(크래시 방지 — 유효성은 validateSchemaPatterns가 별도 보고).
 export function extractSchemaEntities(units) {
   const set = new Set();
   for (const { text, patterns } of units || []) {
-    for (const p of patterns || []) {
-      let rx;
-      try { rx = compileSchemaPattern(p); } catch { continue; }
-      for (const m of String(text || "").matchAll(rx)) {
-        const id = String(m[1] ?? "").trim().toLowerCase();
-        if (id) set.add(id);
-      }
-    }
+    for (const id of matchedIdentifiers(text, patterns)) set.add(id);
   }
   return set;
+}
+
+// 소스 파일별 추출 표본 — 어댑터 **품질**은 정규식 문법만으로 판정할 수 없다(이슈 #21 C-1:
+// 느슨한 어댑터 `type Wizard = {}`는 기계적으로 걸러낼 문법 결함이 없다). 이 함수는 소비 게이트가
+// "어떤 파일에서 어떤 식별자가 나왔는가"를 매 실행 표면화하도록 원자료를 낸다 — 그 위에서
+// /sdd-update 등 사람 개입 지점이 최종 승인한다. units: [{text, patterns, file}] — file 없는
+// unit은 표본에서 제외(내부 호출 하위호환). 반환: [{file, entities:[...]}] file 오름차순.
+export function schemaSourceSamples(units) {
+  const byFile = new Map();
+  for (const { text, patterns, file } of units || []) {
+    if (!file) continue;
+    for (const id of matchedIdentifiers(text, patterns)) {
+      if (!byFile.has(file)) byFile.set(file, []);
+      const arr = byFile.get(file);
+      if (!arr.includes(id)) arr.push(id);
+    }
+  }
+  return [...byFile.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([file, entities]) => ({ file, entities }));
 }
 
 // 스펙별 소유 entity가 스키마 집합(∪ 면제)에 없으면 위반. 소유 entity는 raw(여기서 정규화).

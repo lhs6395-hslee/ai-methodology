@@ -35,7 +35,7 @@ import { ownershipCategoriesFindings, exemptGlobFindings } from "./grammar-lib.m
 import { parseRelationEntry, relationTypeFinding, resolveRelations, findCycles } from "./relation-lib.mjs";
 import { capabilityCheckActive, capabilityInertReasons, capabilityOwnershipFindings } from "./capability-ownership-lib.mjs";
 import { compileGlob , parseFilesLine} from "./spec-sync-lib.mjs";
-import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, extractSchemaEntities, schemaBackingFindings } from "./schema-backing-lib.mjs";
+import { schemaBackingActive, schemaBackingInertReasons, validateSchemaPatterns, schemaSourceGlobFindings, extractSchemaEntities, schemaSourceSamples, schemaBackingFindings } from "./schema-backing-lib.mjs";
 import { specSlug, specSlugSourceDeclared, symbolRealityActive, symbolRealityInertReasons, symbolRealityFindings, isFileLikeSurface } from "./ownership-reality-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
@@ -447,6 +447,7 @@ if (capHard) {
 const sbErrors = [];
 let sbFindings = [];
 let sbExemptUsed = []; // 사용 중(소유된) 면제 entity — 항상 표면화(부채, 조용한 '완료' 방지)
+let sbSamples = []; // 소스 파일별 추출 표본 — 이슈 #21 C-1, 어댑터 품질의 사람 승인 근거
 if (SB_ACTIVE) {
   const EXEMPT = cfg.entitySchemaExemptEntities || {};
   const exemptSet = new Set();
@@ -459,6 +460,9 @@ if (SB_ACTIVE) {
   for (const e of validateSchemaPatterns(SB_SOURCES)) {
     sbErrors.push(`entitySchemaSources[${e.index}].patterns "${e.pattern}" — 잘못된 정규식(문법 오류): 이 knob의 추출 패턴을 확인하라`);
   }
+  // 스펙 디렉토리 자기참조 글롭 차단(이슈 #21 C-1) — 완전 순환은 문법 오류가 아니라 구조
+  // 오류라 별도 판정한다.
+  sbErrors.push(...schemaSourceGlobFindings(SB_SOURCES, cfg.specDir));
   // 구조 SSOT 파일 수집(루트 1회 순회, ignoreDirs 제외) 후 소스별 글롭 매치·패턴 추출.
   const IGNORE = new Set(cfg.ignoreDirs);
   const allFiles = [];
@@ -480,7 +484,7 @@ if (SB_ACTIVE) {
     if (!globs.length || !patterns.length) continue;
     for (const rel of allFiles) {
       if (!globs.some((rx) => rx.test(rel))) continue;
-      try { units.push({ text: readFileSync(join(ROOT, rel), "utf8"), patterns }); } catch { /* skip */ }
+      try { units.push({ text: readFileSync(join(ROOT, rel), "utf8"), patterns, file: rel }); } catch { /* skip */ }
     }
   }
   // 모듈 문법(SPEC-029 ①) — `{kind:"spec-slug"}` 소스가 선언되면 스펙 파일명 슬러그도
@@ -490,6 +494,7 @@ if (SB_ACTIVE) {
     : null;
   sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet, slugBySpec);
   sbExemptUsed = [...exemptSet].filter((e) => owners[ENT_CAT].has(e)).sort();
+  sbSamples = schemaSourceSamples(units);
 }
 const sbHard = SB_POLICY === "hard" && sbFindings.length > 0;
 if (SB_ACTIVE && sbFindings.length) {
@@ -504,8 +509,15 @@ if (SB_ACTIVE && sbFindings.length) {
 if (SB_ACTIVE && sbExemptUsed.length) {
   console.log(`Entity 스키마 백킹: 스키마 대조 면제 ${sbExemptUsed.length}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): ${sbExemptUsed.join(", ")}`);
 }
+// 어댑터 표본 — 정규식 문법은 유효해도 "구조 SSOT를 가리키는가"는 기계로 완전히 판정할 수
+// 없다(이슈 #21 C-1: 느슨한 어댑터 `type Wizard = {}`류). 매 실행 파일별 추출 표본을 표면화해
+// /sdd-update 등 사람 개입 지점이 새·변경 entitySchemaSources를 승인 전에 훑어보게 한다.
+if (SB_ACTIVE && sbSamples.length) {
+  console.log(`Entity 스키마 백킹 어댑터 표본(entitySchemaSources 신규·변경 시 사람이 정합성을 확인 — 이슈 #21 C-1):`);
+  for (const { file, entities } of sbSamples) console.log(`  · ${file} → ${entities.join(", ")}`);
+}
 if (sbErrors.length) {
-  console.error(`\n✗ entitySchemaExemptEntities 위반 ${sbErrors.length}건:`);
+  console.error(`\n✗ Entity 스키마 백킹 설정 오류 ${sbErrors.length}건(entitySchemaExemptEntities·entitySchemaSources):`);
   for (const e of sbErrors) console.error(`  ✗ ${e}`);
   process.exit(1);
 }

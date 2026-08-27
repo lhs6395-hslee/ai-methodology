@@ -277,6 +277,73 @@ test("py ownership entitySchemaBacking(이슈 #21 M-4/M-5): ^ 라인 앵커·(?i
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-026/FR-008
+test("py ownership entitySchemaBacking 스펙 자기참조 글롭(이슈 #21 C-1): 구조 오류로 exit 1 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL x.\n## Ownership\n- **Entities**: user\n- **Capabilities**: user.create\n",
+    "src/schema.prisma": "model user {}\n",
+  };
+  const cfg = {
+    entitySchemaBackingPolicy: "advisory",
+    entitySchemaSources: [
+      { globs: ["src/*.prisma"], patterns: ["^model (\\w+)"] },
+      { globs: ["sdd/specs/**"], patterns: ["\\*\\*Entities\\*\\*: (\\w+)"] },
+    ],
+  };
+  const root = fixture(files, cfg);
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    assert.match(nd.out, /entitySchemaSources\[1\]\.globs "sdd\/specs\/\*\*" — 스펙 디렉토리/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-026/FR-009
+test("py ownership entitySchemaBacking import 문·주석 라인 배제(이슈 #21 C-1): 매치 제외 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL x.\n## Ownership\n- **Entities**: wizard\n- **Capabilities**: wizard.create\n",
+    "src/types.ts": 'import { type Wizard } from "./x";\n-- TODO: CREATE TABLE wizard\ninterface RealTable {}\n',
+  };
+  const cfg = {
+    entitySchemaBackingPolicy: "hard",
+    entitySchemaSources: [{ globs: ["src/*.ts"], patterns: ["type\\s+(\\w+)", "CREATE TABLE (\\w+)", "interface\\s+(\\w+)"] }],
+  };
+  const root = fixture(files, cfg);
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    assert.match(nd.out, /Entities "wizard" — 구조 SSOT\(스키마\)에 실재하지 않음/); // import·주석 매치가 배제돼 여전히 유령
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-026/FR-010
+test("py ownership entitySchemaBacking 어댑터 매치 표본(이슈 #21 C-1): 파일별 표면화 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL x.\n## Ownership\n- **Entities**: user\n- **Capabilities**: user.create\n",
+    "src/schema.prisma": "model user {}\nmodel order {}\n",
+  };
+  const cfg = {
+    entitySchemaBackingPolicy: "advisory",
+    entitySchemaSources: [{ globs: ["src/*.prisma"], patterns: ["^model (\\w+)"] }],
+  };
+  const root = fixture(files, cfg);
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.equal(nd.code, 0, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    assert.match(nd.out, /Entity 스키마 백킹 어댑터 표본/);
+    assert.match(nd.out, /src\/schema\.prisma → user, order/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 const OWN = (id, keys) => `**Spec**: \`${id}\`\nbody mentions thing and stuff.\n## Ownership\n${keys}\n`;
 
 test("py ownership: 정규화 후 같은 키 → 중복 소유 exit 1 (Surfaces 표기 차이 흡수)", skip, () => {
