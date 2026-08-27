@@ -88,6 +88,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | `tooling/harness/pre-commit`의 강도 안내 주석을 `capabilityVerbPolicy` 신설(SPEC-002 FR-011)에 맞춰 갱신 — 미등록 verb는 이제 이 knob이 `hard`면 `--strict` 없이도 exit 1임을 명시 | 감사 이슈 #21 문서-코드 드리프트 정정 — 훅이 실제로 어떤 조건에서 차단하는지 주석이 정확해야 그 훅을 읽는 사람이 오판하지 않는다. 판정 로직 무변경(SPEC-002 소관), 이 스펙은 훅 파일 소유자로서 주석 동기화만 |
 | 2026-08-27 | `sdd-init.sh`의 `/sdd-pipeline-setup` 배포 목록에 `github-actions-renderer.mjs`·`gitlab-ci-renderer.mjs` 추가(Jenkins 전용에서 3제공자로 확장, SPEC-059) | 원 설계는 Jenkins만 Phase 1로 두고 GH Actions·GitLab CI를 렌더러 없이 스키마만 반영해뒀다 — 오너 요청으로 두 렌더러를 마저 구현하면서 배포 목록도 동반 갱신했다. `sync_copy` 목록 누락은 정확히 이 스펙이 경계하는 결함 클래스(설치는 됐는데 배선이 조용히 빠짐)라 별도 행으로 남긴다 |
 | 2026-08-26 | `tooling/harness/pre-push` 정본 템플릿에 배포 시간창 게이트(SPEC-060) 존재-확인 조건부 호출 추가(`scripts/check-deploy-window.mjs` 있을 때만, sdd-sync 훅과 같은 stdin 캐시 재사용) + `sdd-init.sh`의 `--gate=node` 블록에 `/sdd-pipeline-setup` 마법사 산출물(SPEC-059 인터뷰·렌더러 + SPEC-060 배포 시간창 게이트, 합쳐 lib 3·게이트 1·렌더러 README 1·스킬 1) 배포 목록 추가 | SPEC-060의 pre-push 배선을 소비 프로젝트 쪽이 아니라 킷 소유 정본 템플릿에 두기로 함 — `sync_copy`가 킷 소유 산출물을 매 업데이트마다 무조건 덮어쓰므로, 소비 프로젝트에 직접 배선하면 다음 업데이트에서 조용히 사라져 이 제안이 막으려는 결함 클래스 자체를 재현한다. 마법사를 안 쓴 프로젝트엔 파일이 없어 존재-확인 분기가 완전히 무해 |
 | 2026-08-16 | 설치/업데이트 완료 안내에 **미선언 축 체크리스트** 추가(`riskyActionPatterns`·`diagnosisSpecMap`·`surfaceGlobs`가 비어 있으면 비대화형으로 알림) | 실측: 이 세 축은 훅이 배선돼도 선언이 비면 **훅에서 조용히 침묵**하고, 그 사실은 사람이 직접 스윕을 돌렸을 때만 "미선언 — 판정 안 함" 한 줄로 드러난다 — 설치 직후엔 아무도 모른다. 실제 JSON 파싱을 쓴 이유: 셸 정규식은 pretty-printed 배열(여는 대괄호와 내용이 다른 줄)을 못 본다 |

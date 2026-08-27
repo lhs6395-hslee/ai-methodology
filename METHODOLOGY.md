@@ -128,7 +128,7 @@ EARS 문장으로 쓴 FR은 구체적인 Ownership 키로 이어진다. 아래 �
 
 **verb 집합:**
 - **CRUD 기본 (코드 고정)**: `create · read · update · delete · list`
-- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`). 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반 — **기본 강도는 ⚠ warn(exit 0)**, `check-ownership --strict`에서 exit 1(설치 훅·CI 기본 호출엔 `--strict` 없음). 따라서 현재 실효 관문은 차단이 아니라 위 config 리뷰이며, **권장 종착지는 hard**(`--strict` 없이도 차단). `APPLYING.md`의 `⚠ 미등록 verb` 행이 이 강도의 정본 표기다.
+- **도메인 verb (config)**: `sdd.config.json`의 `capabilityVerbs`에 등록(예: `recommend`, `assign`) — 배열(레거시)이나 `{동사:사유}` 객체(entityRegistry와 동형, 빈 사유는 항상 에러) 둘 다 받는다. 신규 verb 추가 = config 변경 = 리뷰 관문. 미등록 verb = 형식 위반 — **기본 강도는 ⚠ warn(exit 0)**, 전용 knob `capabilityVerbPolicy`가 `hard`면 전역 `--strict` 없이도 exit 1(설치 훅·CI 기본 호출엔 `--strict` 자체가 없지만 이 knob은 그와 독립이다). **권장 종착지는 `capabilityVerbPolicy: hard`.** `APPLYING.md`의 `⚠ 미등록 verb` 행이 기본 강도의 정본 표기다.
 
 **키 앵커 — FR 안에서 키의 원천을 표기한다(SPEC-023).** 위 절차로 도출한 키의 원천 단어를 FR 문장에서 **평문 bold**로 표기한다 — bold는 수사적 강조가 아니라 키 앵커 전용이다(예: `WHEN a request hits **POST /api/recommend/{id}** (S), THE SYSTEM SHALL **staff.recommend** (C) using **pjt_projects** (E)` — 굵은 키마다 카테고리 마커 `(E)`/`(S)`/`(C)`, FR-005·`frAnchorMarkers`). `frKeyAnchorPolicy`(off 기본|advisory|hard)를 켜면 consistency 게이트가 앵커를 그 스펙의 소유∪참조 키와 대조한다 — 미매치 bold(장식용 **Fargate** 류)는 advisory 경고·hard exit 1. consistency의 "키→본문 근거" 검사와 합쳐 **양방향 앵커**(키↔FR)가 닫힌다. **앵커는 더 이상 선택이 아니다**(2026-07-21 개정): 굵은 것은 키여야 하고(FR-003) 마커를 달아야 하며(FR-005), surface·capability 키를 백틱에 두면 위반이고(FR-006), **소유 키는 각각 어느 FR엔가 최소 1회 굵게 앵커돼야 한다**(FR-007 — 산문만은 불충분). 여전히 선택인 것은 *어느* FR에 다는지와 같은 키의 반복 언급을 매번 굵게 하는지(키당 1회면 충족)뿐 — 그 판단은 리뷰 경계다.
 

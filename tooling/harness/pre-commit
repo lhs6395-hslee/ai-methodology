@@ -14,9 +14,10 @@ if [ ! -f scripts/check-fr-coverage.mjs ] || [ ! -f scripts/check-ownership.mjs 
 fi
 node scripts/check-fr-coverage.mjs   # PREFIX 화이트리스트·사유·번호 무결성·조용한누락(exit 1)
 # check-ownership: --strict 없이 exit 1인 것 = 중복 소유(dedup)·관계 대상 실재(SPEC-017)·
-# entityRegistry·정책 enum/카테고리 위반 + 귀속(SPEC-024)·스키마 백킹(SPEC-026)이 hard일 때.
-# 키 형식(Capability entity.verb·미등록 verb·Surface 형식)과 Ownership 블록 부재는 ⚠ warn이고
-# exit 0이다 — 이 훅은 --strict를 붙이지 않는다(형식을 차단하려면 --strict를 명시하라).
+# entityRegistry·capabilityVerbs 사유·정책 enum/카테고리 위반 + 귀속(SPEC-024)·스키마
+# 백킹(SPEC-026)이 hard일 때, 그리고 capabilityVerbPolicy가 hard일 때의 미등록 verb.
+# 나머지 키 형식(Capability 점표기·Surface 형식)과 Ownership 블록 부재는 ⚠ warn이고
+# exit 0이다 — 이 훅은 --strict를 붙이지 않는다(그 형식들을 차단하려면 --strict를 명시하라).
 node scripts/check-ownership.mjs
 # check-deploy-debt: outOfBandDeployPolicy=hard일 때만 발화한다(그 외엔 즉시 exit 0, 파일 IO 1회).
 # hard가 advisory와 다른 유일한 지점 — 미기록 배포를 적재해 두고 여기서 커밋을 막는다.

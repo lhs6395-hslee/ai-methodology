@@ -20,7 +20,7 @@
    | 유형 | 버킷 | 제안 |
    |---|---|---|
    | Capability | **A 약칭 불일치** | 명사가 소유/참조 entity의 스키마명과 유사(`budget`↔`pjt_budgets`) → capability를 스키마 키로 개명 |
-   | Capability | **B 교차 aggregate** | 명사가 *다른 스펙*이 소유한 entity → 해소는 **두 갈래뿐**(게이트 메시지와 동일): (1) 그 capability와 FR을 **그 entity 소유 스펙으로 이관**(verb가 달라도 같은 스펙에 FR 신설), (2) 이 스펙이 실제 그 aggregate면 **`Ownership.Entities`에 소유 선언**(그러면 dedup이 타 스펙과의 충돌을 검증). ⚠ **`## Dependencies`는 해소 수단이 아니다** — `Name (references)`를 적어도 판정은 소유 Entities만 보므로 위반이 그대로 남고(hard면 "고쳤다" 보고 후 무한 재시도), capability 자체를 Dependencies로 옮기는 것은 귀속·동사·형식·dedup 판정을 전부 건너뛰는 우회다 |
+   | Capability | **B 교차 aggregate** | 명사가 *다른 스펙*이 소유한 entity → 해소는 **두 갈래뿐**(게이트 메시지와 동일): (1) 그 capability와 FR을 **그 entity 소유 스펙으로 이관**(verb가 달라도 같은 스펙에 FR 신설), (2) 이 스펙이 실제 그 aggregate면 **`Ownership.Entities`에 소유 선언**(그러면 dedup이 타 스펙과의 충돌을 검증). ⚠ **`## Dependencies`는 해소 수단이 아니다** — `Name (references)`를 적어도 판정은 소유 Entities만 보므로 위반이 그대로 남고(hard면 "고쳤다" 보고 후 무한 재시도). capability 자체를 Dependencies로 옮겨도 dedup은 여전히 제외지만, 동사 형식과 유령 entity 참조는 그대로 검증된다 — "이 스펙이 소유한다"는 귀속 판정만 사라질 뿐, 검증 전체를 건너뛰는 우회는 아니다 |
    | Capability | **C 유령 entity** | 명사가 어느 스펙에도 없거나 스키마에 실재 안 함(`wizard`·`project_list` 등 — SPEC-026 스키마 백킹이 검출) → **원인별 해소(면제 남용 금지)**: (1) UI/흐름 개념(FR이 실 테이블 조작)이면 **Surface 강등 + capability를 실 entity(`pjt_projects.<verb>`)로 재키** — 이게 대다수, (2) 인프라·proto entity면 **그 구조 SSOT(terraform·`.proto`)를 `entitySchemaSources`에 소스 추가**(면제 아님), (3) 실 외부 aggregate(외부 API 자원 등)만 `entitySchemaExemptEntities` 소수 면제. ⚠ 수십 건을 일괄 면제하고 hard 올리는 것은 거짓 완료(실측) — 대량이면 readopt 대상 |
    | 키 앵커 | **수사적** | bold가 필드명·파일경로·강조어 → 평문 또는 백틱(`` `...` ``)으로 강등 |
    | 키 앵커 | **키여야 함** | bold가 실제 소유/참조 키인데 미선언 → Ownership/Dependencies에 선언 |

@@ -3,7 +3,7 @@
 DIR=$(git rev-parse --show-toplevel) || exit 1
 cd "$DIR"
 node tooling/check-fr-coverage.mjs || exit 1   # incremental(미커버 warn), PREFIX·번호·Planned모순 exit 1
-node tooling/check-ownership.mjs   || exit 1   # exit 1 = 중복소유(dedup)·관계 실재·entityRegistry·정책 enum (+귀속/백킹이 hard일 때); 키 형식·블록 부재는 ⚠ warn(--strict 미사용)
+node tooling/check-ownership.mjs   || exit 1   # exit 1 = 중복소유(dedup)·관계 실재·entityRegistry·capabilityVerbs 사유·정책 enum (+귀속/백킹이 hard일 때, +capabilityVerbPolicy가 hard일 때 미등록 verb); 나머지 키 형식·블록 부재는 ⚠ warn(--strict 미사용)
 node tooling/check-deploy-debt.mjs || exit 1   # outOfBandDeployPolicy=hard일 때만 발화 — 미기록 배포 부채가 남아 있으면 커밋 차단(그 외엔 즉시 exit 0)
 # 검증 실행 기록(SPEC-041) — 로컬 pre-commit이 스위트를 돌리지는 않지만(runTestsPolicy는 pre-push),
 # CI가 남긴 원장이 로컬에 없으면 R14가 전 자산을 "기록 없음"으로 센다. 로컬 스윕의 판정 입력을
