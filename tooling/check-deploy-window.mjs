@@ -57,7 +57,11 @@ function main() {
   const applicable = pipeline.promotions.filter((p) => p.from === deployBranch && p.deployWindow && p.deployWindow.enabled);
   if (!applicable.length) process.exit(0); // 이 배포 브랜치에 걸린 시간창이 없다 — 침묵
 
-  const results = applicable.map((p) => ({ promotion: `${p.from}→${p.to}`, verdict: deployWindowVerdict(p.deployWindow, Date.now(), message) }));
+  // SDD_DEPLOY_WINDOW_NOW_MS — 테스트 전용 시각 주입(SDD_SYNC_BUDGET_MS·SDD_ALLOW_DRIFT와 같은
+  // 계열의 SDD_ 접두 override). 실 운용에서는 미설정 — Date.now()가 실제 push 시각을 잰다.
+  const injectedNow = Number(process.env.SDD_DEPLOY_WINDOW_NOW_MS);
+  const nowMs = Number.isFinite(injectedNow) && injectedNow > 0 ? injectedNow : Date.now();
+  const results = applicable.map((p) => ({ promotion: `${p.from}→${p.to}`, verdict: deployWindowVerdict(p.deployWindow, nowMs, message) }));
   const blocking = results.filter((r) => r.verdict.status === "out-of-window" || r.verdict.status === "misconfigured");
 
   if (!blocking.length) process.exit(0); // 창 안 또는 예외됨 — 조용할 자격이 있다

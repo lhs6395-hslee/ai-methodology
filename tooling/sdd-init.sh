@@ -145,8 +145,10 @@ if [ "$GATE" = "node" ]; then
   sync_copy "$KIT/tooling/pipeline-setup-lib.mjs"                   "$T/scripts/pipeline-setup-lib.mjs"
   sync_copy "$KIT/tooling/deploy-window-lib.mjs"                    "$T/scripts/deploy-window-lib.mjs"
   sync_copy "$KIT/tooling/check-deploy-window.mjs"                  "$T/scripts/check-deploy-window.mjs"
-  sync_copy "$KIT/tooling/pipeline-renderers/jenkins-renderer.mjs"  "$T/scripts/pipeline-renderers/jenkins-renderer.mjs"
-  sync_copy "$KIT/tooling/pipeline-renderers/README.md"             "$T/scripts/pipeline-renderers/README.md"
+  sync_copy "$KIT/tooling/pipeline-renderers/jenkins-renderer.mjs"        "$T/scripts/pipeline-renderers/jenkins-renderer.mjs"
+  sync_copy "$KIT/tooling/pipeline-renderers/github-actions-renderer.mjs" "$T/scripts/pipeline-renderers/github-actions-renderer.mjs"
+  sync_copy "$KIT/tooling/pipeline-renderers/gitlab-ci-renderer.mjs"      "$T/scripts/pipeline-renderers/gitlab-ci-renderer.mjs"
+  sync_copy "$KIT/tooling/pipeline-renderers/README.md"                  "$T/scripts/pipeline-renderers/README.md"
   sync_copy "$KIT/tooling/harness/sdd-pipeline-setup.SKILL.md"      "$T/.claude/skills/sdd-pipeline-setup/SKILL.md"
   say "  → 파이프라인 셋업 마법사 설치: /sdd-pipeline-setup (배포 시간창 게이트는 deployWindowPolicy로 명시 승격해야 강제된다)"
 

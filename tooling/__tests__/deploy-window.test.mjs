@@ -4,6 +4,7 @@
 // @covers SPEC-060/FR-003
 // @covers SPEC-060/FR-004
 // @covers SPEC-060/FR-005
+// @covers SPEC-060/FR-006
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -103,8 +104,13 @@ function commit(root, message) {
   execFileSync("git", ["commit", "-q", "-m", message], { cwd: root });
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 }
-function runHook(root, stdin) {
-  try { return { code: 0, out: execFileSync("node", [GATE, "--hook"], { cwd: root, encoding: "utf8", input: stdin, stdio: ["pipe", "pipe", "pipe"] }) }; }
+// 벽시계에 기대지 않는다 — 실측 위험: OUT_OF_WINDOW가 days:["Tue"]뿐이라, 주입 없이 실제
+// Date.now()를 쓰면 테스트 스위트가 실제 화요일 09:00~18:00 UTC에 돈 그 순간만 "창 안"으로
+// 뒤집혀 flaky해진다. SDD_DEPLOY_WINDOW_NOW_MS로 고정 시각(수요일)을 주입해 결정적으로 만든다.
+const FIXED_WEDNESDAY_UTC = String(Date.parse("2026-08-26T10:00:00.000Z"));
+function runHook(root, stdin, nowMs = FIXED_WEDNESDAY_UTC) {
+  const env = { ...process.env, SDD_DEPLOY_WINDOW_NOW_MS: nowMs };
+  try { return { code: 0, out: execFileSync("node", [GATE, "--hook"], { cwd: root, encoding: "utf8", input: stdin, stdio: ["pipe", "pipe", "pipe"], env }) }; }
   catch (e) { return { code: e.status ?? 1, out: (e.stdout || "") + (e.stderr || "") }; }
 }
 
@@ -160,5 +166,20 @@ test("게이트 e2e: deployWindowPolicy off는 파이프라인 설정이 있어�
   try {
     const r = runHook(root, `refs/heads/main ${oid} refs/heads/main deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n`);
     assert.equal(r.code, 0); assert.equal(r.out.trim(), "");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 e2e: SDD_DEPLOY_WINDOW_NOW_MS 주입이 실제 벽시계를 대체한다(결정성 회귀 확인)", () => {
+  // 같은 창(월~금 09:00~18:00 UTC)에 대해, 주입 시각만 바꿔 안/밖 둘 다 재현한다 — 이 테스트가
+  // 실행되는 실제 시각과 무관하게 항상 같은 결과가 나와야 주입이 실제로 먹힌다는 증거다.
+  const weekdayWindow = { enabled: true, days: ["Mon", "Tue", "Wed", "Thu", "Fri"], start: "09:00", end: "18:00", timezone: "UTC" };
+  const root = fixture({ deployWindowPolicy: "hard" }, PIPELINE(weekdayWindow));
+  const oid = commit(root, "deploy: x");
+  try {
+    const inWindow = String(Date.parse("2026-08-26T10:00:00.000Z"));   // 수요일 10:00 UTC — 창 안
+    const outWindow = String(Date.parse("2026-08-29T10:00:00.000Z"));  // 토요일 — 요일 밖
+    const stdin = `refs/heads/main ${oid} refs/heads/main deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n`;
+    assert.equal(runHook(root, stdin, inWindow).code, 0);
+    assert.equal(runHook(root, stdin, outWindow).code, 1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

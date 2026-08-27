@@ -38,6 +38,7 @@
 - **FR-003** (ubiquitous): THE core's **parsePrePushRefs(stdin)** and **targetsDeployBranch(refs, deployBranch)** (S) SHALL determine whether a push targets the deploy branch using each ref line's `remoteRef` field only (never the local ref name), SHALL exclude a line whose `localOid` is all zero (a remote-branch deletion), and SHALL include a line whose `remoteOid` is all zero (a first push of a new branch), because these two zero-oid cases carry opposite meaning in the git pre-push protocol.
 - **FR-004** (event): WHEN **check-deploy-window.mjs** (S) runs as a pre-push hook and finds no `sdd.pipeline.config.json`, or `deployWindowPolicy` is `"off"`, or the push's `remoteRef` does not target the declared deploy branch, THE gate SHALL exit 0 with no output; WHEN it finds an applicable promotion whose window status is `out-of-window` or `misconfigured`, THE gate SHALL print the finding under any policy and SHALL exit non-zero only when `deployWindowPolicy` is `"hard"` — capability: **deploy-window.enforce** (C).
 - **FR-005** (event): WHEN the kit's own canonical `tooling/harness/pre-push` template runs and `scripts/check-deploy-window.mjs` does not exist in the consuming project, THE template SHALL skip that check entirely (no error, no output); WHEN it does exist, THE template SHALL invoke it with the same pre-push stdin already cached for the sync check, so that projects that never ran the pipeline-setup wizard are wholly unaffected and the wiring survives every kit update (it lives in the kit-owned template, not a per-project copy).
+- **FR-006** (optional): WHERE the `SDD_DEPLOY_WINDOW_NOW_MS` environment variable is set to a finite positive number, THE gate SHALL use it as the current moment instead of the real clock when judging a window, so window judgment is deterministically testable regardless of the real weekday and time the test suite happens to run on.
 
 ### Key Entities
 - **deploy window** — a per-promotion declaration (`enabled`, `days`, `start`, `end`, `timezone`, `overrideTrailer`) of when a push to the deploy branch is allowed to proceed toward that promotion, judged against the actual push moment in the declared timezone, not a fixed offset. The declaration itself is defined and stored by SPEC-059; this spec owns only its runtime judgment and enforcement.
@@ -60,7 +61,7 @@
 ---
 
 ## Success Criteria (측정형)
-- **SC-001**: `deploy-window.test.mjs` 전 케이스 green — 타임존 로컬 시각 판정(고정 오프셋 아님)·요일 제한·자정 넘는 창·트레일러 예외·원격 ref 기반 판정·zero-oid 두 의미 구분·게이트 e2e(미선언/정책 off/배포 브랜치 아님 침묵, hard 차단, advisory 경고, 트레일러 예외 통과)·pre-push 정본 템플릿의 존재-확인 배선. [검증: tooling/__tests__/deploy-window.test.mjs]
+- **SC-001**: `deploy-window.test.mjs` 전 케이스 green — 타임존 로컬 시각 판정(고정 오프셋 아님)·요일 제한·자정 넘는 창·트레일러 예외·원격 ref 기반 판정·zero-oid 두 의미 구분·게이트 e2e(미선언/정책 off/배포 브랜치 아님 침묵, hard 차단, advisory 경고, 트레일러 예외 통과)·pre-push 정본 템플릿의 존재-확인 배선·`SDD_DEPLOY_WINDOW_NOW_MS` 주입이 실제 벽시계를 대체함(같은 창을 다른 주입 시각으로 안/밖 둘 다 재현). [검증: tooling/__tests__/deploy-window.test.mjs]
 - **SC-002**: 마법사를 안 쓴 프로젝트에서 킷 업데이트(`sdd-init.sh` 재실행) 전후로 pre-push 훅 동작이 바이트 단위로 동일하다(무해성 회귀 확인) — `scripts/check-deploy-window.mjs`가 없을 때 `tooling/harness/pre-push`의 조건문이 그 분기를 완전히 건너뜀을 스크립트 정적 확인으로 대체(킷 자신은 소비 프로젝트가 아니라 실배포 워크플로가 없어 실측 e2e 불가 — 픽스처 기반 게이트 e2e가 대체 증거). [검증: tooling/__tests__/deploy-window.test.mjs]
 
 ## Non-Functional Requirements
@@ -79,6 +80,7 @@
 | 일시 | 수행자 | 판정 |
 |---|---|---|
 | 2026-08-26 | 셀프리뷰(코어 TDD + 게이트 카나리아 다수 + 오너 확정 설계 대조) + SPEC-059에서 분할(retrofit이므로 Reviewed로 직접 작성) → Reviewed | FR-001~005 unit 커버. 킷 자기적용: 킷 자신에 배포 대상이 없어 INERT이고 게이트가 그 사실을 매 실행 밝힌다 |
+| 2026-08-27 | 시각 주입 knob(FR-006) 추가로 실측 flaky 위험 봉합 → Reviewed 유지 | FR-006 unit 커버(같은 창을 다른 주입 시각으로 안/밖 둘 다 재현) |
 
 ## Dedup-Review
 <!-- 이웃 스펙과의 의미적 중복 검토 기록 — 게이트는 존재·형식만 검사(판정은 사람/LLM) -->
@@ -93,6 +95,7 @@
   사후 재도출이 불가능하다(선제 캡처, SPEC-009). completeness 게이트가 존재를 검사. -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | `SDD_DEPLOY_WINDOW_NOW_MS` 테스트 전용 시각 주입 knob 추가(FR-006) | 실측 위험 발견: `deploy-window.test.mjs`의 `OUT_OF_WINDOW` e2e 픽스처(`days: ["Tue"]`)가 게이트의 실제 `Date.now()`에 의존해, 테스트 스위트가 실제 화요일 09:00~18:00 UTC에 돌면 판정이 뒤집혀 flaky해질 수 있었다 — 발화 전에 고정 시각 주입으로 닫음 |
 | 2026-08-26 | 초안(SPEC-059에서 분할, retrofit — Reviewed로 직접 작성) — 배포 시간창 판정 코어·pre-push 강제 게이트·킷 정본 템플릿 배선 신설 | cohesion 게이트(FR 14개 > `maxFRsPerSpec: 10`) 대응 — 완화(상한 상향) 대신 이미 독립 파일이던 관심사를 실제로 분할 |
 
 > **폐기 시:** `Status=Removed` + **코드·테스트를 같은 PR로 동시 삭제**(dangling `@covers`는 FR 게이트가 막음) + 이 표에 제거 기록 → spec 파일 삭제(git이 히스토리 보존). 상세: `STRUCTURE.md` 폐기 수명주기.

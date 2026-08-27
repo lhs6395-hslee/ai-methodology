@@ -4,10 +4,11 @@
 // @covers SPEC-059/FR-003
 // @covers SPEC-059/FR-004
 // @covers SPEC-059/FR-005
+// @covers SPEC-059/FR-010
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  INTERVIEW_QUESTIONS, buildPipelineConfig, validatePipelineConfig, PIPELINE_CONFIG_FILE,
+  INTERVIEW_QUESTIONS, buildPipelineConfig, validatePipelineConfig, PIPELINE_CONFIG_FILE, CI_PROVIDERS,
 } from "../pipeline-setup-lib.mjs";
 
 test("INTERVIEW_QUESTIONS: 모든 질문이 id·section·prompt를 갖는다", () => {
@@ -77,6 +78,14 @@ test("buildPipelineConfig: 환경 여러 개(dev+prod)면 승격 지점마다 �
   assert.equal(config.promotions[1].deployWindow.timezone, "UTC");
   assert.equal(config.promotions[1].concurrencyLock, true);
   assert.deepEqual(config.promotions[1].deployEvidence, ["healthcheck", "image-tag"]);
+});
+
+test("buildPipelineConfig: ciProvider는 등록된 값만 받고, 미답변·미등록 값은 jenkins로 기본한다", () => {
+  assert.deepEqual(CI_PROVIDERS, ["jenkins", "github-actions", "gitlab-ci"]);
+  assert.equal(buildPipelineConfig({ ciProvider: "github-actions" }).ciProvider, "github-actions");
+  assert.equal(buildPipelineConfig({ ciProvider: "gitlab-ci" }).ciProvider, "gitlab-ci");
+  assert.equal(buildPipelineConfig({}).ciProvider, "jenkins");
+  assert.equal(buildPipelineConfig({ ciProvider: "circleci" }).ciProvider, "jenkins"); // 미등록 값 폴백
 });
 
 test("buildPipelineConfig: ephemeralAgent는 모르겠음도 안전측(unknown)으로 보존, infraApply는 항상 approval", () => {

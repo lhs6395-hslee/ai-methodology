@@ -90,7 +90,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 114건
+## Surface 키 — 116건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -154,6 +154,8 @@
 | `fr-placement-lib.mjs` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure-lib.mjs` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
+| `github-actions-renderer.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
+| `gitlab-ci-renderer.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
 | `go-gate` | SPEC-006 | ✓ | ✓ | ✓ |
 | `grammar-lib.mjs` | SPEC-013 | ✓ | ✓ | ✓ |
 | `hooks-install-lib.mjs` | SPEC-036 | ✓ | ✓ | ✓ |
@@ -302,7 +304,7 @@
 
 ## 집계
 
-- 소유 키 총 **256건** (entity 61 · surface 114 · capability 63 · 역할없음 18)
+- 소유 키 총 **258건** (entity 61 · surface 116 · capability 63 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

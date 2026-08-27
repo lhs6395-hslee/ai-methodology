@@ -1,8 +1,8 @@
 ---
 name: sdd-pipeline-setup
-description: CI/CD 배포 파이프라인 셋업 마법사 — 대화형 인터뷰로 sdd.pipeline.config.json을 만들고 Jenkinsfile을 생성한다. 손으로 짠 파이프라인이 반복적으로 겪는 결함(hard 게이트인데 실행 조건이 안 맞아 조용히 무발화)을 질문-응답으로 미리 막는다.
+description: CI/CD 배포 파이프라인 셋업 마법사 — 대화형 인터뷰로 sdd.pipeline.config.json을 만들고 선택한 제공자(Jenkins·GitHub Actions·GitLab CI)의 설정 파일을 생성한다. 손으로 짠 파이프라인이 반복적으로 겪는 결함(hard 게이트인데 실행 조건이 안 맞아 조용히 무발화)을 질문-응답으로 미리 막는다.
 ---
-# /sdd-pipeline-setup — CI/CD 배포 파이프라인 셋업 (SPEC-059, Phase 1)
+# /sdd-pipeline-setup — CI/CD 배포 파이프라인 셋업 (SPEC-059)
 
 **정본 절차(SSOT):** `prompts/pipeline-setup.md`를 **그대로 실행**한다(절차 원본은 그 파일 한 곳 —
 중복 저장 안 함). 로컬 키트가 있으면 `<KIT>/prompts/pipeline-setup.md`(캐시 위치 관례
@@ -20,14 +20,17 @@ description: CI/CD 배포 파이프라인 셋업 마법사 — 대화형 인터�
    경로 가드(D섹션)는 매니페스트 스캔(`package.json`·`Dockerfile`·`go.mod`·`requirements.txt`·
    `pom.xml`·`*.csproj` 존재 확인)으로 추천값을 먼저 만들어 확인/수정만 받는다.
 2. **직렬화·검증.** 답변을 `buildPipelineConfig(answers)`로 `sdd.pipeline.config.json` 스키마에
-   맞추고, `validatePipelineConfig(config)`로 4종 경고를 확인해 있는 그대로 사람에게 보여준다
-   (조용히 넘기지 않는다 — 특히 `ephemeral-agent-unknown-defaulted`는 안전측 기본값을 썼다는
-   사실 자체가 알림이다).
-3. **미리보기 → 승인 게이트.** `renderJenkinsfile(config)`로 생성될 Jenkinsfile 전체를 미리보기로
-   제시한다. 대상 프로젝트에 이미 `Jenkinsfile`이 있으면 **자동 덮어쓰지 않는다** — 미리보기만
-   내고, 병합은 사람이 한다(`jenkins-renderer.mjs` CLI 자체의 계약과 동일).
-4. **저장.** 승인 후 `sdd.pipeline.config.json`을 쓰고, `node tooling/pipeline-renderers/jenkins-renderer.mjs`로
-   `Jenkinsfile`을 생성한다(`--force`는 사람이 명시적으로 원할 때만).
+   맞추고(`ciProvider` 답변이 어느 렌더러를 쓸지 결정 — 기본 `jenkins`), `validatePipelineConfig(config)`로
+   3종 경고를 확인해 있는 그대로 사람에게 보여준다(조용히 넘기지 않는다 — 특히
+   `ephemeral-agent-unknown-defaulted`는 안전측 기본값을 썼다는 사실 자체가 알림이다).
+3. **미리보기 → 승인 게이트.** `ciProvider`에 해당하는 렌더러(`jenkins-renderer.mjs`|
+   `github-actions-renderer.mjs`|`gitlab-ci-renderer.mjs`)의 `render*(config)`가 낼 생성물 전체를
+   미리보기로 제시한다. 대상 프로젝트에 이미 같은 이름의 파일(Jenkinsfile·
+   `.github/workflows/pipeline.yml`·`.gitlab-ci.yml`)이 있으면 **자동 덮어쓰지 않는다** — 미리보기만
+   내고, 병합은 사람이 한다(각 렌더러 CLI 자체의 계약과 동일).
+4. **저장.** 승인 후 `sdd.pipeline.config.json`을 쓰고, 선택한 렌더러를
+   `node tooling/pipeline-renderers/<ciProvider>-renderer.mjs`로 실행해 생성물을 만든다(`--force`는
+   사람이 명시적으로 원할 때만).
 5. **config 배선 확인.** `sdd.config.json`의 `pipelineConfigFile`·`deployWindowPolicy`를 확인하고,
    배포 시간창을 실제로 강제하려면 `deployWindowPolicy`를 `advisory` 이상으로 올리도록 안내한다
    (기본은 `off` — 마법사를 돌려도 강제는 명시적 승격 전까지 침묵한다).
@@ -37,7 +40,8 @@ description: CI/CD 배포 파이프라인 셋업 마법사 — 대화형 인터�
 ## 고정 규칙 (발명 금지)
 - **인터뷰 순서·질문 정의는 `pipeline-setup-lib.mjs`가 유일한 소스다** — 이 스킬이나 절차 문서가
   질문을 마음대로 추가·생략하지 않는다(새 질문이 필요하면 라이브러리를 고치고 스펙을 갱신한다).
-- **자동 승인·자동 덮어쓰기 금지.** Jenkinsfile이 이미 있으면 병합은 항상 사람이 한다.
-- **안전측 기본값은 조용히 넘기지 않는다.** `validatePipelineConfig`의 경고 4종은 반드시 사람에게
+- **자동 승인·자동 덮어쓰기 금지.** 렌더링 산출물이 이미 있으면 병합은 항상 사람이 한다.
+- **안전측 기본값은 조용히 넘기지 않는다.** `validatePipelineConfig`의 경고 3종은 반드시 사람에게
   보여준 뒤 진행한다.
+- **렌더러 선택은 `ciProvider` 답변이 결정한다** — 스킬이 임의로 제공자를 가정하지 않는다.
 - **자동 인프라 적용은 이 스키마에 존재하지 않는다** — 인프라 적용 스텝은 항상 승인 대기.
