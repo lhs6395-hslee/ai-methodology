@@ -450,6 +450,7 @@ DEFAULTS = {
     "specSyncUnownedPolicy": "silent",
     "specSyncBase": None,
     "draftBlockPolicy": "advisory",
+    "enforcementReachabilityPolicy": "off",
     "entityRegistry": {},
     "relationTypes": [],
     "capabilityVerbs": [],
@@ -549,6 +550,7 @@ RATCHETED_POLICIES = [
     "riskyActionPolicy",
     "deployWindowPolicy",
     "capabilityVerbPolicy",
+    "enforcementReachabilityPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -3594,13 +3596,20 @@ def _before_audit_trail(text):
     return text[:m.start()] if m else text
 
 
+def _marker_pattern(m):
+    """ASCII 단어 마커는 \\b 경계 인식(이슈 #21 M-1과 같은 부분문자열 오판정 계열 — "bucket"이
+    "Bitbucket"의 부분문자열로 오탐하지 않게). 한글 마커는 경계 의미가 없어 그대로 부분문자열."""
+    esc = re.escape(m)
+    return rf"\b{esc}\b" if re.match(r"^[A-Za-z0-9 ]+$", m) else esc
+
+
 def object_storage_findings(text, markers):
     """오브젝트 스토리지 결정 검사 (object-storage-lib.mjs 미러 — 바이트 동일, SPEC-016).
     감사 트레일(Review Log/Dedup-Review/Change Log)의 마커 언급은 스캔 제외(자기 서술 오탐 방지)."""
     if not markers:
         return []
     scan = _before_audit_trail(text)
-    if not any(re.search(re.escape(m), scan, re.IGNORECASE) for m in markers):
+    if not any(re.search(_marker_pattern(m), scan, re.IGNORECASE) for m in markers):
         return []
     section = _section_body(text, "Object Storage Decision")
     if section is None:
@@ -4239,6 +4248,50 @@ def compile_glob(glob):
             out += re.sub(r"[.+?^${}()|\[\]\\]", lambda m: "\\" + m.group(0), glob[i])
             i += 1
     return re.compile(f"^{out}$")
+
+
+# ── 선언↔강제지점 결합 (SPEC-061, 이슈 #21 D-1) — enforcement-reachability-lib.mjs 미러 ──
+
+NATIVE_CI_GLOBS = {
+    "github": [".github/workflows/**"],
+    "gitlab": [".gitlab-ci.yml", ".gitlab/ci/**"],
+    "bitbucket": ["bitbucket-pipelines.yml"],
+    "azure": ["azure-pipelines*"],
+}
+
+
+def detect_git_host(remote_url):
+    s = str(remote_url or "")
+    if re.search(r"(^|[@./])github\.com([:/]|$)", s):
+        return "github"
+    if re.search(r"(^|[@./])gitlab\.com([:/]|$)", s):
+        return "gitlab"
+    if re.search(r"(^|[@./])bitbucket\.org([:/]|$)", s):
+        return "bitbucket"
+    if re.search(r"(^|[@./])dev\.azure\.com([:/]|$)", s) or re.search(r"visualstudio\.com([:/]|$)", s):
+        return "azure"
+    return None
+
+
+def host_ci_mismatch_finding(host, present_providers):
+    if not host or host not in NATIVE_CI_GLOBS:
+        return None
+    present = set(present_providers or [])
+    if host in present:
+        return None
+    others = sorted(p for p in present if p != host)
+    if not others:
+        return None
+    return {"host": host, "present": others}
+
+
+def range_enforcement_finding(draft_block_policy, ci_text_concat):
+    if draft_block_policy != "hard":
+        return None
+    text = str(ci_text_concat or "")
+    if re.search(r"check-spec-sync|sdd-sync", text):
+        return None
+    return {"knob": "draftBlockPolicy", "value": "hard"}
 
 
 def files_line_missing_paths(tokens, exists):
@@ -5506,6 +5559,59 @@ EXEMPTION_FINDING_TEXT = {
     "missing-field": "면제 레코드에 필수 필드가 없다",
     "stale-record": "등록부에만 남은 레코드 — 면제는 걷어냈는데 기록이 남았다(등록부 부패의 시작)",
 }
+
+
+def cmd_enforcementreachability(cfg):
+    """선언↔강제지점 결합 게이트(SPEC-061) — Node check-enforcement-reachability.mjs 미러."""
+    policy = cfg.get("enforcementReachabilityPolicy") or "off"
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ enforcementReachabilityPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "enforcementReachabilityPolicy")
+        print("선언↔강제지점 결합 게이트 — enforcementReachabilityPolicy:off (판정 안 함)")
+        sys.exit(0)
+
+    remote_url = (_git(cfg, ["remote", "get-url", "origin"]) or "").strip() or None
+    host = detect_git_host(remote_url)
+
+    all_files = [rel_from_root(cfg, p) for p in walk_files(cfg["__root"], cfg)]
+    files_by_provider = {}
+    for provider, globs in NATIVE_CI_GLOBS.items():
+        rxs = [compile_glob(g) for g in globs]
+        files_by_provider[provider] = [f for f in all_files if any(rx.match(f) for rx in rxs)]
+    present_providers = sorted(p for p in files_by_provider if files_by_provider[p])
+
+    findings = []
+    mismatch = host_ci_mismatch_finding(host, present_providers)
+    if mismatch:
+        findings.append(("host-ci-mismatch", mismatch))
+
+    ci_text_parts = []
+    for files in files_by_provider.values():
+        for f in files:
+            ci_text_parts.append(read_text(resolve(cfg, f)))
+    ci_text = "\n".join(ci_text_parts)
+    range_finding = range_enforcement_finding(cfg.get("draftBlockPolicy") or "advisory", ci_text)
+    if range_finding:
+        findings.append(("range-unreachable", range_finding))
+
+    hard = policy == "hard" and len(findings) > 0
+    judged(len(findings))
+    print(f"선언↔강제지점 결합 게이트(enforcementReachabilityPolicy={policy}) — 리모트 호스트:{host or '미해석'} CI provider:{','.join(present_providers) if present_providers else '없음'}")
+    for kind, detail in findings:
+        tag = "✗" if hard else "⚠"
+        if kind == "host-ci-mismatch":
+            print(f"  {tag} git 리모트는 {detail['host']}인데 그 provider의 네이티브 CI 정의가 없고 {','.join(detail['present'])}의 CI만 있다 — 그 CI는 이 리포에서 실행되지 않는다(host↔CI 불일치)")
+        elif kind == "range-unreachable":
+            print(f"  {tag} {detail['knob']}={detail['value']}인데 발견된 CI 정의 어디에도 check-spec-sync/sdd-sync 호출 흔적이 없다 — range 전용 승격(SPEC-008 FR-007)이 이 리포의 어떤 강제 지점에서도 발화하지 않는다")
+    if hard:
+        print("\n✗ enforcementReachabilityPolicy=hard: 강도 선언과 실제 강제 지점이 어긋난다 — CI를 실제 호스트에 맞게 정의하거나, spec-sync 호출을 그 CI에 배선하거나, 지금 이 리포에서 발화하지 않는 강도라면 정직하게 내려라(SPEC-061).",
+              file=sys.stderr)
+        sys.exit(1)
+    print("선언↔강제지점 결합 게이트: OK — 강도 선언이 발화할 강제 지점이 확인된다(또는 판정 대상 없음).")
+    sys.exit(0)
 
 
 def cmd_ratchet(cfg, base_arg):
@@ -8751,6 +8857,8 @@ def main():
         cmd_schemadrift(cfg)
     elif sub == "ratchet":
         cmd_ratchet(cfg, positional[0] if positional else None)
+    elif sub == "enforcementreachability":
+        cmd_enforcementreachability(cfg)
     elif sub == "engineevent":
         cmd_engineevent(cfg)
     elif sub == "evidence":

@@ -1039,6 +1039,32 @@ test("패리티: completeness 오브젝트 스토리지 결정(S3 마커+섹션 
   } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
 });
 
+// 이슈 #21 M-1과 같은 부분문자열 오판정 계열의 object-storage 마커 수정(bucket이 Bitbucket
+// 부분문자열로 오탐하면 안 됨) — Node·Python 패리티로 재확인.
+// @covers SPEC-016/FR-001
+test("패리티: completeness 오브젝트 스토리지 마커 경계 인식(bitbucket 오탐 없음, bucket 단독은 트리거) — Node와 Python 출력 동일", skip, () => {
+  const noTrigger = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Active\nCI provider로 bitbucket을 지원한다.\n- **FR-001** (event): THE SYSTEM SHALL detect.\n**Given** x\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 이웃 없음\n",
+  };
+  const trigger = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`  **Status**: Active\n이 bucket 정책을 정의한다.\n- **FR-001** (event): THE SYSTEM SHALL store.\n**Given** x\n- **SC-001**: 90%\n## Review Log\n| 2026-07-05 | 리뷰 | PASS |\n## Dedup-Review\n- 이웃 없음\n",
+  };
+  for (const files of [noTrigger, trigger]) {
+    const a = fixture(files);
+    const b = fixture(files);
+    try {
+      const p = runPy(a, ["completeness"]);
+      const n = runNode(b, "check-spec-completeness.mjs");
+      assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+      assert.equal(p.out, n.out, `출력 불일치(바이트 패리티)\npy:${p.out}\nnode:${n.out}`);
+    } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
+  }
+  const bA = fixture(noTrigger);
+  try { assert.doesNotMatch(runNode(bA, "check-spec-completeness.mjs").out, /Object Storage Decision/); } finally { rmSync(bA, { recursive: true, force: true }); }
+  const bB = fixture(trigger);
+  try { assert.match(runNode(bB, "check-spec-completeness.mjs").out, /Object Storage Decision/); } finally { rmSync(bB, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-008/FR-006
 test("패리티: completeness Lifecycle enum 밖 값(temporary) — Node와 Python 출력 동일", skip, () => {
   const files = {
@@ -1389,6 +1415,43 @@ test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·�
       const p = runPy(root, ["ratchet", base]);
       assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify(curCfg)})`);
       assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify(curCfg)})`);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
+// ── enforcementreachability 게이트 패리티(SPEC-061, 이슈 #21 D-1) ──
+test("py enforcementreachability: host↔CI 불일치·range 미도달·off·모르는 호스트 — Node·Python 바이트 동일", skip, () => {
+  const scen = [
+    // 실측 시나리오: GitLab 리모트 + GitHub Actions 전용 CI.
+    { cfg: { enforcementReachabilityPolicy: "hard" },
+      files: { ".github/workflows/ci.yml": "name: CI\non: [push]\n" }, remote: "git@gitlab.com:org/repo.git" },
+    { cfg: { enforcementReachabilityPolicy: "hard", draftBlockPolicy: "hard" },
+      files: { ".gitlab-ci.yml": "gates:\n  script:\n    - node scripts/check-spec-sync.mjs $BASE\n" }, remote: "git@gitlab.com:org/repo.git" },
+    { cfg: { enforcementReachabilityPolicy: "hard", draftBlockPolicy: "hard" },
+      files: { ".gitlab-ci.yml": "gates:\n  script:\n    - npm test\n" }, remote: "git@gitlab.com:org/repo.git" },
+    { cfg: { enforcementReachabilityPolicy: "advisory" },
+      files: { ".github/workflows/ci.yml": "name: CI\n" }, remote: "git@gitlab.com:org/repo.git" },
+    { cfg: { enforcementReachabilityPolicy: "hard" },
+      files: { ".github/workflows/ci.yml": "name: CI\n" }, remote: "git@git.internal.corp:org/repo.git" },
+    { cfg: {}, files: {}, remote: "git@github.com:org/repo.git" }, // off 기본값
+  ];
+  for (const { cfg, files, remote } of scen) {
+    const root = mkdtempSync(join(tmpdir(), "sdd-py-enf-"));
+    const git = (...a) => execFileSync("git", ["-C", root, ...a], { stdio: ["ignore", "pipe", "pipe"] });
+    try {
+      mkdirSync(join(root, "sdd", "specs"), { recursive: true });
+      writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", ...cfg }));
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(root, rel, ".."), { recursive: true });
+        writeFileSync(join(root, rel), body);
+      }
+      git("init", "-q"); git("config", "user.email", "t@t"); git("config", "user.name", "t");
+      if (remote) git("remote", "add", "origin", remote);
+      git("add", "-A"); git("commit", "-qm", "base");
+      const n = runNode(root, "check-enforcement-reachability.mjs", []);
+      const p = runPy(root, ["enforcementreachability"]);
+      assert.equal(p.out, n.out, `출력 동일 (${JSON.stringify({ cfg, remote })})`);
+      assert.equal(p.code, n.code, `exit 동일 (${JSON.stringify({ cfg, remote })})`);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });

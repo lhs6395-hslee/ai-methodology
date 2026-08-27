@@ -90,3 +90,4 @@
 | 2026-07-06 | 초안 — `objectStorageMarkers` 감지 + Object Storage Decision 섹션(Bucket·Consolidation 라벨) completeness 검사(advisory·--strict), Node·Python 동시 | QA 도구가 전용 S3 버킷을 무계획 생성해 제품 버킷과 분리 방치[실측] — 스토리지 도입 시 버킷 선택·이전 기준을 설계 단계에 기록하도록 강제 |
 | 2026-07-06 | 마커 스캔에서 감사 트레일(Review Log/Dedup-Review/Change Log) 제외 (Node·Python) | 자기 서술 오탐[검증]: 메타 스펙(SPEC-001·002·004·006)의 Change Log가 "오브젝트 스토리지 게이트"를 언급하자 게이트가 자기·이웃을 물었음 — 도입 신호는 설계 본문에서만 판정 |
 | 2026-07-27 | FR 키 앵커 완성 — 소유 키 2건을 FR 선언 라인에 볼드+마커로 앵커 | SPEC-001 FR-010(역할 선언) 도입으로 킷 자신에게 SPEC-023 FR-005/007이 처음 발화 — 익명 주어 THE SYSTEM을 실제 수행 모듈/심볼로 바꿔 앵커 삽입(FR 의미·소유 불변) |
+| 2026-08-27 | 마커 매치를 ASCII 단어(문자·숫자·공백)에 한해 `\b` 경계 인식으로 교정(Node·Python), 한글 마커는 기존 부분문자열 매치 유지 | 이슈 #21 M-1과 같은 부분문자열 오판정 계열[실측]: SPEC-061 초안이 CI provider로 "bitbucket"을 언급하다 "bucket" 마커에 부분문자열로 오탐해 completeness가 불필요한 Object Storage Decision 섹션을 요구했다 [검증: tooling/__tests__/object-storage.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |

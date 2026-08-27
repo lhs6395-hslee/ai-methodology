@@ -100,6 +100,10 @@ const RULES = [
   // 대조 확인했다는 승인 마커(행동 해시 결속)를 요구한다. 실측: QA 실측·댓글까지 마친 티켓을
   // 배포도 안 된 채 종결 상태로 넘기려 했다 — 커밋 이전, 대화 안에서 끝나 기존 게이트가 못 본다.
   { rule: "R25 위험 행동 승인(독립 검증 없이 지나가지 않는가)", gates: ["check-risky-action.mjs"] },
+  // R26(SPEC-061): 강도 knob이 hard여도 그 판정이 발화할 CI 정의가 이 리포에 없으면 선언은
+  // 프로즈다. git 리모트 호스트와 CI 정의 provider의 결합, range 전용 승격(draftBlockPolicy)의
+  // CI 호출 흔적을 본다. 실측: GitLab 리모트 + GitHub Actions 전용 CI는 어떤 게이트도 못 부른다.
+  { rule: "R26 선언↔강제지점 결합(강도가 실제로 발화할 지점이 있는가)", gates: ["check-enforcement-reachability.mjs"] },
 ];
 
 // 게이트 ↔ Python 서브커맨드 **선언**. SPEC-006은 판정 게이트에 양판을 요구하는데, 그 대응은
@@ -140,6 +144,7 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-fr-placement.mjs": "frplacement",
   "check-gate-escalation.mjs": "gateescalation",
   "check-risky-action.mjs": "riskyaction",
+  "check-enforcement-reachability.mjs": "enforcementreachability",
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 

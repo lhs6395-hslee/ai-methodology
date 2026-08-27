@@ -31,11 +31,20 @@ function sectionBody(text, heading) {
   return next === -1 ? rest : rest.slice(0, next);
 }
 
+// 마커가 ASCII 단어(문자·숫자·공백)뿐이면 \b로 경계 인식 매치 — "bucket"이 "Bitbucket" 같은
+// 고유명사의 부분문자열로 오탐하지 않게 한다(이슈 #21 M-1과 같은 부분문자열 오판정 계열).
+// 한글 마커는 JS 정규식 \b가 비ASCII 글자를 단어문자로 인식하지 않아 경계가 엉뚱한 자리에
+// 잡히므로, 기존 그대로 부분문자열 매치를 유지한다(오탐 확대보다 하위호환을 우선).
+function markerPattern(m) {
+  const esc = escapeRegExp(m);
+  return /^[A-Za-z0-9 ]+$/.test(m) ? `\\b${esc}\\b` : esc;
+}
+
 // 반환: 경고 메시지 배열(없으면 []).
 export function objectStorageFindings(specText, markers) {
   if (!markers || !markers.length) return [];
   const scan = beforeAuditTrail(specText);
-  const matched = markers.some((m) => new RegExp(escapeRegExp(m), "i").test(scan));
+  const matched = markers.some((m) => new RegExp(markerPattern(m), "i").test(scan));
   if (!matched) return [];
   const section = sectionBody(specText, "Object Storage Decision");
   if (section === null) {

@@ -45,3 +45,20 @@ test("감사 섹션(Change Log·Review Log·Dedup-Review)의 마커 언급은 �
   const t = "본문은 순수 로직만 다룬다.\n## Review Log\n| 2026 | r | PASS |\n## Change Log\n| 2026 | S3 오브젝트 스토리지 결정 게이트 배선 | x |\n";
   assert.deepEqual(objectStorageFindings(t, MARKERS), []);
 });
+
+// 이슈 #21 M-1과 같은 부분문자열 오판정 계열: "bucket" 마커가 "Bitbucket" 같은 고유명사의
+// 부분문자열로 오탐하면 안 된다(실측: SPEC-061이 CI provider로 "bitbucket"을 언급하다 걸림).
+test("ASCII 단어 마커는 경계 인식 — 'bucket'이 'Bitbucket'의 부분문자열로 오탐하지 않는다", () => {
+  const r = objectStorageFindings("CI provider로 bitbucket을 지원한다.\n", MARKERS);
+  assert.deepEqual(r, []);
+});
+
+test("경계 인식은 정당한 매치를 여전히 잡는다 — 'bucket' 단독 단어는 그대로 트리거", () => {
+  const r = objectStorageFindings("이 bucket 정책을 정의한다.\n", MARKERS);
+  assert.equal(r.length, 1);
+});
+
+test("한글 마커는 경계 판정을 적용하지 않는다 — 부분문자열 그대로(하위호환)", () => {
+  const r = objectStorageFindings("신규 버킷이 필요하다.\n", MARKERS); // "버킷"이 조사와 붙어도 매치
+  assert.equal(r.length, 1);
+});
