@@ -7,6 +7,7 @@
 // @covers SPEC-026/FR-004
 // @covers SPEC-026/FR-005
 // @covers SPEC-026/FR-006
+// @covers SPEC-026/FR-007
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveCategoryRoles } from "../ownership-keys.mjs";
@@ -55,6 +56,38 @@ test("extractSchemaEntities: 패턴 캡처1 = 식별자, 정규화(소문자), �
     { text: `CREATE TABLE invoices (...);`, patterns: ["CREATE TABLE ([a-z_]+)"] },
   ]);
   assert.deepEqual([...set].sort(), ["invoices", "pjt_projects", "pjt_staff"]);
+});
+
+// 이슈 #21 M-4: "g"만 주고 멀티라인을 안 켜서 `^model` 같은 라인 앵커가 텍스트 전체의
+// 시작에만 걸려 사실상 매치 불가 — 소스가 뭐든 추출 0건이 되고 소유 entity 전부가 유령으로
+// hard 차단됐다(진단은 원인을 전혀 가리키지 못해 "일괄 면제"를 유도).
+test("extractSchemaEntities: ^ 라인 앵커가 텍스트 중간 줄에서도 매치된다(이슈 #21 M-4)", () => {
+  const set = extractSchemaEntities([
+    { text: "// header comment\nmodel User {}\nmodel Post {}\n", patterns: ["^model (\\w+)"] },
+  ]);
+  assert.deepEqual([...set].sort(), ["post", "user"]);
+});
+
+// 이슈 #21 M-5: Python 전용 인라인 플래그 `(?m)`을 Node가 파싱하지 못해 같은 패턴 문자열이
+// 엔진별로 성공/에러로 갈렸다(SPEC-026 SC-001 바이트 동일 위반).
+test("compileSchemaPattern: (?i)·(?s) 인라인 플래그를 직접 파싱해 흡수한다(이슈 #21 M-5)", () => {
+  const setCI = extractSchemaEntities([{ text: "MODEL User {}\n", patterns: ["(?i)^model (\\w+)"] }]);
+  assert.deepEqual([...setCI], ["user"]);
+  const setDotall = extractSchemaEntities([{ text: "model\nUser {}\n", patterns: ["(?s)model\\n(\\w+)"] }]);
+  assert.deepEqual([...setDotall], ["user"]);
+});
+
+test("compileSchemaPattern: 인식 못 하는 인라인 플래그는 유효성 검사에서 에러로 잡힌다", () => {
+  const errs = validateSchemaPatterns([{ patterns: ["(?x)model (\\w+)"] }]);
+  assert.deepEqual(errs, [{ index: 0, pattern: "(?x)model (\\w+)" }]);
+});
+
+// 이슈 #21 M-5: Python str 정규식은 기본 \w가 유니코드 인식이라 한글 식별자를 매치하는데,
+// Node \w는 ASCII 전용이라 같은 패턴이 반대 판정을 냈다(SPEC-026 SC-001 위반). Python을
+// ASCII 전용으로 좁혀 Node와 일치시킨다 — 한글 스키마 식별자는 두 엔진 다 매치하지 않는다.
+test("extractSchemaEntities: \\w는 ASCII 전용 — 한글 식별자는 매치하지 않는다(Node 원래 동작)", () => {
+  const set = extractSchemaEntities([{ text: "model 사용자 {}\nmodel Order {}\n", patterns: ["^model (\\w+)"] }]);
+  assert.deepEqual([...set], ["order"]);
 });
 
 test("schemaBackingFindings: 스키마에 없는 소유 entity만 위반 — 실재·면제는 통과", () => {

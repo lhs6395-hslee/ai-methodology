@@ -1806,6 +1806,34 @@ def schema_backing_inert_reasons(policy, sources, roles):
     return reasons
 
 
+_INLINE_FLAGS_RE = re.compile(r"^\(\?([a-zA-Z]+)\)")
+
+
+def _compile_schema_pattern(pattern):
+    """패턴 문자열에서 선두 인라인 플래그 `(?im)` 류를 떼어 컴파일(이슈 #21 M-4/M-5, Node
+    compileSchemaPattern 미러). 두 엔진이 같은 문자열 처리를 거쳐야 결과가 갈리지 않는다.
+    ① MULTILINE은 항상 켠다(라인 앵커 `^model`이 텍스트 전체 시작에만 걸려 추출 0건이 되고
+    소유 entity 전부가 유령으로 몰리던 결함 — 진단은 원인을 가리키지 못했다).
+    ② 인라인 플래그는 i·s만 인정 — Python 전용 `(?m)` 구문을 Node가 못 읽어 같은 문자열이
+    엔진별 성공/에러로 갈리던 것을, 직접 문자열을 파싱해 플래그로 승격시켜 없앤다.
+    ③ re.ASCII를 항상 더한다 — Python str 패턴은 기본 \\w·\\b 등이 유니코드 인식이라 한글
+    식별자에서 Node(ASCII 전용 \\w)와 반대로 판정했다. 좁은 쪽(Node)에 맞춰 통일한다."""
+    src = str(pattern)
+    m = _INLINE_FLAGS_RE.match(src)
+    body = src
+    flags = re.MULTILINE | re.ASCII
+    if m:
+        letters = m.group(1)
+        if not all(c in "ims" for c in letters):
+            raise re.error(f"지원하지 않는 인라인 플래그: {letters}")
+        if "i" in letters:
+            flags |= re.IGNORECASE
+        if "s" in letters:
+            flags |= re.DOTALL
+        body = src[m.end():]
+    return re.compile(body, flags)
+
+
 def validate_schema_patterns(sources):
     """소스별 패턴의 정규식 유효성 검사 — 잘못된 정규식은 (index, pattern)로 수집(크래시 대신 보고).
     엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티)."""
@@ -1813,7 +1841,7 @@ def validate_schema_patterns(sources):
     for index, src in enumerate(sources or []):
         for p in (src or {}).get("patterns") or []:
             try:
-                re.compile(p)
+                _compile_schema_pattern(p)
             except re.error:
                 errors.append((index, str(p)))
     return errors
@@ -1827,7 +1855,7 @@ def extract_schema_entities(units):
         text = unit.get("text") or ""
         for p in unit.get("patterns") or []:
             try:
-                rx = re.compile(p)
+                rx = _compile_schema_pattern(p)
             except re.error:
                 continue
             for m in rx.finditer(text):

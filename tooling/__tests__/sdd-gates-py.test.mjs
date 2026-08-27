@@ -253,6 +253,30 @@ test("py fr: 테스트 인프라 격리(INFRA가 **/qa/** 소유) → Node·Pyth
   } finally { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-026/FR-002
+// @covers SPEC-026/FR-007
+test("py ownership entitySchemaBacking(이슈 #21 M-4/M-5): ^ 라인 앵커·(?i) 인라인 플래그·한글 \\w ASCII 일치 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL x.\n## Ownership\n- **Entities**: user, order\n- **Capabilities**: user.create, order.create\n",
+    "src/schema.prisma": "// header comment\nMODEL user {}\nmodel order {}\nmodel 사용자 {}\n",
+  };
+  const cfg = {
+    entitySchemaBackingPolicy: "hard",
+    entitySchemaSources: [{ globs: ["src/*.prisma"], patterns: ["(?i)^model (\\w+)"] }],
+  };
+  const root = fixture(files, cfg);
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    // M-4 fix: ^ 앵커가 중간 줄(header 다음)에서도 매치 → user 실재로 인정.
+    // M-5 fix: (?i) 인라인 플래그로 대문자 MODEL도 매치 → user 실재. 한글 사용자는 \w ASCII라 미매치,
+    // order는 소유 안 됐으니 무관 — 실제 위반은 없어야 한다(둘 다 실재로 판정).
+    assert.equal(py.code, 0, py.out);
+    assert.equal(nd.code, 0, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 const OWN = (id, keys) => `**Spec**: \`${id}\`\nbody mentions thing and stuff.\n## Ownership\n${keys}\n`;
 
 test("py ownership: 정규화 후 같은 키 → 중복 소유 exit 1 (Surfaces 표기 차이 흡수)", skip, () => {

@@ -36,13 +36,40 @@ export function schemaBackingInertReasons(policy, sources, roles) {
   ]);
 }
 
+// 패턴 문자열에서 선두 인라인 플래그 그룹 `(?im)` 류를 떼어내고 {body, flags}를 반환한다
+// (이슈 #21 M-4/M-5, Python 미러 `_compile_schema_pattern` — 두 엔진이 **같은 문자열 처리**를
+// 거쳐야 컴파일 결과가 갈리지 않는다). 세 가지를 여기서 고정한다:
+//   ① **m(멀티라인)은 항상 켠다.** 이전 판은 "g"만 줘서 `^model` 같은 라인 앵커가 텍스트
+//      전체의 시작에만 걸려 사실상 매치 불가 — 소스가 뭐든 추출 0건 → 소유 entity 전부가
+//      유령으로 hard 차단되고, 진단은 원인을 전혀 가리키지 못해 "일괄 면제"로 유도했다.
+//      `^`/`$` 없는 기존 패턴은 m 플래그의 영향을 받지 않으므로 순수 추가다.
+//   ② **인라인 플래그는 i·s만 인정한다**(m은 이미 기본이라 명시해도 무해). Python 전용 구문인
+//      `(?m)`을 Node가 파싱하지 못해 같은 문자열이 엔진별로 성공/에러로 갈리던 것을, 두 엔진이
+//      **직접 문자열을 파싱해 플래그로 승격**시킴으로써 없앤다 — RegExp 엔진에 그대로 맡기지 않는다.
+//   ③ 인식 못 하는 인라인 플래그(x 등)나 잘못된 정규식은 컴파일 실패로 취급 — 조용히 다른 뜻으로
+//      해석하지 않는다.
+const INLINE_FLAGS_RE = /^\(\?([a-zA-Z]+)\)/;
+export function compileSchemaPattern(pattern) {
+  const src = String(pattern);
+  let body = src;
+  let requested = "";
+  const m = INLINE_FLAGS_RE.exec(src);
+  if (m) {
+    if (![...m[1]].every((c) => "ims".includes(c))) throw new Error(`지원하지 않는 인라인 플래그: ${m[1]}`);
+    requested = m[1];
+    body = src.slice(m[0].length);
+  }
+  const flags = "gm" + [...new Set([...requested].filter((c) => c !== "m"))].join("");
+  return new RegExp(body, flags);
+}
+
 // 스키마 소스별 패턴 문자열의 정규식 유효성 검사 — 잘못된 정규식은 {index, pattern}로 수집한다
 // (게이트가 크래시하지 않고 명확히 보고하도록). 엔진별 예외 메시지는 담지 않는다(Node↔Python 패리티).
 export function validateSchemaPatterns(sources) {
   const errors = [];
   (sources || []).forEach((src, index) => {
     for (const p of (src && src.patterns) || []) {
-      try { new RegExp(p, "g"); }
+      try { compileSchemaPattern(p); }
       catch { errors.push({ index, pattern: String(p) }); }
     }
   });
@@ -57,7 +84,7 @@ export function extractSchemaEntities(units) {
   for (const { text, patterns } of units || []) {
     for (const p of patterns || []) {
       let rx;
-      try { rx = new RegExp(p, "g"); } catch { continue; }
+      try { rx = compileSchemaPattern(p); } catch { continue; }
       for (const m of String(text || "").matchAll(rx)) {
         const id = String(m[1] ?? "").trim().toLowerCase();
         if (id) set.add(id);
