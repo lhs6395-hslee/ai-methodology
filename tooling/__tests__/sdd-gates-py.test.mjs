@@ -322,6 +322,30 @@ test("py ownership entitySchemaBacking import 문·주석 라인 배제(이슈 #
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// 이슈 #21 사소 항목(entityRegistry dangling과 대칭) — 사용 안 하는 면제 항목은 조용히
+// 넘기지 않고 매 실행 경고로 표면화한다.
+test("py ownership entitySchemaBacking dangling 면제(이슈 #21 사소 항목): 사용 중은 침묵, 미사용은 경고 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** THE SYSTEM SHALL x.\n## Ownership\n- **Entities**: wizard\n- **Capabilities**: wizard.create\n",
+    "src/schema.prisma": "model user {}\n",
+  };
+  const cfg = {
+    entitySchemaBackingPolicy: "advisory",
+    entitySchemaSources: [{ globs: ["src/*.prisma"], patterns: ["^model (\\w+)"] }],
+    entitySchemaExemptEntities: { wizard: "레거시 UI 개념", ghost_leftover: "예전엔 썼는데 지금은 아무도 소유 안 함" },
+  };
+  const root = fixture(files, cfg);
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.equal(nd.code, 0, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    assert.match(nd.out, /ghost_leftover.*를 소유한 spec 없음/);
+    assert.doesNotMatch(nd.out, /"wizard"를 소유한 spec 없음/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-026/FR-010
 test("py ownership entitySchemaBacking 어댑터 매치 표본(이슈 #21 C-1): 파일별 표면화 — Node와 바이트 동일", skip, () => {
   const files = {

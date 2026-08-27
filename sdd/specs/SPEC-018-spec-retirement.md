@@ -88,6 +88,7 @@
 | 날짜 | 변경 | 근거 |
 |---|---|---|
 | 2026-07-15 | 초안 — `sdd-retire` 폐기 워크플로 + Planned 상태 + 번호 gap 재sync | 도그푸딩(소비 프로젝트 B): 폐기 경로 부재로 유령 명세·번호 gap이 리포트 노이즈로 누적, "누적 아닌 정리·삭제" 요청(설계 문서 A/D) |
+| 2026-08-27 | `sdd-retire.mjs`의 entity 역할 카테고리 파생(`ROLES.entity \|\| CATEGORIES[0]`)을 `cfg.__entCat`(sdd-config.mjs가 한 곳에서 계산) 참조로 교체 — 동작 불변, 파생 로직만 통합 | 감사 이슈 #21 사소 항목: 같은 한 줄이 check-ownership.mjs·check-spec-cohesion.mjs·이 파일 3곳에 복붙돼 있어 셋 중 하나만 고치고 나머지를 잊는 사각지대였다(SPEC-001 FR-010 파생값을 SPEC-001이 한 곳에서 내주는 구조로) [검증: tooling/__tests__/retire.test.mjs] |
 | 2026-07-15 | 증분 1 — `retire-lib.mjs`(순수 계획 코어)·`sdd-retire.mjs`(dry-run/--write) 구현 + 테스트(FR-001~004). Python 포트·FR-005(Planned)·FR-006(numbering)은 증분 2 | 자기 시연: 이 스펙 자체가 requireAccounting R3에 걸려 "새/유령 스펙 노이즈" 문제를 입증 — FR-005/006 deferred로 정직 회계 |
 | 2026-07-15 | 증분 2a — FR-005 구현: `Status: Planned` → 미커버 FR을 planned로 회계(R3 미검증 아님·"not yet implemented" 노이즈 아님). lifecycle STATUS_ENUM·verification-accounting classify·fr-coverage, Node·Python 패리티. FR-005 deferred→unit | 소비 프로젝트 B 유령 명세(0/N) 노이즈 직접 해소 — 유령이 아니라 "의도된 미구현"으로 명시 |
 | 2026-07-16 | 증분 2b — FR-006 구현: `retiredIds` config knob + `numberingIssues(specIds, retiredIds)` — 폐기 gap을 정상 retirement gap으로 취급(사고성 결번과 구분), Node·Python 패리티 + 테스트 2건. FR-006 deferred→unit → SPEC-018 6/6 완결 | 폐기 워크플로가 남기는 번호 gap이 advisory 노이즈로 재부상하지 않게 봉합 — "정리·삭제"가 잔재를 남기지 않음 |

@@ -743,6 +743,9 @@ def _build_config(user, path, root):
     cfg["__allVerbs"] = set(v.strip().lower() for v in CRUD + list(cfg.get("capabilityVerbs") or []))
     # 카테고리 역할 파생값(SPEC-001 FR-010) — Node cfg.__roles 미러(판정 코어 공유 단일 소스).
     cfg["__roles"] = resolve_category_roles(cfg.get("ownershipCategories"), cfg.get("ownershipCategoryRoles"))
+    # entity 역할 카테고리명 + 이름 폴백 — Node cfg.__entCat 미러(이슈 #21 사소 항목: 4곳 복붙 통합).
+    categories = cfg.get("ownershipCategories") or []
+    cfg["__entCat"] = cfg["__roles"].get("entity") or (categories[0] if categories else None)
     return cfg
 
 
@@ -2482,7 +2485,7 @@ def symbol_reality_findings(owned_by_spec, real_set):
 def cmd_ownership(cfg, strict):
     categories = cfg["ownershipCategories"]
     roles = cfg["__roles"]
-    ent_cat = roles["entity"] or categories[0]
+    ent_cat = cfg["__entCat"]
     # Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
     cap_cat = roles["capability"]
     cap_policy = cfg.get("capabilityOwnershipPolicy") or "advisory"
@@ -2797,7 +2800,7 @@ def cmd_ownership(cfg, strict):
         sys.exit(1)
 
     # Entity 스키마 백킹 리포트(SPEC-026) — 소유 entity가 구조 SSOT(스키마)에 실재하는가.
-    sb_errors, sb_findings, sb_exempt_used, sb_samples = [], [], [], []
+    sb_errors, sb_findings, sb_exempt_used, sb_exempt_dangling, sb_samples = [], [], [], [], []
     if sb_active:
         exempt = cfg.get("entitySchemaExemptEntities") or {}
         exempt_set = set()
@@ -2838,6 +2841,7 @@ def cmd_ownership(cfg, strict):
         slug_by_spec = ({sid: slug for sid, slug in sb_slugs} if spec_slug_source_declared(sb_sources) else None)
         sb_findings = schema_backing_findings(sb_owned, extract_schema_entities(units), exempt_set, slug_by_spec)
         sb_exempt_used = sorted(e for e in exempt_set if e in owners[ent_cat])
+        sb_exempt_dangling = sorted(e for e in exempt_set if e not in owners[ent_cat])
         sb_samples = schema_source_samples(units)
     sb_hard = sb_policy == "hard" and len(sb_findings) > 0
     if sb_active and sb_findings:
@@ -2848,6 +2852,8 @@ def cmd_ownership(cfg, strict):
     # 면제는 조용히 '완료'가 되지 않게 항상 표면화(부채·리뷰 대상). 대량 면제는 개념 단위 분할 신호.
     if sb_active and sb_exempt_used:
         print(f'Entity 스키마 백킹: 스키마 대조 면제 {len(sb_exempt_used)}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): {", ".join(sb_exempt_used)}')
+    for e in sb_exempt_dangling:
+        print(f'⚠ entitySchemaExemptEntities의 "{e}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상')
     # 어댑터 표본 — 정규식 문법은 유효해도 "구조 SSOT를 가리키는가"는 기계로 완전히 판정할 수
     # 없다(이슈 #21 C-1). 매 실행 파일별 추출 표본을 표면화해 사람 개입 지점이 승인 전에 훑어보게 한다.
     if sb_active and sb_samples:
@@ -2961,7 +2967,7 @@ def cmd_cohesion(cfg, strict):
     max_frs = cfg["maxFRsPerSpec"]
     max_agg = cfg.get("maxAggregateRootsPerSpec", 1)
     roles = cfg["__roles"]
-    ent_cat = roles["entity"] or categories[0]
+    ent_cat = cfg["__entCat"]
     files = spec_md_files(cfg)
 
     violations = []  # (spec_id, kind, n, max)

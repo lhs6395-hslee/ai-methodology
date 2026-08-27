@@ -39,7 +39,7 @@ const specFiles = () => specMdFiles(SPEC_DIR, (d) => {
 // 마지막 단계는 순수한 **위치 추측**이다(순서가 의미를 갖는다는 근거는 어디에도 없다). 이전 판은
 // 그것을 조용히 했다 — aggregate root 판정 대상이 엉뚱한 카테고리가 되어도 아무 출력이 없었다.
 // 막지 않는다(하위호환) — **추측했다는 사실을 매 실행 말한다.**
-const ENT_CAT = cfg.__roles.entity || CATEGORIES[0];
+const ENT_CAT = cfg.__entCat;
 if (!cfg.__roles.entity && CATEGORIES.length) {
   console.log(`· entity 역할을 해석하지 못해 **첫 카테고리 "${CATEGORIES[0]}"로 추측했다** — 선언도 이름 폴백도 없었다.`
     + " 순서가 의미를 갖는다는 근거는 없다: `ownershipCategoryRoles`로 entity를 선언하라(추측 위의 입도 판정은 조용히 틀린다).");

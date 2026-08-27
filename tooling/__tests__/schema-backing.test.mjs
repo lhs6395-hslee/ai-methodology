@@ -277,6 +277,20 @@ test("게이트: 스펙 디렉토리 자기참조 글롭 — 구조 오류로 ex
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// entityRegistry의 dangling 경고(registryWarns)와 대칭 — 이슈 #21 사소 항목.
+test("게이트: 소유하는 spec 없는 면제(dangling)가 매 실행 경고로 표면화된다", () => {
+  const root = fixture("advisory", { extraConfig: {
+    entityRegistry: { pjt_projects: "실 aggregate", wizard: "x" },
+    entitySchemaExemptEntities: { wizard: "레거시 UI 개념", ghost_leftover: "예전엔 썼는데 지금은 아무도 소유 안 함" } } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /스키마 대조 면제 1건/); // wizard만 사용 중으로 집계
+    assert.match(r.out, /⚠ entitySchemaExemptEntities의 "ghost_leftover"를 소유한 spec 없음 — 선등록이 아니면 정리 대상/);
+    assert.doesNotMatch(r.out, /entitySchemaExemptEntities의 "wizard"를 소유한 spec 없음/); // 사용 중은 dangling 아님
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("게이트: 어댑터 매치 표본이 파일별로 매 실행 표면화된다(이슈 #21 C-1 FR-010)", () => {
   const root = fixture("hard", { entities: "pjt_project_staff", extraConfig: {
     entityRegistry: { pjt_projects: "실 aggregate", pjt_project_staff: "실 인력 테이블" } } });

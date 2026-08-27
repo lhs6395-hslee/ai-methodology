@@ -50,7 +50,7 @@ const CATEGORIES = cfg.ownershipCategories;
 // 역할은 config 선언(ownershipCategoryRoles)에서 오고 미선언 시 이름 폴백(SPEC-001 FR-010) —
 // 이름 정규식 폴백이 3개 파일에 복붙돼 있던 것(감사 F8: 개명+순서 조합에서 엉뚱한 카테고리 조준)을 없앴다.
 const ROLES = cfg.__roles;
-const ENT_CAT = ROLES.entity || CATEGORIES[0];
+const ENT_CAT = cfg.__entCat;
 // Capability 귀속(SPEC-024) — 스펙 경계는 entity 기준: capability x.verb는 entity x 소유 스펙만.
 // entity·capability류 카테고리가 둘 다 있을 때만 활성(비-웹 카테고리 무영향).
 const CAP_CAT = ROLES.capability;
@@ -447,6 +447,7 @@ if (capHard) {
 const sbErrors = [];
 let sbFindings = [];
 let sbExemptUsed = []; // 사용 중(소유된) 면제 entity — 항상 표면화(부채, 조용한 '완료' 방지)
+let sbExemptDangling = []; // 등록됐으나 소유하는 spec이 없는 면제 — entityRegistry dangling과 대칭(이슈 #21 사소 항목)
 let sbSamples = []; // 소스 파일별 추출 표본 — 이슈 #21 C-1, 어댑터 품질의 사람 승인 근거
 if (SB_ACTIVE) {
   const EXEMPT = cfg.entitySchemaExemptEntities || {};
@@ -494,6 +495,8 @@ if (SB_ACTIVE) {
     : null;
   sbFindings = schemaBackingFindings(sbOwned, extractSchemaEntities(units), exemptSet, slugBySpec);
   sbExemptUsed = [...exemptSet].filter((e) => owners[ENT_CAT].has(e)).sort();
+  // entityRegistry dangling(registryWarns)과 대칭 — 면제만 등록·미소유는 매 실행 침묵이었다.
+  sbExemptDangling = [...exemptSet].filter((e) => !owners[ENT_CAT].has(e)).sort();
   sbSamples = schemaSourceSamples(units);
 }
 const sbHard = SB_POLICY === "hard" && sbFindings.length > 0;
@@ -509,6 +512,9 @@ if (SB_ACTIVE && sbFindings.length) {
 if (SB_ACTIVE && sbExemptUsed.length) {
   console.log(`Entity 스키마 백킹: 스키마 대조 면제 ${sbExemptUsed.length}건(부채·리뷰 대상 — UI/흐름 개념은 Surface 강등+실 entity 재키, 인프라/proto는 해당 구조 SSOT를 entitySchemaSources에 추가; 면제는 스키마 밖 실 외부 aggregate에만): ${sbExemptUsed.join(", ")}`);
 }
+// entityRegistry의 dangling 경고(registryWarns)와 대칭 — 면제는 걷어냈는데 등록만 남은 경우가
+// 조용히 사라지면 등록부가 부패해도 아무도 모른다(이슈 #21 사소 항목).
+for (const e of sbExemptDangling) console.log(`⚠ entitySchemaExemptEntities의 "${e}"를 소유한 spec 없음 — 선등록이 아니면 정리 대상`);
 // 어댑터 표본 — 정규식 문법은 유효해도 "구조 SSOT를 가리키는가"는 기계로 완전히 판정할 수
 // 없다(이슈 #21 C-1: 느슨한 어댑터 `type Wizard = {}`류). 매 실행 파일별 추출 표본을 표면화해
 // /sdd-update 등 사람 개입 지점이 새·변경 entitySchemaSources를 승인 전에 훑어보게 한다.

@@ -86,6 +86,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | `check-ownership.mjs`·`check-spec-cohesion.mjs`의 entity 역할 카테고리 파생을 `cfg.__entCat`(SPEC-001 소유, sdd-config.mjs가 한 곳에서 계산) 참조로 교체 — 동작 불변 | 감사 이슈 #21 사소 항목: 같은 파생 한 줄이 이 두 게이트와 sdd-retire.mjs(SPEC-018) 3곳에 복붙돼 사각지대였다 [검증: tooling/__tests__/schema-backing.test.mjs] |
 | 2026-08-10 | `check-fr-coverage`가 R1d·R1e의 어휘·확장자를 config에서 주입받도록 배선(`localHostPatterns`·`implModuleExtensions`·`implReferenceProseRegex` 기본값을 코어 선언에서 가져온다) | 오너 규범(하드코딩 지양) — 게이트에 인라인 문자열로 박혀 있던 기본값을 소유 코어의 export로 옮겼다. 같은 사실에 값이 둘이면 한쪽만 갱신돼 두 판정이 갈린다 [검증: tooling/__tests__/impl-reference.test.mjs] |
 | 2026-08-10 | `check-ownership`에 지원 계층 출구 배선(SPEC-024 판정 소비) + `check-sc-coverage`에 선언 형식 드리프트 표면화(SPEC-034 판정 소비) | 두 판정 모두 소유 스펙이 규범을 정하고 이 spec은 **배선만** 갖는다(품질 게이트군의 소비 지점). 형식 드리프트는 강도 무관 표면화다 — 사실의 노출은 정책이 정하는 것이 아니다 [검증: tooling/__tests__/check-ownership.test.mjs] |
 | 2026-08-27 | FR-011 신설 — 미등록 verb 판정을 `capabilityVerbPolicy`(off\|advisory\|hard, 기본 advisory)로 전역 `--strict`에서 독립시켜 hard가 `--strict` 없이도 exit 1하게 하고, `capabilityVerbs` 등록 개수를 매 실행 표면화하며, 객체형(`{동사:사유}`)의 빈 사유는 정책 무관 항상 에러(entityRegistry 패턴) | 감사 이슈 #21 E-5 — 미등록 verb는 warn 뒤 `--strict`가 있어야 exit 1인데 훅·CI 기본 호출 어디도 `--strict`를 안 넘겨 hard가 실전에서 한 번도 발화하지 않았다("등록 안 해도 통과"). 동시에 어휘 확장이 사유·흔적 없이 배열에 그냥 추가됐다(entityRegistry·entitySchemaExemptEntities·policyRatchetExceptions는 이미 사유를 요구하는데 capabilityVerbs만 예외). 형식·config 파생값은 SPEC-001 소관, 이 spec은 게이트 강도·리포트 배선만 [검증: tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |

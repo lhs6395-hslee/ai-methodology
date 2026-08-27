@@ -634,6 +634,10 @@ function buildConfig(user, path, root) {
 
   // 카테고리 역할 파생값(SPEC-001 FR-010) — 판정 코어·게이트가 공유하는 단일 소스.
   cfg.__roles = resolveCategoryRoles(cfg.ownershipCategories, cfg.ownershipCategoryRoles);
+  // entity 역할 카테고리명 + 이름 폴백(첫 카테고리) — 이전엔 이 한 줄이 check-ownership.mjs·
+  // check-spec-cohesion.mjs·sdd-retire.mjs 3곳에 복붙돼 있었다(이슈 #21 사소 항목: 셋 중 하나만
+  // 고치고 나머지를 잊는 사각지대). 한 곳에서 파생해 세 소비처가 읽기만 하게 통합.
+  cfg.__entCat = cfg.__roles.entity || cfg.ownershipCategories[0];
 
   // Verb 파생값 — capabilityVerbs는 배열(레거시)·`{동사:사유}` 객체(승격형) 둘 다 받는다.
   const CRUD = ["create", "read", "update", "delete", "list"];
