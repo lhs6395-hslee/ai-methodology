@@ -29,6 +29,14 @@ if (!globs.length) {
 // 미선언 시 이름 정규식 폴백(entit/surface/capabilit)이 적용된다.
 const SURFACE_CAT = (cfg.__roles && cfg.__roles.surface) || "Surfaces";
 const norm = (s) => s.trim().toLowerCase();
+// 글롭 메타문자(compileGlob이 인식하는 것과 동일 집합)가 있으면 리터럴이 아니라 패턴이다.
+const isGlobLike = (s) => /[*?{}]/.test(s);
+// 리터럴 선언은 경로 **경계**에서만 일치한다 — 정확히 같거나, "/"로 구분된 접두/접미사만
+// 허용(파일명만 적은 선언, 상위 디렉토리를 뺀 선언 둘 다 정당한 표기라 방향을 안 고른다).
+// 중간에서 끊기는 부분문자열은 인정하지 않는다(이슈 #21 M-1 — "src" 같은 짧은 토큰이
+// 그 문자열을 담은 모든 경로를 조용히 "선언됨"으로 만들던 결함).
+const pathBoundaryMatch = (relLower, d) =>
+  relLower === d || relLower.endsWith("/" + d) || d.endsWith("/" + relLower);
 const declared = new Set();
 const specDir = resolveFromRoot(cfg, cfg.specDir);
 for (const f of (() => { try { return readdirSync(specDir); } catch { return []; } })()) {
@@ -55,8 +63,13 @@ for (const p of walk(ROOT)) {
   const rel = p.replace(ROOT + "/", "");
   if (!globs.some((re) => re.test(rel))) continue;
   surfaces++;
-  // 표면이 선언 집합 중 하나와 일치(부분 일치 허용 — 선언은 경로로 표기)
-  const claimed = [...declared].some((d) => d === norm(rel) || norm(rel).includes(d) || d.includes(norm(rel)));
+  // 표면이 선언 집합 중 하나와 일치. 글롭 메타문자가 있으면 compileGlob으로 실제 컴파일해
+  // 대조하고(Files·specSyncExemptGlobs와 같은 글롭 문법), 리터럴 선언은 경로 **경계** 기준
+  // 접미/접두 일치만 허용한다(이슈 #21 M-1) — 중간 부분문자열 포함은 더는 인정하지 않는다.
+  // 이전 판은 `norm(rel).includes(d) || d.includes(norm(rel))`로 양방향 부분문자열을 그대로
+  // 받아, 선언에 "src" 3글자만 있어도 그 문자열을 포함하는 모든 표면이 조용히 "선언됨"으로
+  // 오판정됐다(실측: PM 프로젝트 orphan 18/23이 이 경로의 거짓양성).
+  const claimed = [...declared].some((d) => (isGlobLike(d) ? compileGlob(d).test(rel) : pathBoundaryMatch(norm(rel), d)));
   if (claimed) continue;
   if (EXEMPT.some((re) => re.test(rel))) { exempted++; continue; }
   orphans.push(rel);

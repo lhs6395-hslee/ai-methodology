@@ -44,3 +44,36 @@ test("스펙에 없는 표면 → advisory 경고(exit 0), strict 실패", () =>
   assert.match(warn.out, /orphan\/route\.ts/);
   assert.equal(run(dir, ["--strict"]).code, 1);
 });
+
+// 이슈 #21 M-1: 양방향 부분문자열 매칭이던 판은 짧은 리터럴 선언 토큰("src" 등)이
+// 그 문자열을 담은 모든 표면을 조용히 "선언됨"으로 오판정했다(실측: PM 프로젝트 18/23 거짓양성).
+test("짧은 리터럴 선언 토큰은 무관한 표면을 오판정하지 않는다(이슈 #21 M-1)", () => {
+  const dir = fixture(CFG, {
+    "src/app/unrelated/route.ts": "export {};",
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Surfaces**: src\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /orphans:1/);
+  assert.match(r.out, /unrelated\/route\.ts/);
+});
+
+test("경로 경계에서 끊기는 접두/접미 선언은 정당하게 인정된다(부분문자열이 아니라 경계)", () => {
+  const dir = fixture(CFG, {
+    "src/app/api/chat/route.ts": "export function POST() {}",
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Surfaces**: api/chat/route.ts\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /orphans:0/);
+});
+
+test("글롭 메타문자가 있는 선언은 compileGlob으로 실제 컴파일해 대조한다", () => {
+  const dir = fixture(CFG, {
+    "src/app/api/chat/route.ts": "export function POST() {}",
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Surfaces**: src/app/api/*/route.ts\n",
+  });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /orphans:0/);
+});

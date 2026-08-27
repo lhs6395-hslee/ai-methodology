@@ -4116,7 +4116,14 @@ def cmd_orphan(cfg, strict):
             continue
         surfaces += 1
         nrel = rel.strip().lower()
-        claimed = any(d == nrel or d in nrel or nrel in d for d in declared)
+        # 글롭 메타문자가 있으면 compile_glob으로 실제 컴파일해 대조하고, 리터럴 선언은 경로
+        # **경계** 기준 접두/접미 일치만 허용한다(이슈 #21 M-1, Node 미러) — 중간 부분문자열
+        # 포함은 인정하지 않는다("src" 같은 짧은 토큰이 전체를 오판정하던 결함).
+        claimed = any(
+            compile_glob(d).match(rel) if re.search(r"[*?{}]", d)
+            else (nrel == d or nrel.endswith("/" + d) or d.endswith("/" + nrel))
+            for d in declared
+        )
         if claimed:
             continue
         if any(rx.match(rel) for rx in exempt):

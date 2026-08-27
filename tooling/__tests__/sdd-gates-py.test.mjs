@@ -513,6 +513,44 @@ test("py orphan: 선언 안 된 표면 파일 → warn, --strict exit 1 / surfac
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(noop, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-003/FR-009
+test("py orphan: 짧은 리터럴 선언 토큰이 무관한 표면을 오판정하지 않는다(이슈 #21 M-1) — Node와 바이트 동일", skip, () => {
+  const files = {
+    // "src"라는 3글자 선언이 있어도, 다른 파일이 "src"를 부분문자열로 포함한다고 그걸로
+    // "선언됨" 처리되면 안 된다(실측: 부분문자열 매칭이 있던 판은 이걸 오판정으로 놓쳤다).
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Surfaces**: src\n",
+    "src/app/unrelated/route.ts": "export {};\n",
+    // 경계에서 끊기는 접미사 매칭은 여전히 정당 — "owned/route.ts"만 선언해도 그 접미사와
+    // 일치하는 실제 경로는 인정된다.
+    "src/app/owned/route.ts": "export {};\n",
+  };
+  const root = fixture(files, { surfaceGlobs: ["src/app/.*/route\\.ts$"] });
+  try {
+    const py = runPy(root, ["orphan"]);
+    const nd = runNode(root, "check-orphan-surfaces.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /orphans:2/); // "src" 짧은 토큰으론 둘 다 못 지운다
+    assert.match(py.out, /unrelated\/route\.ts/);
+    assert.match(py.out, /owned\/route\.ts/); // 접미 매칭 없이 "src" 전체선언만으론 owned도 못 지운다
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("py orphan: 경로 경계 접미사 선언은 정당하게 인정된다 — Node와 바이트 동일", skip, () => {
+  const files = {
+    "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n## Ownership\n- **Surfaces**: app/owned/route.ts\n",
+    "src/app/owned/route.ts": "export {};\n",
+  };
+  const root = fixture(files, { surfaceGlobs: ["src/app/.*/route\\.ts$"] });
+  try {
+    const py = runPy(root, ["orphan"]);
+    const nd = runNode(root, "check-orphan-surfaces.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /orphans:0/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── specsync: git 픽스처로 hard/advisory 분기 ──
 
 function gitFixture() {
