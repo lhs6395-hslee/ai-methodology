@@ -61,7 +61,7 @@
 - **Symbols**: ownership-keys.mjs, sdd-config.mjs
 - **Artifacts**: —
 - **Capabilities**: key-pipeline.parse
-- **Files**: tooling/ownership-keys.mjs, tooling/sdd-config.mjs, sdd.config.json, tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs
+- **Files**: tooling/ownership-keys.mjs, tooling/sdd-config.mjs, sdd.config.json, tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs, tooling/__tests__/ownership-combinatorial.test.mjs
 
 ## Dependencies (참조 — dedup 제외)
 > 없음 — 이 spec이 파이프라인의 뿌리다(다른 spec들이 이것을 참조).
@@ -71,6 +71,7 @@
 ## Success Criteria (측정형)
 - **SC-001**: `ownership-keys.test.mjs`·`sdd-config.test.mjs`의 모든 케이스가 통과하며(현재 green), 동일 입력에 대한 `parseSection`/`normalizeKey`/`validateKey` 결과가 100% 재현된다. [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
 - **SC-002**: config 파일이 없는 프로젝트에서 `loadConfig`가 `DEFAULTS`와 동일한 유효 config를 산출한다(하위호환 회귀 0건). [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
+- **SC-003**: Entities/Surfaces/Capabilities 소유 조합(7가지) × `surfaceFormat`(http/path/any) 21셀 전부에서 `check-ownership.mjs`·`check-spec-consistency.mjs`를 정상 구성 픽스처에 실제 실행해 형식 위반·크래시가 0건이다(단위 테스트가 아니라 실행 조합 회귀). [검증: tooling/__tests__/ownership-combinatorial.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 파이프라인은 순수 텍스트 파서로 Node 런타임만 요구하고 대상 프로젝트 언어에 비의존한다. [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-config.test.mjs]
@@ -90,6 +91,7 @@
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | 도그푸딩 픽스처 스위트(`ownership-combinatorial.test.mjs`) 신설 — Entities/Surfaces/Capabilities 소유 조합 7가지 × `surfaceFormat`(http/path/any) 3가지 = 21셀 전부에서 `check-ownership.mjs`·`check-spec-consistency.mjs`를 실제 실행해 정상 구성 스펙이 형식 위반·크래시 없이 통과하는지 확인 + 위양성 방지용 음성대조(미등록 verb는 여전히 지목) | 감사 이슈 #21 근본 원인 진단: M-11(surfaceFormat http/path 비호환)·M-12([id] 파라미터 미정규화) 같은 결함은 개별 축 단위 테스트로는 안 보이고 여러 축이 실전 조합될 때만 드러났다 — "새 규칙보다 이미 선언된 규범의 기계화"가 다음 증분의 주제여야 한다는 지적에 따라, 특정 버그 하나가 아니라 조합 공간 자체를 체계적으로 실행하는 스위트로 회귀를 잡는다 [검증: tooling/__tests__/ownership-combinatorial.test.mjs] |
 | 2026-08-27 | `loadConfig()`에 `cfg.__entCat`(entity 역할 카테고리명 + 이름 폴백) 파생값 추가 — `cfg.__roles.entity \|\| cfg.ownershipCategories[0]`를 한 곳에서 계산해 소비 게이트가 읽기만 하게 함(Python `sdd_gates.py` 동일 파생 추가) | 감사 이슈 #21 사소 항목: 이 한 줄이 check-ownership.mjs·check-spec-cohesion.mjs·sdd-retire.mjs 3곳에 복붙돼 있어 하나만 고치고 나머지를 잊는 사각지대였다 — SPEC-001 FR-010(역할 파생)이 이미 `cfg.__roles`를 한 곳에서 내주는 것과 같은 이유로 `__entCat`도 통합 [검증: tooling/__tests__/sdd-config.test.mjs] |
 | 2026-08-27 | config 표면에 `surfaceSchemePrefixes`(기본 `["event","job"]`) 추가 — FR-005 개정: `http`·`path` 두 `surfaceFormat` 모두 이 목록의 "`<scheme>:<나머지>`" 접두어를 형식 위반 없이 인정, Node·Python 패리티 | 감사 이슈 #21 M-11 — `http`는 등록 안 된 scheme(`ui:` 등)이나 파일 글롭을 거부하고 `path`는 공백을 거부해, 둘 다 커버 못 하는 실제 프로젝트(HTTP 라우트 + UI 화면 키 혼재)가 형식검증을 통째로 포기하는 `"any"`로 몰렸다(실측: 소비 프로젝트 둘 다 `any`). scheme 목록을 두 형식이 공유해, `ui:` 하나만 등록해도 `http`·`path` 어느 쪽을 쓰든 섞을 수 있다 [검증: tooling/__tests__/ownership-keys.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs] |
 | 2026-08-27 | config 표면에 `capabilityVerbPolicy`(off\|advisory\|hard, 기본 advisory) 추가 + `capabilityVerbs`가 배열(레거시)뿐 아니라 `{동사:사유}` 객체도 받도록 `__allVerbs` 파생 확장(FR-007 개정), Node·Python DEFAULTS 동시 + `RATCHETED_POLICIES`에 등재 | 감사 이슈 #21 E-5 — capabilityVerbs만 entityRegistry·entitySchemaExemptEntities·policyRatchetExceptions와 달리 사유 없이 배열에 추가할 수 있었고, 어휘가 늘어도 diff 밖 흔적이 없었다. 객체형은 entityRegistry와 동형(빈 사유는 항상 에러) — 등록이 곧 diff에 사유를 남긴다. 실제 hard 승격·게이트 배선은 SPEC-002(check-ownership.mjs) 소관 [검증: tooling/__tests__/ownership-keys.test.mjs] |
