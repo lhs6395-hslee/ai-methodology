@@ -86,10 +86,13 @@ if (!STAGED && !branchDiffOk) {
   process.exit(0);
 }
 
+// git diff --name-status의 리네임 줄(`R100\t<old>\t<new>`) — collectRenames·collectDeleted 공용.
+const RENAME_RE = /^R\d*\t(.+)\t(.+)$/;
+
 // ②b 리네임 수집(SPEC-019): 소유 파일 리네임은 semantic drift 승격 트리거.
 const renamed = new Set(); // 리네임된 새 경로
 const collectRenames = (raw) => lines(raw).forEach((ln) => {
-  const m = /^R\d*\t(.+)\t(.+)$/.exec(ln);
+  const m = RENAME_RE.exec(ln);
   if (m) renamed.add(m[2].trim());
 });
 if (branchDiffOk) collectRenames(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
@@ -103,10 +106,21 @@ if (STAGED) collectRenames(shOk("git diff --cached --name-status --find-renames"
 // 존재하는 이유 자체가 물러진다. `specSyncExemptGlobs`로 빼는 것도 답이 아니다 — 지우는 파일 때문에
 // **영구 예외**가 config에 남아 부채가 반대 방향으로 쌓인다.
 // 삭제는 "잘못 적힌 경로"도 "소유 없는 파일"도 아니다 — 세 번째 상태이므로 따로 센다.
+//
+// **리네임의 원본 경로도 같은 세 번째 상태다**(실측 제보 이슈 #27). 위 ⓐⓑ 교착이 삭제에
+// 대해서는 해소됐는데 리네임은 빠져 있었다 — collectRenames는 새 경로(m[2])만 담고 사라진
+// 원본(m[1])은 아무도 기록하지 않아, 소유 파일을 `git mv`로 옮기면 스펙이 가리키는 옛 경로가
+// (아직 index∪HEAD 어느 한쪽엔 남아 있으므로) "잘못 적힌 경로"로 오판돼 **어떤 커밋 순서로도
+// 정답이 없어졌다**(먼저 고치면 새 경로가 아직 없어서 부재, 나중에 고치면 옛 경로가 이미 없어서
+// 부재). renamed(SPEC-019 semantic drift 승격 트리거)는 그대로 둔다 — 리네임 자체는 여전히
+// 의미 변경(또는 Spec-Impact 사유)을 요구한다. 여기서 없애는 것은 잘못된 진단 하나
+// ("이 경로는 잘못 적혔다")뿐이다.
 const deleted = new Set();
 const collectDeleted = (raw) => lines(raw).forEach((ln) => {
   const m = /^D\d*\t(.+)$/.exec(ln);
-  if (m) deleted.add(m[1].trim());
+  if (m) { deleted.add(m[1].trim()); return; }
+  const r = RENAME_RE.exec(ln);
+  if (r) deleted.add(r[1].trim()); // 옮긴 것이지 잘못 적은 것이 아니다
 });
 if (branchDiffOk) collectDeleted(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
 if (STAGED) collectDeleted(shOk("git diff --cached --name-status --find-renames"));

@@ -677,6 +677,51 @@ test("삭제와 무관: 존재한 적 없는 경로를 Files에 적음(오타·�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ── 소유 파일 리네임 경로 (이슈 #27 — 삭제 해소의 미해결 분기) ──
+// 삭제(D)에 대해서는 위 ⓐⓑ 교착이 이미 해소됐는데, 리네임(R)에 대해서는 그대로 남아 있었다:
+// collectRenames가 새 경로만 담고 사라진 원본은 아무도 기록하지 않아, 소유 파일을 git mv로
+// 옮기면 스펙이 가리키는 옛 경로가 "잘못 적힌 경로"로 오판돼 **어떤 커밋 순서로도 정답이 없었다**.
+
+test("리네임: git mv + Files 정정을 한 커밋에 → 통과(이것이 정답 경로다)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts, src/lib/pdf/fold.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    writeFileSync(join(root, "src/lib/pdf/fold.ts"), "export const f = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 한 커밋에: git mv + Files 항목을 새 경로로 정정(+ Change Log)
+    g("mv", "src/lib/pdf/fold.ts", "src/lib/pdf/fold2.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/parse.ts, src/lib/pdf/fold2.ts", "| 2026-08-27 | fold → fold2 리네임 | 파일명 정리 |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename fold\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, /리터럴 경로 부재/);
+    assert.doesNotMatch(r.out, /unowned: src\/lib\/pdf\/fold2\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("리네임: 파일만 옮기고 Files 항목은 **그대로** → 여전히 차단(옛 경로는 더는 리터럴 부재가 아니지만, 새 경로가 unowned로 걸린다)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", specSyncUnownedPolicy: "error" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts, src/lib/pdf/fold.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    writeFileSync(join(root, "src/lib/pdf/fold.ts"), "export const f = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("mv", "src/lib/pdf/fold.ts", "src/lib/pdf/fold2.ts");   // 선언은 손대지 않는다
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename fold\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    // 옛 경로가 "잘못 적힌 경로"로 오진되지 않는다(그게 이 이슈의 결함이었다) — 대신 옮겨간
+    // 새 경로가 정직하게 unowned로 걸린다(선언을 안 고쳤으니 소유가 안 이어진 게 맞다).
+    assert.doesNotMatch(r.out, /리터럴 경로 부재/);
+    assert.match(r.out, /unowned: src\/lib\/pdf\/fold2\.ts/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("삭제와 무관: 신규 미소유 파일 → 여전히 차단(closed-world 유지)", () => {
   const { root, g } = repo();
   try {

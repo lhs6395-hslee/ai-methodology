@@ -641,6 +641,34 @@ test("py specsync: 소유 파일 삭제 + 같은 커밋의 Files 항목 제거 �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// ── 소유 파일 리네임 경로(이슈 #27 패리티) — 삭제 해소의 미해결 분기 ──
+// collectRenames/collect_renames는 새 경로만 담고 사라진 원본은 아무도 기록하지 않아, 소유
+// 파일을 git mv로 옮기면 스펙이 가리키는 옛 경로가 어떤 커밋 순서로도 "잘못 적힌 경로"로
+// 오판됐다(삭제 D에는 이미 있던 해소가 리네임 R에는 없었다). 두 런타임 동시 수정.
+// @covers SPEC-003/FR-010
+test("py specsync: git mv + Files 정정을 한 커밋에 → 양판 통과(리네임 원본도 삭제 경로 취급)", skip, () => {
+  const { root, g } = gitFixture();
+  try {
+    const specPath = join(root, "sdd/specs/SPEC-001.md");
+    writeFileSync(join(root, "src/lib/old.ts"), "export const old = 1;\n");
+    const spec = execFileSync("cat", [specPath], { encoding: "utf8" });
+    writeFileSync(specPath, spec.replace("- **Files**: src/lib/**", "- **Files**: src/lib/a.ts, src/lib/old.ts"));
+    g("add", "-A"); g("commit", "-qm", "own old");
+    // 한 커밋에: git mv + Files 항목을 새 경로로 정정(+ Change Log)
+    g("mv", "src/lib/old.ts", "src/lib/old2.ts");
+    const spec2 = execFileSync("cat", [specPath], { encoding: "utf8" });
+    writeFileSync(specPath, spec2.replace("src/lib/old.ts", "src/lib/old2.ts") + "| 2026-08-27 | old → old2 리네임 | 파일명 정리 |\n");
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename old\n");
+    const p = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    const n = runNode(root, "check-spec-sync.mjs", ["--staged", "--message-file", "msg"]);
+    assert.equal(p.code, 0, p.out);
+    assert.equal(p.code, n.code, `exit code 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.equal(p.out, n.out, `출력 불일치\npy:${p.out}\nnode:${n.out}`);
+    assert.doesNotMatch(p.out, /리터럴 경로 부재/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── 검증 실행 회계(SPEC-041 패리티) ──────────────────────────────────────────
 test("py verifyrun: 원장 미선언 INERT · 침묵 차단 · 사유 있는 포기 통과 — Node와 바이트 동일", skip, () => {
   const mk = (config) => {

@@ -4231,12 +4231,15 @@ def cmd_specsync(cfg, staged, msg_file, base):
     if not staged and not branch_diff_ok:
         sys.exit(0)
 
+    # git diff --name-status의 리네임 줄(`R100\t<old>\t<new>`) — collect_renames·collect_deleted 공용.
+    RENAME_RE = r"^R\d*\t(.+)\t(.+)$"
+
     # ②b 리네임 수집(SPEC-019): 소유 파일 리네임은 semantic drift 승격 트리거.
     renamed = set()
 
     def collect_renames(raw):
         for ln in lines(raw):
-            m = re.match(r"^R\d*\t(.+)\t(.+)$", ln)
+            m = re.match(RENAME_RE, ln)
             if m:
                 renamed.add(m.group(2).strip())
     if branch_diff_ok:
@@ -4246,6 +4249,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
 
     # ②c 삭제 경로(SPEC-003 FR-010 개정) — 삭제는 "잘못 적힌 경로"도 "소유 없는 파일"도 아닌 세 번째 상태다.
     # 두 검사가 changeset을 추가·수정만으로 가정해 **소유 파일을 지우는 정답 경로가 아예 없었다**.
+    #
+    # 리네임의 원본 경로도 같은 세 번째 상태다(이슈 #27) — collect_renames는 새 경로만 담고
+    # 사라진 원본은 아무도 기록하지 않아, 소유 파일을 git mv로 옮기면 스펙이 가리키는 옛 경로가
+    # 어떤 커밋 순서로도 "잘못 적힌 경로"로 오판됐다. Node 판(check-spec-sync.mjs)과 동일 수정.
     deleted_paths = set()
 
     def collect_deleted(raw):
@@ -4253,6 +4260,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
             m = re.match(r"^D\d*\t(.+)$", ln)
             if m:
                 deleted_paths.add(m.group(1).strip())
+                continue
+            r = re.match(RENAME_RE, ln)
+            if r:
+                deleted_paths.add(r.group(1).strip())  # 옮긴 것이지 잘못 적은 것이 아니다
 
     if branch_diff_ok:
         collect_deleted(_git(cfg, ["diff", "--name-status", "--find-renames", f"{base}...HEAD"]))
