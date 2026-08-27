@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 61건
+## Entity 키 (aggregate root) — 62건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -43,6 +43,7 @@
 | `derivation-accounting` | SPEC-009 | ✓ | ✓ | ✓ |
 | `diagnosis-guard` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic` | SPEC-038 | ✓ | ✓ | ✓ |
+| `enforcement-reachability` | SPEC-061 | ✓ | ✓ | ✓ |
 | `engine-event` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing` | SPEC-026 | ✓ | ✓ | ✓ |
@@ -90,7 +91,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 116건
+## Surface 키 — 118건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -110,6 +111,7 @@
 | `check-derivation.mjs` | SPEC-009 | ✓ | ✓ | ✓ |
 | `check-diagnosis-guard.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `check-duplicate-logic.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
+| `check-enforcement-reachability.mjs` | SPEC-061 | ✓ | ✓ | ✓ |
 | `check-engine-event.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `check-evidence.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `check-fr-coverage.mjs` | SPEC-002 | ✓ | ✓ | ✓ |
@@ -147,6 +149,7 @@
 | `diagnosis-guard-lib.mjs` | SPEC-053 | ✓ | ✓ | ✓ |
 | `drift-lib.mjs` | SPEC-019 | ✓ | ✓ | ✓ |
 | `duplicate-logic-lib.mjs` | SPEC-038 | ✓ | ✓ | ✓ |
+| `enforcement-reachability-lib.mjs` | SPEC-061 | ✓ | ✓ | ✓ |
 | `engine-event-lib.mjs` | SPEC-030 | ✓ | ✓ | ✓ |
 | `evidence-lib.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `evidence-scope-lib.mjs` | SPEC-043 | ✓ | ✓ | ✓ |
@@ -211,7 +214,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 63건
+## Capability 키 — 64건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -230,6 +233,7 @@
 | `derivation-accounting.account` | SPEC-009 | ✓ | ✓ | ✓ |
 | `diagnosis-guard.expose` | SPEC-053 | ✓ | ✓ | ✓ |
 | `duplicate-logic.judge` | SPEC-038 | ✓ | ✓ | ✓ |
+| `enforcement-reachability.judge` | SPEC-061 | ✓ | ✓ | ✓ |
 | `engine-event.judge` | SPEC-030 | ✓ | ✓ | ✓ |
 | `entity-relations.resolve` | SPEC-017 | ✓ | ✓ | ✓ |
 | `entity-schema-backing.judge` | SPEC-026 | ✓ | ✓ | ✓ |
@@ -304,7 +308,7 @@
 
 ## 집계
 
-- 소유 키 총 **258건** (entity 61 · surface 116 · capability 63 · 역할없음 18)
+- 소유 키 총 **262건** (entity 62 · surface 118 · capability 64 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건
