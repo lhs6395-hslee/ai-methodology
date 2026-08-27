@@ -221,6 +221,86 @@ export function classifyExemptionRatchet(baseCfg, curCfg, declaredKnobs = null, 
   return { grown, allowedGrowth };
 }
 
+// ─── 구조적 knob 래칫 (SPEC-027 확장, 이슈 #21 A-3) ──────────────────────────
+// 강도(off/advisory/hard)도 상한(RATCHETED_LIMITS)도 면제 개수(exemption ratchet)도
+// 아닌 네 번째 축 — "감시·강제의 범위 자체"를 정의하는 knob. 실측(이슈 #21 A-3):
+// `policyRatchetPolicy: hard`를 유지한 채로 21개 knob(entityRegistry:{}·ignoreDirs+=
+// "src"·specDir 재지정 등)을 한 커밋에 바꿔도 `violations:0 · exit 0` — 이 축을 보는
+// 코드가 없었다. 세 모양으로 나뉜다(각각 "완화"의 방향이 다르다):
+//
+//   (a) 원소가 줄면 완화 — 등록·허용 목록이 비워지면(또는 줄면) 그 목록이 강제하던 항목의
+//       보호가 사라진다. entityRegistry({}로 붕괴 = 등록 요구 전체 비활성),
+//       relationTypes([]=무제한 — 감사로 교정된 전제: 무제한인 것은 이 knob뿐),
+//       strictSpecs(제거된 spec은 그 즉시 strict 미적용), testFileRegex(패턴이 줄면
+//       그만큼 파일이 "테스트 아님"으로 검증 회계에서 빠진다).
+//   (b) 원소가 늘면 완화 — 배제·정당화 범위가 넓어질수록 게이트가 보지 않는 표면이 커진다.
+//       ignoreDirs(순회 자체에서 제외 — 위반을 "안 본 것"으로 만든다),
+//       retiredIds(번호 결번 정당화 사유가 임의로 늘면 진짜 결번과 구분할 신호가 없다).
+//   (c) 포인터/리다이렉션 knob — "약해짐"의 방향 자체가 없다(개명은 정당할 수 있다).
+//       그러나 이 값이 강제 지점을 결정하므로 base 대비 **변경 자체**를 표면화해야 한다
+//       (완전 차단이 아니라 확인 요구 — policyRatchetExceptions로 승인하면 조용해진다,
+//       기존 강도·상한 래칫과 같은 탈출구). specDir(스펙 디렉터리 재지정으로 판정 대상
+//       축소) · smokeManifest/derivationManifest(null로 되돌리면 그 회계가 게이트
+//       no-op) · specSyncBase(base ref를 조작하면 diff 자체가 빈다) · commands.test
+//       ("true" 같은 무판정 명령으로 교체하면 runTests hard가 항상 green).
+//
+// capabilityVerbs는 의도적으로 이 목록에서 뺐다 — growth 자체가 "동사 등록"이라는
+// 정상 행위와 구분 안 되고, 그 정합적 해소(사유 필드 승격 + 미등록 hard화)는 별도
+// 과제(이슈 #21 E-5/E-6)의 몫이라 여기서 손대면 두 해법이 겹친다.
+export const RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex"];
+export const RATCHETED_SETS_GROW = ["ignoreDirs", "retiredIds"];
+export const RATCHETED_POINTERS = ["specDir", "smokeManifest", "derivationManifest", "specSyncBase", "commands.test"];
+
+function pointerValue(cfg, dotted) {
+  return dotted.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), cfg);
+}
+
+// 배열은 length, 객체(레지스트리류)는 키 개수, 그 외(null 등)는 0 — RATCHETED_LIMITS의
+// numOf와 동형으로 "판정 가능한 크기"만 뽑는다.
+function setSize(v) {
+  if (Array.isArray(v)) return v.length;
+  if (v && typeof v === "object") return Object.keys(v).length;
+  return 0;
+}
+
+// base config 대비 current config에서 감시 표면이 좁아진 knob을 분류한다.
+// classifyRatchet·classifyExemptionRatchet과 같은 모양(violations/allowedDowngrades,
+// exceptions는 policyRatchetExceptions 재사용) — 세 번째 래칫이 아니라 같은 래칫의 확장이다.
+export function classifyStructuralRatchet(baseCfg, curCfg, exceptions = []) {
+  const ex = new Set(exceptions || []);
+  const violations = [];
+  const allowedDowngrades = [];
+  const push = (knob, from, to, kind) => {
+    const rec = { knob, from, to, kind };
+    (ex.has(knob) ? allowedDowngrades : violations).push(rec);
+  };
+  for (const knob of RATCHETED_SETS_SHRINK) {
+    if (!baseCfg || !(knob in baseCfg)) continue; // base 미존재 = 래칫 기준 없음(하위호환)
+    const from = setSize(baseCfg[knob]);
+    const to = setSize(curCfg ? curCfg[knob] : undefined);
+    if (to < from) push(knob, from, to, "set-shrink");
+  }
+  for (const knob of RATCHETED_SETS_GROW) {
+    if (!baseCfg || !(knob in baseCfg)) continue;
+    const from = setSize(baseCfg[knob]);
+    const to = setSize(curCfg ? curCfg[knob] : undefined);
+    if (to > from) push(knob, from, to, "set-grow");
+  }
+  for (const knob of RATCHETED_POINTERS) {
+    const from = baseCfg ? pointerValue(baseCfg, knob) : undefined;
+    if (from === undefined) continue; // base가 이 포인터를 모르면 판정 밖(하위호환)
+    const to = pointerValue(curCfg || {}, knob);
+    if (JSON.stringify(from) !== JSON.stringify(to)) push(knob, from, to, "pointer-changed");
+  }
+  return { violations, allowedDowngrades };
+}
+
+export const STRUCTURAL_FINDING_TEXT = Object.freeze({
+  "set-shrink": "감시·강제 대상 집합이 줄었다 — 래칫은 늘어나는(또는 유지되는) 방향만 허용한다",
+  "set-grow": "배제·정당화 범위가 늘었다 — 그만큼 게이트가 보지 않는 표면이 커진다",
+  "pointer-changed": "강제 지점을 결정하는 값이 base 대비 바뀌었다 — 정당한 개명일 수 있으나 확인 없이 조용히 넘어가지 않는다",
+});
+
 export const EXEMPTION_FINDING_TEXT = Object.freeze({
   unregistered: "면제가 **사유·분류 없이** 존재한다 — `exemptionRegistry`에 등록하라(넷이 없는 면제는 이월이 아니라 방치다)",
   "bad-kind": `면제 종류가 ${EXEMPTION_KINDS.join("|")} 중 하나가 아니다 — boundary(구조적·영구) / debt(임시 부채)로 분류하라`,

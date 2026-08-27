@@ -1193,6 +1193,17 @@ test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·�
     [{ policyRatchetPolicy: "hard" }, { policyRatchetPolicy: "off", policyRatchetExceptions: ["policyRatchetPolicy"] }, "main"],
     [{ frKeyAnchorPolicy: "hard", policyRatchetPolicy: "off" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "off" }, "main"],
     [{ frKeyAnchorPolicy: "hard", policyRatchetPolicy: "off" }, { frKeyAnchorPolicy: "advisory", policyRatchetPolicy: "hard" }, "main"],
+    // 구조 knob 래칫(이슈 #21 A-3): entityRegistry가 {}로 붕괴 → 등록 요구 전체 비활성.
+    [{ policyRatchetPolicy: "hard", entityRegistry: { wizard: "aggregate" } }, { policyRatchetPolicy: "hard", entityRegistry: {} }, "main"],
+    // ignoreDirs 확장 + commands.test 무력화가 한 커밋에 같이 옴.
+    [{ policyRatchetPolicy: "hard", ignoreDirs: ["node_modules"], commands: { test: "npm test" } },
+      { policyRatchetPolicy: "hard", ignoreDirs: ["node_modules", "src"], commands: { test: "true" } }, "main"],
+    // specDir 재지정도 예외 선언하면 부채로만 표면화(exit 0).
+    [{ policyRatchetPolicy: "hard", specDir: "sdd/specs" },
+      { policyRatchetPolicy: "hard", specDir: "specs", policyRatchetExceptions: ["specDir"] }, "main"],
+    // relationTypes·strictSpecs 축소는 위반, retiredIds 확장도 위반 — 셋이 같은 커밋.
+    [{ policyRatchetPolicy: "hard", relationTypes: ["has-many"], strictSpecs: ["SPEC-001"], retiredIds: [] },
+      { policyRatchetPolicy: "hard", relationTypes: [], strictSpecs: [], retiredIds: ["CICD-005"] }, "main"],
   ];
   for (const [baseCfg, curCfg, base] of scen) {
     const root = mkdtempSync(join(tmpdir(), "sdd-py-ratchet-"));

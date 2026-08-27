@@ -11,7 +11,7 @@ import { loadConfig, configFromString } from "./sdd-config.mjs";
 import {
   classifyRatchet, effectiveRatchetPolicy,
   exemptionFindings, classifyExemptionRatchet, exemptionKnobs, exemptionEntries,
-  EXEMPTION_FINDING_TEXT,
+  EXEMPTION_FINDING_TEXT, classifyStructuralRatchet, STRUCTURAL_FINDING_TEXT,
 } from "./policy-ratchet-lib.mjs";
 
 import { armVerdict, verdict, judged, VERDICT_KINDS } from "./verdict-lib.mjs";
@@ -103,13 +103,24 @@ for (const f of exFindings.slice(0, 20)) {
 }
 if (exFindings.length > 20) console.log(`   … 외 ${exFindings.length - 20}건`);
 
-const totalViolations = violations.length + exBlocking.length + grown.length;
+// ── 구조적 knob 래칫 — 강도·상한·면제개수 어디에도 안 잡히는 "감시 표면" 축(이슈 #21 A-3).
+const { violations: structViolations, allowedDowngrades: structAllowed } = classifyStructuralRatchet(baseCfg, cfg, cfg.policyRatchetExceptions || []);
+console.log(`구조 래칫: 감시 표면 축소 ${structViolations.length}건 · 허용된 축소 ${structAllowed.length}건`);
+for (const d of structAllowed) {
+  console.log(`  · [부채] ${d.knob}: ${JSON.stringify(d.from)} → ${JSON.stringify(d.to)} (policyRatchetExceptions로 허용됨 — 재승격 대상)`);
+}
+for (const v of structViolations) {
+  console.log(`  · ${v.knob}: ${JSON.stringify(v.from)} → ${JSON.stringify(v.to)} — ${STRUCTURAL_FINDING_TEXT[v.kind]}. 정당한 변경이면 policyRatchetExceptions에 "${v.knob}" 선언(부채로 표면화)`);
+}
+
+const totalViolations = violations.length + exBlocking.length + grown.length + structViolations.length;
 judged(totalViolations);
 if (totalViolations) {
   const parts = [];
   if (violations.length) parts.push("강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화)");
   if (exBlocking.length) parts.push("면제가 사유·분류 없이 존재한다(넷이 없는 면제는 이월이 아니라 방치다)");
   if (grown.length) parts.push("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)");
+  if (structViolations.length) parts.push("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정)");
   const msg = `정책 래칫 위반 — ${parts.join(" / ")}. 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).`;
   if (HARD) { console.error(`\n✗ ${msg}`); process.exit(1); }
   console.log(`\n⚠ ${msg} (policyRatchetPolicy:advisory — 경고)`);

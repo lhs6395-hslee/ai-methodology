@@ -602,6 +602,70 @@ def classify_ratchet(base_cfg, cur_cfg, exceptions=None):
     return violations, allowed
 
 
+# 구조적 knob 래칫(SPEC-027 확장, 이슈 #21 A-3) — policy-ratchet-lib.mjs classifyStructuralRatchet 미러.
+# capabilityVerbs는 의도적으로 제외(성장=정상 등록과 구분 불가, E-5/E-6 별도 과제).
+RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex"]
+RATCHETED_SETS_GROW = ["ignoreDirs", "retiredIds"]
+RATCHETED_POINTERS = ["specDir", "smokeManifest", "derivationManifest", "specSyncBase", "commands.test"]
+
+STRUCTURAL_FINDING_TEXT = {
+    "set-shrink": "감시·강제 대상 집합이 줄었다 — 래칫은 늘어나는(또는 유지되는) 방향만 허용한다",
+    "set-grow": "배제·정당화 범위가 늘었다 — 그만큼 게이트가 보지 않는 표면이 커진다",
+    "pointer-changed": "강제 지점을 결정하는 값이 base 대비 바뀌었다 — 정당한 개명일 수 있으나 확인 없이 조용히 넘어가지 않는다",
+}
+
+
+def _pointer_value(cfg, dotted):
+    cur = cfg
+    for part in dotted.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def _set_size(v):
+    if isinstance(v, list):
+        return len(v)
+    if isinstance(v, dict):
+        return len(v)
+    return 0
+
+
+def classify_structural_ratchet(base_cfg, cur_cfg, exceptions=None):
+    """감시 표면 축(등록 목록 축소·배제 목록 확장·강제 지점 재지정) — 세 방향의 판정을 합쳐
+    반환한다(policy-ratchet-lib.mjs classifyStructuralRatchet 미러)."""
+    ex = set(exceptions or [])
+    violations, allowed = [], []
+
+    def push(knob, frm, to, kind):
+        rec = {"knob": knob, "from": frm, "to": to, "kind": kind}
+        (allowed if knob in ex else violations).append(rec)
+
+    for knob in RATCHETED_SETS_SHRINK:
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = _set_size(base_cfg.get(knob))
+        to = _set_size(cur_cfg.get(knob) if cur_cfg else None)
+        if to < frm:
+            push(knob, frm, to, "set-shrink")
+    for knob in RATCHETED_SETS_GROW:
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = _set_size(base_cfg.get(knob))
+        to = _set_size(cur_cfg.get(knob) if cur_cfg else None)
+        if to > frm:
+            push(knob, frm, to, "set-grow")
+    for knob in RATCHETED_POINTERS:
+        frm = _pointer_value(base_cfg, knob) if base_cfg else None
+        if frm is None:
+            continue
+        to = _pointer_value(cur_cfg or {}, knob)
+        if json.dumps(frm, sort_keys=True, ensure_ascii=False) != json.dumps(to, sort_keys=True, ensure_ascii=False):
+            push(knob, frm, to, "pointer-changed")
+    return violations, allowed
+
+
 def find_config(start):
     d = start
     while True:
@@ -5381,7 +5445,14 @@ def cmd_ratchet(cfg, base_arg):
     if len(ex_findings) > 20:
         print(f"   … 외 {len(ex_findings) - 20}건")
 
-    total_violations = len(violations) + len(ex_blocking) + len(grown)
+    struct_violations, struct_allowed = classify_structural_ratchet(base_cfg, cfg, cfg.get("policyRatchetExceptions") or [])
+    print(f"구조 래칫: 감시 표면 축소 {len(struct_violations)}건 · 허용된 축소 {len(struct_allowed)}건")
+    for d in struct_allowed:
+        print(f'  · [부채] {d["knob"]}: {json.dumps(d["from"], ensure_ascii=False)} → {json.dumps(d["to"], ensure_ascii=False)} (policyRatchetExceptions로 허용됨 — 재승격 대상)')
+    for v in struct_violations:
+        print(f'  · {v["knob"]}: {json.dumps(v["from"], ensure_ascii=False)} → {json.dumps(v["to"], ensure_ascii=False)} — {STRUCTURAL_FINDING_TEXT[v["kind"]]}. 정당한 변경이면 policyRatchetExceptions에 "{v["knob"]}" 선언(부채로 표면화)')
+
+    total_violations = len(violations) + len(ex_blocking) + len(grown) + len(struct_violations)
     judged(total_violations)
     if total_violations:
         parts = []
@@ -5391,6 +5462,8 @@ def cmd_ratchet(cfg, base_arg):
             parts.append("면제가 사유·분류 없이 존재한다(넷이 없는 면제는 이월이 아니라 방치다)")
         if grown:
             parts.append("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)")
+        if struct_violations:
+            parts.append("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정)")
         msg = ("정책 래칫 위반 — " + " / ".join(parts)
                + ". 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).")
         if hard:

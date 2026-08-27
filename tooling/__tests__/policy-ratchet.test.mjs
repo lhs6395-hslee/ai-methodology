@@ -368,3 +368,101 @@ test("킷의 면제 전부가 분류·사유를 갖는다(도그푸딩) — 등�
     .filter((x) => x.kind !== "stale-record");
   assert.deepEqual(f, [], `킷 면제에 미등록·형식 위반이 남아 있다:\n${JSON.stringify(f, null, 2)}`);
 });
+
+// ── 구조적 knob 래칫(SPEC-027 확장, 이슈 #21 A-3) — 강도·상한·면제개수 어디에도 안 잡히던
+//    "감시 표면" 축. policyRatchetPolicy:hard를 유지한 채 entityRegistry:{}·ignoreDirs
+//    확장·specDir 재지정 등을 한 커밋에 적용해도 기존 세 래칫은 violations:0이었다.
+// @covers SPEC-027/FR-010
+import { classifyStructuralRatchet, RATCHETED_SETS_SHRINK, RATCHETED_SETS_GROW, RATCHETED_POINTERS, STRUCTURAL_FINDING_TEXT } from "../policy-ratchet-lib.mjs";
+
+test("구조 래칫: 등록 목록이 줄면(entityRegistry 등) 위반, 늘면 통과", () => {
+  const base = { entityRegistry: { a: "r", b: "r" }, relationTypes: ["has-many"] };
+  const shrunk = classifyStructuralRatchet(base, { entityRegistry: { a: "r" }, relationTypes: [] }, []);
+  assert.deepEqual(shrunk.violations.map((v) => v.knob).sort(), ["entityRegistry", "relationTypes"]);
+  const grown = classifyStructuralRatchet(base, { entityRegistry: { a: "r", b: "r", c: "r" }, relationTypes: ["has-many", "belongs-to"] }, []);
+  assert.deepEqual(grown.violations, []);
+});
+
+test("구조 래칫: entityRegistry가 {}로 붕괴하면 위반 — 등록 요구 전체 비활성화(이슈 #21 A-3 실측)", () => {
+  const r = classifyStructuralRatchet({ entityRegistry: { wizard: "aggregate" } }, { entityRegistry: {} }, []);
+  assert.deepEqual(r.violations, [{ knob: "entityRegistry", from: 1, to: 0, kind: "set-shrink" }]);
+});
+
+test("구조 래칫: 배제 목록이 늘면(ignoreDirs·retiredIds) 위반, 줄면 통과", () => {
+  const base = { ignoreDirs: ["node_modules"], retiredIds: [] };
+  const grown = classifyStructuralRatchet(base, { ignoreDirs: ["node_modules", "src"], retiredIds: ["CICD-005"] }, []);
+  assert.deepEqual(grown.violations.map((v) => v.knob).sort(), ["ignoreDirs", "retiredIds"]);
+  const shrunk = classifyStructuralRatchet({ ignoreDirs: ["node_modules", "src"] }, { ignoreDirs: ["node_modules"] }, []);
+  assert.deepEqual(shrunk.violations, []);
+});
+
+test("구조 래칫: 포인터 knob(specDir·commands.test 등)이 base 대비 바뀌면 위반 — 방향 무관, 변경 자체가 신호", () => {
+  const base = { specDir: "sdd/specs", commands: { test: "npm test" }, specSyncBase: null };
+  const r = classifyStructuralRatchet(base, { specDir: "sdd/specs", commands: { test: "true" }, specSyncBase: null }, []);
+  assert.deepEqual(r.violations, [{ knob: "commands.test", from: "npm test", to: "true", kind: "pointer-changed" }]);
+});
+
+test("구조 래칫: policyRatchetExceptions 선언 시 부채로만 표면화 — 정당한 재지정 출구", () => {
+  const r = classifyStructuralRatchet({ specDir: "sdd/specs" }, { specDir: "specs" }, ["specDir"]);
+  assert.deepEqual(r.violations, []);
+  assert.deepEqual(r.allowedDowngrades, [{ knob: "specDir", from: "sdd/specs", to: "specs", kind: "pointer-changed" }]);
+});
+
+test("구조 래칫: base에 knob이 없으면 판정 밖(하위호환) — capabilityVerbs는 목록 밖(E-5/E-6 별도 과제)", () => {
+  assert.deepEqual(classifyStructuralRatchet({}, { entityRegistry: {}, ignoreDirs: ["x"] }, []).violations, []);
+  assert.ok(!RATCHETED_SETS_SHRINK.includes("capabilityVerbs"));
+  assert.ok(!RATCHETED_SETS_GROW.includes("capabilityVerbs"));
+});
+
+test("구조 래칫: 세 종류 판정 문구가 전부 있다", () => {
+  for (const k of ["set-shrink", "set-grow", "pointer-changed"]) {
+    assert.ok(String(STRUCTURAL_FINDING_TEXT[k] || "").length > 5, `${k} 문구 없음`);
+  }
+});
+
+test("게이트 e2e: entityRegistry:{} 로 등록 요구를 꺼도 policyRatchetPolicy:hard가 지목한다(이슈 #21 A-3 재현)", () => {
+  const root = gitRepo(
+    { policyRatchetPolicy: "hard", entityRegistry: { wizard: "aggregate" } },
+    { policyRatchetPolicy: "hard", entityRegistry: {} });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /entityRegistry: 1 → 0/);
+    assert.match(r.out, /감시·강제 대상 집합이 줄었다/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 e2e: ignoreDirs 확장·commands.test 무력화도 hard에서 지목된다", () => {
+  const root = gitRepo(
+    { policyRatchetPolicy: "hard", ignoreDirs: ["node_modules"], commands: { test: "npm test" } },
+    { policyRatchetPolicy: "hard", ignoreDirs: ["node_modules", "src"], commands: { test: "true" } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /ignoreDirs: 1 → 2/);
+    assert.match(r.out, /commands\.test: "npm test" → "true"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 e2e: 구조 래칫 위반도 예외 선언이면 부채로 표면화되고 exit 0", () => {
+  const root = gitRepo(
+    { policyRatchetPolicy: "hard", specDir: "sdd/specs" },
+    { policyRatchetPolicy: "hard", specDir: "specs", policyRatchetExceptions: ["specDir"],
+      exemptionRegistry: { policyRatchetExceptions: { specDir: { kind: "debt", reason: "테스트 픽스처", clearBy: "픽스처 제거 시", due: "2026-12-31", acceptor: "테스트" } } } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /\[부채\] specDir: "sdd\/specs" → "specs"/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("게이트 e2e: 아무 것도 안 바뀌면 구조 래칫도 조용하다(하위호환)", () => {
+  const root = gitRepo(
+    { policyRatchetPolicy: "advisory", entityRegistry: { a: "r" } },
+    { policyRatchetPolicy: "advisory", entityRegistry: { a: "r" } });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /구조 래칫: 감시 표면 축소 0건/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
