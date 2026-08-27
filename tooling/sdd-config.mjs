@@ -65,6 +65,11 @@ export const DEFAULTS = {
   // 신호 → 분할 권고(advisory). 카테고리명 무관(ownershipCategories 따름).
   maxKeysPerCategoryPerSpec: 4,
   maxFRsPerSpec: 8,
+  // cohesion 강도 knob(이슈 #21 M-9) — off|advisory|hard. 이전엔 --strict CLI 플래그로만
+  // 강도를 받아 다른 축 전부가 쓰는 선언적 config knob이 없었다(update.md graduation이
+  // 승격을 권할 대상 자체가 없었다는 뜻). 기본 advisory — 게이트는 이 knob 없이도 항상
+  // 평가해 왔으므로(무조건 실행) 미선언 시 그 기존 동작을 그대로 보존한다.
+  specCohesionPolicy: "advisory",
   // cohesion: 한 spec이 소유 가능한 aggregate root(Entity 키) 최대 수. 기본 1(1 spec = 1 aggregate).
   // aggregate 루트 + 그 자식 표들을 한 spec이 함께 소유하는 모델이면 상향(자식은 별도 root 아님).
   maxAggregateRootsPerSpec: 1,

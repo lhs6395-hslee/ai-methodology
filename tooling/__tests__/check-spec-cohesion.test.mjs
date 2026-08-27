@@ -25,6 +25,42 @@ function run(dir, args = []) {
 }
 const CFG = { specDir: "sdd/specs", maxKeysPerCategoryPerSpec: 4, maxFRsPerSpec: 8 };
 
+// specCohesionPolicy(off|advisory|hard) — 이슈 #21 M-9: 이전엔 --strict CLI 플래그로만
+// 강도를 받아 다른 축 전부가 쓰는 선언적 config knob이 없었다.
+test("specCohesionPolicy: 미선언은 기존 동작(무조건 평가·advisory) 그대로 — 하위호환", () => {
+  const frs = Array.from({ length: 9 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const dir = fixture(CFG, { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n` });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /SPEC-001/);
+});
+
+test("specCohesionPolicy: off는 평가 자체를 건너뛴다", () => {
+  const frs = Array.from({ length: 9 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const dir = fixture({ ...CFG, specCohesionPolicy: "off" }, { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n` });
+  const r = run(dir);
+  assert.equal(r.code, 0);
+  assert.match(r.out, /specCohesionPolicy:off/);
+  assert.doesNotMatch(r.out, /SPEC-001/);
+});
+
+test("specCohesionPolicy: hard는 --strict 없이도 exit 1 — advisory는 exit 0 유지", () => {
+  const frs = Array.from({ length: 9 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const files = { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n` };
+  const hard = run(fixture({ ...CFG, specCohesionPolicy: "hard" }, files));
+  assert.equal(hard.code, 1, hard.out);
+  assert.match(hard.out, /specCohesionPolicy=hard/);
+  const advisory = run(fixture({ ...CFG, specCohesionPolicy: "advisory" }, files));
+  assert.equal(advisory.code, 0, advisory.out);
+});
+
+test("specCohesionPolicy: enum 밖 값 → exit 1", () => {
+  const dir = fixture({ ...CFG, specCohesionPolicy: "strict" }, { "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n**FR-001** a\n" });
+  const r = run(dir);
+  assert.equal(r.code, 1);
+  assert.match(r.out, /specCohesionPolicy 값 위반/);
+});
+
 test("응집된 spec(키·FR 기준 내) → 통과", () => {
   const dir = fixture(CFG, {
     "sdd/specs/SPEC-001.md":

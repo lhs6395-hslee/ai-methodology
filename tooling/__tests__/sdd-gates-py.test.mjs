@@ -508,6 +508,38 @@ test("py cohesion: aggregate root(Entities) 2개 > maxAggregateRootsPerSpec(1) �
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// specCohesionPolicy(off|advisory|hard, 이슈 #21 M-9) — Node↔Python 바이트 동일.
+// supportLayerSpecs는 안 씀(Python cmd_cohesion 미구현 — 별도 기존 격차, 이 변경과 무관).
+test("py cohesion specCohesionPolicy(이슈 #21 M-9): off·hard·enum 밖 — Node와 바이트 동일", skip, () => {
+  const frs = Array.from({ length: 9 }, (_, i) => `**FR-${String(i + 1).padStart(3, "0")}** x`).join("\n");
+  const files = { "sdd/specs/SPEC-001.md": `**Spec**: \`SPEC-001\`\n${frs}\n` };
+
+  const offRoot = fixture(files, { specCohesionPolicy: "off" });
+  try {
+    const py = runPy(offRoot, ["cohesion"]);
+    const nd = runNode(offRoot, "check-spec-cohesion.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일(off)");
+  } finally { rmSync(offRoot, { recursive: true, force: true }); }
+
+  const hardRoot = fixture(files, { specCohesionPolicy: "hard" });
+  try {
+    const py = runPy(hardRoot, ["cohesion"]);
+    const nd = runNode(hardRoot, "check-spec-cohesion.mjs", []);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일(hard)");
+  } finally { rmSync(hardRoot, { recursive: true, force: true }); }
+
+  const badRoot = fixture(files, { specCohesionPolicy: "strict" });
+  try {
+    const py = runPy(badRoot, ["cohesion"]);
+    const nd = runNode(badRoot, "check-spec-cohesion.mjs", []);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일(enum 밖)");
+  } finally { rmSync(badRoot, { recursive: true, force: true }); }
+});
+
 test("py completeness: FR 있는데 SC 없음 → warn, --strict exit 1 / FR 0개는 면제", skip, () => {
   const root = fixture({
     "sdd/specs/SPEC-001.md": "**Spec**: `SPEC-001`\n- **FR-001** (event): THE SYSTEM SHALL x.\n",

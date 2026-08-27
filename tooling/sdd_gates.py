@@ -309,6 +309,7 @@ DEFAULTS = {
     "surfaceGlobs": [],
     "maxKeysPerCategoryPerSpec": 4,
     "maxFRsPerSpec": 8,
+    "specCohesionPolicy": "advisory",
     "maxAggregateRootsPerSpec": 1,
     "supportLayerSpecs": {},
     "changeLogFrRefPolicy": "advisory",
@@ -551,6 +552,7 @@ RATCHETED_POLICIES = [
     "deployWindowPolicy",
     "capabilityVerbPolicy",
     "enforcementReachabilityPolicy",
+    "specCohesionPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -2962,6 +2964,16 @@ def cmd_ownership(cfg, strict):
 # ── cohesion — 입도(under-fragmentation) (check-spec-cohesion.mjs) ──
 
 def cmd_cohesion(cfg, strict):
+    # 강도 knob(이슈 #21 M-9, Node check-spec-cohesion.mjs 미러) — --strict CLI 플래그와 OR.
+    policy = cfg.get("specCohesionPolicy") or "advisory"
+    if policy not in ("off", "advisory", "hard"):
+        print(f'✗ specCohesionPolicy 값 위반 "{policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)', file=sys.stderr)
+        sys.exit(1)
+    if policy == "off":
+        verdict("OFF", "specCohesionPolicy:off")
+        print("Spec 입도(cohesion) 게이트 — specCohesionPolicy:off (판정 안 함)")
+        sys.exit(0)
+    hard = strict or policy == "hard"
     categories = cfg["ownershipCategories"]
     max_keys = cfg["maxKeysPerCategoryPerSpec"]
     max_frs = cfg["maxFRsPerSpec"]
@@ -3016,7 +3028,7 @@ def cmd_cohesion(cfg, strict):
               " 순서가 의미를 갖는다는 근거는 없다: `ownershipCategoryRoles`로 entity를 선언하라(추측 위의 입도 판정은 조용히 틀린다).")
     print(f"Spec 입도(cohesion) 게이트: spec {len(files)}개 검사 (키>{max_keys}/카테고리, FR>{max_frs}).")
     if violations:
-        tag = "✗" if strict else "⚠"
+        tag = "✗" if hard else "⚠"
         print(f"{tag} 과대 spec(분할 권고) {len(violations)}건:")
         for spec_id, kind, n, mx in violations:
             if "(min)" in kind:
@@ -3025,8 +3037,8 @@ def cmd_cohesion(cfg, strict):
                 print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} — 여러 aggregate 삼킴 의심 → root 1개만 남기고 나머지는 Dependencies의 `이름 (relation-type)`으로 이관(SPEC-017), 그래도 남으면 분할 검토")
             else:
                 print(f"  {tag} {spec_id}: {kind} {n}개 > {mx} → capability별 분할 검토")
-        if strict:
-            print("\n✗ --strict: 과대 spec은 분할 필요.", file=sys.stderr)
+        if hard:
+            print("\n✗ specCohesionPolicy=hard: 과대 spec은 분할 필요.", file=sys.stderr)
             sys.exit(1)
         return
     print("✓ 모든 spec이 입도 기준 내 — 분할 권고 없음.")

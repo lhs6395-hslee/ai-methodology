@@ -84,7 +84,12 @@
   Capability: ①핵심 Entity 식별(스키마 식별자 그대로, 소문자) ②핵심 동작 1개 추출 ③허용 verb 집합에 매핑 ④entity.verb 조립(점 1개) ⑤미등록 verb면 STOP → config capabilityVerbs 등록(리뷰) 후 진행. 임의 동의어 우회 금지.
   Surface:    ①메서드 대문자 ②path 소문자 ③param 표준형(:id·<id>→{id}) ④trailing slash 제거
   Entity:     스키마 테이블/타입명 그대로 trim+소문자(단복수·표기 임의변경 금지)
-  경계: 1 spec = 1 aggregate root(독립 생성·삭제되는 핵심 Entity). 다른 aggregate는 위 Dependencies로. -->
+  경계: 1 spec = 1 aggregate root(독립 생성·삭제되는 핵심 Entity)가 기본이다. 다른 aggregate는
+  위 Dependencies로. 이 경계는 절대 규칙이 아니라 `specCohesionPolicy`(off|advisory|hard,
+  check-spec-cohesion.mjs)가 판정하는 knob이다 — root+자식 표를 한 spec이 함께 소유하는
+  모델이면 `maxAggregateRootsPerSpec` 상향, aggregate를 가질 수 없는 지원 계층(공유 설정·빌드
+  배선)이면 `supportLayerSpecs`에 사유와 함께 등록해 예외를 명시적으로 남긴다(둘 다 무근거
+  일탈이 아니라 사유가 매 실행 표면화되는 선언된 예외). -->
 
 ---
 

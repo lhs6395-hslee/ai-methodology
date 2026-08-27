@@ -24,6 +24,21 @@ armVerdict();  // 모든 종료 경로에서 판정 타입 한 줄(SPEC-040) —
 const cfg = loadConfig();
 const SPEC_DIR = resolveFromRoot(cfg, cfg.specDir);
 const STRICT = process.argv.includes("--strict");
+// 강도 knob(이슈 #21 M-9) — 이전엔 이 게이트가 --strict CLI 플래그로만 강도를 받아 다른 축
+// 전부가 쓰는 선언적 off|advisory|hard config knob이 없었다. 기본 advisory로 기존 동작(무조건
+// 평가 + 경고)을 그대로 유지 — "off"는 이 승격으로 새로 생긴 선택지다(하위호환: 미선언 시 불변).
+// --strict는 하위호환으로 유지하고 정책 hard와 OR — 둘 중 하나만 있어도 hard로 판정한다.
+const POLICY = cfg.specCohesionPolicy || "advisory";
+if (!["off", "advisory", "hard"].includes(POLICY)) {
+  console.error(`✗ specCohesionPolicy 값 위반 "${POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
+if (POLICY === "off") {
+  verdict(VERDICT_KINDS.OFF, "specCohesionPolicy:off");
+  console.log("Spec 입도(cohesion) 게이트 — specCohesionPolicy:off (판정 안 함)");
+  process.exit(0);
+}
+const HARD = STRICT || POLICY === "hard";
 const CATEGORIES = cfg.ownershipCategories;
 const MAX_KEYS = cfg.maxKeysPerCategoryPerSpec;
 const MAX_FRS = cfg.maxFRsPerSpec;
@@ -136,7 +151,7 @@ if (supportSeen.size)
   console.log(`· 지원 계층 스펙 ${supportSeen.size}건(aggregate 없음 — 부채·리뷰 대상, 캡은 그대로 적용): ${[...supportSeen].sort().map((id) => `${id}(${SUPPORT[id]})`).join(", ")}`);
 
 if (violations.length) {
-  const tag = STRICT ? "✗" : "⚠";
+  const tag = HARD ? "✗" : "⚠";
   console.log(`${tag} 과대 spec(분할 권고) ${violations.length}건:`);
   for (const v of violations) {
     if (v.kind.includes("(min)"))
@@ -146,8 +161,8 @@ if (violations.length) {
     else
       console.log(`  ${tag} ${v.specId}: ${v.kind} ${v.n}개 > ${v.max} → capability별 분할 검토`);
   }
-  if (STRICT) {
-    console.error(`\n✗ --strict: 과대 spec은 분할 필요.`);
+  if (HARD) {
+    console.error(`\n✗ specCohesionPolicy=hard: 과대 spec은 분할 필요.`);
     process.exit(1);
   }
   process.exit(0);
