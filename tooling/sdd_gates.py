@@ -609,14 +609,16 @@ def classify_ratchet(base_cfg, cur_cfg, exceptions=None):
 
 # 구조적 knob 래칫(SPEC-027 확장, 이슈 #21 A-3) — policy-ratchet-lib.mjs classifyStructuralRatchet 미러.
 # capabilityVerbs는 의도적으로 제외(성장=정상 등록과 구분 불가, E-5/E-6 별도 과제).
-RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex"]
+RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex", "entitySchemaSources"]
 RATCHETED_SETS_GROW = ["ignoreDirs", "retiredIds"]
 RATCHETED_POINTERS = ["specDir", "smokeManifest", "derivationManifest", "specSyncBase", "commands.test"]
+RATCHETED_BOOLEANS = ["requireAccounting"]
 
 STRUCTURAL_FINDING_TEXT = {
     "set-shrink": "감시·강제 대상 집합이 줄었다 — 래칫은 늘어나는(또는 유지되는) 방향만 허용한다",
     "set-grow": "배제·정당화 범위가 늘었다 — 그만큼 게이트가 보지 않는 표면이 커진다",
     "pointer-changed": "강제 지점을 결정하는 값이 base 대비 바뀌었다 — 정당한 개명일 수 있으나 확인 없이 조용히 넘어가지 않는다",
+    "bool-weaken": "요구 스위치가 base 대비 꺼졌다(true→false) — 그 축의 회계·강제가 전면 비활성화됐다",
 }
 
 
@@ -638,8 +640,8 @@ def _set_size(v):
 
 
 def classify_structural_ratchet(base_cfg, cur_cfg, exceptions=None):
-    """감시 표면 축(등록 목록 축소·배제 목록 확장·강제 지점 재지정) — 세 방향의 판정을 합쳐
-    반환한다(policy-ratchet-lib.mjs classifyStructuralRatchet 미러)."""
+    """감시 표면 축(등록 목록 축소·배제 목록 확장·강제 지점 재지정·요구 스위치 해제) — 네 방향의
+    판정을 합쳐 반환한다(policy-ratchet-lib.mjs classifyStructuralRatchet 미러)."""
     ex = set(exceptions or [])
     violations, allowed = [], []
 
@@ -668,6 +670,13 @@ def classify_structural_ratchet(base_cfg, cur_cfg, exceptions=None):
         to = _pointer_value(cur_cfg or {}, knob)
         if json.dumps(frm, sort_keys=True, ensure_ascii=False) != json.dumps(to, sort_keys=True, ensure_ascii=False):
             push(knob, frm, to, "pointer-changed")
+    for knob in RATCHETED_BOOLEANS:
+        if not base_cfg or knob not in base_cfg:
+            continue
+        frm = bool(base_cfg.get(knob))
+        to = bool(cur_cfg.get(knob) if cur_cfg else None)
+        if frm and not to:
+            push(knob, frm, to, "bool-weaken")
     return violations, allowed
 
 
@@ -5774,7 +5783,7 @@ def cmd_ratchet(cfg, base_arg):
         if grown:
             parts.append("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)")
         if struct_violations:
-            parts.append("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정)")
+            parts.append("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정·요구 스위치 해제)")
         msg = ("정책 래칫 위반 — " + " / ".join(parts)
                + ". 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).")
         if hard:

@@ -249,9 +249,22 @@ export function classifyExemptionRatchet(baseCfg, curCfg, declaredKnobs = null, 
 // capabilityVerbs는 의도적으로 이 목록에서 뺐다 — growth 자체가 "동사 등록"이라는
 // 정상 행위와 구분 안 되고, 그 정합적 해소(사유 필드 승격 + 미등록 hard화)는 별도
 // 과제(이슈 #21 E-5/E-6)의 몫이라 여기서 손대면 두 해법이 겹친다.
-export const RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex"];
+//
+// entitySchemaExemptEntities·prefixClassExemptions는 이 목록들에 없다 — 이름이 `Exempt`/
+// `Exception`을 담는 knob은 별도의 **면제 개수 래칫**(classifyExemptionRatchet, 위)이
+// **이름 규약으로 자동** 감시한다. 손 목록 두 벌(구조 축·면제 축)이 같은 대상을 손으로
+// 중복 등재하면 그 자체가 새 사각지대(등재 누락)를 낳으므로, 면제류는 이름 규약 축 하나에만
+// 산다 — 여기 목록은 "면제가 아닌" 등록·배제·포인터 knob 전용이다.
+//
+// (d) **불리언 knob — true→false가 완화.** `requireAccounting`은 강도 enum도 상한도 면제도
+//     아닌 셋째 모양: FR 검증 회계 요구 자체의 on/off 스위치다. false로 내리면 그 순간부터
+//     커버리지 회계 요구가 전면 비활성이라, 위 (a)~(c) 어느 판정도 이 축을 보지 않았다
+//     (이슈 #21 A-3 21항목 중 잔여 4개 — entitySchemaSources·requireAccounting 둘만
+//     남았고 나머지 둘은 위 자동 감지·capabilityVerbs 설계 제외로 이미 닫혀 있었다).
+export const RATCHETED_SETS_SHRINK = ["entityRegistry", "relationTypes", "strictSpecs", "testFileRegex", "entitySchemaSources"];
 export const RATCHETED_SETS_GROW = ["ignoreDirs", "retiredIds"];
 export const RATCHETED_POINTERS = ["specDir", "smokeManifest", "derivationManifest", "specSyncBase", "commands.test"];
+export const RATCHETED_BOOLEANS = ["requireAccounting"];
 
 function pointerValue(cfg, dotted) {
   return dotted.split(".").reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), cfg);
@@ -294,6 +307,12 @@ export function classifyStructuralRatchet(baseCfg, curCfg, exceptions = []) {
     const to = pointerValue(curCfg || {}, knob);
     if (JSON.stringify(from) !== JSON.stringify(to)) push(knob, from, to, "pointer-changed");
   }
+  for (const knob of RATCHETED_BOOLEANS) {
+    if (!baseCfg || !(knob in baseCfg)) continue;
+    const from = Boolean(baseCfg[knob]);
+    const to = Boolean(curCfg ? curCfg[knob] : undefined);
+    if (from && !to) push(knob, from, to, "bool-weaken"); // true→false만 완화, false→true는 전진
+  }
   return { violations, allowedDowngrades };
 }
 
@@ -301,6 +320,7 @@ export const STRUCTURAL_FINDING_TEXT = Object.freeze({
   "set-shrink": "감시·강제 대상 집합이 줄었다 — 래칫은 늘어나는(또는 유지되는) 방향만 허용한다",
   "set-grow": "배제·정당화 범위가 늘었다 — 그만큼 게이트가 보지 않는 표면이 커진다",
   "pointer-changed": "강제 지점을 결정하는 값이 base 대비 바뀌었다 — 정당한 개명일 수 있으나 확인 없이 조용히 넘어가지 않는다",
+  "bool-weaken": "요구 스위치가 base 대비 꺼졌다(true→false) — 그 축의 회계·강제가 전면 비활성화됐다",
 });
 
 export const EXEMPTION_FINDING_TEXT = Object.freeze({

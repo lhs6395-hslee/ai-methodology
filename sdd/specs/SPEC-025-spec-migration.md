@@ -29,7 +29,7 @@
 - **FR-002** (event): WHEN a spec restructuring proposal is ready, THE SYSTEM SHALL halt at a human-approval gate before editing any spec, and SHALL ask rather than assume for judgment items — whether a noun is a real table, which entity is the aggregate root, and — for a cross-aggregate capability — whether to move it to the owning spec or to declare that entity as this spec's own (a `Dependencies` reference is not a resolution).
 - **FR-003** (event): WHEN the user approves items, THE SYSTEM SHALL apply them as spec-first edits with an accompanying Change Log row, one spec per commit (never a big-bang rewrite), and re-run the gates to confirm.
 - **FR-004** (unwanted): IF `/sdd-migrate` would finalize or overwrite a spec or production code without recorded approval, or would invent a domain fact, THEN THE SYSTEM SHALL refuse and wait for approval.
-- **FR-005** (state): WHILE backlog items remain unapproved, THE SYSTEM SHALL leave them as advisory so they resurface on the next update/migrate, and SHALL offer to promote `frKeyAnchorPolicy`/`capabilityOwnershipPolicy` to hard only once the backlog is clear.
+- **FR-005** (state): WHILE backlog items remain unapproved, THE SYSTEM SHALL leave them as advisory so they resurface on the next update/migrate, and SHALL offer to promote the graduation-eligible strength knob to hard only once that knob's own backlog is clear — the eligible-knob set is generic (every off/advisory/hard knob update.md's graduation step enumerates), not a fixed pair, so a newly introduced strength knob (`entitySchemaBackingPolicy`, `policyRatchetPolicy`, etc.) is covered without a spec text update.
 
 ### Key Entities
 - **migration backlog** — the open set of new-syntax advisories (capability-ownership, key-anchor, cohesion/relation) collected from the gate sweep, triaged per spec with a proposed fix.
@@ -77,6 +77,7 @@
 <!-- 필수(비우지 말 것): 버그픽스가 착지하는 자리 — check-spec-sync가 새 항목을 요구한다 -->
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | FR-005 개정 — 승격 대상을 `frKeyAnchorPolicy`/`capabilityOwnershipPolicy` 고정 나열에서 "update.md 승격 목록이 열거하는 모든 강도 knob"으로 일반화 | 감사 이슈 #21 실측: `entitySchemaBackingPolicy`가 update.md 구현 목록엔 있는데 이 FR의 고정 나열엔 없어 스펙-구현 텍스트 드리프트였다 — 같은 값을 두 곳에 적으면 한쪽이 뒤처진다는 킷 자신의 반복 교훈과 같은 결함 계열. 이번에 목록이 `policyRatchetPolicy`까지 늘었으니 이 FR을 고정 나열로 두면 다음에도 같은 드리프트가 재발한다 |
 | 2026-07-21 | 초안 — `/sdd-migrate` 실행기 스킬 + 정본 절차 `prompts/migrate.md` + 계약 테스트. update(표면화)와 분리된 백로그 실행(승인 관문·한 스펙 한 커밋). entity 재구성·키 앵커 정합 중심 | 실측(소비 프로젝트): update 반복해도 스펙 불변("똑같다") — 백로그를 실제 재구성으로 실행하는 경로 부재. owner가 (b) 실행기 스킬 선택, "update가 방법론 방식에 따라 스펙 재구성으로 이어져야" |
 | 2026-07-21 | 강도 승격 권장(graduation) 명문화 — update.md 6단계 신설(강도 knob은 백로그 0에서 hard 승격 권장, advisory=경유지)·migrate.md 6단계·presets frKeyAnchorPolicy 종착지=hard. 낮은 강도 유지를 권하지 않음 | owner: update가 'advisory 유지(미채택)'를 권장으로 내세우던 것 → 'hard 승격'을 권장으로 뒤집음(강제가 목표) |
 | 2026-07-27 | FR-002 판단 항목 정정 — 교차 aggregate capability의 갈래를 "move-versus-reference"에서 "소유 스펙 이관 vs 이 스펙의 Entities 소유 선언"으로(`Dependencies` 참조는 해소가 아님). `sdd-migrate.SKILL.md` triage/HALT 문구 동반 정정 | 문서–코드 드리프트 감사: `capability-ownership-lib.mjs`의 판정 입력은 소유 Entities뿐이라 참조 선언으로는 위반이 해소되지 않고(hard에서 무한 재시도), Dependencies의 Capabilities는 귀속·동사·형식 판정에 도달하지 않아 검증 우회가 된다 — 게이트 출력의 두 갈래와 정렬 |

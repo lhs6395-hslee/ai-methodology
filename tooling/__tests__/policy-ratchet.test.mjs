@@ -373,7 +373,7 @@ test("킷의 면제 전부가 분류·사유를 갖는다(도그푸딩) — 등�
 //    "감시 표면" 축. policyRatchetPolicy:hard를 유지한 채 entityRegistry:{}·ignoreDirs
 //    확장·specDir 재지정 등을 한 커밋에 적용해도 기존 세 래칫은 violations:0이었다.
 // @covers SPEC-027/FR-010
-import { classifyStructuralRatchet, RATCHETED_SETS_SHRINK, RATCHETED_SETS_GROW, RATCHETED_POINTERS, STRUCTURAL_FINDING_TEXT } from "../policy-ratchet-lib.mjs";
+import { classifyStructuralRatchet, RATCHETED_SETS_SHRINK, RATCHETED_SETS_GROW, RATCHETED_POINTERS, RATCHETED_BOOLEANS, STRUCTURAL_FINDING_TEXT } from "../policy-ratchet-lib.mjs";
 
 test("구조 래칫: 등록 목록이 줄면(entityRegistry 등) 위반, 늘면 통과", () => {
   const base = { entityRegistry: { a: "r", b: "r" }, relationTypes: ["has-many"] };
@@ -414,8 +414,38 @@ test("구조 래칫: base에 knob이 없으면 판정 밖(하위호환) — capa
   assert.ok(!RATCHETED_SETS_GROW.includes("capabilityVerbs"));
 });
 
-test("구조 래칫: 세 종류 판정 문구가 전부 있다", () => {
-  for (const k of ["set-shrink", "set-grow", "pointer-changed"]) {
+// 이슈 #21 A-3 잔여 항목: entitySchemaSources:[] 한 줄이 entitySchemaBackingPolicy:hard를
+// 무음 inert로 만드는 우회(A-1과 같은 계열)가 21항목 중 유일하게 구조 래칫 감시 밖이었다.
+test("구조 래칫: entitySchemaSources가 비면(→ 백킹 hard가 inert) 위반(이슈 #21 A-3 잔여)", () => {
+  const r = classifyStructuralRatchet(
+    { entitySchemaSources: [{ globs: ["src/db/*.ts"], patterns: ["x"] }] },
+    { entitySchemaSources: [] },
+    []);
+  assert.deepEqual(r.violations, [{ knob: "entitySchemaSources", from: 1, to: 0, kind: "set-shrink" }]);
+});
+
+// entitySchemaExemptEntities·prefixClassExemptions는 이 손 목록에 없다 — 이름이 Exempt/Exception을
+// 담아 classifyExemptionRatchet(이름 규약 자동 감지)이 이미 감시하므로 여기 중복 등재하지 않는다.
+test("구조 래칫: 면제류(Exempt/Exception) knob은 이 손 목록에 없다 — 이름 규약 자동 감지가 별도로 감시", () => {
+  for (const knob of [...RATCHETED_SETS_SHRINK, ...RATCHETED_SETS_GROW]) {
+    assert.doesNotMatch(knob, /Exempt|Exception/, `${knob}은 면제류라 이름규약 축(classifyExemptionRatchet)의 몫`);
+  }
+});
+
+// requireAccounting은 강도 enum도 상한도 면제도 아닌 넷째 모양 — 회계 요구 전체의 on/off
+// 스위치다(이슈 #21 A-3 잔여, Row 6). false로 내리는 방향만 완화, 켜는 방향은 전진이라 통과.
+test("구조 래칫: 불리언 knob(requireAccounting)이 true→false면 위반, false→true는 통과", () => {
+  assert.deepEqual(RATCHETED_BOOLEANS, ["requireAccounting"]);
+  const weakened = classifyStructuralRatchet({ requireAccounting: true }, { requireAccounting: false }, []);
+  assert.deepEqual(weakened.violations, [{ knob: "requireAccounting", from: true, to: false, kind: "bool-weaken" }]);
+  const strengthened = classifyStructuralRatchet({ requireAccounting: false }, { requireAccounting: true }, []);
+  assert.deepEqual(strengthened.violations, []);
+  const unchanged = classifyStructuralRatchet({ requireAccounting: true }, { requireAccounting: true }, []);
+  assert.deepEqual(unchanged.violations, []);
+});
+
+test("구조 래칫: 네 종류 판정 문구가 전부 있다", () => {
+  for (const k of ["set-shrink", "set-grow", "pointer-changed", "bool-weaken"]) {
     assert.ok(String(STRUCTURAL_FINDING_TEXT[k] || "").length > 5, `${k} 문구 없음`);
   }
 });
@@ -464,5 +494,18 @@ test("게이트 e2e: 아무 것도 안 바뀌면 구조 래칫도 조용하다(�
     const r = run(root);
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /구조 래칫: 감시 표면 축소 0건/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 이슈 #21 A-3 잔여 2건(entitySchemaSources·requireAccounting)이 실제 게이트를 통해서도 잡히는지.
+test("게이트 e2e: entitySchemaSources 비우기·requireAccounting 끄기도 hard에서 지목된다(이슈 #21 A-3 잔여)", () => {
+  const root = gitRepo(
+    { policyRatchetPolicy: "hard", entitySchemaSources: [{ globs: ["src/db/*.ts"], patterns: ["x"] }], requireAccounting: true },
+    { policyRatchetPolicy: "hard", entitySchemaSources: [], requireAccounting: false });
+  try {
+    const r = run(root);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /entitySchemaSources: 1 → 0/);
+    assert.match(r.out, /requireAccounting: true → false/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -1469,6 +1469,12 @@ test("py ratchet: off·하향(advisory/hard)·상향·예외부채·미조회·�
     // relationTypes·strictSpecs 축소는 위반, retiredIds 확장도 위반 — 셋이 같은 커밋.
     [{ policyRatchetPolicy: "hard", relationTypes: ["has-many"], strictSpecs: ["SPEC-001"], retiredIds: [] },
       { policyRatchetPolicy: "hard", relationTypes: [], strictSpecs: [], retiredIds: ["CICD-005"] }, "main"],
+    // 구조 래칫 잔여(이슈 #21 A-3): entitySchemaSources 비우기(→ 백킹 hard 무음 inert) + requireAccounting
+    // 끄기(불리언 knob, true→false만 완화)가 한 커밋에 같이 옴.
+    [{ policyRatchetPolicy: "hard", entitySchemaSources: [{ globs: ["src/db/*.ts"], patterns: ["x"] }], requireAccounting: true },
+      { policyRatchetPolicy: "hard", entitySchemaSources: [], requireAccounting: false }, "main"],
+    // requireAccounting을 켜는 방향(false→true)은 전진이라 통과 — 방향성 확인.
+    [{ policyRatchetPolicy: "hard", requireAccounting: false }, { policyRatchetPolicy: "hard", requireAccounting: true }, "main"],
   ];
   for (const [baseCfg, curCfg, base] of scen) {
     const root = mkdtempSync(join(tmpdir(), "sdd-py-ratchet-"));

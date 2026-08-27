@@ -120,7 +120,7 @@ if (totalViolations) {
   if (violations.length) parts.push("강제 강도를 낮췄다(정책 하향 ∨ 수치 임계 완화)");
   if (exBlocking.length) parts.push("면제가 사유·분류 없이 존재한다(넷이 없는 면제는 이월이 아니라 방치다)");
   if (grown.length) parts.push("면제 개수가 늘었다(래칫은 줄어드는 방향만 허용)");
-  if (structViolations.length) parts.push("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정)");
+  if (structViolations.length) parts.push("감시·강제 표면이 좁아졌다(등록 목록 축소·배제 목록 확장·강제 지점 재지정·요구 스위치 해제)");
   const msg = `정책 래칫 위반 — ${parts.join(" / ")}. 위반을 knob 조정이나 면제 추가로 회피하지 말고 스펙을 편집해 해소하라(advisory는 경유지·hard가 종착지).`;
   if (HARD) { console.error(`\n✗ ${msg}`); process.exit(1); }
   console.log(`\n⚠ ${msg} (policyRatchetPolicy:advisory — 경고)`);
