@@ -463,10 +463,15 @@ export const DEFAULTS = {
   capabilityVerbPolicy: "advisory",
   // Surface path param 표준 표기
   surfacePathParam: "{name}",
-  // Surface 키 형식: "http"(기본 — "<METHOD> <path>" / "event:" / "job:") | "path"(파일경로 표면)
-  // | "any"(형식검증 안함). 파일 라우팅 프레임워크(Next.js 등)나 비-HTTP 자원(Dockerfile·IaC)을
-  // Surface로 모델링하는 프로젝트는 "path". normalizeKey/validateKey가 이 값으로 분기.
+  // Surface 키 형식: "http"(기본 — "<METHOD> <path>" / 등록된 scheme:) | "path"(파일경로 표면,
+  // 등록된 scheme:도 인정) | "any"(형식검증 안함). 파일 라우팅 프레임워크(Next.js 등)나 비-HTTP
+  // 자원(Dockerfile·IaC)을 Surface로 모델링하는 프로젝트는 "path". normalizeKey/validateKey가
+  // 이 값으로 분기.
   surfaceFormat: "http",
+  // http·path 두 형식이 공통으로 인정하는 "<scheme>:<나머지>" 접두어 목록(이슈 #21 M-11).
+  // 기본은 하위호환(event:·job:)이지만, UI 화면 키(ui:)류를 추가하면 http·path 어느 쪽을
+  // 쓰든 그 scheme이 형식 위반 없이 섞인다 — "any"로 검증을 통째로 포기하지 않아도 된다.
+  surfaceSchemePrefixes: ["event", "job"],
   // 언어별 셸 명령(sdd-run.mjs가 실행). 미설정 stage는 건너뜀.
   //   { "setup": "...", "lint": "...", "typecheck": "...", "test": "..." }
   commands: {},

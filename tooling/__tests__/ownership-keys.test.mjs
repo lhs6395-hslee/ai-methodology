@@ -80,6 +80,27 @@ test("validateKey: surfaceFormat 'any' → Surface 형식 검증 안함", () => 
   assert.equal(validateKey("Surfaces", "anything at all", anyCfg), null);
 });
 
+// 이슈 #21 M-11: http·path 어느 형식도 "scheme:" 접두어(ui: 등)를 받지 못해, HTTP 라우트와
+// UI 화면 키가 섞인 프로젝트가 형식검증을 통째로 포기하는 "any"로 몰렸다.
+test("validateKey: surfaceSchemePrefixes 등록 시 http·path 둘 다 scheme: 접두어를 인정한다(이슈 #21 M-11)", () => {
+  const httpCfg = { ...cfg, surfaceFormat: "http", surfaceSchemePrefixes: ["event", "job", "ui"] };
+  assert.equal(validateKey("Surfaces", "ui:project-wizard", httpCfg), null);
+  assert.equal(validateKey("Surfaces", "POST /api/x", httpCfg), null); // 기존 http 형식도 여전히 통과
+  const pathCfg = { ...cfg, surfaceFormat: "path", surfaceSchemePrefixes: ["event", "job", "ui"] };
+  assert.equal(validateKey("Surfaces", "ui:project-wizard", pathCfg), null);
+  assert.equal(validateKey("Surfaces", "src/app/api/route.ts", pathCfg), null); // 기존 path 형식도 여전히 통과
+});
+
+test("validateKey: 미등록 scheme는 여전히 위반 — 등록이 곧 허용 범위다", () => {
+  const httpCfg = { ...cfg, surfaceFormat: "http" }; // 기본 scheme = event, job
+  assert.equal(validateKey("Surfaces", "ui:project-wizard", httpCfg) !== null, true);
+});
+
+test("validateKey: 기본 scheme(event:/job:)은 명시 등록 없이도 하위호환으로 통과한다", () => {
+  assert.equal(validateKey("Surfaces", "event:order.created", cfg), null);
+  assert.equal(validateKey("Surfaces", "job:nightly-sync", { ...cfg, surfaceFormat: "path" }), null);
+});
+
 test("normalizeKey: surfaceFormat 'path' → 소문자 + trailing slash 제거(METHOD 파싱 안함)", () => {
   const pathCfg = { ...cfg, surfaceFormat: "path" };
   assert.equal(normalizeKey("Surfaces", "Src/App/API/route.ts/", pathCfg), "src/app/api/route.ts");

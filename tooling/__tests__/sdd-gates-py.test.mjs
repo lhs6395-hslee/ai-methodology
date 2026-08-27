@@ -292,6 +292,32 @@ test("py ownership: 정규화 후 같은 키 → 중복 소유 exit 1 (Surfaces 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-001/FR-005
+test("py ownership: surfaceSchemePrefixes 등록 시 http·path 둘 다 scheme: 키를 받는다(이슈 #21 M-11) — Node와 바이트 동일", skip, () => {
+  const httpMix = fixture(
+    { "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Surfaces**: POST /api/x, ui:project-wizard") },
+    { surfaceSchemePrefixes: ["event", "job", "ui"] });
+  const pathMix = fixture(
+    { "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Surfaces**: src/app/route.ts, ui:project-wizard") },
+    { surfaceFormat: "path", surfaceSchemePrefixes: ["event", "job", "ui"] });
+  const unregistered = fixture(
+    { "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Surfaces**: ui:project-wizard") }, {});
+  try {
+    for (const root of [httpMix, pathMix]) {
+      const py = runPy(root, ["ownership"]);
+      const nd = runNode(root, "check-ownership.mjs", []);
+      assert.equal(py.code, 0, py.out);
+      assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    }
+    const pyBad = runPy(unregistered, ["ownership"]);
+    const ndBad = runNode(unregistered, "check-ownership.mjs", []);
+    assert.match(pyBad.out, /등록된 scheme/);
+    assert.equal(pyBad.out, ndBad.out, "Node↔Python 출력 바이트 동일(미등록)");
+  } finally {
+    for (const r of [httpMix, pathMix, unregistered]) rmSync(r, { recursive: true, force: true });
+  }
+});
+
 test("py ownership: 미등록 verb Capability는 형식위반 warn, --strict에서 exit 1", skip, () => {
   const root = fixture({
     "sdd/specs/SPEC-001.md": OWN("SPEC-001", "- **Capabilities**: thing.frobnicate"),

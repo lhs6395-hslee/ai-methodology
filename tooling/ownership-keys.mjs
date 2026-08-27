@@ -160,14 +160,19 @@ export function validateKey(category, key, cfg) {
   if (category === "Surfaces") {
     const style = (cfg && cfg.surfaceFormat) || "http";
     if (style === "any") return null;
+    // http·path 두 형식이 공통으로 인정하는 "<scheme>:<나머지>" 접두어(이슈 #21 M-11) — 등록
+    // 하면 그 scheme은 어느 형식을 쓰든 형식 위반 없이 섞인다("any"로 통째 포기하지 않아도 된다).
+    const schemes = (cfg && cfg.surfaceSchemePrefixes) || ["event", "job"];
+    const schemeRe = schemes.length ? new RegExp(`^(?:${schemes.map(escapeRegExp).join("|")}):\\S+$`) : null;
+    if (schemeRe && schemeRe.test(key)) return null;
     if (style === "path") {
       // 파일경로 Surface: 공백 없는 경로형 토큰(슬래시·점·하이픈·[param]·glob·@scope 허용).
       return /^[\w.\-/\[\]@*]+$/.test(key)
         ? null
-        : `Surface(path)는 공백 없는 파일경로 형식이어야 함: "${key}"`;
+        : `Surface(path)는 공백 없는 파일경로 형식이거나 등록된 scheme(${schemes.join("/")}):이어야 함: "${key}"`;
     }
-    if (!/^[A-Z]+ \S/.test(key) && !/^(event|job):/.test(key))
-      return `Surface는 "<METHOD> <path>" 또는 "event:/job:" 형식이어야 함: "${key}"`;
+    if (!/^[A-Z]+ \S/.test(key))
+      return `Surface는 "<METHOD> <path>" 또는 등록된 scheme(${schemes.join("/")}): 형식이어야 함: "${key}"`;
     return null;
   }
   return null; // Entity는 형식 제약 없음(스키마 식별자 그대로)

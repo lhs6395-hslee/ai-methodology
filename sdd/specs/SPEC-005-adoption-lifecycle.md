@@ -82,6 +82,7 @@ SDD가 없던 프로젝트에서 `/sdd-start`를 부르면, 에이전트가 `pro
 ## Change Log
 | 날짜 | 변경 | 근거 |
 |---|---|---|
+| 2026-08-27 | `adopt.md` 3단계에 `specSyncExemptGlobs`에 `"scripts/**"` 등록을 권장 항목으로 추가, `update.md`의 `specSyncUnownedPolicy` hard 승격 전제조건에 그 등록 여부 확인을 추가, `STRUCTURE.md`·`sdd.config.presets.md`에 정본 사례로 명문화(이슈 #21 M-14) — `prompts/**`는 exempt라 spec-sync가 이 변경을 요구하지 않지만 자발적으로 기록한다 | 감사 이슈 #21 M-14: 설치된 하네스(`scripts/`)는 킷이 `tooling/`에서 복사한 게이트 사본이라 소비 프로젝트의 어느 기능 스펙도 아닌데, 그 소유 처방이 방법론 어디에도 없었다. `specSyncUnownedPolicy: error`로 승격하면 `/sdd-update` 재실행마다 그 사본들이 unowned로 걸려 업데이트 자체가 커밋 불가능해지고, exempt하면 게이트 코드가 흔적 없이 바뀔 수 있는 구역이 된다 — 킷 자신은 `tooling/`을 스펙으로 소유해 이 문제를 회피했을 뿐, 소비 프로젝트에는 대응하는 처방이 없었다(만성 unowned 노이즈가 진짜 소유 포기 신호를 가리는 상위 원인이기도 하다, D-2 실측과 같은 결) [검증: STRUCTURE.md, tooling/sdd.config.presets.md] |
 | 2026-07-03 | 초안 — 채택 수명주기 3 명령(start/readopt/update)을 별도 aggregate로 신설(SPEC-004 install 메커니즘과 분리; cohesion 캡 준수) | feat/lifecycle-commands |
 | 2026-07-04 | 진입점 교정 — 로컬 절대경로(`~/Documents/claude/sdd/prompts/*`) 하드코딩 제거, 정본 진입을 GitHub **raw URL**로; tooling 확보를 repo URL 기반 **partial+sparse**로 명시(전체 clone 불필요, clean-machine 진입 보장). Edge Cases·Assumptions 갱신 | feat/lifecycle-commands |
 | 2026-07-04 | main 머지 후 ref 승격 — 진입 raw URL·`REF` 기본값·문서 주석의 `<ref>`를 `feat/lifecycle-commands`→`main`으로 교체(정본 ref=main, 자기참조 유지). Change Log 근거 열은 이력이라 보존 | main |

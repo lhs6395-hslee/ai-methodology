@@ -456,6 +456,7 @@ DEFAULTS = {
     "capabilityVerbPolicy": "advisory",
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
+    "surfaceSchemePrefixes": ["event", "job"],
     "commands": {},
     "retiredIds": [],
     "semanticDriftPolicy": "advisory",
@@ -878,11 +879,17 @@ def validate_key(category, key, cfg):
         style = cfg.get("surfaceFormat") or "http"
         if style == "any":
             return None
+        # http·path 두 형식이 공통으로 인정하는 "<scheme>:<나머지>" 접두어(이슈 #21 M-11, Node
+        # 미러) — 등록하면 그 scheme은 어느 형식을 쓰든 형식 위반 없이 섞인다.
+        schemes = cfg.get("surfaceSchemePrefixes") or ["event", "job"]
+        scheme_re = re.compile(r"^(?:" + "|".join(re.escape(s) for s in schemes) + r"):\S+$") if schemes else None
+        if scheme_re and scheme_re.match(key):
+            return None
         if style == "path":
             return None if re.match(r"^[\w.\-/\[\]@*]+$", key) \
-                else f'Surface(path)는 공백 없는 파일경로 형식이어야 함: "{key}"'
-        if not re.match(r"^[A-Z]+ \S", key) and not re.match(r"^(event|job):", key):
-            return f'Surface는 "<METHOD> <path>" 또는 "event:/job:" 형식이어야 함: "{key}"'
+                else f'Surface(path)는 공백 없는 파일경로 형식이거나 등록된 scheme({"/".join(schemes)}):이어야 함: "{key}"'
+        if not re.match(r"^[A-Z]+ \S", key):
+            return f'Surface는 "<METHOD> <path>" 또는 등록된 scheme({"/".join(schemes)}): 형식이어야 함: "{key}"'
         return None
     return None  # Entity는 형식 제약 없음(스키마 식별자 그대로)
 

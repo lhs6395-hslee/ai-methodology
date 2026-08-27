@@ -24,7 +24,7 @@
    sh "$KIT/tooling/sdd-init.sh" --gate=node              # ← 이 프로젝트 루트에서 실행
    ```
    → `sdd/` 레이아웃 · 게이트(~30파일) · git 훅(`pre-commit`·`commit-msg`) · SessionStart/PreToolUse · 스킬 설치. (언어 무관 — 게이트는 node 런타임만 쓰고 언어차는 `sdd.config.json`으로 흡수.)
-3. **config 맞춤.** `sdd.config.json`의 `scanDirs`·`testFileRegex`·`commands`·`specIdPrefixes`·`ownershipCategories`를 이 프로젝트 언어로 맞춘다(프리셋: `tooling/sdd.config.presets.md`).
+3. **config 맞춤.** `sdd.config.json`의 `scanDirs`·`testFileRegex`·`commands`·`specIdPrefixes`·`ownershipCategories`를 이 프로젝트 언어로 맞춘다(프리셋: `tooling/sdd.config.presets.md`). **`specSyncExemptGlobs`에 `"scripts/**"`를 넣는다** — 설치기가 `tooling/`에서 복사한 킷 소유 게이트 사본이라(이슈 #21 M-14), 이 프로젝트 기능 스펙이 소유할 대상이 아니다. 안 넣으면 `/sdd-update` 재실행마다 그 사본들이 매번 unowned로 표면화돼 만성 노이즈가 되고, 그 노이즈가 **진짜 소유 포기**(기능 코드가 어느 Files에도 안 잡히는 사고)를 가리는 상위 원인이 된다(§STRUCTURE.md "만성 unowned").
 4. **확인.** 세션 재시작(SessionStart가 방법론 주입) 후 게이트를 돌려 green 확인.
 
 여기까지는 **설치·배선까지만**. 스펙 대량 생성은 사용자 승인 후.
