@@ -103,10 +103,19 @@ if (STAGED) collectRenames(shOk("git diff --cached --name-status --find-renames"
 // 존재하는 이유 자체가 물러진다. `specSyncExemptGlobs`로 빼는 것도 답이 아니다 — 지우는 파일 때문에
 // **영구 예외**가 config에 남아 부채가 반대 방향으로 쌓인다.
 // 삭제는 "잘못 적힌 경로"도 "소유 없는 파일"도 아니다 — 세 번째 상태이므로 따로 센다.
+// 리네임의 **원본 경로도 같은 세 번째 상태다.** 위 ⓐⓑ 교착이 삭제에 대해서만 해소돼 있었고
+// 리네임은 빠져 있었다: `collectRenames`는 새 경로(m[2])만 담고 사라진 원본(m[1])은 어느
+// 집합에도 없어서, 소유 파일을 옮기면 HEAD 스펙이 가리키는 옛 경로가 "잘못 적힌 경로"로
+// hard 차단된다. 정답 순서가 없다 — 스펙을 먼저 고치면 아직 없는 경로라 부재, 나중에 고치면
+// 옛 경로가 부재. 즉 주석이 경고한 그대로 `--no-verify` 외에 길이 없다.
+// 실측(소비 프로젝트, 2026-08-27): 코드 전역 개명에서 소유 파일 203건이 R100으로 옮겨졌고
+// 스펙 Files를 같은 커밋에서 새 경로로 고쳤는데도 14개 스펙이 차단됐다.
 const deleted = new Set();
 const collectDeleted = (raw) => lines(raw).forEach((ln) => {
   const m = /^D\d*\t(.+)$/.exec(ln);
-  if (m) deleted.add(m[1].trim());
+  if (m) { deleted.add(m[1].trim()); return; }
+  const r = /^R\d*\t(.+)\t(.+)$/.exec(ln);
+  if (r) deleted.add(r[1].trim());   // 옮긴 것이지 잘못 적은 것이 아니다
 });
 if (branchDiffOk) collectDeleted(shOk(`git diff --name-status --find-renames ${BASE}...HEAD`));
 if (STAGED) collectDeleted(shOk("git diff --cached --name-status --find-renames"));

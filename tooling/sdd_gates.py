@@ -4251,6 +4251,11 @@ def cmd_specsync(cfg, staged, msg_file, base):
             m = re.match(r"^D\d*\t(.+)$", ln)
             if m:
                 deleted_paths.add(m.group(1).strip())
+                continue
+            # 리네임 원본도 같은 세 번째 상태다(Node 구현과 대칭 — check-spec-sync.mjs 주석 참조).
+            r = re.match(r"^R\d*\t(.+)\t(.+)$", ln)
+            if r:
+                deleted_paths.add(r.group(1).strip())
 
     if branch_diff_ok:
         collect_deleted(_git(cfg, ["diff", "--name-status", "--find-renames", f"{base}...HEAD"]))

@@ -660,6 +660,29 @@ test("삭제: 파일만 삭제하고 Files 항목은 **그대로** → 여전히
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// 리네임: 삭제와 **같은 세 번째 상태**다. 원본 경로는 이 changeset에서 저장소에서 사라졌다.
+// 이 축이 없던 동안 소유 파일 리네임은 어떤 순서로도 통과하지 못했다 — 스펙 Files를 먼저
+// 고치면 아직 없는 경로라 부재, 나중에 고치면 옛 경로가 부재. 실측 제보(소비 프로젝트,
+// 2026-08-27): 코드 전역 개명에서 소유 파일 203건이 R100으로 옮겨졌고 스펙을 같은 커밋에서
+// 고쳤는데도 14개 스펙이 차단됐다.
+test("리네임: 소유 파일 이동 + 스펙 Files 갱신을 한 커밋에 → 통과(이것이 정답 경로다)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/parse.ts"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    // 파일을 옮기고 스펙 Files도 같은 커밋에서 새 경로로 고친다
+    g("mv", "src/lib/pdf/parse.ts", "src/lib/pdf/read.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"),
+      SPEC("src/lib/pdf/read.ts", "| 2026-08-27 | parse.ts -> read.ts 리네임 | 이름이 하는 일과 달랐다 |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: parse.ts -> read.ts\n\nSpec-Impact: rename-only\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);
+    assert.doesNotMatch(r.out, /리터럴 경로 부재/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("삭제와 무관: 존재한 적 없는 경로를 Files에 적음(오타·리네임 누락) → 여전히 차단", () => {
   const { root, g } = repo();
   try {
