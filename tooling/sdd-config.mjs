@@ -452,8 +452,15 @@ export const DEFAULTS = {
   // 어휘 — capabilityVerbs와 동형. 비어 있으면(기본) 어휘 무제한(형식만 kebab 1토큰 강제).
   // 채우면 미등록 type은 ownership 게이트가 exit 1(SPEC-017).
   relationTypes: [],
-  // CRUD 기본에 더할 도메인 verb
+  // CRUD 기본에 더할 도메인 verb. 배열(레거시, 사유 없음)과 `{동사:사유}` 객체(승격형, 이슈 #21
+  // E-5) 둘 다 받는다 — entityRegistry와 동형 패턴, 빈 사유는 ownership 게이트가 항상 에러.
+  // 객체형이 리뷰 관문이다: 등록이 곧 diff에 사유를 남긴다("동사가 늘어도 흔적이 없다"를 봉합).
   capabilityVerbs: [],
+  // 미등록 verb의 강도. off(무판정)|advisory(기본 — 경고 exit 0)|hard(exit 1, **--strict 없이도**).
+  // 실측(이슈 #21 E-5): 기존엔 warn 뒤 `--strict`가 있어야 exit 1인데 hook·CI 기본 호출 어디도
+  // --strict를 안 넘겨 hard가 실전에서 한 번도 발화하지 않았다 — "등록 안 해도 통과"의 근원.
+  // 이 knob은 전역 --strict와 독립이라, 다른 형식 위반은 advisory인 채로 verb만 hard로 올릴 수 있다.
+  capabilityVerbPolicy: "advisory",
   // Surface path param 표준 표기
   surfacePathParam: "{name}",
   // Surface 키 형식: "http"(기본 — "<METHOD> <path>" / "event:" / "job:") | "path"(파일경로 표면)
@@ -620,11 +627,14 @@ function buildConfig(user, path, root) {
   // 카테고리 역할 파생값(SPEC-001 FR-010) — 판정 코어·게이트가 공유하는 단일 소스.
   cfg.__roles = resolveCategoryRoles(cfg.ownershipCategories, cfg.ownershipCategoryRoles);
 
-  // Verb 파생값
+  // Verb 파생값 — capabilityVerbs는 배열(레거시)·`{동사:사유}` 객체(승격형) 둘 다 받는다.
   const CRUD = ["create", "read", "update", "delete", "list"];
   cfg.__crudVerbs = CRUD;
+  const domainVerbs = Array.isArray(cfg.capabilityVerbs)
+    ? cfg.capabilityVerbs
+    : Object.keys(cfg.capabilityVerbs || {});
   cfg.__allVerbs = new Set(
-    [...CRUD, ...(cfg.capabilityVerbs || [])].map((v) => String(v).trim().toLowerCase())
+    [...CRUD, ...domainVerbs].map((v) => String(v).trim().toLowerCase())
   );
 
   return cfg;

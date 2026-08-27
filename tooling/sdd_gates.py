@@ -453,6 +453,7 @@ DEFAULTS = {
     "entityRegistry": {},
     "relationTypes": [],
     "capabilityVerbs": [],
+    "capabilityVerbPolicy": "advisory",
     "surfacePathParam": "{name}",
     "surfaceFormat": "http",
     "commands": {},
@@ -546,6 +547,7 @@ RATCHETED_POLICIES = [
     "gateFailureEscalationPolicy",
     "riskyActionPolicy",
     "deployWindowPolicy",
+    "capabilityVerbPolicy",
 ]
 
 # 수치 임계도 강제 강도다 — **값을 올리는 것이 완화**다(policy-ratchet-lib.mjs RATCHETED_LIMITS 미러).
@@ -2382,6 +2384,22 @@ def cmd_ownership(cfg, strict):
     cap_inert = capability_inert_reasons(cap_policy, roles)
     cap_findings = []  # (spec_id, capability, entity)
 
+    # 미등록 verb 강도(이슈 #21 E-5) — 전역 --strict와 독립(Node 미러).
+    verb_policy = cfg.get("capabilityVerbPolicy") or "advisory"
+    if verb_policy not in ("off", "advisory", "hard"):
+        print(f'✗ capabilityVerbPolicy 값 위반 "{verb_policy}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)',
+              file=sys.stderr)
+        sys.exit(1)
+    # capabilityVerbs 승격형(`{동사:사유}`) — entityRegistry와 동형: 빈 사유는 항상 에러(정책 무관).
+    # 실제 exit는 judged() 선언 뒤(entity_errors 처리부 근처)에서 한다 — 여기서 바로 exit하면
+    # verdict() 호출 전에 종료돼 UNTYPED로 자백된다(Node 미러 — 같은 결함을 같은 자리에서 고쳤다).
+    cap_verbs_cfg = cfg.get("capabilityVerbs")
+    verb_errors = []
+    if cap_verbs_cfg and not isinstance(cap_verbs_cfg, list):
+        for verb, reason in cap_verbs_cfg.items():
+            if not str(reason or "").strip():
+                verb_errors.append(f'capabilityVerbs["{verb}"] — 도입 사유 필요(빈 값 불가)')
+
     # Entity 스키마 백킹(SPEC-026) — 소유 entity가 구조 SSOT에 실재하는지 대조(유령 entity 차단).
     sb_policy = cfg.get("entitySchemaBackingPolicy") or "off"
     if sb_policy not in ("off", "advisory", "hard"):
@@ -2591,15 +2609,36 @@ def cmd_ownership(cfg, strict):
     if missing:
         tag = "✗" if (strict or orq_policy == "hard") else "⚠"
         print(f"{tag} Ownership 블록 없음({len(missing)}): {', '.join(missing)}")
-    if format_issues:
+    # 미등록 verb는 capabilityVerbPolicy가 별도로 강도를 정한다(이슈 #21 E-5, Node 미러) —
+    # 전역 --strict와 독립. 나머지 형식 위반은 기존대로 --strict에 묶인다.
+    verb_issues = [(s, b) for s, b in format_issues if b.startswith("미등록 verb")]
+    other_format_issues = [(s, b) for s, b in format_issues if not b.startswith("미등록 verb")]
+    if other_format_issues:
         tag = "✗" if strict else "⚠"
-        for spec_id, bad in format_issues:
+        for spec_id, bad in other_format_issues:
             print(f"{tag} [{spec_id}] {bad}")
+    verb_hard = verb_policy == "hard" and len(verb_issues) > 0
+    if verb_policy != "off" and verb_issues:
+        tag = "✗" if (strict or verb_hard) else "⚠"
+        for spec_id, bad in verb_issues:
+            print(f"{tag} [{spec_id}] {bad}")
+    domain_verb_count = len(cap_verbs_cfg) if cap_verbs_cfg else 0
+    if domain_verb_count > 0:
+        print(f"· capabilityVerbs 등록 {domain_verb_count}건(CRUD 5종 외 도메인 어휘, capabilityVerbPolicy={verb_policy}) — 어휘 확장은 이 줄로 매 실행 표면화된다")
+    if verb_hard:
+        print(f"\n✗ capabilityVerbPolicy=hard: 미등록 verb {len(verb_issues)}건 — capabilityVerbs에 사유와 함께 등록하거나 CRUD 동사로 표현하라(--strict 없이도 차단, SPEC-001).",
+              file=sys.stderr)
+        sys.exit(1)
     for w in registry_warns:
         print(f"⚠ {w}")
     if entity_errors:
         print(f"\n✗ ENTITY 레지스트리 위반 {len(entity_errors)}건:", file=sys.stderr)
         for e in entity_errors:
+            print(f"  ✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    if verb_errors:
+        print(f"\n✗ CAPABILITY VERB 레지스트리 위반 {len(verb_errors)}건:", file=sys.stderr)
+        for e in verb_errors:
             print(f"  ✗ {e}", file=sys.stderr)
         sys.exit(1)
     # 선언된 정책이 아무것도 판정하지 않으면(inert) 사유 고지(SPEC-002 FR-010) — 침묵 금지.

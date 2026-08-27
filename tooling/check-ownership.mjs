@@ -60,6 +60,14 @@ if (!["off", "advisory", "hard"].includes(CAP_POLICY)) {
   process.exit(1);
 }
 const CAP_ACTIVE = CAP_POLICY !== "off" && capabilityCheckActive(ROLES);
+
+// 미등록 verb 강도(이슈 #21 E-5) — 전역 --strict와 독립. 실측: 기존엔 warn 뒤 --strict가 있어야
+// exit 1인데 hook·CI 기본 호출이 --strict를 안 넘겨 hard가 한 번도 발화하지 않았다.
+const VERB_POLICY = cfg.capabilityVerbPolicy || "advisory";
+if (!["off", "advisory", "hard"].includes(VERB_POLICY)) {
+  console.error(`✗ capabilityVerbPolicy 값 위반 "${VERB_POLICY}" — off|advisory|hard 중 하나(문법화, 정의되지 않은 값 금지)`);
+  process.exit(1);
+}
 // 정책이 off가 아닌데 판정이 성립하지 않으면(inert) 사유를 반드시 출력한다 — hard면 차단(거짓 안전).
 const CAP_INERT = capabilityInertReasons(CAP_POLICY, ROLES);
 const capFindings = []; // {specId, capability, entity}
@@ -300,6 +308,15 @@ if (Object.keys(REGISTRY).length) {
   }
 }
 
+// capabilityVerbs 승격형(`{동사:사유}`) — entityRegistry와 동형: 빈 사유는 항상 에러(정책 무관, 이슈 #21 E-5).
+// 배열(레거시)은 사유 없이 통과 — 하위호환, 이 검증은 객체형을 쓴 프로젝트에만 발화한다.
+const verbErrors = [];
+if (cfg.capabilityVerbs && !Array.isArray(cfg.capabilityVerbs)) {
+  for (const [verb, reason] of Object.entries(cfg.capabilityVerbs)) {
+    if (!String(reason || "").trim()) verbErrors.push(`capabilityVerbs["${verb}"] — 도입 사유 필요(빈 값 불가)`);
+  }
+}
+
 // Entity 관계(SPEC-017): 대상 실재·소유 spec 해석 = hard, 순환 참조 = advisory.
 // relationTypes가 비어있으면 어휘 무제한(capabilityVerbs 동형) — 형식(kebab 토큰)만 relation-lib가 이미 강제.
 const RELATION_TYPES = cfg.relationTypes || [];
@@ -338,15 +355,40 @@ if (missing.length) {
   console.log(`${tag} Ownership 블록 없음(${missing.length}): ${missing.join(", ")}`);
 }
 
-if (formatIssues.length) {
+// 미등록 verb는 capabilityVerbPolicy가 별도로 강도를 정한다(이슈 #21 E-5) — 전역 --strict와 독립.
+// 나머지 형식 위반(surface 문법 등)은 기존대로 --strict에 묶인다.
+const verbIssues = formatIssues.filter((f) => f.bad.startsWith("미등록 verb"));
+const otherFormatIssues = formatIssues.filter((f) => !f.bad.startsWith("미등록 verb"));
+if (otherFormatIssues.length) {
   const tag = STRICT ? "✗" : "⚠";
-  for (const f of formatIssues) console.log(`${tag} [${f.specId}] ${f.bad}`);
+  for (const f of otherFormatIssues) console.log(`${tag} [${f.specId}] ${f.bad}`);
+}
+const verbHard = VERB_POLICY === "hard" && verbIssues.length > 0;
+if (VERB_POLICY !== "off" && verbIssues.length) {
+  const tag = (STRICT || verbHard) ? "✗" : "⚠";
+  for (const f of verbIssues) console.log(`${tag} [${f.specId}] ${f.bad}`);
+}
+// 도메인 verb 어휘 개수를 매 실행 표면화 — 늘어도 흔적이 없던 결함(이슈 #21 E-5)의 직접 봉합.
+// 사유가 이미 config diff에 남으므로 여기선 개수만 부채로 보여준다(리뷰는 diff가 한다).
+const domainVerbCount = Array.isArray(cfg.capabilityVerbs)
+  ? cfg.capabilityVerbs.length : Object.keys(cfg.capabilityVerbs || {}).length;
+if (domainVerbCount > 0) {
+  console.log(`· capabilityVerbs 등록 ${domainVerbCount}건(CRUD 5종 외 도메인 어휘, capabilityVerbPolicy=${VERB_POLICY}) — 어휘 확장은 이 줄로 매 실행 표면화된다`);
+}
+if (verbHard) {
+  console.error(`\n✗ capabilityVerbPolicy=hard: 미등록 verb ${verbIssues.length}건 — capabilityVerbs에 사유와 함께 등록하거나 CRUD 동사로 표현하라(--strict 없이도 차단, SPEC-001).`);
+  process.exit(1);
 }
 
 for (const w of registryWarns) console.log(`⚠ ${w}`);
 if (entityErrors.length) {
   console.error(`\n✗ ENTITY 레지스트리 위반 ${entityErrors.length}건:`);
   for (const e of entityErrors) console.error(`  ✗ ${e}`);
+  process.exit(1);
+}
+if (verbErrors.length) {
+  console.error(`\n✗ CAPABILITY VERB 레지스트리 위반 ${verbErrors.length}건:`);
+  for (const e of verbErrors) console.error(`  ✗ ${e}`);
   process.exit(1);
 }
 

@@ -3,6 +3,8 @@
 // @covers SPEC-002/FR-007
 // @covers SPEC-002/FR-009
 // @covers SPEC-002/FR-010
+// @covers SPEC-002/FR-011
+// @covers SPEC-001/FR-007
 // @covers SPEC-017/FR-001
 // @covers SPEC-017/FR-002
 // @covers SPEC-017/FR-003
@@ -306,4 +308,65 @@ test("Dependencies capability의 entity가 다른 스펙 소유라면 정당한 
   const B = "# SPEC-002\n## Ownership\n- **Entities**: staff\n";
   const r = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { capabilityOwnershipPolicy: "hard" });
   assert.equal(r.code, 0, r.out);
+});
+
+// ── E-5/E-6: capabilityVerbs 사유 승격 + 미등록 hard화(이슈 #21) ──
+
+test("capabilityVerbPolicy 기본값(advisory)은 기존과 동일 — 미등록 verb는 warn·exit 0", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, {});
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /⚠ \[SPEC-001\] 미등록 verb "frobnicate"/);
+});
+
+test("capabilityVerbPolicy=hard: 미등록 verb는 --strict 없이도 exit 1(이슈 #21 E-5 — 기존엔 --strict 없이 hard가 발화한 적이 없었다)", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbPolicy: "hard" });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /✗ \[SPEC-001\] 미등록 verb "frobnicate"/);
+  assert.match(r.out, /✗ capabilityVerbPolicy=hard: 미등록 verb 1건/);
+});
+
+test("capabilityVerbPolicy=off: 미등록 verb를 아예 표시하지 않는다", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbPolicy: "off" });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /미등록 verb/);
+});
+
+test("capabilityVerbs 객체형(`{동사:사유}`)은 entityRegistry와 동형 — 빈 사유는 항상 에러(정책 무관)", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: { frobnicate: "  " } });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /✗ CAPABILITY VERB 레지스트리 위반 1건/);
+  assert.match(r.out, /capabilityVerbs\["frobnicate"\] — 도입 사유 필요\(빈 값 불가\)/);
+});
+
+test("capabilityVerbs 객체형에 사유가 있으면 그 동사는 등록된 것으로 인정 — 배열형과 동등하게 통과", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: { frobnicate: "커스텀 워크플로 트리거" }, capabilityVerbPolicy: "hard" });
+  assert.equal(r.code, 0, r.out);
+  assert.doesNotMatch(r.out, /미등록 verb/);
+});
+
+test("capabilityVerbs 배열형(레거시)은 사유 없이 그대로 통과 — 하위호환", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: ["frobnicate"], capabilityVerbPolicy: "hard" });
+  assert.equal(r.code, 0, r.out);
+});
+
+test("등록된 도메인 verb 개수는 매 실행 표면화된다(이슈 #21 E-5 — 늘어도 흔적이 없던 결함)", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: { frobnicate: "사유" } });
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /· capabilityVerbs 등록 1건\(CRUD 5종 외 도메인 어휘, capabilityVerbPolicy=advisory\)/);
+  const none = runWithConfig({ "SPEC-001.md": "# SPEC-001\n## Ownership\n- **Entities**: staff\n" }, {});
+  assert.doesNotMatch(none.out, /capabilityVerbs 등록/); // 0건이면 표면화할 것이 없다
+});
+
+test("capabilityVerbPolicy 값 위반은 enum 검증에서 즉시 exit 1", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: staff\n";
+  const r = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbPolicy: "bogus" });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /capabilityVerbPolicy 값 위반/);
 });

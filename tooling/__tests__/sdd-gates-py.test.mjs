@@ -433,6 +433,35 @@ test("py ownership Dependencies Capability 유령 entity(이슈 #21 E-1): adviso
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-001/FR-004
+test("py ownership capabilityVerbPolicy(이슈 #21 E-5): hard는 --strict 없이도 exit 1, 객체형 빈 사유는 항상 에러 — Node와 바이트 동일", skip, () => {
+  const spec = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: staff\n- **Capabilities**: staff.frobnicate\n";
+  const root = fixture({ "sdd/specs/SPEC-001.md": spec }, { capabilityVerbPolicy: "hard" });
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 1, py.out);
+    assert.equal(nd.code, 1, nd.out);
+    assert.match(py.out, /capabilityVerbPolicy=hard: 미등록 verb 1건/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+
+    writeFileSync(join(root, "sdd.config.json"),
+      JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], capabilityVerbs: { frobnicate: "  " } }));
+    const pyEmpty = runPy(root, ["ownership"]);
+    const ndEmpty = runNode(root, "check-ownership.mjs", []);
+    assert.equal(pyEmpty.code, 1, pyEmpty.out);
+    assert.match(pyEmpty.out, /CAPABILITY VERB 레지스트리 위반 1건/);
+    assert.equal(pyEmpty.out, ndEmpty.out, "Node↔Python 출력 바이트 동일(빈 사유)");
+
+    writeFileSync(join(root, "sdd.config.json"),
+      JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], capabilityVerbs: { frobnicate: "사유" } }));
+    const pyOk = runPy(root, ["ownership"]);
+    const ndOk = runNode(root, "check-ownership.mjs", []);
+    assert.equal(pyOk.code, 0, pyOk.out);
+    assert.equal(pyOk.out, ndOk.out, "Node↔Python 출력 바이트 동일(등록됨)");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // @covers SPEC-023/FR-002
 // @covers SPEC-023/FR-003
 test("py consistency 키 앵커(SPEC-023): advisory ⚠·hard exit 1 — Node와 출력 바이트 동일", skip, () => {
