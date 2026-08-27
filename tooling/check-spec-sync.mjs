@@ -280,8 +280,14 @@ const satisfied = new Set([...triggered].filter((id) => {
   const s = specs.find((x) => x.id === id);
   return s && frLineChanged(s.path);
 }));
+// 값 없는 `Spec-Impact:` 한 줄은 사유가 아니다(이슈 #21 M-6) — `none` 분기(위 ①)는 이미 빈
+// 사유를 exit 1로 막는데, 이 일반 분기는 내용 유무를 아예 안 봐서 **더 관대한 역전**이 있었다.
+// none이 여기까지 살아남았다면 그 시점에 이미 사유가 있는 것이 보장된다(위에서 빈 사유는 종료).
 let hasSpecImpact = false;
-if (STAGED && MSG) hasSpecImpact = /^Spec-Impact:/m.test(readFileSync(MSG, "utf8"));
+if (STAGED && MSG) {
+  const m = readFileSync(MSG, "utf8").match(/^Spec-Impact:\s*(.*)$/m);
+  hasSpecImpact = !!(m && m[1].trim());
+}
 const drift = escalations(triggered, satisfied, hasSpecImpact, DRIFT_POLICY);
 if (drift.policyError) { console.error(`✗ ${drift.policyError}`); process.exit(1); }
 const driftHard = drift.hard && drift.violations.length > 0;
@@ -313,6 +319,13 @@ if (filesMissingHard && !violations.length) {
 }
 // semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
 for (const id of drift.violations) console.log(`  ${driftHard ? "✗" : "⚠"} [${id}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy=${DRIFT_POLICY})`);
+// 트레일러 사용 감사 흔적(이슈 #21 M-7) — Spec-Impact가 이 커밋의 semantic drift 승격 전체를
+// 면제하면 위반이 0건이 돼 조용히 지나간다. 판정(0건)은 옳지만 **왜 0건인지**가 남아야
+// 사후에 "그 사유가 타당했는가"를 감사할 수 있다 — 트레일러는 커밋 이력에 영속해도 이
+// 게이트의 stdout에는 아무 흔적이 없었다.
+if (hasSpecImpact && triggered.size && !drift.violations.length) {
+  console.log(`  · [부채] semantic drift 승격 ${triggered.size}건이 Spec-Impact 트레일러로 면제됨(${[...triggered].sort().join(", ")}) — 트레일러 사유의 타당성은 사후 감사 대상`);
+}
 if (!violations.length && !driftHard) {
   if (SPEC_IMPACT) console.log(`spec-sync: Spec-Impact: none — 통과 (사유: ${SPEC_IMPACT}) [트레일러가 커밋에 영속 — 글롭 문법·unowned 정책은 면제 대상 아님]`);
   else console.log(drift.violations.length

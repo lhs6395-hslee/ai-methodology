@@ -412,6 +412,7 @@ test("비ASCII 경로(quotepath): 한글 파일명 소유 코드도 인용 없�
 });
 
 // @covers SPEC-019/FR-001
+// @covers SPEC-019/FR-006
 test("semantic drift: 소유 파일 리네임 + FR라인 무변경(hard) → ✗ exit 1 / FR라인 변경 → PASS / Spec-Impact → PASS", () => {
   const { root, g } = repo();
   try {
@@ -442,6 +443,46 @@ test("semantic drift: 소유 파일 리네임 + FR라인 무변경(hard) → ✗
     writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact: 파일명만 정리, 동작 불변\n");
     const r3 = runGate(root, ["--staged", "--message-file", "msg"]);
     assert.equal(r3.code, 0, r3.out);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 이슈 #21 M-6: 값 없는 `Spec-Impact:` 한 줄이 사유 있는 `Spec-Impact: none <사유>`보다
+// 더 관대했다 — "none" 분기는 빈 사유를 exit 1로 막는데, 일반 분기는 내용을 아예 안 봤다.
+test("semantic drift: 값 없는 Spec-Impact: 한 줄은 사유가 아니다 — 여전히 위반(이슈 #21 M-6)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("mv", "src/lib/pdf/parse.ts", "src/lib/pdf/parser.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n"));
+    g("add", "-A");
+    // 내용 없는 트레일러 — 예전 판은 이 한 줄만으로 승격 요구 전체를 면제했다.
+    writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact:\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /semantic drift/);
+    assert.match(r.out, /SPEC-001/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 이슈 #21 M-7: Spec-Impact 트레일러가 승격 전체를 면제하면 위반 0건이라 조용히 지나갔다 —
+// 판정(0건)은 옳지만 왜 0건인지가 stdout에 흔적을 남겨야 사후 감사가 가능하다.
+test("semantic drift: Spec-Impact로 면제되면 부채 줄로 사후 감사 흔적을 남긴다(이슈 #21 M-7)", () => {
+  const { root, g } = repo();
+  try {
+    writeFileSync(join(root, "sdd.config.json"), JSON.stringify({ specDir: "sdd/specs", semanticDriftPolicy: "hard" }));
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**"));
+    writeFileSync(join(root, "src/lib/pdf/parse.ts"), "export const v = 1;\n");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("mv", "src/lib/pdf/parse.ts", "src/lib/pdf/parser.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n"));
+    g("add", "-A");
+    writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact: 파일명만 정리, 동작 불변\n");
+    const r = runGate(root, ["--staged", "--message-file", "msg"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /· \[부채\] semantic drift 승격 1건이 Spec-Impact 트레일러로 면제됨\(SPEC-001\)/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

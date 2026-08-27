@@ -4599,9 +4599,12 @@ def cmd_specsync(cfg, staged, msg_file, base):
     spec_by_id = {s[0]: s for s in specs}
     satisfied = set(sid for sid in triggered
                     if spec_by_id.get(sid) and fr_line_changed(spec_by_id[sid][1]))
+    # 값 없는 `Spec-Impact:` 한 줄은 사유가 아니다(이슈 #21 M-6, Node 미러) — none 분기는 이미
+    # 빈 사유를 exit 1로 막으므로, 여기까지 살아남은 none은 사유가 있는 것이 보장된다.
     has_spec_impact = False
     if staged and msg_file:
-        has_spec_impact = re.search(r"^Spec-Impact:", read_text(msg_file), re.MULTILINE) is not None
+        m = re.search(r"^Spec-Impact:\s*(.*)$", read_text(msg_file), re.MULTILINE)
+        has_spec_impact = bool(m and m.group(1).strip())
     drift_violations, drift_hard_flag, drift_policy_error = escalations(
         triggered, satisfied, has_spec_impact, drift_policy)
     if drift_policy_error:
@@ -4634,6 +4637,10 @@ def cmd_specsync(cfg, staged, msg_file, base):
     # semantic drift 승격 리포트(SPEC-019) — 리네임 트리거 스펙에 FR라인/Spec-Impact 부재.
     for sid in drift_violations:
         print(f"  {'✗' if drift_hard else '⚠'} [{sid}] 소유 파일 리네임 — FR 선언 라인 변경 또는 Spec-Impact 사유 필요(semantic drift 승격, policy={drift_policy})")
+    # 트레일러 사용 감사 흔적(이슈 #21 M-7, Node 미러) — 판정(0건)은 옳되 왜 0건인지가 남아야
+    # 사후 감사가 가능하다.
+    if has_spec_impact and triggered and not drift_violations:
+        print(f"  · [부채] semantic drift 승격 {len(triggered)}건이 Spec-Impact 트레일러로 면제됨({', '.join(sorted(triggered))}) — 트레일러 사유의 타당성은 사후 감사 대상")
     if not violations and not drift_hard:
         if spec_impact:
             print(f"spec-sync: Spec-Impact: none — 통과 (사유: {spec_impact}) [트레일러가 커밋에 영속 — 글롭 문법·unowned 정책은 면제 대상 아님]")

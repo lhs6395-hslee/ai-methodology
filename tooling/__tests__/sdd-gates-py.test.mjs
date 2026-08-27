@@ -606,6 +606,36 @@ test("py specsync range: 코드-only 브랜치 → advisory(exit 0) + base posit
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-019/FR-002
+test("py specsync semantic drift(이슈 #21 M-6/M-7): 값 없는 Spec-Impact는 위반, 사유 있으면 부채 줄로 감사 흔적 — Node와 바이트 동일", skip, () => {
+  const SPEC = (files, extra = "") => `# SPEC-001\n**Spec**: \`SPEC-001\`\n\n### Edge Cases\n- 기존\n\n**FR-001** THE SYSTEM SHALL x.\n\n## Ownership\n- **Entities**: thing\n- **Files**: ${files}\n\n## Change Log\n| 날짜 | 변경 | 근거 |\n|---|---|---|\n| 2026-07-01 | 초안 | |\n${extra}`;
+  const root = fixture(
+    { "sdd/specs/SPEC-001.md": SPEC("src/lib/pdf/**"), "src/lib/pdf/parse.ts": "export const v = 1;\n" },
+    { semanticDriftPolicy: "hard" });
+  const g = (...a) => execFileSync("git", a, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+  try {
+    g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t");
+    g("add", "-A"); g("commit", "-qm", "base");
+    g("mv", "src/lib/pdf/parse.ts", "src/lib/pdf/parser.ts");
+    writeFileSync(join(root, "sdd/specs/SPEC-001.md"), SPEC("src/lib/pdf/**", "| 2026-07-16 | 리네임 | |\n"));
+    g("add", "-A");
+
+    writeFileSync(join(root, "msg"), "refactor: rename parse\n\nSpec-Impact:\n");
+    const pyEmpty = runPy(root, ["specsync", "--staged", "--message-file", "msg"]);
+    const ndEmpty = runNode(root, "check-spec-sync.mjs", ["--staged", "--message-file", "msg"]);
+    assert.equal(pyEmpty.code, 1, pyEmpty.out);
+    assert.equal(ndEmpty.code, 1, ndEmpty.out);
+    assert.equal(pyEmpty.out, ndEmpty.out, "Node↔Python 출력 바이트 동일(빈 트레일러)");
+
+    writeFileSync(join(root, "msg2"), "refactor: rename parse\n\nSpec-Impact: 파일명만 정리, 동작 불변\n");
+    const pyOk = runPy(root, ["specsync", "--staged", "--message-file", "msg2"]);
+    const ndOk = runNode(root, "check-spec-sync.mjs", ["--staged", "--message-file", "msg2"]);
+    assert.equal(pyOk.code, 0, pyOk.out);
+    assert.match(pyOk.out, /· \[부채\] semantic drift 승격 1건이 Spec-Impact 트레일러로 면제됨\(SPEC-001\)/);
+    assert.equal(pyOk.out, ndOk.out, "Node↔Python 출력 바이트 동일(사유 있음)");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // ── fr 검증 회계(SPEC-007 패리티): strictSpecs·requireAccounting·smokeManifest ──
 
 test("py fr 회계: strictSpecs 부분커버 exit 1 · R3 unaccounted exit 1 · manifest 검증 에러", skip, () => {
