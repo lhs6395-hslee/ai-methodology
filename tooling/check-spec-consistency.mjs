@@ -40,19 +40,19 @@ for (const f of (() => { try { return readdirSync(SPEC_DIR); } catch { return []
   if (ANCHOR_POLICY !== "off") {
     const deps = parseSection(text, "Dependencies", CATEGORIES);
     const lines = text.split("\n");
-    const keySet = buildKeySet(own, deps);
+    const keySet = buildKeySet(own, deps, cfg.__roles, cfg);
     const r = anchorFindings(lines, keySet, cfg.__reqAlt);
     anchors.matched += r.matched.length;
     for (const u of r.unmatched) anchors.findings.push({ specId, ...u });
     // 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (S)·capability (C).
-    const kindMap = buildKeyKindMap(own, deps, cfg.__roles);
+    const kindMap = buildKeyKindMap(own, deps, cfg.__roles, cfg);
     const cm = categoryMarkerFindings(lines, kindMap, MARKERS, cfg.__reqAlt);
     for (const m of cm.missing) markers.missing.push({ specId, ...m });
     for (const m of cm.wrong) markers.wrong.push({ specId, ...m });
     // 굵게 ⟺ 키 세 번째 방향(FR-006): 백틱에 든 선언 키는 앵커여야 함(리터럴 아님).
     for (const m of backtickKeyFindings(lines, kindMap, MARKERS, cfg.__reqAlt)) markers.backtick.push({ specId, ...m });
     // 소유 키 앵커 강제(FR-007, (B)): 소유 entity/surface/capability 키는 FR에 굵게 앵커돼야 함.
-    for (const m of unanchoredOwnedKeyFindings(lines, buildKeyKindMap(own, {}, cfg.__roles), MARKERS, cfg.__reqAlt)) markers.unanchored.push({ specId, ...m });
+    for (const m of unanchoredOwnedKeyFindings(lines, buildKeyKindMap(own, {}, cfg.__roles, cfg), MARKERS, cfg.__reqAlt)) markers.unanchored.push({ specId, ...m });
   }
   // Extract body (FR text) — everything before the Ownership section
   // Only the FR body BEFORE ## Ownership grounds keys; the Ownership block (and any

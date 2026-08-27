@@ -792,7 +792,8 @@ def normalize_key(category, raw, cfg):
         method = m.group(1).upper()
         spp = cfg["surfacePathParam"]
         param_repl = spp.replace("name", r"\1") if "name" in spp else r"{\1}"
-        path = re.sub(r"[:{<]([a-z0-9_-]+)[>}]?", param_repl, m.group(2).lower())
+        # [id] — Next.js 파일 라우팅 param 문법(이슈 #21 M-12, Node 미러).
+        path = re.sub(r"[:{<\[]([a-z0-9_-]+)[>}\]]?", param_repl, m.group(2).lower())
         path = re.sub(r"/+$", "", path) or "/"
         return f"{method} {path}"
     # Entity·Capability = 소문자 + 내부 공백 정리
@@ -2377,6 +2378,7 @@ def cmd_ownership(cfg, strict):
     owners = {c: {} for c in categories}
     missing, format_issues = [], []
     spec_deps = []  # (spec_id, [(name, type), ...]) — 관계 판정용(SPEC-017)
+    spec_dep_caps = []  # (spec_id, [capability_raw, ...]) — Dependencies의 capability(이슈 #21 E-1)
     rel_struct_count = rel_free_count = 0  # 관계 판정 발화량(침묵 표면화용)
     declared = 0
     for file in files:
@@ -2428,6 +2430,16 @@ def cmd_ownership(cfg, strict):
         # 관계 판정 발화량 — 전부 자유참조면 SPEC-017이 아무것도 보지 않는다(침묵 표면화).
         rel_struct_count += len(rel_entities)
         rel_free_count += len(rel_parsed) - len(rel_entities)
+
+        # Dependencies의 Capabilities(이슈 #21 E-1, Node 미러) — dedup 대상은 아니지만(참조),
+        # 형식(entity.verb·등록 동사)은 위치와 무관하게 늘 적용한다.
+        if cap_active and cap_cat and deps.get(cap_cat):
+            spec_dep_caps.append((spec_id, deps[cap_cat]))
+            for raw in deps[cap_cat]:
+                key = normalize_key(cap_cat, raw, cfg)
+                bad = validate_key(cap_cat, key, cfg)
+                if bad:
+                    format_issues.append((spec_id, f"{bad}(Dependencies)"))
 
     conflicts = []
     for cat in categories:
@@ -2543,15 +2555,30 @@ def cmd_ownership(cfg, strict):
               file=sys.stderr)
         sys.exit(1)
 
+    # Dependencies의 Capabilities 유령 entity 검사(이슈 #21 E-1, Node 미러) — own이 아니라 **전역**
+    # owners[ent_cat]과 대조(참조는 다른 스펙 소유라도 정당, 유령만 잡는다). 판정 로직은
+    # capability_ownership_findings 그대로 재사용(대조 집합만 다르다).
+    dep_cap_findings = []
+    if cap_active and cap_cat:
+        all_entity_keys = list(owners[ent_cat].keys())
+        for spec_id, capabilities in spec_dep_caps:
+            for cap, entity in capability_ownership_findings(all_entity_keys, capabilities):
+                dep_cap_findings.append((spec_id, cap, entity))
+
     # Capability 귀속 리포트(SPEC-024) — 스펙 경계는 entity 기준.
-    cap_hard = cap_policy == "hard" and len(cap_findings) > 0
+    cap_hard = cap_policy == "hard" and (len(cap_findings) > 0 or len(dep_cap_findings) > 0)
     if cap_active and cap_findings:
         print(f"Capability 귀속(capabilityOwnershipPolicy={cap_policy}): 위반 {len(cap_findings)}건 — capability는 그 entity를 소유한 스펙에 귀속")
         for spec_id, cap, entity in cap_findings:
             tag = "✗" if cap_hard else "⚠"
             print(f'  {tag} [{spec_id}] Capabilities "{cap}" — entity "{entity}"를 이 스펙이 소유하지 않음: 그 entity 소유 스펙으로 이관(verb가 달라도 같은 스펙에 FR 신설), 이 스펙이 그 aggregate면 Entities에 소유 선언')
+    if cap_active and dep_cap_findings:
+        print(f"Dependencies Capability 유령 entity(capabilityOwnershipPolicy={cap_policy}): 위반 {len(dep_cap_findings)}건 — 참조는 실재하는 entity만 가능")
+        for spec_id, cap, entity in dep_cap_findings:
+            tag = "✗" if cap_hard else "⚠"
+            print(f'  {tag} [{spec_id}] Dependencies.Capabilities "{cap}" — entity "{entity}"를 어느 스펙도 소유하지 않음(유령 entity, 오타 확인). Dependencies에 적는다고 검증을 우회하지 않는다')
     if cap_hard:
-        print("\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).",
+        print("\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability(기술 계층 스펙, 또는 Dependencies의 유령 entity 참조) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하거나(Ownership) 실재하는 entity로 정정하라(Dependencies)(SPEC-024).",
               file=sys.stderr)
         sys.exit(1)
 
@@ -3665,9 +3692,11 @@ def _bare_key(raw):
     return re.split(r"\s+\(", s)[0].strip().lower()
 
 
-def _build_key_kind_map(own_sections, dep_sections, roles=None):
-    """키 → 종류(entity/surface/capability) 맵 — 마커 대조용. 관계 서픽스 제거, 첫 등장 우선.
-    세 종류 카테고리가 하나도 없으면(킷 Modules 등) 빈 맵(inert)."""
+_KIND_TO_NORMALIZE_CATEGORY = {"entity": "Entities", "surface": "Surfaces", "capability": "Capabilities"}
+
+
+def _make_kind_of(roles):
+    """카테고리명 → 종류(entity/surface/capability) 판정기 — _build_key_set·_build_key_kind_map 공용(Node 미러)."""
     by_role = None
     if roles and (roles.get("entity") or roles.get("surface") or roles.get("capability")):
         by_role = {str(c).strip().lower(): k for k, c in
@@ -3684,6 +3713,16 @@ def _build_key_kind_map(own_sections, dep_sections, roles=None):
         if re.search(r"capabilit", cat, re.IGNORECASE):
             return "capability"
         return None
+    return kind_of
+
+
+def _build_key_kind_map(own_sections, dep_sections, roles=None, cfg=None):
+    """키 → 종류(entity/surface/capability) 맵 — 마커 대조용. 관계 서픽스 제거, 첫 등장 우선.
+    세 종류 카테고리가 하나도 없으면(킷 Modules 등) 빈 맵(inert).
+
+    cfg를 주면(선택) 정본 표기(normalize_key)도 같은 kind로 추가 등록한다(이슈 #21 B-3, Node 미러) —
+    Ownership이 원시 형태로 선언돼도 DEDUP.md 권장 정본형으로 앵커한 저자가 빠지지 않게 한다."""
+    kind_of = _make_kind_of(roles)
     km = {}
     for sec in (own_sections, dep_sections):
         for cat, lst in (sec or {}).items():
@@ -3694,6 +3733,11 @@ def _build_key_kind_map(own_sections, dep_sections, roles=None):
                 k = _bare_key(raw)
                 if k and k not in ("—", "-") and k not in km:
                     km[k] = kind
+                norm_cat = cfg and _KIND_TO_NORMALIZE_CATEGORY.get(kind)
+                if norm_cat:
+                    canon = normalize_key(norm_cat, _bare_key(raw), cfg).lower()
+                    if canon and canon not in ("—", "-") and canon not in km:
+                        km[canon] = kind
     return km
 
 
@@ -3772,6 +3816,9 @@ def _unanchored_owned_key_findings(fr_lines, owned_kind_map, markers, req_alt="F
         for tok, _ in _extract_anchors_with_markers(line, req_alt):
             anchored.add(tok)
     for key, kind in owned_kind_map.items():
+        # 글롭 키(`*` 포함)는 볼드 앵커로 구조적으로 표현 불가능하다(이슈 #21 B-1) — Node 판과 동일.
+        if "*" in key:
+            continue
         if key in anchored:
             continue
         expected = str(markers[kind]).upper() if markers and markers.get(kind) else None
@@ -3779,17 +3826,28 @@ def _unanchored_owned_key_findings(fr_lines, owned_kind_map, markers, req_alt="F
     return out
 
 
-def _build_key_set(own_sections, dep_sections):
-    """Ownership ∪ Dependencies 전 카테고리(Files 제외) 정규화 키 + 관계 서픽스 제거(SPEC-017)."""
+def _build_key_set(own_sections, dep_sections, roles=None, cfg=None):
+    """Ownership ∪ Dependencies 전 카테고리(Files 제외) 정규화 키 + 관계 서픽스 제거(SPEC-017).
+
+    roles·cfg를 함께 주면(선택) 정본 표기(normalize_key)도 같은 키로 등록한다(더할 뿐, 기존
+    매치는 보존 — 이슈 #21 B-3, Node 미러). 미전달 시(하위호환) 원시 소문자만 등록."""
     keys = set()
+    kind_of = _make_kind_of(roles)
     for sec in (own_sections, dep_sections):
         for cat, lst in (sec or {}).items():
             if cat.lower() == "files":
                 continue
+            kind = kind_of(cat)
             for raw in lst or []:
-                k = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip().lower()
-                if k and k not in ("—", "-"):
-                    keys.add(k)
+                stripped = re.sub(r"\s*\([a-z][a-z0-9-]*\)\s*$", "", str(raw)).strip()
+                lower = stripped.lower()
+                if lower and lower not in ("—", "-"):
+                    keys.add(lower)
+                norm_cat = cfg and kind and _KIND_TO_NORMALIZE_CATEGORY.get(kind)
+                if norm_cat:
+                    canon = normalize_key(norm_cat, stripped, cfg).lower()
+                    if canon and canon not in ("—", "-"):
+                        keys.add(canon)
     return keys
 
 
@@ -3837,12 +3895,12 @@ def cmd_consistency(cfg, strict):
         if anchor_policy != "off":
             deps = parse_section(text, "Dependencies", categories)
             lines = text.split("\n")
-            key_set = _build_key_set(own, deps)
+            key_set = _build_key_set(own, deps, cfg["__roles"], cfg)
             mt, un = _anchor_findings(lines, key_set, cfg["__reqAlt"])
             anchor_matched += len(mt)
             anchor_unmatched.extend((spec_id, fr, tok) for fr, tok in un)
             # 카테고리 마커(SPEC-023 확장): 굵은 키마다 종류 표기 — entity (E)·surface (S)·capability (C).
-            kind_map = _build_key_kind_map(own, deps, cfg["__roles"])
+            kind_map = _build_key_kind_map(own, deps, cfg["__roles"], cfg)
             miss, wr = _category_marker_findings(lines, kind_map, markers, cfg["__reqAlt"])
             marker_missing.extend((spec_id, fr, tok, exp) for fr, tok, exp in miss)
             marker_wrong.extend((spec_id, fr, tok, exp, got) for fr, tok, exp, got in wr)
@@ -3850,7 +3908,7 @@ def cmd_consistency(cfg, strict):
             for fr, tok, exp in _backtick_key_findings(lines, kind_map, markers, cfg["__reqAlt"]):
                 marker_backtick.append((spec_id, fr, tok, exp))
             # 소유 키 앵커 강제(FR-007, (B)): 소유 entity/surface/capability 키는 FR에 굵게 앵커돼야 함.
-            for key, kind, exp in _unanchored_owned_key_findings(lines, _build_key_kind_map(own, {}, cfg["__roles"]), markers, cfg["__reqAlt"]):
+            for key, kind, exp in _unanchored_owned_key_findings(lines, _build_key_kind_map(own, {}, cfg["__roles"], cfg), markers, cfg["__reqAlt"]):
                 marker_unanchored.append((spec_id, key, kind, exp))
         h = re.search(r"^##\s+Ownership\b", text, re.MULTILINE)
         # ## Ownership 이전 본문만 근거 — 키가 자기 선언 줄로 근거되는 것을 방지.

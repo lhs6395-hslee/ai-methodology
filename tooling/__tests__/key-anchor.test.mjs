@@ -249,3 +249,42 @@ test("bareKey: 백틱·괄호 주석을 벗겨 키 본체만 — 앵커 구조�
   assert.equal(km.get("pjt_salary_ranges"), "entity");
   assert.ok(![...km.keys()].some((k) => k.includes("`") || k.includes("(")));
 });
+
+// ── 이슈 #21 B-1: 글롭 키는 볼드 앵커로 구조적으로 표현 불가 ──
+test("unanchoredOwnedKeyFindings: 글롭 키(* 포함)는 앵커 요구에서 면제된다(구조적으로 불가능한 요구를 하지 않는다)", () => {
+  const globMap = new Map([["get /api/*/users", "surface"], ["thing", "entity"]]);
+  // 글롭 키는 전혀 앵커되지 않아도 findings에 안 뜬다. 일반 키(thing)는 여전히 요구된다.
+  const findings = unanchoredOwnedKeyFindings([], globMap, M);
+  assert.deepEqual(findings.map((f) => f.key), ["thing"]);
+});
+
+test("extractAnchorsWithMarkers: 글롭 앵커(**GET /api/*/users**)는 * 경계에서 잘려 통째로 안 잡힌다(구조적 한계 — 실측 근거)", () => {
+  // 이 결과 자체가 B-1의 원인이다 — markdown bold 델리미터(**)와 글롭의 *가 겹쳐 파서가
+  // 못 뚫는다. unanchoredOwnedKeyFindings의 글롭 면제(위 테스트)가 이 구조적 한계의 보완책이다.
+  const out = extractAnchorsWithMarkers("- **FR-001** ... SHALL serve **GET /api/*/users** (S) ...");
+  assert.ok(!out.some((a) => a.token.includes("/users")));
+});
+
+// ── 이슈 #21 B-3: buildKeySet/buildKeyKindMap이 정본 표기(normalizeKey)도 함께 인정 ──
+test("buildKeySet: cfg를 주면 정본 표기도 추가 등록(원시 표기는 유지 — 상집합, 회귀 없음)", () => {
+  const cfg = { surfaceFormat: "http", surfacePathParam: "{name}" };
+  const roles = { entity: "Entities", surface: "Surfaces", capability: "Capabilities" };
+  const own = { Entities: [], Surfaces: ["POST /api/:id"], Capabilities: [] };
+  // cfg 없이 부르면(하위호환) 원시 소문자만 — 종전 동작 불변.
+  const legacy = buildKeySet(own, {});
+  assert.deepEqual([...legacy], ["post /api/:id"]);
+  // cfg를 주면 정본 표기(POST /api/{id})도 함께 들어간다 — DEDUP.md 권장 표기로 앵커한 저자가
+  // "Ownership이 원시 형태라 못 찾음"으로 오탐되지 않는다(이슈 #21 B-3 실측).
+  const withCfg = buildKeySet(own, {}, roles, cfg);
+  assert.ok(withCfg.has("post /api/:id"));   // 원시 표기 — 여전히 매치(회귀 없음)
+  assert.ok(withCfg.has("post /api/{id}"));  // 정본 표기 — 새로 매치
+});
+
+test("buildKeyKindMap: cfg를 주면 정본 표기도 같은 kind로 등록", () => {
+  const cfg = { surfaceFormat: "http", surfacePathParam: "{name}" };
+  const roles = { entity: "Entities", surface: "Surfaces", capability: "Capabilities" };
+  const own = { Entities: [], Surfaces: ["POST /api/:id"], Capabilities: [] };
+  const km = buildKeyKindMap(own, {}, roles, cfg);
+  assert.equal(km.get("post /api/:id"), "surface");
+  assert.equal(km.get("post /api/{id}"), "surface");
+});

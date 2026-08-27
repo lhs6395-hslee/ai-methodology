@@ -280,6 +280,21 @@ test("py ownership: 미등록 verb Capability는 형식위반 warn, --strict에�
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// @covers SPEC-024/FR-006
+test("py ownership: Dependencies에 적은 capability도 형식위반은 잡힌다(이슈 #21 E-1) — Node와 출력 바이트 동일", skip, () => {
+  const spec = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: wizard\n## Dependencies\n- **Capabilities**: wizard.frobnicate\n";
+  const root = fixture({ "sdd/specs/SPEC-001.md": spec });
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /미등록 verb "frobnicate".*\(Dependencies\)/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    assert.equal(runPy(root, ["ownership", "--strict"]).code, 1);
+    assert.equal(runNode(root, "check-ownership.mjs", ["--strict"]).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("py ownership: 관계(SPEC-017) — 대상 실재 확인(hard)·순환(advisory)·레거시 무관 (Node 패리티)", skip, () => {
   const A = "**Spec**: `SPEC-001`\n## Ownership\n- **Entities**: investigation_run\n## Dependencies\n- **Entities**: investigation_finding (has-many)\n";
   const B = "**Spec**: `SPEC-002`\n## Ownership\n- **Entities**: investigation_finding\n";
@@ -394,6 +409,27 @@ test("py ownership Capability 귀속(SPEC-024): advisory ⚠·hard exit 1 — No
       JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], capabilityVerbs: ["aggregate"], capabilityOwnershipPolicy: "hard" }));
     assert.equal(runPy(root, ["ownership"]).code, 1);
     assert.equal(runNode(root, "check-ownership.mjs", []).code, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// @covers SPEC-024/FR-002
+// @covers SPEC-024/FR-003
+test("py ownership Dependencies Capability 유령 entity(이슈 #21 E-1): advisory ⚠·hard exit 1 — Node와 출력 바이트 동일", skip, () => {
+  const spec = "# S\n**Spec**: `SPEC-001`\n\n## Ownership\n- **Entities**: recommendation\n## Dependencies\n- **Capabilities**: ghost.create\n";
+  const root = fixture({ "sdd/specs/SPEC-001.md": spec }, { capabilityOwnershipPolicy: "advisory" });
+  try {
+    const py = runPy(root, ["ownership"]);
+    const nd = runNode(root, "check-ownership.mjs", []);
+    assert.equal(py.code, 0, py.out);
+    assert.match(py.out, /Dependencies Capability 유령 entity.*위반 1건/);
+    assert.equal(py.out, nd.out, "Node↔Python 출력 바이트 동일");
+    writeFileSync(join(root, "sdd.config.json"),
+      JSON.stringify({ specDir: "sdd/specs", scanDirs: ["src"], testFileRegex: ["\\.test\\.mjs$"], capabilityOwnershipPolicy: "hard" }));
+    const pyHard = runPy(root, ["ownership"]);
+    const ndHard = runNode(root, "check-ownership.mjs", []);
+    assert.equal(pyHard.code, 1, pyHard.out);
+    assert.equal(ndHard.code, 1, ndHard.out);
+    assert.equal(pyHard.out, ndHard.out, "Node↔Python 출력 바이트 동일(hard)");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

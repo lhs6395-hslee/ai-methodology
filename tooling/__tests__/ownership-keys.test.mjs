@@ -36,6 +36,12 @@ test("normalizeKey: Surface = 메서드 대문자 + 경로 소문자 + param 표
   assert.equal(normalizeKey("Surfaces", "post /api/items/<id>", cfg), "POST /api/items/{id}");
   // 하이픈 포함 param
   assert.equal(normalizeKey("Surfaces", "get /api/items/:item-id", cfg), "GET /api/items/{item-id}");
+  // [id] Next.js 파일 라우팅 형식(이슈 #21 M-12) — 빠지면 :id·{id}·[id]가 서로 다른 키가 되어
+  // 같은 라우트를 두 스펙이 나눠 소유해도 dedup이 못 잡는다.
+  assert.equal(normalizeKey("Surfaces", "get /api/items/[id]", cfg), "GET /api/items/{id}");
+  assert.equal(
+    normalizeKey("Surfaces", "get /api/items/[id]", cfg),
+    normalizeKey("Surfaces", "get /api/items/:id", cfg));
 });
 
 test("normalizeKey: Capability = 소문자, 점표기 유지", () => {

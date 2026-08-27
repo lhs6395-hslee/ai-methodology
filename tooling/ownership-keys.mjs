@@ -139,7 +139,9 @@ export function normalizeKey(category, raw, cfg) {
     if (!m) return s.toLowerCase();
     const method = m[1].toUpperCase();
     const paramRepl = cfg.surfacePathParam.includes("name") ? cfg.surfacePathParam.replace("name", "$1") : "{$1}";
-    let path = m[2].toLowerCase().replace(/[:{<]([a-z0-9_-]+)[>}]?/g, paramRepl);
+    // [id] — Next.js 파일 라우팅 param 문법(이슈 #21 M-12). 빠지면 :id·{id}·[id]가 서로
+    // 다른 키가 되어 같은 라우트를 두 스펙이 나눠 소유해도 dedup이 못 잡는다.
+    let path = m[2].toLowerCase().replace(/[:{<[]([a-z0-9_-]+)[>}\]]?/g, paramRepl);
     path = path.replace(/\/+$/, "") || "/";
     return `${method} ${path}`;
   }

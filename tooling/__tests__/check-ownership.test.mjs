@@ -277,3 +277,33 @@ test("등록만 하고 Files도 없으면 막힌다 — 등록은 백지수표�
   assert.equal(r.code, 1);
   assert.match(r.out, /미선언 1건: SPEC-002/);
 });
+
+// ── E-1/E-2: Dependencies의 Capabilities는 dedup 대상이 아니지만, 형식·유령 entity 검사는 회피 못 한다(이슈 #21) ──
+// @covers SPEC-024/FR-006
+
+test("Dependencies에 적은 capability도 형식 위반(미등록 verb)은 잡힌다 — 기본 warn, --strict에서 exit 1", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: wizard\n## Dependencies\n- **Capabilities**: wizard.frobnicate\n";
+  const warn = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: ["recommend"] });
+  assert.equal(warn.code, 0, warn.out);
+  assert.match(warn.out, /frobnicate.*\(Dependencies\)/);
+  const strict = runWithConfig({ "SPEC-001.md": A }, { capabilityVerbs: ["recommend"] }, ["--strict"]);
+  assert.equal(strict.code, 1, strict.out);
+});
+
+test("Dependencies에 적은 capability의 entity가 유령이면 hard에서 exit 1, advisory는 ⚠만", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: recommendation\n## Dependencies\n- **Capabilities**: ghost.create\n";
+  const hard = runWithConfig({ "SPEC-001.md": A }, { capabilityOwnershipPolicy: "hard" });
+  assert.equal(hard.code, 1, hard.out);
+  assert.match(hard.out, /Dependencies Capability 유령 entity/);
+  assert.match(hard.out, /✗ \[SPEC-001\] Dependencies\.Capabilities "ghost\.create" — entity "ghost"를 어느 스펙도 소유하지 않음/);
+  const advisory = runWithConfig({ "SPEC-001.md": A }, { capabilityOwnershipPolicy: "advisory" });
+  assert.equal(advisory.code, 0, advisory.out);
+  assert.match(advisory.out, /⚠ \[SPEC-001\] Dependencies\.Capabilities "ghost\.create"/);
+});
+
+test("Dependencies capability의 entity가 다른 스펙 소유라면 정당한 참조 — exit 0", () => {
+  const A = "# SPEC-001\n## Ownership\n- **Entities**: recommendation\n## Dependencies\n- **Capabilities**: staff.create\n";
+  const B = "# SPEC-002\n## Ownership\n- **Entities**: staff\n";
+  const r = runWithConfig({ "SPEC-001.md": A, "SPEC-002.md": B }, { capabilityOwnershipPolicy: "hard" });
+  assert.equal(r.code, 0, r.out);
+});

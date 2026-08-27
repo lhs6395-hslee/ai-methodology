@@ -25,6 +25,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 - 점 없는 capability는 형식 위반이라 `validateKey`가 담당 — 이 판정은 스킵(이중 보고 금지).
 - 대조는 정규화(트림·소문자) — Ownership 선언의 표기 편차에 비의존.
 - 참조 entity(Dependencies) 위의 capability도 위반이다 — 참조는 읽기/호출 선언이지 능력 소유 근거가 아니며, 그 능력은 entity 소유 스펙의 FR이다(owner 확정: verb가 달라도 같은 스펙).
+- **`## Dependencies`에 직접 적은 capability는 dedup 대상이 아니지만 무저항 탈출구는 아니다(이슈 #21 E-1, 2026-08-27).** dedup 제외(Dependencies는 참조)와 "형식·실재 검증 면제"를 혼동하면, `## Dependencies\n- **Capabilities**: ghost.frobnicate` 한 줄로 `validateKey`의 verb 형식 검사와 이 spec의 entity 귀속 대조를 **둘 다** 우회할 수 있었다 — Ownership에 적으면 걸릴 것이 Dependencies로 옮기면 조용히 통과했다(실측: `capabilityOwnershipPolicy: hard`에서도 exit 0). 형식(verb 등록)은 위치와 무관하게 늘 적용되고, entity 귀속은 **이 스펙 소유가 아니라 전역** 대조로 바뀐다 — Dependencies는 참조이니 다른 스펙이 그 entity를 소유해도 정당하지만, **아무 스펙도 소유하지 않는 유령 entity**는 여전히 위반이다(오타·삭제된 entity 조기 발견). 두 위반은 리포트가 분리된다 — Ownership 쪽은 "Capability 귀속"(이관 처방), Dependencies 쪽은 "Dependencies Capability 유령 entity"(정정 처방) — 처방이 다르기 때문(전자는 소유 스펙 이관, 후자는 오타 정정).
 - 위반 해소는 두 방향: (a) capability를 entity 소유 스펙으로 이관(+FR 이동), (b) 이 스펙이 실제 그 aggregate면 Entities에 소유 선언(그러면 dedup이 타 스펙과의 충돌을 검증).
 - 기본 `advisory` — 핵심 경계 규칙이라 off가 아닌 advisory로 태어나되 빌드는 안 깬다(기존 위반 스펙의 마이그레이션은 update 백로그 경로).
 - **지원 계층 출구는 `ownershipRequiredPolicy`까지 연다** — `supportLayerSpecs`에 사유와 함께 등록된 스펙은 **Files 선언만으로** Ownership 요구를 충족한다. 실측 제보: aggregate 없는 부가 계층이 ①캡 초과라 분할해야 하는데 ②분리 스펙은 entity가 없어 capability를 소유할 수 없고 ③그러면 키가 0이라 Ownership 게이트가 막아 **출구가 없었다**. Files가 있으면 중복 검사의 사각이 아니다 — `filesOverlapPolicy`(G3)가 그 글롭의 실파일 겹침을 판정하므로 이 출구는 dedup을 약화시키지 않는다. 등록 없이 키 0이면 여전히 막히고, 등록만 하고 Files도 없으면 막힌다(등록은 백지수표가 아니다). 그리고 이 출구는 **매 실행 표면화**한다.
@@ -39,9 +40,11 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 - **FR-003** (unwanted): IF violations exist, THEN THE SYSTEM SHALL warn and exit zero under advisory, and SHALL exit non-zero under hard.
 - **FR-004** (unwanted): IF the policy value is outside off|advisory|hard, THEN THE SYSTEM SHALL report it and exit non-zero.
 - **FR-005** (unwanted): IF the policy is not off but the configured ownership categories cannot support the judgment — no entity-like or no capability-like category — THEN THE SYSTEM SHALL yield each missing-category reason so the consuming gate can surface the inert policy instead of passing silently.
+- **FR-006** (event): WHEN the policy is advisory or hard and a spec's `## Dependencies` section declares capability keys, THE SYSTEM SHALL apply the same verb-format validation as owned capabilities to those keys, and separately SHALL require each key's entity segment to be owned by any spec (not necessarily the declaring one), reporting a distinct ghost-entity finding (capability, entity segment, declaring spec) when none does.
 
 ### Key Entities
 - **capability ownership** — the rule that a capability key belongs to the spec owning its entity segment: spec boundaries are entity-based, so verbs never spawn specs and engines never own foreign capabilities.
+- **dependencies capability reference** — a capability key declared under `## Dependencies` rather than `## Ownership`: exempt from dedup (it names no owner) but not from format validation or ghost-entity detection (FR-006) — a location, not an escape hatch.
 
 ---
 
@@ -62,6 +65,7 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 ## Success Criteria (측정형)
 - **SC-001**: `capability-ownership.test.mjs` 전 케이스 green + 귀속 판정 출력·exit의 Node↔Python 바이트 동일(패리티 테스트 green). [검증: tooling/__tests__/capability-ownership.test.mjs]
 - **SC-002**: budget-engine 픽스처(Entities 0 + capability 4)에서 위반 4건 전부 지목·hard exit 1(실측 재현 — 도입 검증에서 양판 바이트 동일 확인). [검증: tooling/__tests__/capability-ownership.test.mjs]
+- **SC-003**: `## Dependencies`에 적은 capability의 형식 위반·유령 entity 참조가 모두 지목되고 Node↔Python 바이트 동일(FR-006). [검증: tooling/__tests__/check-ownership.test.mjs, tooling/__tests__/sdd-gates-py.test.mjs]
 
 ## Non-Functional Requirements
 - **NFR-001**: 판정 코어는 문자열 정규화·집합 대조만의 순수 함수라 결정적으로 단위 테스트되고, 파일 IO는 소비 게이트(check-ownership)가 수행. [검증: tooling/__tests__/capability-ownership.test.mjs]
@@ -99,4 +103,5 @@ ownership 게이트가 각 스펙의 소유 capability에 대해 entity 조각(�
 | 2026-07-28 | Edge Case 보강 — 분할의 선행 조건에 **FR 앵커 밀도**를 추가(실제 순서는 3단: 앵커 → 분할 → 이관) | 직전 항목이 "대상 분할 선행"까지만 말해 실행자가 곧바로 분할을 시도할 수 있었다. PM SPEC-004 실측: aggregate 경계는 명확한데(6 root·capability 10/4/3/3/2/1) FR 169개 중 **124개가 앵커 없음**이라 FR 귀속 근거가 스펙에 없다 — SPEC-023 FR-007이 "키당 최소 1회"만 요구하므로 정당한 통과다. 앵커 밀도를 먼저 올리지 않으면 실행자가 124개 FR의 귀속을 추정하게 되고 그것은 스펙 경계를 대신 결정하는 것이다 |
 | 2026-07-28 | **표면 스펙(surface-only spec)을 정당한 종류로 명명** — `Surfaces`만 소유하고 `Entities`·`Capabilities`를 두지 않는 스펙. 판정 로직·강도 무변경(FR-002가 이미 공허 통과) | owner 지시: "판정 불가한 건 방법론을 수정해서라도 업데이트해야지". 실측(PM SPEC-004): 판정 불가 52건 중 **37건**이 어느 aggregate에도 붙지 않는 화면·파이프라인·draft·표현 FR인데, 그 집이 방법론에 **이름이 없어서** 실행자가 귀속 불가로 남길 수밖에 없었다. 금지 대상은 entity 없는 **capability**(남의 aggregate 위 능력 주장)이고 entity 없는 **surface**는 아니다 — capability는 주장이라 aggregate 귀속이 필요하고 surface는 위치라 필요 없다. 선례는 이미 실재했다(PM SPEC-010·SPEC-014·TEST-001) — 규범만 없었다 |
 | 2026-07-28 | Edge Case 신설 — 분할 실행의 두 함정(앵커 승계·캐시 컬럼 판정). 그리고 `METHODOLOGY.md`의 3단 순서 주장을 **실행 결과로 정정**(앵커 밀도는 선행 조건이 아니다) | PM SPEC-004 분할 11조각 완주 실측. ① 앵커 밀도는 올릴 수 **없었다**(118건 중 문장에 선언 키를 지닌 것이 4건) — 그런데도 분할이 성공했고 귀속 근거는 앵커가 아니라 **FR 전수 판독**이 제공했다. 즉 초판이 선행 조건이라 적은 것이 실제로는 보조 신호였다. ② aggregate 축으로 51%가 갈라지지 않아 화면·파이프라인 축을 병용했다(aggregate 스펙 5 + 표면 스펙 5 + 외부 이관 11). ③ 조각 단위 원자 커밋이 회귀 2건을 즉시 잡았다. 결과: SPEC-004 FR 169→92 · aggregate root 6→**1** · cohesion 경고 11→10 · 총 FR 590·`unaccounted:0` 전 구간 보존 |
+| 2026-08-27 | FR-006 신설 — `## Dependencies`에 적은 capability도 verb 형식 검증(위치 무관, `(Dependencies)` 태그로 구분) + entity 귀속을 **전역**(이 스펙이 아니라 어느 스펙이든 소유하면 충족) 대조로 확장, 유령 entity 발견을 "Capability 귀속"과 분리된 리포트("Dependencies Capability 유령 entity")로 출력. Node·Python 패리티 | 감사 이슈 #21 E-1 실측: dedup 제외(참조라 정당)와 검증 전체 면제를 혼동한 결함 — `## Dependencies\n- **Capabilities**: ghost.frobnicate` 한 줄로 미등록 verb 형식 검사와 entity 귀속 검사를 둘 다 우회, `capabilityOwnershipPolicy: hard`에서도 exit 0으로 통과했다. Dependencies에 적는다고 검증을 우회하지 않는다는 것을 재확인 |
 | 2026-08-10 | Capability 귀속 픽스처의 복사 목록을 폐포 계산으로 교체 | 같은 드리프트 결함 |

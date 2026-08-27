@@ -137,6 +137,7 @@ const owners = Object.fromEntries(CATEGORIES.map((c) => [c, new Map()]));
 const missing = [], formatIssues = [];
 const supportFilesOnly = [];  // 지원 계층 스펙이 Files만으로 충족한 것 — 면제가 아니므로 매 실행 표면화
 const specDeps = []; // {specId, entities:[{name,type}]} — 관계 판정용(SPEC-017)
+const specDepCaps = []; // {specId, capabilities:[raw...]} — Dependencies에 적은 capability(이슈 #21 E-1)
 let relStructCount = 0, relFreeCount = 0; // 관계 판정 발화량(침묵 표면화용)
 let declaredCount = 0;
 
@@ -217,6 +218,18 @@ for (const file of files) {
   // 전부 자유참조인 레포에서는 대상 실재 검증이 **한 번도 돌지 않는다**. 그 침묵을 표면화한다.
   relFreeCount += relParsed.length - relEntities.length;
   relStructCount += relEntities.length;
+
+  // Dependencies의 Capabilities(이슈 #21 E-1) — dedup 대상은 아니지만(참조), 형식(entity.verb·
+  // 등록 동사)은 위치와 무관하게 늘 적용한다. 여기 적어도 buildKeySet(key-anchor-lib)이 유효
+  // FR 앵커로 인정하므로, 검증 없이 앵커 자격만 얻는 비대칭을 남기지 않는다.
+  if (CAP_ACTIVE && CAP_CAT && (deps[CAP_CAT] || []).length) {
+    specDepCaps.push({ specId, capabilities: deps[CAP_CAT] });
+    for (const raw of deps[CAP_CAT]) {
+      const key = normalizeKey(CAP_CAT, raw, cfg);
+      const bad = validateKey(CAP_CAT, key, cfg);
+      if (bad) formatIssues.push({ specId, cat: CAP_CAT, bad: `${bad}(Dependencies)` });
+    }
+  }
 }
 
 // 충돌(같은 키를 2+ spec이 소유) 수집
@@ -355,16 +368,36 @@ if (SB_POLICY === "hard" && SB_INERT.length) {
   process.exit(1);
 }
 
+// Dependencies의 Capabilities 유령 entity 검사(이슈 #21 E-1) — own[ENT_CAT]이 아니라 **전역**
+// owners[ENT_CAT]과 대조한다: Dependencies는 참조이니 다른 스펙이 그 entity를 소유해도 정당하다
+// (귀속 위반이 아니다). 검사하는 것은 "그 entity가 어디에도 없다"(유령)뿐 — capabilityOwnershipFindings를
+// 그대로 재사용한다(같은 판정 로직, 대조 집합만 다르다 — R13 중복 방지).
+const depCapFindings = [];
+if (CAP_ACTIVE && CAP_CAT) {
+  const allEntityKeys = [...owners[ENT_CAT].keys()];
+  for (const { specId, capabilities } of specDepCaps) {
+    for (const f of capabilityOwnershipFindings(allEntityKeys, capabilities)) {
+      depCapFindings.push({ specId, ...f });
+    }
+  }
+}
+
 // Capability 귀속 리포트(SPEC-024) — 스펙 경계는 entity 기준.
-const capHard = CAP_POLICY === "hard" && capFindings.length > 0;
+const capHard = CAP_POLICY === "hard" && (capFindings.length > 0 || depCapFindings.length > 0);
 if (CAP_ACTIVE && capFindings.length) {
   console.log(`Capability 귀속(capabilityOwnershipPolicy=${CAP_POLICY}): 위반 ${capFindings.length}건 — capability는 그 entity를 소유한 스펙에 귀속`);
   for (const f of capFindings) {
     console.log(`  ${capHard ? "✗" : "⚠"} [${f.specId}] Capabilities "${f.capability}" — entity "${f.entity}"를 이 스펙이 소유하지 않음: 그 entity 소유 스펙으로 이관(verb가 달라도 같은 스펙에 FR 신설), 이 스펙이 그 aggregate면 Entities에 소유 선언`);
   }
 }
+if (CAP_ACTIVE && depCapFindings.length) {
+  console.log(`Dependencies Capability 유령 entity(capabilityOwnershipPolicy=${CAP_POLICY}): 위반 ${depCapFindings.length}건 — 참조는 실재하는 entity만 가능`);
+  for (const f of depCapFindings) {
+    console.log(`  ${capHard ? "✗" : "⚠"} [${f.specId}] Dependencies.Capabilities "${f.capability}" — entity "${f.entity}"를 어느 스펙도 소유하지 않음(유령 entity, 오타 확인). Dependencies에 적는다고 검증을 우회하지 않는다`);
+  }
+}
 if (capHard) {
-  console.error(`\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability 소유(기술 계층 스펙) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하라(SPEC-024).`);
+  console.error(`\n✗ capabilityOwnershipPolicy=hard: entity 없는 capability(기술 계층 스펙, 또는 Dependencies의 유령 entity 참조) 금지 — 위 능력을 소유 aggregate 스펙으로 이관하거나(Ownership) 실재하는 entity로 정정하라(Dependencies)(SPEC-024).`);
   process.exit(1);
 }
 

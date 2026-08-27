@@ -13,7 +13,28 @@
 
 // 카테고리 역할 해석의 **정본**은 key-pipeline(SPEC-001)이다 — 이름 폴백 정규식을 여기 복제하면
 // 두 사이트가 갈라진다(R13이 실측으로 잡은 중복). ownership-keys는 이 파일을 참조하지 않아 순환 없음.
-import { resolveCategoryRoles } from "./ownership-keys.mjs";
+import { resolveCategoryRoles, normalizeKey } from "./ownership-keys.mjs";
+
+// 카테고리명 → 종류(entity|surface|capability) 판정기 — buildKeySet·buildKeyKindMap 공용
+// (종전엔 buildKeyKindMap 안에 인라인돼 buildKeySet은 종류를 몰랐다 — R13이 잡는 중복은
+// 아니었지만, 종류를 모르면 normalizeKey를 어느 카테고리 규칙으로 부를지도 알 수 없었다).
+function makeKindOf(roles) {
+  const byRole = roles && (roles.entity || roles.surface || roles.capability)
+    ? new Map([[roles.entity, "entity"], [roles.surface, "surface"], [roles.capability, "capability"]]
+        .filter(([c]) => c)
+        .map(([c, k]) => [String(c).trim().toLowerCase(), k]))
+    : null;
+  const nameFallback = (cat) => {
+    const r = resolveCategoryRoles([cat], null);
+    return r.entity ? "entity" : r.surface ? "surface" : r.capability ? "capability" : null;
+  };
+  return (cat) => (byRole ? (byRole.get(String(cat).trim().toLowerCase()) || null) : nameFallback(cat));
+}
+
+// kind(entity|surface|capability|null) → normalizeKey가 받는 카테고리 리터럴. normalizeKey는
+// 카테고리 **이름**이 아니라 이 세 문자열만 특수 취급한다(Surfaces만 METHOD/param 규칙) —
+// 소비 프로젝트가 카테고리를 어떻게 부르든(Symbols·Endpoints…) 역할만 맞으면 같은 규칙을 쓴다.
+const KIND_TO_NORMALIZE_CATEGORY = { entity: "Entities", surface: "Surfaces", capability: "Capabilities" };
 
 // 코드 스팬 제거 — `...` 안은 리터럴(강조 아님). 짝 안 맞는 홀 백틱은 그대로 둔다(안전).
 export function stripCodeSpans(line) {
@@ -55,16 +76,31 @@ export function extractAnchors(line, reqAlt = "FR") {
 
 // 스펙의 대조 키 집합 — Ownership ∪ Dependencies 전 카테고리(Files 제외 — 글롭은 키가 아님),
 // 정규화(트림·소문자) + Dependencies 구조화 관계의 "(relation-type)" 서픽스 제거(SPEC-017 문법).
-export function buildKeySet(ownSections, depSections) {
+//
+// roles·cfg를 함께 주면(선택) **정본 표기**(ownership-keys.normalizeKey — METHOD 대문자·param
+// 표준형 등)도 같은 키로 등록한다 — 원시 형태만 지우지 않고 **더한다**(집합이라 상집합, 기존
+// 매치는 그대로 보존돼 회귀가 없다). 실측 이슈 #21 B-3: Ownership이 `POST /api/:id`로 선언돼도
+// DEDUP.md 권장대로 FR에서 정본형 `**POST /api/{id}**`로 앵커한 저자가 "키 아님"으로 오탐됐다 —
+// 두 표기 다 이 스펙 자신의 선언이므로 어느 쪽으로 앵커해도 인정하는 것이 맞는 동작이다.
+// roles·cfg 미전달 시(하위호환) 원시 소문자만 등록 — 기존 소비처(roles 없이 부르는 자리) 무변.
+export function buildKeySet(ownSections, depSections, roles = null, cfg = null) {
   const keys = new Set();
-  const add = (raw) => {
-    const k = String(raw).replace(/\s*\([a-z][a-z0-9-]*\)\s*$/, "").trim().toLowerCase();
-    if (k && k !== "—" && k !== "-") keys.add(k);
+  const kindOf = makeKindOf(roles);
+  const add = (raw, kind) => {
+    const stripped = String(raw).replace(/\s*\([a-z][a-z0-9-]*\)\s*$/, "").trim();
+    const lower = stripped.toLowerCase();
+    if (lower && lower !== "—" && lower !== "-") keys.add(lower);
+    const normCat = cfg && kind && KIND_TO_NORMALIZE_CATEGORY[kind];
+    if (normCat) {
+      const canon = normalizeKey(normCat, stripped, cfg).toLowerCase();
+      if (canon && canon !== "—" && canon !== "-") keys.add(canon);
+    }
   };
   for (const sec of [ownSections, depSections]) {
     for (const [cat, list] of Object.entries(sec || {})) {
       if (/^files$/i.test(cat)) continue;
-      for (const raw of list || []) add(raw);
+      const kind = kindOf(cat);
+      for (const raw of list || []) add(raw, kind);
     }
   }
   return keys;
@@ -106,23 +142,21 @@ export function bareKey(raw) {
 // **역할이 해석된** 카테고리만(Files·역할 없는 카테고리 제외), 관계 서픽스 제거, 첫 등장 우선.
 // 역할은 config가 선언하고(ownershipCategoryRoles) 미선언 시 이름 정규식 폴백(SPEC-001 FR-010).
 // roles 미전달 시 기존 이름 규칙으로 동작(하위호환). 셋 다 미해석이면 빈 맵 → 마커 판정 inert.
-export function buildKeyKindMap(ownSections, depSections, roles = null) {
+//
+// cfg를 함께 주면(선택) 정본 표기(normalizeKey)도 같은 kind로 추가 등록한다 — buildKeySet과
+// 같은 이유(이슈 #21 B-3): Ownership이 원시 형태로 선언돼도 DEDUP.md 권장 정본형으로 앵커한
+// 저자가 마커 판정에서 "키 아님"으로 빠지지 않게 한다. 원시형 엔트리는 그대로 두고 더할 뿐이다.
+export function buildKeyKindMap(ownSections, depSections, roles = null, cfg = null) {
   const map = new Map();
-  const byRole = roles && (roles.entity || roles.surface || roles.capability)
-    ? new Map([[roles.entity, "entity"], [roles.surface, "surface"], [roles.capability, "capability"]]
-        .filter(([c]) => c)
-        .map(([c, k]) => [String(c).trim().toLowerCase(), k]))
-    : null;
-  // 역할 미전달 시의 이름 폴백은 **정본이 하나**여야 한다 — 여기 복제돼 있던 정규식이
-  // resolveCategoryRoles의 것과 갈라지면 같은 카테고리를 두 사이트가 다르게 읽는다(R13 실측).
-  const nameFallback = (cat) => {
-    const r = resolveCategoryRoles([cat], null);
-    return r.entity ? "entity" : r.surface ? "surface" : r.capability ? "capability" : null;
-  };
-  const kindOf = (cat) => (byRole ? (byRole.get(String(cat).trim().toLowerCase()) || null) : nameFallback(cat));
+  const kindOf = makeKindOf(roles);
   const add = (raw, kind) => {
     const k = bareKey(raw);
     if (k && k !== "—" && k !== "-" && !map.has(k)) map.set(k, kind);
+    const normCat = cfg && KIND_TO_NORMALIZE_CATEGORY[kind];
+    if (normCat) {
+      const canon = normalizeKey(normCat, bareKey(raw), cfg).toLowerCase();
+      if (canon && canon !== "—" && canon !== "-" && !map.has(canon)) map.set(canon, kind);
+    }
   };
   for (const sec of [ownSections, depSections]) {
     for (const [cat, list] of Object.entries(sec || {})) {
@@ -202,6 +236,11 @@ export function unanchoredOwnedKeyFindings(frLines, ownedKindMap, markers, reqAl
     for (const { token } of extractAnchorsWithMarkers(line, reqAlt)) anchored.add(token);
   }
   for (const [key, kind] of ownedKindMap) {
+    // 글롭 키(`*` 포함)는 볼드 앵커로 구조적으로 표현 불가능하다 — `**...**` 델리미터와 글롭의
+    // `*`가 markdown 파서 층에서 겹쳐, extractAnchorsWithMarkers의 `\*\*([^*]+?)\*\*`가 `*` 내부
+    // 경계에서 항상 끊긴다(실측 이슈 #21 B-1: `**GET /api/*/users**`가 앵커 0건으로 사라짐).
+    // 요구할 수 없는 것을 요구하면 항상 위반이라 hard에서 영구 차단된다 — 이 카테고리는 면제한다.
+    if (key.includes("*")) continue;
     if (anchored.has(key)) continue;
     const expected = (markers && markers[kind]) ? String(markers[kind]).toUpperCase() : null;
     out.push({ key, kind, expected });
