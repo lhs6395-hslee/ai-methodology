@@ -27,7 +27,8 @@ const RULES = [
   { rule: "R3 dedup+입도+완전성+일관성", gates: ["check-ownership.mjs", "check-spec-cohesion.mjs", "check-spec-completeness.mjs", "check-spec-consistency.mjs",
     // 보증 맵 드리프트(SPEC-028) — 맵이 현재 소유 선언과 갈라지면 "미판정" 가시성이 낡은 사실을
     // 보여준다. `--check`는 읽기 전용(재생성 안 함) — 강제점이 없어 사람이 기억해야 하던 구멍을 닫는다.
-    { file: "gen-ownership-map.mjs", args: ["--check", "--if-present"] }] },
+    { file: "gen-ownership-map.mjs", args: ["--check", "--if-present"] },
+    { file: "gen-fr-index.mjs", args: ["--check", "--if-present"] }] },
   // R5(감사 M1): 테스트 실행 결과 — runTestsPolicy가 off(기본)면 게이트가 스스로 no-op라 비용 0.
   // SPEC-021이 선언한 "CI·pre-push" 발동 지점의 실제 배선(선언만 있고 호출처 0곳이던 결함 봉합).
   { rule: "R5 test 실행(commands.test)", gates: ["check-test-run.mjs"] },
@@ -145,6 +146,7 @@ export const PY_SUBCOMMAND = Object.freeze({
   "check-gate-escalation.mjs": "gateescalation",
   "check-risky-action.mjs": "riskyaction",
   "check-enforcement-reachability.mjs": "enforcementreachability",
+  "gen-fr-index.mjs": { notAJudge: "생성기 — FR 조회 인덱스를 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
   "gen-ownership-map.mjs": { notAJudge: "생성기 — 보증 맵을 다시 쓰고 드리프트만 알린다. 판정 출력(SPEC-040)이 아니므로 양판 대상이 아니다" },
 });
 

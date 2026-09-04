@@ -183,6 +183,7 @@
     "templates/**",
     "sdd/smoke-manifest.json",
     "sdd/derivation.json",
+    "sdd/FR_INDEX.json",
     "sdd/similarity-candidates.tsv",
     "sdd/OWNERSHIP_MAP.md",
     "sdd/MODULE_MAP.md",
@@ -246,7 +247,8 @@
     "expose",
     "classify",
     "grade",
-    "render"
+    "render",
+    "locate"
   ],
   "capabilityOwnershipPolicy": "hard",
   "ownershipRequiredPolicy": "hard",
@@ -401,6 +403,11 @@
         "kind": "boundary",
         "reason": "재도출 매니페스트 — 생성·갱신 대상 데이터",
         "whyPermanent": "SPEC-009가 소스 클래스 회계로 판정한다"
+      },
+      "sdd/FR_INDEX.json": {
+        "kind": "boundary",
+        "reason": "FR 조회 인덱스 — `gen-fr-index.mjs`가 만드는 캐시(정본은 스펙 파일)",
+        "whyPermanent": "SPEC-062의 `--check` 모드가 인덱스 드리프트를 매 스윕 판정한다(R3). spec-first를 겹치면 스펙을 고칠 때마다 재생성 커밋이 다시 스펙 동반을 요구해 교착이 된다"
       },
       "sdd/similarity-candidates.tsv": {
         "kind": "boundary",

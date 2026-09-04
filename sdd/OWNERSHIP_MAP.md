@@ -92,7 +92,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 120건
+## Surface 키 — 121건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -158,6 +158,7 @@
 | `fr-locator-lib.mjs` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-placement-lib.mjs` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure-lib.mjs` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
+| `gen-fr-index.mjs` | SPEC-062 | ✓ | ✓ | ✓ |
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
 | `github-actions-renderer.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
 | `gitlab-ci-renderer.mjs` | SPEC-059 | ✓ | ✓ | ✓ |
@@ -217,7 +218,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 65건
+## Capability 키 — 66건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -245,6 +246,7 @@
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `external-target.disclose` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
+| `fr-locator.generate` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-locator.locate` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-placement.classify` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure.record` | SPEC-057 | ✓ | ✓ | ✓ |
@@ -287,7 +289,7 @@
 | `verification-run.record` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog.attest` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## 역할 없는 카테고리 키 — 18건
+## 역할 없는 카테고리 키 — 19건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -307,12 +309,13 @@
 | `agents.md` | SPEC-004 | ✓ | — | — |
 | `sdd/derivation.json` | SPEC-009 | ✓ | — | — |
 | `sdd/duplicate-candidates.tsv` | SPEC-038 | ✓ | — | — |
+| `sdd/fr_index.json` | SPEC-062 | ✓ | — | — |
 | `sdd/ownership_map.md` | SPEC-028 | ✓ | — | — |
 | `sdd/smoke-manifest.json` | SPEC-007 | ✓ | — | — |
 
 ## 집계
 
-- 소유 키 총 **266건** (entity 63 · surface 120 · capability 65 · 역할없음 18)
+- 소유 키 총 **269건** (entity 63 · surface 121 · capability 66 · 역할없음 19)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

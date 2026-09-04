@@ -2460,8 +2460,10 @@ def is_file_like_surface(key):
 def symbol_candidates(key):
     """심볼 키가 실재로 인정될 수 있는 후보 표기(결정적 변환만) — Node판 미러.
 
-    점 표기 모듈 경로(`src.cli.x`)를 경로(`src/cli/x`)와 basename(`x`)으로도 본다.
-    Python·Java의 표준 모듈 문법이라 휴리스틱이 아니다(실측: finops 오탐률 100% 원인).
+    점 표기 모듈 경로(`src.cli.x`)를 경로(`src/cli/x`)로도 본다 — Python·Java의 표준
+    모듈 문법이라 휴리스틱이 아니다(실측: finops 오탐률 100% 원인).
+    ⚠ 경로의 마지막 조각(basename)은 후보에 넣지 않는다 — `src.cli.chat`에서 `chat`을
+    뽑으면 아무 위치의 `chat`이나 매치해 틀린 키를 통과시킨다(Node판 주석과 같은 판단).
     """
     k = str(key or "").strip().lower()
     if not k:

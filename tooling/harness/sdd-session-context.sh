@@ -7,6 +7,9 @@ cat <<'EOF'
 궤도: spec → code → test → sync (이탈은 hook·게이트가 되돌림)
 진입 규칙(새 기능/수정 시 반드시):
   1) MODULE_MAP.md 대조 — 기존 spec과 겹치면 그 spec 개정, 아니면 새 spec
+  1b) **어느 FR인지는 조회한다 — 통독하지 말 것**: node scripts/sdd-where.mjs <경로> (또는 --key <소유 키> · --keyword "<도메인 단어>")
+      조회는 미리 만든 인덱스(sdd/FR_INDEX.json) 하나만 읽어 스펙 수와 무관하다. "낡음"이라 하면 node scripts/gen-fr-index.mjs로 재생성.
+      편집 시점에도 pre-edit 훅이 같은 후보를 먼저 띄운다 — 그 출력이 있으면 그걸 쓰면 된다.
   2) spec 위치 = sdd/specs/ (docs/superpowers/specs/ 아님)
   2b) 설계 문서(pre-spec, 승인 전) 위치 = docs/design/ (docs/superpowers/specs/ 아님, STORAGE §2.7)
   3) PREFIX 표준 = SPEC / INFRA / TEST / CICD 만 (FEAT 등 임의 생성 금지)

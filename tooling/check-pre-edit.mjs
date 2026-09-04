@@ -18,10 +18,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile, specMdFiles } from "./sdd-config.mjs";
 import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
 // FR 후보 산출은 SPEC-062의 순수 코어에 있다 — 이 훅은 그 결과를 **편집 시점에 보여주는 소비처**다.
 import { frDeclLines, locateFrs, formatCandidate } from "./fr-locator-lib.mjs";
+// 인덱스 상수·지문은 생성기가 정본이다(같은 값을 두 곳에 적으면 한쪽이 뒤처진다).
+import { INDEX_REL_PATH, specDigest } from "./gen-fr-index.mjs";
 // 결정 이력이 사는 절 목록은 **SPEC-053의 정본을 재사용한다** — 같은 사실을 두 곳에 적으면
 // 한쪽이 뒤처지고, 그때 두 층이 서로 다른 절을 가리킨다(R13이 보는 결함).
 import { DEFAULT_GUIDE_SECTIONS as GUIDE_SECTIONS } from "./diagnosis-guard-lib.mjs";
@@ -62,16 +64,43 @@ if (IS_CODE_PATH) {
 }
 const rel = String(target).replace(/^\.\//, "").replace(new RegExp(`^${ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`), "");
 
-// 스펙별 Files glob → 이 경로를 소유한 스펙 찾기.
-let names = [];
-try { names = readdirSync(SPEC_DIR).sort().filter((n) => /\.md$/.test(n)); } catch { process.exit(0); }
-const owners = [];
-for (const n of names) {
-  let text; try { text = readFileSync(join(SPEC_DIR, n), "utf8"); } catch { continue; }
-  const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
-  if (!globs.length) continue;
-  if (globs.some((g) => { try { return compileGlob(g).test(rel); } catch { return false; } })) {
-    owners.push({ specId: (text.match(cfg.__specIdRe) || [n])[0], file: `${cfg.specDir}/${n}`, text });
+// 이 경로를 소유한 스펙 찾기 — **인덱스 우선**(SPEC-062).
+// 이 훅은 편집마다 돈다. 인덱스가 없던 판은 매 편집에 스펙 전수(킷 실측 63개·1.1MB)를 읽었고,
+// 스펙이 늘면 그 비용이 선형으로 늘었다("스펙이 많아져도 오래 걸리면 안 된다" — 오너 요구).
+// 인덱스가 최신이면 파일 하나만 읽고, 낡거나 없으면 종전대로 스펙을 읽는다(정확성이 우선이고,
+// 조용히 틀리지 않는 쪽을 고른다 — 다만 그 경로에서는 느리다).
+let owners = [];
+let usedIndex = false;
+try {
+  const idx = JSON.parse(readFileSync(resolveFromRoot(cfg, INDEX_REL_PATH), "utf8"));
+  if (idx?.source?.digest === specDigest(specMdFiles(SPEC_DIR), ROOT.length + 1)) {
+    usedIndex = true;
+    const hit = new Set(idx.fileOwners
+      .filter(({ glob }) => { try { return compileGlob(glob).test(rel); } catch { return false; } })
+      .map(({ spec }) => spec));
+    owners = [...hit].sort().map((specId) => ({
+      specId,
+      file: idx.specs[specId]?.path,
+      frs: (idx.specs[specId]?.frs || []).map((fr) => ({ specId, frId: fr.id, line: fr.line })),
+    }));
+  }
+} catch { /* 인덱스 없음/깨짐 — 아래 폴백 */ }
+
+if (!usedIndex) {
+  let names = [];
+  try { names = readdirSync(SPEC_DIR).sort().filter((n) => /\.md$/.test(n)); } catch { process.exit(0); }
+  for (const n of names) {
+    let text; try { text = readFileSync(join(SPEC_DIR, n), "utf8"); } catch { continue; }
+    const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
+    if (!globs.length) continue;
+    if (globs.some((g) => { try { return compileGlob(g).test(rel); } catch { return false; } })) {
+      const specId = (text.match(cfg.__specIdRe) || [n])[0];
+      owners.push({
+        specId,
+        file: `${cfg.specDir}/${n}`,
+        frs: frDeclLines(text, cfg.__frDeclRe, cfg.__reqAlt).map((u) => ({ specId, ...u })),
+      });
+    }
   }
 }
 if (!owners.length) process.exit(0); // 미소유 경로 — 침묵
@@ -109,7 +138,7 @@ for (const o of stale) {
   // FR 찾는 게 너무 오래 걸린다"). 훅은 **싼 근거만** 쓴다 — 대상 파일 1개 + 소유 스펙 1개 읽기로
   // 끝나는 지목·앵커 대조까지다. 테스트 전수 스캔이 필요한 `@covers` 근거는 조회기(`sdd-where`)의
   // 몫이다(편집마다 레포를 순회하면 훅이 느려지고, 느린 훅은 우회된다).
-  const units = frDeclLines(o.text, cfg.__frDeclRe, cfg.__reqAlt).map((u) => ({ specId: o.specId, ...u }));
+  const units = o.frs || [];
   const cands = locateFrs(units, {
     path: rel, pathText,
     isTestName: (n) => isTestFile(n, cfg),
