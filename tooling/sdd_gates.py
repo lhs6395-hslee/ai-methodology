@@ -7641,6 +7641,102 @@ def cmd_agentwiring(cfg):
 # 차단할 수 있는 층이 한 런타임에만 있으면 다른 런타임 프로젝트는 `hard`를 켜고도 보호가 0이다:
 # **hard 선언 + 무판정 = 거짓 안전.** 그래서 조건을 고치고(SPEC-006) 그 처방대로 복제했다.
 # 원래 결정의 근거("미러가 있어도 호출부가 없다")도 함께 해소한다 — 훅 쉘이 런타임을 골라 부른다.
+# ── FR 로케이터 (SPEC-062, fr-locator-lib.mjs 미러) ──
+# "지금 바꾸려는 이것은 어느 FR인가"를 결정적 근거로 좁힌다. 판정기가 아니라 조회 보조라서
+# 추측하지 않고(유사도 추천 금지), 못 좁히면 못 좁혔다고 소비처가 말한다.
+# 훅(cmd_preedit)이 쓰는 근거는 **싼 것만** — 대상 파일 1개 + 소유 스펙 1개 읽기로 끝나는
+# 지목·앵커 대조다(테스트 전수 스캔이 필요한 covers 근거는 Node 조회기 `sdd-where.mjs`의 몫).
+EVIDENCE_RANK = {"covers": 3, "named-fn": 3, "named-mod": 2, "anchor": 2, "keyword": 2}
+
+
+def covers_score(breadth):
+    """넓게 태깅한 테스트의 covers는 약한 근거다 — 태깅 폭으로 나눈다(Node coversScore 미러)."""
+    try:
+        n = float(breadth)
+    except (TypeError, ValueError):
+        n = 0.0
+    return EVIDENCE_RANK["covers"] / (n if n > 0 else 1.0)
+
+
+def fr_decl_lines(spec_text, fr_decl_re, req_alt="FR"):
+    """FR 선언 라인 — [(fr_id, line)]. fr_declarations는 ID만 주므로 라인 본문이 필요한 이 축이 따로 모은다."""
+    rx = fr_decl_re if hasattr(fr_decl_re, "search") else re.compile(str(fr_decl_re))
+    out = []
+    for line in str(spec_text or "").split("\n"):
+        if not _is_fr_decl_line(line, req_alt):
+            continue
+        m = rx.search(line)
+        if m:
+            out.append((m.group(1), line.strip()))
+    return out
+
+
+def _base_of(p):
+    s = str(p or "").rstrip("/")
+    return s.rsplit("/", 1)[-1] if "/" in s else s
+
+
+def _strip_ext(p):
+    b = str(p or "")
+    i = b.rfind(".")
+    return b[:i] if i > 0 else b
+
+
+def _anchor_matches_path(token, rel_path):
+    """굵은 키 앵커가 이 경로에 대응하는가 — symbol_candidates(SPEC-029)를 역방향 대조에 그대로 쓴다."""
+    if not is_file_like_surface(token):
+        return False
+    rel = str(rel_path or "").lower()
+    targets = {rel, _base_of(rel), _strip_ext(rel), _strip_ext(_base_of(rel))}
+    return any(c in targets for c in symbol_candidates(token))
+
+
+def locate_frs(fr_units, path=None, path_text="", covers_by=None, keyword=None,
+               is_test_name=None, module_extensions=None):
+    """FR 후보 — [{specId, frId, line, evidence, score}](score 내림 → specId → frId). 근거 0건은 제외."""
+    kw = str(keyword).strip() if keyword else None
+    base_lower = _base_of(str(path)).lower() if path else None
+    out = []
+    for spec_id, fr_id, line in fr_units or []:
+        evidence = []
+        if covers_by:
+            tests = covers_by.get(f"{spec_id}/{fr_id}")
+            if tests:
+                narrowest = min((t["breadth"] if t.get("breadth", 0) > 0 else 1) for t in tests)
+                detail = ", ".join(
+                    f'{t["file"]}→FR {t["breadth"]}개 태깅' if t.get("breadth", 0) > 1 else t["file"] for t in tests)
+                evidence.append({"kind": "covers", "detail": detail, "weight": covers_score(narrowest)})
+        if path or path_text:
+            for impl in named_implementations(line, is_test_name, module_extensions):
+                name, kind = impl["name"], impl["kind"]
+                if kind == "fn" and path_text and re.search(
+                        rf"(^|[^A-Za-z0-9_$]){re.escape(name)}([^A-Za-z0-9_$]|$)", path_text):
+                    evidence.append({"kind": "named-fn", "detail": name})
+                elif kind == "mod" and base_lower and name.lower() == base_lower:
+                    evidence.append({"kind": "named-mod", "detail": name})
+        if path:
+            for token in dict.fromkeys(_extract_anchors(line)):
+                if _anchor_matches_path(token, path):
+                    evidence.append({"kind": "anchor", "detail": token})
+        if kw and re.search(re.escape(kw), line, flags=re.I):
+            evidence.append({"kind": "keyword", "detail": kw})
+        if not evidence:
+            continue
+        score = sum(e["weight"] if isinstance(e.get("weight"), float) else EVIDENCE_RANK.get(e["kind"], 0)
+                    for e in evidence)
+        out.append({"specId": spec_id, "frId": fr_id, "line": line, "evidence": evidence, "score": score})
+    out.sort(key=lambda c: (-c["score"], c["specId"], c["frId"]))
+    return out
+
+
+def format_candidate(c, width=100):
+    """후보 한 줄 요약 — Node formatCandidate와 **문구 동일**(두 판의 표기가 갈리면 같은 사실이 두 모양이 된다)."""
+    why = " + ".join(f'{e["kind"]}({e["detail"]})' if e.get("detail") else e["kind"] for e in c["evidence"])
+    body = re.sub(r"\s+", " ", re.sub(r"^-\s*", "", str(c["line"]))).strip()
+    shown = f"{body[:width]}…" if width > 0 and len(body) > width else body
+    return f'{c["specId"]}/{c["frId"]} — {shown}  [근거: {why}]'
+
+
 def cmd_preedit(cfg, positional, args):
     policy = str(cfg.get("preEditSpecFirstPolicy") or "advisory")
     if policy not in ("off", "advisory", "hard"):
@@ -7687,7 +7783,7 @@ def cmd_preedit(cfg, positional, args):
             continue
         if any(rx.search(rel) for rx in globs):
             m = cfg["__specId"].search(text)
-            owners.append({"specId": m.group(0) if m else n, "file": f'{cfg.get("specDir")}/{n}'})
+            owners.append({"specId": m.group(0) if m else n, "file": f'{cfg.get("specDir")}/{n}', "text": text})
     if not owners:
         return                                    # 미소유 경로 — 침묵(오탐 금지)
 
@@ -7708,9 +7804,33 @@ def cmd_preedit(cfg, positional, args):
     judged(len(stale))
     stream = sys.stderr if hard else sys.stdout
     print(f'[SDD spec-first — 편집 전 순서 {"차단" if hard else "확인"}] {rel}', file=stream)
+
+    # 편집 대상의 현재 내용 — FR이 이름으로 지목한 함수가 이 파일에 있는지 대조용(신규 파일이면 없다).
+    path_text = ""
+    try:
+        with open(os.path.join(root, rel), encoding="utf-8") as fh:
+            path_text = fh.read()
+    except OSError:
+        pass
+
     for o in stale:
         print(f'  {"✗" if hard else "⚠"} 소유 스펙 {o["specId"]}({o["file"]})이 이 브랜치에서 아직 미수정 — 코드보다 명세가 먼저다', file=stream)
         print(f'     어디: {o["file"]} 의 {" · ".join(DEFAULT_GUIDE_SECTIONS)}(결정 이력이 사는 절)', file=stream)
+        # 그리고 **어느 FR인지까지** 좁힌다(SPEC-062) — 절 이름만 주면 FR 특정이 통독으로 남고,
+        # FR 상한이 50인 프로젝트에서 그 비용이 변경 1건마다 발생한다.
+        units = [(o["specId"], fid, line) for fid, line in
+                 fr_decl_lines(o["text"], cfg["__frDecl"], cfg["__reqAlt"])]
+        cands = locate_frs(units, path=rel, path_text=path_text,
+                           is_test_name=lambda n: is_test_file(n, cfg),
+                           module_extensions=cfg.get("implModuleExtensions"))
+        if cands:
+            print(f'     FR 후보 {len(cands)}건 / 그 스펙 FR {len(units)}건:', file=stream)
+            for c in cands[:3]:
+                print(f'       · {format_candidate(c, 72)}', file=stream)
+            if len(cands) > 3:
+                print(f'       … 외 {len(cands) - 3}건 — 전체는 node scripts/sdd-where.mjs {rel}', file=stream)
+        elif units:
+            print(f'     FR 후보 0건 / 그 스펙 FR {len(units)}건 — 지목·앵커로 좁히지 못했다. 테스트 태그까지 보려면: node scripts/sdd-where.mjs {rel}', file=stream)
     tail = "" if hard else "(커밋 시점엔 commit-msg 훅이 hard로 막는다)"
     print(f"  → 먼저 그 스펙의 FR/Edge Cases/Change Log를 갱신하고 편집하라{tail}.", file=stream)
     if hard:

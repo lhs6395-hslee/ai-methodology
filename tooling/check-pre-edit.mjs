@@ -18,8 +18,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { loadConfig, resolveFromRoot } from "./sdd-config.mjs";
+import { loadConfig, resolveFromRoot, isTestFile } from "./sdd-config.mjs";
 import { compileGlob, parseFilesLine } from "./spec-sync-lib.mjs";
+// FR 후보 산출은 SPEC-062의 순수 코어에 있다 — 이 훅은 그 결과를 **편집 시점에 보여주는 소비처**다.
+import { frDeclLines, locateFrs, formatCandidate } from "./fr-locator-lib.mjs";
 // 결정 이력이 사는 절 목록은 **SPEC-053의 정본을 재사용한다** — 같은 사실을 두 곳에 적으면
 // 한쪽이 뒤처지고, 그때 두 층이 서로 다른 절을 가리킨다(R13이 보는 결함).
 import { DEFAULT_GUIDE_SECTIONS as GUIDE_SECTIONS } from "./diagnosis-guard-lib.mjs";
@@ -69,7 +71,7 @@ for (const n of names) {
   const globs = parseFilesLine(text);   // Files 라인 문법은 spec-sync-lib 단일 사이트(SPEC-038 실수확)
   if (!globs.length) continue;
   if (globs.some((g) => { try { return compileGlob(g).test(rel); } catch { return false; } })) {
-    owners.push({ specId: (text.match(cfg.__specIdRe) || [n])[0], file: `${cfg.specDir}/${n}` });
+    owners.push({ specId: (text.match(cfg.__specIdRe) || [n])[0], file: `${cfg.specDir}/${n}`, text });
   }
 }
 if (!owners.length) process.exit(0); // 미소유 경로 — 침묵
@@ -91,11 +93,36 @@ if (!stale.length) process.exit(0); // 소유 스펙이 이미 이 브랜치에�
 judged(stale.length);
 const out = HARD ? console.error : console.log;
 out(`[SDD spec-first — 편집 전 순서 ${HARD ? "차단" : "확인"}] ${rel}`);
+
+// 편집 대상의 현재 내용 — FR이 **이름으로 지목한 함수**가 이 파일에 있는지 대조하는 데 쓴다
+// (새 파일이면 없다 — 그때는 그 근거만 빠지고 나머지는 그대로 돈다).
+let pathText = "";
+try { pathText = readFileSync(join(ROOT, rel), "utf8"); } catch { /* 신규 파일 — 침묵 */ }
+
 for (const o of stale) {
   out(`  ${HARD ? "✗" : "⚠"} 소유 스펙 ${o.specId}(${o.file})이 이 브랜치에서 아직 미수정 — 코드보다 명세가 먼저다`);
   // **대신 갈 길을 절 위치까지** 준다(SPEC-053과 같은 규율) — 스펙 이름만 주면 처음부터 읽어야 하고,
   // 급할 때 처음부터 읽는 사람은 없다. 결정 이력이 사는 절을 지목한다.
   out(`     어디: ${o.file} 의 ${GUIDE_SECTIONS.join(" · ")}(결정 이력이 사는 절)`);
+  // **그리고 어느 FR인지까지 좁힌다**(SPEC-062). 절 이름만 주던 이전 판은 FR 특정을 통독에
+  // 맡겼고, FR 상한이 50인 프로젝트에서 그 비용이 변경 1건마다 발생했다(오너 제보: "변경할 때
+  // FR 찾는 게 너무 오래 걸린다"). 훅은 **싼 근거만** 쓴다 — 대상 파일 1개 + 소유 스펙 1개 읽기로
+  // 끝나는 지목·앵커 대조까지다. 테스트 전수 스캔이 필요한 `@covers` 근거는 조회기(`sdd-where`)의
+  // 몫이다(편집마다 레포를 순회하면 훅이 느려지고, 느린 훅은 우회된다).
+  const units = frDeclLines(o.text, cfg.__frDeclRe, cfg.__reqAlt).map((u) => ({ specId: o.specId, ...u }));
+  const cands = locateFrs(units, {
+    path: rel, pathText,
+    isTestName: (n) => isTestFile(n, cfg),
+    moduleExtensions: cfg.implModuleExtensions,
+  });
+  if (cands.length) {
+    out(`     FR 후보 ${cands.length}건 / 그 스펙 FR ${units.length}건:`);
+    for (const c of cands.slice(0, 3)) out(`       · ${formatCandidate(c, 72)}`);
+    if (cands.length > 3) out(`       … 외 ${cands.length - 3}건 — 전체는 node scripts/sdd-where.mjs ${rel}`);
+  } else if (units.length) {
+    // 못 좁혔으면 못 좁혔다고 말한다(거짓 확신 금지) — 대신 완전 조회 경로를 준다.
+    out(`     FR 후보 0건 / 그 스펙 FR ${units.length}건 — 지목·앵커로 좁히지 못했다. 테스트 태그까지 보려면: node scripts/sdd-where.mjs ${rel}`);
+  }
 }
 out(`  → 먼저 그 스펙의 FR/Edge Cases/Change Log를 갱신하고 편집하라${HARD ? "" : "(커밋 시점엔 commit-msg 훅이 hard로 막는다)"}.`);
 if (HARD) {

@@ -7,6 +7,8 @@
 // 감지는 결정적 선언 신호가 아니라 마커 휴리스틱이라 severity가 advisory다(리마인더).
 // 설계: SPEC-016 (Python판 sdd_gates.py가 동일 동작을 미러 — SPEC-006 패리티).
 
+import { auditTrailHeadingRe } from "./grammar-lib.mjs";
+
 const REQUIRED_LABELS = ["Bucket", "Consolidation"];
 
 function escapeRegExp(s) {
@@ -17,7 +19,9 @@ function escapeRegExp(s) {
 // 스펙이 스토리지를 *도입*하는 신호는 설계 본문(FR·User Story·Infra Prereq·결정 섹션)에
 // 있지, 감사 기록의 서술("S3 게이트 배선함")에 있지 않다 — 게이트의 자기 서술 오탐 방지.
 function beforeAuditTrail(text) {
-  const m = /^#{1,6}\s*(Review Log|Dedup-Review|Change Log)\s*$/im.exec(text);
+  // 절 목록의 정본은 grammar-lib(SPEC-013 — 스펙 문법의 주인)이다. 여기 리터럴로 두면 SPEC-062
+  // 로케이터가 같은 목록을 따로 들고 두 축의 "감사 절" 정의가 갈린다(R13). 동작·출력 불변.
+  const m = auditTrailHeadingRe().exec(text);
   return m ? text.slice(0, m.index) : text;
 }
 

@@ -24,7 +24,7 @@
 | Artifacts | —(역할 없음) |
 | Capabilities | capability |
 
-## Entity 키 (aggregate root) — 62건
+## Entity 키 (aggregate root) — 63건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -52,6 +52,7 @@
 | `execution-evidence` | SPEC-031 | ✓ | ✓ | ✓ |
 | `external-target` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors` | SPEC-023 | ✓ | ✓ | ✓ |
+| `fr-locator` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-placement` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
 | `gate-verdict` | SPEC-040 | ✓ | ✓ | ✓ |
@@ -91,7 +92,7 @@
 | `verification-run` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Surface 키 — 118건
+## Surface 키 — 120건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -154,6 +155,7 @@
 | `evidence-lib.mjs` | SPEC-031 | ✓ | ✓ | ✓ |
 | `evidence-scope-lib.mjs` | SPEC-043 | ✓ | ✓ | ✓ |
 | `external-target-lib.mjs` | SPEC-044 | ✓ | ✓ | ✓ |
+| `fr-locator-lib.mjs` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-placement-lib.mjs` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure-lib.mjs` | SPEC-057 | ✓ | ✗ 미앵커 | ✓ |
 | `gen-ownership-map.mjs` | SPEC-028 | ✓ | ✓ | ✓ |
@@ -204,6 +206,7 @@
 | `sdd-start.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
 | `sdd-sync.mjs` | SPEC-004 | ✓ | ✓ | ✓ |
 | `sdd-update.skill.md` | SPEC-005 | ✓ | ✓ | ✓ |
+| `sdd-where.mjs` | SPEC-062 | ✓ | ✓ | ✓ |
 | `spec-conflict-lib.mjs` | SPEC-052 | ✓ | ✓ | ✓ |
 | `spec-sync-lib.mjs` | SPEC-003 | ✓ | ✓ | ✓ |
 | `synonym-lib.mjs` | SPEC-033 | ✓ | ✓ | ✓ |
@@ -214,7 +217,7 @@
 | `verification-run-lib.mjs` | SPEC-041 | ✓ | ✓ | ✓ |
 | `watchdog-lib.mjs` | SPEC-048 | ✓ | ✓ | ✓ |
 
-## Capability 키 — 64건
+## Capability 키 — 65건
 
 | 키 | 소유 스펙 | 유일성 | FR 앵커 | 실재 |
 |---|---|---|---|---|
@@ -242,6 +245,7 @@
 | `execution-evidence.judge` | SPEC-031 | ✓ | ✓ | ✓ |
 | `external-target.disclose` | SPEC-044 | ✓ | ✓ | ✓ |
 | `fr-key-anchors.judge` | SPEC-023 | ✓ | ✓ | ✓ |
+| `fr-locator.locate` | SPEC-062 | ✓ | ✓ | ✓ |
 | `fr-placement.classify` | SPEC-056 | ✓ | ✓ | ✓ |
 | `gate-failure.record` | SPEC-057 | ✓ | ✓ | ✓ |
 | `gate-verdict.account` | SPEC-040 | ✓ | ✓ | ✓ |
@@ -308,7 +312,7 @@
 
 ## 집계
 
-- 소유 키 총 **262건** (entity 62 · surface 118 · capability 64 · 역할없음 18)
+- 소유 키 총 **266건** (entity 63 · surface 120 · capability 65 · 역할없음 18)
 - 유일성 위반 **0건**
 - FR 앵커 미충족 **4건** / 미판정 0건
 - 실재 위반 **0건** / 면제 0건 / 미판정 0건

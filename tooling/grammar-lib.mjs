@@ -101,6 +101,27 @@ export function frDeclStyleFindings(text, frDeclRe, reqAlt = "FR") {
   return [`FR 선언 문법 혼용 — 불릿 ${bulleted.length}건(예 ${bulleted[0]})과 무불릿 ${plain.length}건(예 ${plain[0]})이 한 스펙에 공존: 한쪽으로 통일하라(게이트의 선언 탐지는 불릿 유무 무관이라 통과하지만, 한쪽 문법만 보는 grep·리뷰가 반대쪽을 놓친다)`];
 }
 
+// 감사 트레일 절 — 스펙의 **이력**이 사는 자리다(결정이 아니라 결정의 기록).
+//
+// 왜 정본이 필요한가: 여러 축이 "이 절의 언급은 신호가 아니다"를 각자 판정한다 —
+// 오브젝트 스토리지 마커 스캔(SPEC-016: Change Log의 "S3 게이트 배선함"을 도입 신호로 오탐하던
+// 게이트 자기 서술 회피)과 FR 로케이터 키워드 조회(SPEC-062: 과거 Change Log 언급을 그 개념의
+// **현재 주인**으로 오인하는 것 회피). 목록이 축마다 흩어지면 한쪽만 절이 늘고, 그때 두 축이
+// 서로 다른 것을 감사 절로 본다(R13이 보는 결함이고, 실제로 이 목록은 Node·Python 각 1곳에
+// 리터럴로 박혀 있었다).
+export const AUDIT_TRAIL_SECTIONS = Object.freeze(["Review Log", "Dedup-Review", "Change Log"]);
+
+// 절 이름이 감사 트레일인가(헤딩 텍스트 기준, 대소문자 무시).
+export function isAuditTrailSection(name) {
+  const n = String(name || "").trim().toLowerCase();
+  return AUDIT_TRAIL_SECTIONS.some((s) => s.toLowerCase() === n);
+}
+
+// 감사 트레일 헤딩 매치 정규식 — `m` 플래그로 본문에서 첫 감사 절의 시작을 찾는 데 쓴다.
+export function auditTrailHeadingRe() {
+  return new RegExp(`^#{1,6}\\s*(${AUDIT_TRAIL_SECTIONS.join("|")})\\s*$`, "im");
+}
+
 // Dedup-Review 섹션이 언급한 스펙 ID 중 실재하지 않는 것(오타·삭제 잔재) — 정렬 반환.
 // 삭제된 이웃의 이력은 "이웃 없음(삭제됨)" 등 ID 없는 서술로 갱신한다(이력 자체는 보존).
 export function dedupReviewDanglingIds(text, specIdRe, knownIds) {
