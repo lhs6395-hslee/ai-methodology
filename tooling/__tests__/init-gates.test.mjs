@@ -139,3 +139,27 @@ test("init-then-execute: sdd-init이 ownership-keys.mjs·check-spec-consistency.
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// FR-002의 인덱스 프라이밍 — "만들라"는 안내만 두면 아무도 만들지 않는다(SPEC-062).
+// 설치·업데이트가 끝나는 자리에서 만들고, 스펙이 0건이면 만들 것이 없으니 만들지 않는다.
+test("init-then-execute: 스펙이 있으면 sdd-init이 FR 조회 인덱스를 만들고, 없으면 만들지 않는다", () => {
+  const root = mkdtempSync(join(tmpdir(), "sdd-init-frindex-"));
+  try {
+    runInit(root);
+    assert.ok(existsSync(join(root, "scripts/gen-fr-index.mjs")), "gen-fr-index.mjs가 scripts/에 설치되어야 함");
+    assert.equal(existsSync(join(root, "sdd/FR_INDEX.json")), false, "스펙 0건이면 인덱스를 만들 것이 없다");
+
+    // `/sdd-update`는 sdd-init 재실행이다 — 채택된 프로젝트에서 그 재실행이 인덱스를 만든다.
+    writeMinimalSpec(root);
+    runInit(root);
+    assert.ok(existsSync(join(root, "sdd/FR_INDEX.json")), "스펙이 있으면 재실행이 인덱스를 만들어야 함");
+
+    // 설치된 파일만으로 조회가 인덱스를 쓰는지(폴백이 아닌지) 확인 — 배포 폐포 회귀 방어.
+    const where = spawnSync("node", ["scripts/sdd-where.mjs", "--key", "sample_entity"], { cwd: root, encoding: "utf8" });
+    const out = (where.stdout || "") + (where.stderr || "");
+    assert.ok(!/ERR_MODULE_NOT_FOUND/.test(out), `설치된 파일만으로 실행되어야 함.\n${out}`);
+    assert.match(out, /인덱스 사용/, out);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

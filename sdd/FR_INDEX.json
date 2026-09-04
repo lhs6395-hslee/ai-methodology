@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "source": {
     "specCount": 63,
-    "digest": "sha256:c3cab827286149ac7a3e6f949643a4e68030611d600ab70f0d3714617aca1e46"
+    "digest": "sha256:01ad9f7d2f225119c8bd527f0e775e2b16b13bee0de4ff3d3ce4c930d3ea4f2b"
   },
   "specs": {
     "CICD-001": {
@@ -423,7 +423,7 @@
         },
         {
           "id": "FR-002",
-          "line": "- **FR-002** (event): WHEN **sdd-init.sh** (S) runs with `--gate=node` in a target project, THE **harness-install** (E) installer SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically.",
+          "line": "- **FR-002** (event): WHEN **sdd-init.sh** (S) runs with `--gate=node` in a target project, THE **harness-install** (E) installer SHALL scaffold the fixed `sdd/` layout, copy the gate import closure so the installed gates run standalone, auto-install `.git/hooks/pre-commit` and `.git/hooks/commit-msg` (writing the hook files directly), and scaffold `scripts/sdd-pre-push.sh` with an advisory `ln -sf` instruction printed to stdout — `.git/hooks/pre-push` is never written automatically — and SHALL prime the kit-owned lookup cache by running the FR index generator once when the target already carries specs, reporting a failure to prime as a warning rather than failing the install.",
           "anchors": [
             "sdd-init.sh",
             "harness-install"
@@ -8883,7 +8883,8 @@
       "tooling/__tests__/key-anchor.test.mjs"
     ],
     "gen-fr-index.mjs": [
-      "tooling/__tests__/fr-index.test.mjs"
+      "tooling/__tests__/fr-index.test.mjs",
+      "tooling/__tests__/init-gates.test.mjs"
     ],
     "sdd-config.mjs": [
       "tooling/__tests__/fr-index.test.mjs",
@@ -8898,7 +8899,8 @@
     ],
     "sdd-where.mjs": [
       "tooling/__tests__/fr-index.test.mjs",
-      "tooling/__tests__/fr-locator.test.mjs"
+      "tooling/__tests__/fr-locator.test.mjs",
+      "tooling/__tests__/init-gates.test.mjs"
     ],
     "fr-locator-lib.mjs": [
       "tooling/__tests__/fr-locator.test.mjs"
@@ -8967,6 +8969,9 @@
     "check-import-wiring.mjs": [
       "tooling/__tests__/import-wiring.test.mjs",
       "tooling/__tests__/sdd-gates-py.test.mjs"
+    ],
+    "FR_INDEX.json": [
+      "tooling/__tests__/init-gates.test.mjs"
     ],
     "OWNERSHIP_MAP.md": [
       "tooling/__tests__/init-gates.test.mjs",

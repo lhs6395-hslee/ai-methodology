@@ -350,6 +350,24 @@ NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "")
 } > "$RECEIPT"
 say "+ sdd/adoption.json (채택 영수증 — 커밋하라)"
 
+# ── 2e. FR 조회 인덱스 초기 생성 (SPEC-062) ─────────────────────
+# 인덱스는 "있으면 빠른" 캐시라서 안내만 하면 아무도 만들지 않는다 — 선언은 있고 발동은 사람
+# 기억에 맡기는 자리이고, 그건 이 킷이 반복해 고발하는 결함 클래스다. 그래서 설치·업데이트가
+# 끝나는 자리에서 한 번 만든다: 없으면 조회가 매번 스펙 전수를 읽어 스펙이 늘수록 느려지고,
+# **느려진 사실을 아무도 모른다**(폴백은 조용하지 않게 알리지만, 그 출력을 보려면 조회를 해야 한다).
+# 실패해도 설치를 막지 않는다 — 캐시이고 정본은 스펙 파일이다.
+if command -v node >/dev/null 2>&1 && [ -f "$T/scripts/gen-fr-index.mjs" ]; then
+  if [ -n "$(ls "$T/sdd/specs"/*.md 2>/dev/null)" ]; then
+    if ( cd "$T" && node scripts/gen-fr-index.mjs >/dev/null 2>&1 ); then
+      say "+ sdd/FR_INDEX.json (FR 조회 인덱스 — 조회가 스펙 수와 무관해진다)"
+    else
+      warn "· FR 조회 인덱스 생성 실패 — 조회는 스펙 직접 읽기로 동작한다(느림). 수동: node scripts/gen-fr-index.mjs"
+    fi
+  else
+    say "· 스펙 0건 — FR 조회 인덱스는 첫 스펙 후 \`node scripts/gen-fr-index.mjs\`로 생성(또는 다음 업데이트가 만든다)"
+  fi
+fi
+
 say ""
 say "완료. 고정 레이아웃 생성됨. 다음:"
 say "  1) sdd.config.json 언어 맞춤 → $KIT/tooling/sdd.config.presets.md"
